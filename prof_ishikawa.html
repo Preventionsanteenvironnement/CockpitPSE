@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ishikawa Vertical - Prof V3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #fffcf0; color: #333; display: flex; height: 100vh; overflow: hidden; user-select: none; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 300px; background: #1e293b; color: white; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 20; flex-shrink: 0; }
+        .sidebar.hidden { display: none; }
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        .sidebar-section { flex-grow: 1; overflow-y: auto; padding: 10px; border-bottom: 1px solid #334155; }
+        .section-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-bottom: 10px; display:flex; justify-content:space-between; }
+
+        /* ZONE PRINCIPALE */
+        .main-content { flex-grow: 1; position: relative; display: flex; flex-direction: column; background: #f8fafc; }
+        
+        /* CONTENEUR DU DIAGRAMME */
+        .fish-container {
+            flex-grow: 1; display: flex; align-items: center; justify-content: center;
+            padding: 20px; position: relative; overflow-x: auto;
+        }
+
+        /* COLONNE VERTEBRALE */
+        .spine {
+            position: absolute; left: 50px; right: 280px; top: 50%;
+            height: 6px; background: #334155; border-radius: 3px; z-index: 0;
+        }
+        .spine::after {
+            content: ''; position: absolute; right: -15px; top: -12px;
+            border-left: 30px solid #334155; border-top: 15px solid transparent; border-bottom: 15px solid transparent;
+        }
+
+        /* TÊTE (EFFET) */
+        .fish-head {
+            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+            width: 240px; min-height: 120px;
+            background: #db2777; color: white;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; font-weight: 800; font-size: 1.3rem;
+            padding: 15px; border-radius: 12px;
+            cursor: pointer; z-index: 10;
+            box-shadow: 0 10px 25px rgba(219, 39, 119, 0.3);
+            border: 4px solid transparent; transition: 0.3s;
+        }
+        .fish-head:hover { transform: translateY(-50%) scale(1.05); }
+
+        /* LES ARÊTES (GRID) */
+        .bones-wrapper {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            width: 100%; height: 100%; padding-right: 280px; padding-left: 50px;
+            z-index: 1; pointer-events: none;
+        }
+        .bone-column { display: flex; flex-direction: column; justify-content: space-between; height: 100%; pointer-events: none; padding: 20px 0; }
+
+        /* GROUPE ARÊTE */
+        .bone-group { pointer-events: auto; display: flex; flex-direction: column; align-items: center; position: relative; min-height: 40%; transition: 0.3s; }
+        
+        /* LIGNE VERTICALE */
+        .bone-line { width: 4px; flex-grow: 1; background: #64748b; min-height: 50px; display: none; }
+        
+        /* TITRE CATÉGORIE */
+        .cat-box {
+            padding: 8px 15px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 0.9rem;
+            cursor: pointer; min-width: 140px; max-width: 200px;
+            border: 2px solid transparent; transition: 0.2s;
+        }
+
+        /* --- DESIGN INTELLIGENT --- */
+        
+        /* 1. Cas "Vide" (Ajouter +) */
+        .cat-box.empty {
+            background: transparent; border: 2px dashed #cbd5e1; color: #94a3b8;
+            box-shadow: none; opacity: 0.6;
+        }
+        .cat-box.empty:hover { opacity: 1; background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; color: #3b82f6; }
+        
+        /* En mode projection, on cache totalement les vides */
+        body.projection .cat-box.empty { opacity: 0; pointer-events: none; }
+
+        /* 2. Cas "Rempli" (Actif) */
+        .cat-box:not(.empty) {
+            background: #3b82f6; color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+        .has-name .bone-line { display: block; } /* La ligne n'apparaît que si nom */
+
+        /* 3. Cas "Sélectionné" (Target) */
+        .bone-group.selected .cat-box { 
+            background: #2563eb; border-color: #facc15; transform: scale(1.1);
+            box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.5);
+        }
+
+        /* LISTE ITEMS */
+        .items-list {
+            display: flex; flex-direction: column; gap: 4px; width: 180px;
+            position: absolute; left: 55%;
+        }
+        .top .items-list { top: 50px; }
+        .bottom .items-list { bottom: 50px; }
+
+        .item-tag {
+            background: white; border-left: 4px solid #3b82f6; padding: 5px 8px; border-radius: 4px;
+            font-size: 0.8rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); animation: slideIn 0.3s;
+        }
+        
+        /* UI WIDGETS */
+        .btn-projection { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; z-index: 50; }
+        .idea-card { background: #334155; padding: 8px; margin-bottom: 5px; border-radius: 4px; font-size: 0.9rem; }
+        .idea-input { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: white; padding: 5px; border-radius: 4px; margin: 5px 0; display: none; }
+        .btn-act { border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; margin-right:3px; }
+
+        .ambient-widget { position: absolute; bottom: 15px; right: 15px; background: #1e293b; padding: 10px; border-radius: 10px; display: flex; gap: 15px; align-items: center; color:white; z-index: 100;}
+        .chrono { font-family: monospace; font-size: 1.2rem; font-weight: bold; color: #3b82f6; cursor: pointer; width: 60px; text-align: center; }
+        .sono-box { width: 80px; height: 10px; background: #0f172a; border-radius: 4px; overflow: hidden; }
+        .sono-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width 0.1s; }
+        .student-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 5px; margin-bottom: 3px; border-radius: 4px; font-size: 0.8rem; }
+        .btn-call { background: #eab308; border:none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
+
+        @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+        #debug-status { position: fixed; bottom: 0; left: 0; font-size: 0.7rem; padding: 2px; background: black; color: lime; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>ISHIKAWA V3</h2>
+            <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓</button>
+        </div>
+        
+        <div class="sidebar-section" style="flex: 1;">
+            <div class="section-title">En Attente <span onclick="clearAll()" style="cursor:pointer;">(Vider)</span></div>
+            <div id="waiting-room"></div>
+        </div>
+
+        <div class="sidebar-section" style="height: 150px; background:#162032;">
+            <div class="section-title">👥 Présents <span id="student-count">(0)</span></div>
+            <div id="student-list"></div>
+        </div>
+        <div id="debug-status">Chargement...</div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+
+        <div class="fish-container">
+            <div class="spine"></div>
+            
+            <div class="fish-head" id="fish-head" ondblclick="renameHead()">EFFET</div>
+
+            <div class="bones-wrapper">
+                <div class="bone-column">
+                    <div class="bone-group top" id="group-1">
+                        <div class="cat-box empty" onclick="handleClick('1')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-1"></div>
+                    </div>
+                    <div class="bone-group bottom" style="flex-direction:column-reverse;" id="group-2">
+                        <div class="cat-box empty" onclick="handleClick('2')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-2"></div>
+                    </div>
+                </div>
+                <div class="bone-column">
+                    <div class="bone-group top" id="group-3">
+                        <div class="cat-box empty" onclick="handleClick('3')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-3"></div>
+                    </div>
+                    <div class="bone-group bottom" style="flex-direction:column-reverse;" id="group-4">
+                        <div class="cat-box empty" onclick="handleClick('4')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-4"></div>
+                    </div>
+                </div>
+                <div class="bone-column">
+                    <div class="bone-group top" id="group-5">
+                        <div class="cat-box empty" onclick="handleClick('5')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-5"></div>
+                    </div>
+                    <div class="bone-group bottom" style="flex-direction:column-reverse;" id="group-6">
+                        <div class="cat-box empty" onclick="handleClick('6')">Ajouter +</div>
+                        <div class="bone-line"></div>
+                        <div class="items-list" id="list-6"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ambient-widget">
+            <div onclick="handleChronoClick()"><div class="chrono" id="chrono">00:00</div></div>
+            <div style="display:flex; align-items:center;">
+                <div class="sono-box"><div class="sono-bar" id="sono-bar"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
+        
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            document.getElementById('debug-status').innerText = "🟢 Connecté Ishikawa V3";
+        } catch(e) { document.getElementById('debug-status').innerText = "🔴 ERREUR CONFIG"; }
+
+        let activeCatId = null;
+        let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
+
+        if(isProjection) {
+            document.body.classList.add('projection'); // Ajout classe pour CSS
+            document.getElementById('sidebar').classList.add('hidden');
+            document.querySelector('.btn-projection').style.display = 'none';
+        }
+
+        window.toggleProjection = () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("mode", "projection");
+            window.open(url.toString(), "_blank");
+        };
+
+        // --- GESTION STRUCTURE ---
+        window.handleClick = async (id) => {
+            if(isProjection) return;
+            
+            const group = document.getElementById('group-'+id);
+            const box = group.querySelector('.cat-box');
+            const currentName = box.innerText;
+            const hasName = group.classList.contains('has-name');
+
+            if (!hasName || currentName === "Ajouter +") {
+                const newName = prompt("Nom de la catégorie (ex: Matériel) :", "");
+                if(newName) {
+                    await setDoc(doc(db, "ishikawa_config", "structure"), { [`cat${id}`]: newName }, { merge: true });
+                    selectCat(id, newName);
+                }
+            } else {
+                if(activeCatId === id) {
+                    const edit = confirm(`Modifier "${currentName}" ?\nOK = Renommer\nAnnuler = Ne rien faire\n(Pour supprimer, vide le nom)`);
+                    if(edit) {
+                        const newName = prompt("Nouveau nom (laisser vide pour supprimer) :", currentName);
+                        if(newName !== null) {
+                            if(newName.trim() === "") {
+                                await setDoc(doc(db, "ishikawa_config", "structure"), { [`cat${id}`]: "Ajouter +" }, { merge: true });
+                                updateGlobalConfig(null, "..."); 
+                            } else {
+                                await setDoc(doc(db, "ishikawa_config", "structure"), { [`cat${id}`]: newName }, { merge: true });
+                                updateGlobalConfig(id, newName);
+                            }
+                        }
+                    }
+                } else {
+                    selectCat(id, currentName);
+                }
+            }
+        };
+
+        async function selectCat(id, label) {
+            document.querySelectorAll('.bone-group').forEach(b => b.classList.remove('selected'));
+            document.getElementById('group-'+id).classList.add('selected');
+            activeCatId = id;
+            await updateGlobalConfig(id, label);
+        }
+
+        async function updateGlobalConfig(id, label) {
+            await setDoc(doc(db, "ishikawa_config", "global"), { currentZone: id, currentLabel: label }, { merge: true });
+        }
+
+        window.renameHead = async () => {
+            if(isProjection) return;
+            const current = document.getElementById('fish-head').innerText;
+            const newVal = prompt("Nom de l'EFFET (Problème) :", current.replace(/\n/g, " "));
+            if(newVal) await setDoc(doc(db, "ishikawa_config", "structure"), { headTitle: newVal }, { merge: true });
+        };
+
+        onSnapshot(doc(db, "ishikawa_config", "structure"), (docSnap) => {
+            if(docSnap.exists()) {
+                const data = docSnap.data();
+                if(data.headTitle) document.getElementById('fish-head').innerText = data.headTitle;
+                
+                for(let i=1; i<=6; i++) {
+                    const name = data[`cat${i}`] || "Ajouter +";
+                    const group = document.getElementById(`group-${i}`);
+                    const box = group.querySelector('.cat-box');
+                    
+                    box.innerText = name;
+                    if(name !== "Ajouter +") {
+                        group.classList.add('has-name');
+                        box.classList.remove('empty');
+                    } else {
+                        group.classList.remove('has-name');
+                        box.classList.add('empty'); // Retour en mode fantôme
+                        if(activeCatId === i.toString()) group.classList.remove('selected');
+                    }
+                }
+            }
+        });
+
+        // --- ITEMS & RESTE DU CODE (Identique V2) ---
+        onSnapshot(collection(db, "ishikawa_items"), (snap) => {
+            for(let i=1; i<=6; i++) document.getElementById('list-'+i).innerHTML = "";
+            snap.forEach(d => {
+                const data = d.data();
+                const container = document.getElementById('list-' + data.category);
+                if(container) {
+                    const div = document.createElement('div');
+                    div.className = 'item-tag';
+                    const delHtml = isProjection ? '' : `<span style="color:red;cursor:pointer;margin-left:5px;" onclick="delItem('${d.id}')">×</span>`;
+                    div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
+                    container.appendChild(div);
+                }
+            });
+        });
+        window.delItem = async (id) => { if(confirm("Suppr?")) await deleteDoc(doc(db, "ishikawa_items", id)); };
+
+        if(!isProjection) {
+            const q = query(collection(db, "ishikawa_ideas"), where("status", "==", "waiting"));
+            onSnapshot(q, (snap) => {
+                const div = document.getElementById('waiting-room');
+                div.innerHTML = "";
+                if(snap.empty) div.innerHTML = "<div style='text-align:center;color:#aaa;font-size:0.8rem;'>Vide...</div>";
+                snap.forEach(d => {
+                    const data = d.data();
+                    const card = document.createElement('div');
+                    card.className = 'idea-card';
+                    card.innerHTML = `
+                        <div style="font-size:0.8rem; color:#aaa;">👤 ${escapeHtml(data.student)}</div>
+                        <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
+                        <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
+                        <div style="display:flex;">
+                            <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
+                            <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
+                            <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
+                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
+                        </div>
+                    `;
+                    div.appendChild(card);
+                });
+            });
+        }
+
+        window.toggleEdit = (btn) => {
+            const parent = btn.closest('.idea-card');
+            const display = parent.querySelector('.text-display');
+            const input = parent.querySelector('.idea-input');
+            if(input.style.display==='none' || !input.style.display) {
+                input.style.display='block'; display.style.display='none'; input.focus(); btn.style.background='#22c55e';
+            } else {
+                display.innerText=input.value; input.style.display='none'; display.style.display='block'; btn.style.background='#f59e0b';
+            }
+        };
+
+        window.doAccept = async (id, btn) => {
+            const input = btn.closest('.idea-card').querySelector('.idea-input');
+            const group = document.getElementById('group-'+activeCatId);
+            if(!activeCatId || !group || !group.classList.contains('has-name')) {
+                alert("Sélectionne une catégorie active d'abord !");
+                return;
+            }
+            await addDoc(collection(db, "ishikawa_items"), { text: input.value, category: activeCatId });
+            await updateDoc(doc(db, "ishikawa_ideas", id), { status: "accepted" });
+        };
+        window.doReject = async (id) => await updateDoc(doc(db, "ishikawa_ideas", id), { status: "rejected" });
+        window.doLike = async (id) => await updateDoc(doc(db, "ishikawa_ideas", id), { feedback: true });
+        window.clearAll = async () => {
+            if(!confirm("Tout vider ?")) return;
+            const snap = await getDocs(query(collection(db, "ishikawa_ideas"), where("status", "==", "waiting")));
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.update(doc(db, "ishikawa_ideas", d.id), { status: "rejected" }));
+            await batch.commit();
+        };
+
+        if(!isProjection) {
+            onSnapshot(collection(db, "ishikawa_presence"), (snap) => {
+                const list = document.getElementById('student-list'); list.innerHTML = "";
+                let count = 0;
+                snap.forEach(d => { count++; list.innerHTML += `<div class="student-item"><span>${escapeHtml(d.id)}</span> <button class="btn-call" onclick="call('${d.id}')">📢</button></div>`; });
+                document.getElementById('student-count').innerText = `(${count})`;
+            });
+        }
+        window.call = (name) => { setDoc(doc(db, "ishikawa_config", "global"), { solicitedStudent: name }, { merge: true }); setTimeout(()=>setDoc(doc(db, "ishikawa_config", "global"), { solicitedStudent: null }, { merge: true }), 5000); };
+
+        let isLocked = false;
+        window.toggleLock = async () => { isLocked = !isLocked; document.getElementById('btn-lock').innerText = isLocked ? "🔒" : "🔓"; await setDoc(doc(db, "ishikawa_config", "global"), { isLocked: isLocked }, { merge: true }); };
+
+        let ti, ir=false, ts=0;
+        window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };
+        function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+        
+        navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); }).catch(()=>{});
+
+        function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
+    </script>
+</body>
+</html>
