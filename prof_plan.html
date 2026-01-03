@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plan de Classe - Pilotage & Stats</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -101,9 +102,26 @@
         .hist-date { font-weight: bold; color: white; }
         .hist-info { font-size: 0.8rem; color: #888; }
 
+    
+
+        /* MOBILE_PATCH */
+        .chip.touch-selected { outline: 3px solid #3498db; box-shadow: 0 0 0 3px rgba(52,152,219,.25); }
+        @media (max-width: 900px) {
+            body { display:block; height:auto; min-height:100vh; overflow:auto; }
+            #mobileMenuBtn { display:block; }
+            #sidebar { position:fixed; top:0; left:0; height:100vh; transform:translateX(-105%); transition:transform .18s ease; z-index:99998; overflow:auto; }
+            body.sidebar-open #sidebar { transform:translateX(0); }
+            body.sidebar-open #sidebarBackdrop { display:block; }
+            #main { padding: 14px; overflow:visible; }
+            #room-container { width: 100%; max-width: 100%; padding: 14px; }
+            #grid { gap: 10px; }
+        }
     </style>
 </head>
 <body>
+
+    <button id="mobileMenuBtn" class="btn-action btn-tool" aria-label="Menu" style="position:fixed;top:12px;left:12px;z-index:99999;display:none;">☰</button>
+    <div id="sidebarBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;z-index:99990;"></div>
 
     <div id="sidebar">
         <button class="btn-action btn-open" onclick="window.openScreen()">📺 OUVRIR PROJECTION</button>
@@ -135,7 +153,7 @@
 
         <div>
             <h2>Zone Absents</h2>
-            <div id="absent-pool" class="pool-container" style="border-color:#c0392b; background:#2c0b0e;" ondrop="window.dropToAbsent(event)" ondragover="window.allowDrop(event)"></div>
+            <div id="absent-pool" class="pool-container" style="border-color:#f39c12" ondrop="window.dropToAbsent(event)" ondragover="window.allowDrop(event)"></div>
         </div>
 
         <div>
@@ -513,6 +531,65 @@
             showNotif("🚀 Plan Envoyé & Sauvegardé !");
         };
 
-    </script>
+    
+        /* TOUCH_PATCH */
+        const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+        // Menu mobile (sidebar off-canvas)
+        const menuBtn = document.getElementById('mobileMenuBtn');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        const closeSidebar = () => { document.body.classList.remove('sidebar-open'); };
+        const openSidebar = () => { document.body.classList.add('sidebar-open'); };
+        if(menuBtn){
+            menuBtn.addEventListener('click', () => {
+                if(document.body.classList.contains('sidebar-open')) closeSidebar();
+                else openSidebar();
+            });
+        }
+        if(backdrop){
+            backdrop.addEventListener('click', closeSidebar);
+        }
+
+        // Helper sans drag&drop: tap pour sélectionner un élève, tap sur une table pour placer
+        let touchSelectedName = null;
+
+        const placeToDesk = (name, idx) => {
+            if(!name && name !== '') return;
+            const oldIdxKey = Object.keys(state.placements).find(k => state.placements[k] === name);
+            const targetOccupant = state.placements[idx];
+
+            if(targetOccupant) { if(oldIdxKey !== undefined) state.placements[oldIdxKey] = targetOccupant; }
+            else { if(oldIdxKey !== undefined) delete state.placements[oldIdxKey]; }
+
+            state.placements[idx] = name;
+            if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
+            buildGrid(); renderPools();
+        };
+
+        document.addEventListener('click', (e) => {
+            if(!isCoarsePointer) return;
+            if(isArchitectMode) return;
+
+            const chip = e.target.closest && e.target.closest('.chip');
+            if(chip){
+                const name = (chip.innerText || '').trim();
+                if(!name) return;
+                touchSelectedName = name;
+
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('touch-selected'));
+                chip.classList.add('touch-selected');
+                return;
+            }
+
+            const desk = e.target.closest && e.target.closest('.desk');
+            if(desk && touchSelectedName){
+                const idx = Number(desk.dataset.idx);
+                if(Number.isFinite(idx)){
+                    placeToDesk(touchSelectedName, idx);
+                }
+            }
+        });
+    
+</script>
 </body>
 </html>
