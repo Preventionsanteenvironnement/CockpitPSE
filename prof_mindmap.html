@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Carte Mentale - Pilotage Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* --- DESIGN GÉNÉRAL --- */
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; user-select: none; }
+        
+        /* SIDEBAR (GAUCHE) */
+        .sidebar { width: 350px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 20; box-shadow: 5px 0 15px rgba(0,0,0,0.3); transition: transform 0.3s; flex-shrink: 0; }
+        .sidebar.hidden { transform: translateX(-100%); position: absolute; }
+        
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        .sidebar-header h2 { margin: 0; font-size: 1rem; color: #94a3b8; text-transform: uppercase; }
+        
+        /* BOUTON LOCK */
+        .btn-lock { background: none; border: 1px solid #22c55e; color: #22c55e; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-lock.locked { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+        .waiting-room { flex-grow: 1; padding: 15px; overflow-y: auto; }
+        
+        /* CARTES IDÉES */
+        .idea-card { background: #334155; padding: 10px; margin-bottom: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; border-left: 3px solid #64748b; animation: slideIn 0.3s ease-out; }
+        .idea-meta { font-size: 0.75rem; color: #94a3b8; font-weight: bold; display: flex; justify-content: space-between; }
+        .idea-text { font-size: 1rem; font-weight: 500; word-break: break-word; color: white; }
+        .idea-input-edit { width: 100%; padding: 5px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 4px; display: none; }
+        
+        .idea-actions { display: flex; gap: 5px; margin-top: 5px; }
+        .btn-action { border: none; flex-grow: 1; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.8rem; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .btn-valid { background: #22c55e; color: #064e3b; }
+        .btn-reject { background: #ef4444; color: #7f1d1d; }
+        .btn-edit { background: #f59e0b; color: #451a03; }
+        .btn-like { background: #db2777; color: white; flex-grow: 0; width: 40px; }
+        
+        /* CARTE & NAVIGATION */
+        .map-wrapper { flex-grow: 1; position: relative; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); overflow: hidden; cursor: grab; }
+        .map-wrapper:active { cursor: grabbing; }
+        .map-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+        #connections { position: absolute; top: 0; left: 0; width: 5000px; height: 5000px; pointer-events: none; z-index: 0; overflow: visible; }
+        
+        /* NOEUDS */
+        .node { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; z-index: 10; transition: box-shadow 0.2s; color: #0f172a; font-weight: 700; border: 2px solid transparent; }
+        .node:hover { z-index: 20; filter: brightness(1.1); }
+        .node.selected { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4); z-index: 30; }
+        
+        /* NIVEAUX VISUELS */
+        .level-0 { width: 140px; height: 120px; background: #facc15; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); font-size: 1.2rem; text-transform: uppercase; }
+        .level-1 { padding: 12px 25px; border-radius: 12px; background: #60a5fa; color: white; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .level-2 { padding: 8px 20px; border-radius: 50px; background: #a78bfa; color: white; font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .level-3 { padding: 5px 15px; border-radius: 4px; background: #34d399; color: #064e3b; font-size: 0.85rem; border: 1px solid #059669; }
+
+        /* TOOLBAR */
+        .toolbar { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); z-index: 100; transition: opacity 0.3s; }
+        .toolbar.hidden { opacity: 0; pointer-events: none; }
+        .toolbar-group { display: flex; gap: 5px; border-right: 1px solid rgba(255,255,255,0.2); padding-right: 10px; margin-right: 5px; }
+        .toolbar-group:last-child { border: none; }
+        .btn-tool { padding: 8px 12px; background: rgba(255,255,255,0.1); color: white; border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        .btn-tool:hover { background: rgba(255,255,255,0.2); }
+        .btn-tool:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn-undo { background: #eab308; color: #422006; }
+        
+        /* WIDGET AMBIANCE (SONO + CHRONO) */
+        .ambient-widget { position: absolute; bottom: 20px; right: 20px; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); display: flex; gap: 20px; align-items: center; z-index: 90; }
+        .chrono { font-family: monospace; font-size: 1.5rem; font-weight: bold; color: #3b82f6; cursor: pointer; min-width: 80px; text-align: center; }
+        .chrono.alert { color: #ef4444; animation: pulse 1s infinite; }
+        .sono-container { width: 100px; height: 10px; background: #334155; border-radius: 5px; overflow: hidden; }
+        .sono-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width 0.1s; }
+        
+        .btn-projection { position: absolute; top: 20px; left: 20px; z-index: 100; background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Salle d'Attente</h2>
+            <button class="btn-lock" id="btn-lock" onclick="toggleLock()">🔓 Ouvert</button>
+        </div>
+        <div class="waiting-room" id="waiting-room"></div>
+        <div id="connection-status" style="font-size:0.7rem; color:#64748b; text-align:center; padding:10px;">Initialisation...</div>
+    </div>
+
+    <div class="map-wrapper" id="map-wrapper">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+
+        <div class="map-container" id="map-container">
+            <svg id="connections"></svg>
+            <div class="node level-0 selected" id="node-root" style="top: 400px; left: 500px;" data-id="root" ondblclick="editNodeText(this)">SUJET</div>
+        </div>
+        
+        <div class="toolbar" id="toolbar">
+            <div class="toolbar-group">
+                <button class="btn-tool btn-undo" onclick="undoAction()" id="btn-undo" disabled>↩️</button>
+                <button class="btn-tool" onclick="resetView()">🎯</button>
+            </div>
+            <div class="toolbar-group">
+                <button class="btn-tool" onclick="addManualNode()" id="btn-add" disabled>➕</button>
+                <button class="btn-tool" onclick="deleteNode()" id="btn-del" disabled style="color:#f87171;">🗑️</button>
+            </div>
+            <div class="toolbar-group">
+                <button class="btn-tool" onclick="cutNode()" id="btn-cut" disabled>✂️</button>
+                <button class="btn-tool" onclick="pasteNode()" id="btn-paste" disabled>📋</button>
+            </div>
+            <div class="toolbar-group"><button class="btn-tool" onclick="window.print()">🖨️</button></div>
+        </div>
+
+        <div class="ambient-widget">
+            <div style="text-align: center;">
+                <div class="chrono" id="chrono" onclick="handleChronoClick()">00:00</div>
+                <div style="font-size:0.6rem; color:#64748b;">Chrono / Minuteur</div>
+            </div>
+            <div>
+                <div class="sono-container"><div class="sono-bar" id="sono-bar"></div></div>
+                <div style="font-size:0.7rem; color:#94a3b8; text-align:center;">Micro</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ----------------------------------------------------
+        // 1. IMPORT & CONFIG FIREBASE
+        // ----------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, updateDoc, doc, setDoc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TA CONFIGURATION (Celle de devoirs-pse)
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig); 
+        const db = getFirestore(app);
+
+        // INDICATEUR DE CONNEXION
+        document.getElementById('connection-status').innerText = "🟢 Connecté à Firebase (En attente d'élèves)";
+
+        // ----------------------------------------------------
+        // 2. GESTION SALLE D'ATTENTE (LE CERVEAU)
+        // ----------------------------------------------------
+        
+        // Ecoute des idées "waiting"
+        const q = query(collection(db, "mindmap_ideas"), where("status", "==", "waiting"), orderBy("timestamp", "asc"));
+        
+        onSnapshot(q, (snapshot) => {
+            const container = document.getElementById('waiting-room');
+            container.innerHTML = ""; // Refresh liste
+            
+            if(snapshot.empty) {
+                container.innerHTML = "<div style='text-align:center; color:#64748b; margin-top:20px; font-style:italic;'>En attente d'idées...</div>";
+            }
+
+            snapshot.forEach((docSnap) => {
+                const idea = docSnap.data();
+                createIdeaCard(docSnap.id, idea.text, idea.student, idea.feedback);
+            });
+        }, (error) => {
+            console.error("Erreur Firebase:", error);
+            document.getElementById('connection-status').innerText = "🔴 Erreur Connexion (Vérifie ta connexion internet)";
+        });
+
+        // Création visuelle de la carte dans la sidebar
+        function createIdeaCard(id, text, student, hasLike) {
+            const div = document.createElement('div'); div.className = 'idea-card';
+            const likeIcon = hasLike ? "💖" : "❤️";
+            const likeStyle = hasLike ? "opacity:1; transform:scale(1.1);" : "opacity:0.6;";
+
+            div.innerHTML = `
+                <div class="idea-meta"><span>👤 ${escapeHtml(student || 'Anonyme')}</span></div>
+                <div class="idea-text">${escapeHtml(text)}</div>
+                <input type="text" class="idea-input-edit" value="${escapeHtml(text)}">
+                <div class="idea-actions">
+                    <button class="btn-action btn-like" style="${likeStyle}" onclick="sendLikeFirebase('${id}', this)">${likeIcon}</button>
+                    <button class="btn-action btn-edit" onclick="toggleEditIdea(this)">✏️</button>
+                    <button class="btn-action btn-valid" onclick="acceptFirebase('${id}', this)">✅</button>
+                    <button class="btn-action btn-reject" onclick="rejectFirebase('${id}', this)">❌</button>
+                </div>
+            `;
+            document.getElementById('waiting-room').appendChild(div);
+        }
+
+        // --- ACTIONS PROF ---
+
+        // 1. Liker (Envoie un feedback visuel à l'élève)
+        window.sendLikeFirebase = async (id, btn) => {
+            btn.innerHTML = "💖"; btn.style.opacity = "1";
+            try { await updateDoc(doc(db, "mindmap_ideas", id), { feedback: true }); } catch(e) { console.error(e); }
+        };
+
+        // 2. Accepter (Met à jour Firebase + Ajoute à la carte visuelle)
+        window.acceptFirebase = async (id, btn) => {
+            if(!selectedNode) { alert("Sélectionne une branche sur la carte pour accrocher cette idée !"); return; }
+            
+            const card = btn.closest('.idea-card');
+            const textEl = card.querySelector('.idea-text');
+            const inputEl = card.querySelector('.idea-input-edit');
+            // Si le prof a édité le texte, on prend la version éditée
+            const finalText = inputEl.style.display === 'block' ? inputEl.value : textEl.textContent;
+            
+            // Création visuelle
+            createNode(finalText, selectedNode); 
+            // Mise à jour BDD (status accepted)
+            await updateDoc(doc(db, "mindmap_ideas", id), { status: "accepted", text: finalText }); 
+        };
+
+        // 3. Rejeter (Disparait de la liste prof, barre l'idée chez l'élève)
+        window.rejectFirebase = async (id, btn) => {
+            await updateDoc(doc(db, "mindmap_ideas", id), { status: "rejected" });
+        };
+        
+        // 4. Editer le texte avant de valider
+        window.toggleEditIdea = (btn) => {
+            const c=btn.closest('.idea-card'), s=c.querySelector('.idea-text'), i=c.querySelector('.idea-input-edit');
+            if(i.style.display==='none'||!i.style.display){ i.style.display='block'; s.style.display='none'; i.focus(); btn.style.background='#22c55e'; btn.innerText='💾'; }
+            else{ s.textContent=i.value; i.style.display='none'; s.style.display='block'; btn.style.background='#f59e0b'; btn.innerText='✏️'; }
+        };
+
+        // 5. Verrouiller la session (Pause)
+        let isLocked = false;
+        window.toggleLock = async () => {
+            isLocked = !isLocked;
+            const btn = document.getElementById('btn-lock');
+            btn.innerHTML = isLocked ? "🔒 Verrouillé" : "🔓 Ouvert";
+            btn.classList.toggle('locked', isLocked);
+            // Ecriture dans l'état global pour que tous les élèves soient bloqués
+            await setDoc(doc(db, "mindmap_config", "global_state"), { isLocked: isLocked }, { merge: true });
+        };
+
+        // 6. Mise à jour du sujet global (Quand le prof clique sur une branche)
+        async function updateFirebaseContext(txt) { 
+            await setDoc(doc(db, "mindmap_config", "global_state"), { currentFocus: txt }, { merge: true }); 
+        }
+
+        function escapeHtml(text) { return text ? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ""; }
+
+        // ----------------------------------------------------
+        // 3. WIDGETS (CHRONO & SONO)
+        // ----------------------------------------------------
+        
+        // CHRONO INTELLIGENT
+        let timerInterval = null;
+        let isRunning = false;
+        let totalSeconds = 0;
+
+        window.handleChronoClick = () => {
+            if (isRunning) {
+                // Arrêt
+                clearInterval(timerInterval);
+                isRunning = false;
+                document.getElementById('chrono').style.color = "#3b82f6";
+                return;
+            }
+
+            const input = prompt("Minuteur (en minutes) ? \nLaisse vide pour un Chronomètre classique.");
+            clearInterval(timerInterval);
+            document.getElementById('chrono').classList.remove('alert');
+            
+            if (input && parseInt(input) > 0) {
+                // Mode Compte à Rebours
+                totalSeconds = parseInt(input) * 60;
+                updateChronoDisplay(totalSeconds);
+                timerInterval = setInterval(() => {
+                    totalSeconds--;
+                    updateChronoDisplay(totalSeconds);
+                    if (totalSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        document.getElementById('chrono').classList.add('alert');
+                        document.getElementById('chrono').innerText = "FIN !";
+                    }
+                }, 1000);
+            } else {
+                // Mode Chronomètre
+                totalSeconds = 0;
+                updateChronoDisplay(totalSeconds);
+                timerInterval = setInterval(() => {
+                    totalSeconds++;
+                    updateChronoDisplay(totalSeconds);
+                }, 1000);
+            }
+            isRunning = true;
+        };
+
+        function updateChronoDisplay(sec) {
+            const m = Math.floor(sec / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            document.getElementById('chrono').innerText = `${m}:${s}`;
+        }
+
+        // SONOMÈTRE (VISUEL)
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)(), analyser = ctx.createAnalyser(), src = ctx.createMediaStreamSource(stream);
+            src.connect(analyser); analyser.fftSize = 256; const data = new Uint8Array(analyser.frequencyBinCount);
+            function draw() { 
+                requestAnimationFrame(draw); 
+                analyser.getByteFrequencyData(data); 
+                let sum=0; for(let i=0;i<data.length;i++)sum+=data[i]; 
+                const pct = Math.min(100, (sum/data.length/50)*100); 
+                document.getElementById('sono-bar').style.width=pct+"%"; 
+            }
+            draw();
+        }).catch(e => { console.log("Micro off"); });
+
+        // ----------------------------------------------------
+        // 4. MOTEUR VISUEL CARTE (ZOOM, PAN, DRAG)
+        // ----------------------------------------------------
+        let isProjection = false;
+        window.toggleProjection = () => {
+            isProjection = !isProjection;
+            document.getElementById('sidebar').classList.toggle('hidden', isProjection);
+            document.getElementById('toolbar').classList.toggle('hidden', isProjection);
+            const btn = document.querySelector('.btn-projection');
+            btn.innerText = isProjection ? "❌ Quitter" : "📺 Mode Projection";
+            btn.style.opacity = isProjection ? "0.5" : "1";
+        };
+
+        let selectedNode=document.getElementById('node-root'), clipboardNode=null, historyStack=[], scale=1, panX=0, panY=0, isDraggingMap=false, startPanX=0, startPanY=0, dragNode=null, dragStartX=0, dragStartY=0, initialNodeLeft=0, initialNodeTop=0;
+        const mapWrapper=document.getElementById('map-wrapper'), mapContainer=document.getElementById('map-container');
+
+        const initialSubject = prompt("Sujet de la carte ?", "Le Stress");
+        document.getElementById('node-root').innerText = initialSubject || "SUJET";
+        saveState(); updateToolbar(); updateTransform(); updateFirebaseContext(document.getElementById('node-root').innerText);
+
+        mapWrapper.addEventListener('wheel', (e) => { e.preventDefault(); scale = Math.min(Math.max(0.2, scale + (-e.deltaY * 0.001)), 4); updateTransform(); });
+        mapWrapper.addEventListener('mousedown', (e) => { if(e.target===mapWrapper||e.target.tagName==='svg'||e.target===mapContainer){ isDraggingMap=true; startPanX=e.clientX-panX; startPanY=e.clientY-panY; mapWrapper.style.cursor='grabbing'; selectNode(null); }});
+        window.addEventListener('mousemove', (e) => { if(isDraggingMap) { panX=e.clientX-startPanX; panY=e.clientY-startPanY; updateTransform(); } else if(dragNode) { e.preventDefault(); const dx=(e.clientX-dragStartX)/scale; const dy=(e.clientY-dragStartY)/scale; dragNode.style.left=(initialNodeLeft+dx)+'px'; dragNode.style.top=(initialNodeTop+dy)+'px'; updateAllLines(); }});
+        window.addEventListener('mouseup', () => { if(isDraggingMap){isDraggingMap=false; mapWrapper.style.cursor='grab';} if(dragNode){dragNode=null; saveState();} });
+
+        initNodeDrag(document.getElementById('node-root'));
+        function initNodeDrag(node) { node.addEventListener('mousedown', (e) => { if(e.button!==0)return; e.stopPropagation(); dragNode=node; selectNode(node); dragStartX=e.clientX; dragStartY=e.clientY; initialNodeLeft=parseFloat(node.style.left)||0; initialNodeTop=parseFloat(node.style.top)||0; }); }
+        function updateTransform() { mapContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
+        
+        window.resetView = () => { panX=0; panY=0; scale=1; updateTransform(); };
+        window.addManualNode = () => { const t=prompt("Nouveau noeud :"); if(t) createNode(t, selectedNode); };
+        window.deleteNode = () => { if(confirm("Supprimer ?")){ saveState(); deleteRecursive(selectedNode); selectedNode=null; updateAllLines(); saveState(); updateToolbar(); }};
+        window.cutNode = () => { clipboardNode=selectedNode; selectedNode.style.opacity='0.5'; updateToolbar(); };
+        window.pasteNode = () => { if(!clipboardNode)return; saveState(); clipboardNode.style.opacity='1'; clipboardNode.dataset.parentId=selectedNode.dataset.id||'root'; document.querySelectorAll(`line[data-to="${clipboardNode.dataset.id}"]`).forEach(l=>l.remove()); createConnectionLine(selectedNode, clipboardNode); clipboardNode=null; saveState(); updateToolbar(); };
+        window.undoAction = undoAction;
+        window.editNodeText = (n) => { const t=prompt("Modifier:", n.innerText); if(t){ saveState(); n.innerText=t; saveState(); updateFirebaseContext(t); }};
+
+        function selectNode(el) { document.querySelectorAll('.node').forEach(n=>n.classList.remove('selected')); if(el) { el.classList.add('selected'); updateFirebaseContext(el.innerText); } else { updateFirebaseContext("Général"); } selectedNode=el; updateToolbar(); }
+        function createNode(text, parentEl) { saveState(); const div = document.createElement('div'); const pLevel = parseInt(parentEl.classList[1].split('-')[1]); const level = Math.min(pLevel+1, 3); const id = 'node-'+Date.now()+Math.random().toString(16).slice(2); const px=parseFloat(parentEl.style.left), py=parseFloat(parentEl.style.top); const angle=Math.random()*6.28, dist=[250,200,150,100][level]||100; div.className = `node level-${level}`; div.innerText=text; div.style.left=(px+Math.cos(angle)*dist)+'px'; div.style.top=(py+Math.sin(angle)*dist)+'px'; div.dataset.id=id; div.dataset.parentId=parentEl.dataset.id||'root'; initNodeDrag(div); div.ondblclick=function(){window.editNodeText(this)}; div.onclick=(e)=>{e.stopPropagation();selectNode(div)}; mapContainer.appendChild(div); createConnectionLine(parentEl, div); saveState(); return div; }
+        function createConnectionLine(p, c) { const svg=document.getElementById('connections'); const line=document.createElementNS('http://www.w3.org/2000/svg','line'); const level=parseInt(c.classList[1].split('-')[1]); const colors=['#facc15','#60a5fa','#a78bfa','#34d399']; line.setAttribute('stroke',colors[level]||'#fff'); line.setAttribute('stroke-width',Math.max(1,4-level)); line.setAttribute('stroke-opacity',0.6); line.dataset.from=p.dataset.id||'root'; line.dataset.to=c.dataset.id; svg.appendChild(line); updateLinePos(line,p,c); }
+        function updateLinePos(l, e1, e2) { l.setAttribute('x1',e1.style.left); l.setAttribute('y1',e1.style.top); l.setAttribute('x2',e2.style.left); l.setAttribute('y2',e2.style.top); }
+        function updateAllLines() { const nodes=Array.from(document.querySelectorAll('.node')), map={}; nodes.forEach(n=>map[n.dataset.id||'root']=n); document.querySelectorAll('line').forEach(l=>{ const n1=map[l.dataset.from], n2=map[l.dataset.to]; if(n1&&n2)updateLinePos(l,n1,n2); else l.remove(); }); }
+        function deleteRecursive(n) { Array.from(document.querySelectorAll(`.node[data-parent-id="${n.dataset.id}"]`)).forEach(deleteRecursive); n.remove(); }
+        function saveState() { const d=[]; document.querySelectorAll('.node').forEach(n=>{ d.push({id:n.dataset.id||'root',text:n.innerText,level:parseInt(n.classList[1].split('-')[1]),left:n.style.left,top:n.style.top,parentId:n.dataset.parentId||null}); }); if(historyStack.length>20)historyStack.shift(); historyStack.push(JSON.stringify(d)); updateToolbar(); }
+        function undoAction() { if(historyStack.length<=1)return; historyStack.pop(); const prev=JSON.parse(historyStack[historyStack.length-1]); document.getElementById('connections').innerHTML=''; document.querySelectorAll('.node').forEach(n=>n.remove()); const map={}; prev.forEach(d=>{ const div=document.createElement('div'); div.className=`node level-${d.level}`; if(d.id==='root')div.classList.add('selected'); div.innerText=d.text; div.style.left=d.left; div.style.top=d.top; div.dataset.id=d.id; div.dataset.parentId=d.parentId; div.id=d.id==='root'?'node-root':''; initNodeDrag(div); div.ondblclick=function(){window.editNodeText(this)}; div.onclick=(e)=>{e.stopPropagation();selectNode(div)}; mapContainer.appendChild(div); map[d.id]=div; }); prev.forEach(d=>{ if(d.parentId&&map[d.parentId]&&map[d.id]) createConnectionLine(map[d.parentId],map[d.id]); }); selectedNode=map['root']||document.getElementById('node-root'); updateToolbar(); }
+        function updateToolbar() { const has=!!selectedNode; document.getElementById('btn-undo').disabled=historyStack.length<=1; document.getElementById('btn-add').disabled=!has; document.getElementById('btn-del').disabled=!has||selectedNode.id==='node-root'; document.getElementById('btn-cut').disabled=!has||selectedNode.id==='node-root'; document.getElementById('btn-paste').disabled=!has||!clipboardNode; }
+    </script>
+</body>
+</html>
