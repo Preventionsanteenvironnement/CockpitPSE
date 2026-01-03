@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PACTE — Suivi d'heures</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f172a;
+      --card:#111c35;
+      --muted:#93a4c7;
+      --text:#e7efff;
+      --line:rgba(255,255,255,.10);
+      --accent:#f7d774;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --r2:22px;
+      --max:1100px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--font);
+      background:linear-gradient(180deg, #081021 0%, #050a16 60%, #050a16 100%);
+      color:var(--text);
+    }
+    .wrap{max-width:var(--max); margin:0 auto; padding:18px 14px 80px}
+    header{
+      position:sticky; top:0; z-index:50;
+      background:rgba(5,10,22,.78);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+    .headInner{
+      max-width:var(--max); margin:0 auto; padding:14px 14px;
+      display:flex; align-items:center; gap:12px; justify-content:space-between;
+    }
+    .brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.2px}
+    .brand .dot{
+      width:38px; height:38px; border-radius:14px;
+      background: radial-gradient(120% 120% at 20% 20%, rgba(247,215,116,.95), rgba(247,215,116,.25));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 12px 28px rgba(247,215,116,.12);
+      display:grid; place-items:center;
+      color:#10172b;
+      font-weight:900;
+    }
+    .sub{color:var(--muted); font-weight:600; font-size:12px}
+    .rightTop{display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      font-weight:700; font-size:12px;
+    }
+    .pill strong{font-size:13px}
+    .pill .k{color:var(--muted); font-weight:700}
+    .tabs{
+      display:flex; gap:10px; flex-wrap:wrap;
+      padding:0 14px 14px;
+      max-width:var(--max); margin:0 auto;
+    }
+    .tabBtn{
+      cursor:pointer; user-select:none;
+      padding:12px 14px; border-radius:16px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      font-weight:800; letter-spacing:.1px;
+      display:flex; align-items:center; gap:10px;
+      transition: transform .08s ease, background .15s ease, border-color .15s ease;
+    }
+    .tabBtn:hover{transform: translateY(-1px); border-color: rgba(247,215,116,.45)}
+    .tabBtn.active{
+      background:rgba(247,215,116,.14);
+      border-color: rgba(247,215,116,.55);
+      box-shadow: 0 10px 24px rgba(0,0,0,.25);
+    }
+    main{padding-top:18px}
+    .grid{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap:14px;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius:var(--r2);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .cardHead{
+      padding:14px 14px 10px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+      border-bottom:1px solid var(--line);
+      background: rgba(0,0,0,.10);
+    }
+    .cardHead h2{margin:0; font-size:16px; letter-spacing:.2px}
+    .cardHead .hint{color:var(--muted); font-size:12px; font-weight:650; margin-top:3px}
+    .cardBody{padding:14px}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    @media (max-width: 560px){ .row{grid-template-columns:1fr} }
+    label{display:block; font-size:12px; font-weight:800; color:var(--muted); margin:0 0 6px}
+    input, select, textarea{
+      width:100%;
+      padding:11px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(7,12,26,.55);
+      color:var(--text);
+      outline:none;
+      font-weight:700;
+    }
+    textarea{min-height:90px; resize:vertical}
+    input::placeholder, textarea::placeholder{color: rgba(147,164,199,.75); font-weight:650}
+    .btnRow{display:flex; gap:10px; flex-wrap:wrap}
+    .btn{
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.05);
+      color:var(--text);
+      border-radius:14px;
+      padding:10px 12px;
+      font-weight:900;
+      letter-spacing:.2px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      transition: transform .08s ease, border-color .15s ease, background .15s ease;
+    }
+    .btn:hover{transform: translateY(-1px); border-color: rgba(247,215,116,.55)}
+    .btn.primary{
+      background: rgba(247,215,116,.18);
+      border-color: rgba(247,215,116,.55);
+    }
+    .btn.ghost{background: transparent}
+    .btn.danger{
+      background: rgba(251,113,133,.14);
+      border-color: rgba(251,113,133,.55);
+    }
+    .btn.small{padding:8px 10px; border-radius:12px; font-size:12px}
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{
+      padding:8px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.05);
+      cursor:pointer;
+      font-weight:850;
+      font-size:12px;
+    }
+    .chip:hover{border-color: rgba(247,215,116,.55)}
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+    }
+    @media (max-width: 650px){ .kpis{grid-template-columns:1fr} }
+    .kpi{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      border-radius:18px;
+      padding:12px;
+    }
+    .kpi .t{font-weight:900; color:var(--muted); font-size:12px}
+    .kpi .v{font-weight:1000; font-size:22px; margin-top:6px}
+    .kpi .s{color:var(--muted); font-size:12px; margin-top:2px; font-weight:700}
+    .list{display:flex; flex-direction:column; gap:10px}
+    .item{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background: rgba(255,255,255,.04);
+      padding:12px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    }
+    .item .meta{display:flex; flex-direction:column; gap:4px}
+    .item .title{font-weight:950}
+    .item .small{color:var(--muted); font-size:12px; font-weight:700}
+    .item .tags{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px}
+    .tag{
+      font-size:11px; font-weight:900;
+      padding:6px 9px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.10);
+      color: rgba(231,239,255,.92);
+    }
+    .tag.accent{border-color: rgba(247,215,116,.55); background: rgba(247,215,116,.12)}
+    .sep{height:1px; background: var(--line); margin:14px 0}
+    .muted{color:var(--muted)}
+    .twoCols{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
+    @media (max-width: 700px){ .twoCols{grid-template-columns:1fr} }
+    .bar{
+      height:10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.10);
+      overflow:hidden;
+    }
+    .bar > div{height:100%; width:0%; background: rgba(247,215,116,.70)}
+    .footTools{
+      position:fixed; left:0; right:0; bottom:0; z-index:60;
+      border-top:1px solid var(--line);
+      background: rgba(5,10,22,.78);
+      backdrop-filter: blur(12px);
+    }
+    .footInner{
+      max-width:var(--max); margin:0 auto; padding:10px 14px;
+      display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    }
+    .toast{
+      position:fixed; right:14px; bottom:74px; z-index:80;
+      max-width:min(420px, calc(100vw - 28px));
+      background: rgba(17,28,53,.95);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:16px;
+      padding:12px 12px;
+      box-shadow: 0 22px 50px rgba(0,0,0,.55);
+      display:none;
+    }
+    .toast strong{display:block; font-weight:1000}
+    .toast span{display:block; color:var(--muted); font-weight:700; margin-top:2px; font-size:12px}
+    .modalBg{
+      position:fixed; inset:0; z-index:90;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:18px;
+    }
+    .modal{
+      width:min(720px, 100%);
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(17,28,53,.98);
+      box-shadow: 0 28px 80px rgba(0,0,0,.60);
+      overflow:hidden;
+    }
+    .modal .mh{
+      padding:14px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background: rgba(0,0,0,.12);
+    }
+    .modal .mh h3{margin:0; font-size:15px}
+    .modal .mb{padding:14px}
+    .gridMini{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
+    @media(max-width:650px){ .gridMini{grid-template-columns:1fr} }
+    .table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+    }
+    .table th, .table td{
+      padding:10px 10px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:12px;
+      text-align:left;
+      vertical-align:top;
+    }
+    .table th{
+      color:var(--muted);
+      font-weight:950;
+      letter-spacing:.2px;
+      background: rgba(0,0,0,.14);
+    }
+    .table tr:last-child td{border-bottom:none}
+    .table td .mini{color:var(--muted); font-weight:700; font-size:11px; margin-top:3px}
+    .right{display:flex; gap:8px; align-items:center; justify-content:flex-end}
+    .nowrap{white-space:nowrap}
+    .hidden{display:none !important}
+  </style>
+</head>
+<body>
+<header>
+  <div class="headInner">
+    <div>
+      <div class="brand">
+        <div class="dot">🤝</div>
+        <div>
+          <div>PACTE <span class="sub">Suivi d’heures (Pacte / HSE / autres)</span></div>
+          <div class="sub" id="subline">Hors‑ligne • Sauvegarde automatique</div>
+        </div>
+      </div>
+    </div>
+    <div class="rightTop">
+      <div class="pill"><span class="k">Semaine</span><strong id="wkTotal">0h</strong></div>
+      <div class="pill"><span class="k">Mois</span><strong id="moTotal">0h</strong></div>
+      <div class="pill"><span class="k">Année</span><strong id="yrTotal">0h</strong></div>
+    </div>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Navigation">
+    <div class="tabBtn active" data-tab="tab-heures" role="tab" aria-selected="true">⏱️ Heures réalisées</div>
+    <div class="tabBtn" data-tab="tab-actions" role="tab" aria-selected="false">👥 Classes / actions</div>
+    <div class="tabBtn" data-tab="tab-recap" role="tab" aria-selected="false">🧾 Récapitulatif</div>
+    <div class="tabBtn" data-tab="tab-param" role="tab" aria-selected="false">⚙️ Paramètres</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <main>
+    <section id="tab-heures">
+      <div class="grid">
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Ajouter une séance</h2>
+              <div class="hint">Choisis une date + un créneau. Le total se calcule automatiquement.</div>
+            </div>
+            <div class="right">
+              <button class="btn small ghost" id="btnQuick">🧩 Mode créneau</button>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="row">
+              <div>
+                <label>Date</label>
+                <input type="date" id="fDate" />
+              </div>
+              <div>
+                <label>Type</label>
+                <div style="display:flex; gap:8px">
+                  <select id="fType"></select>
+                  <button class="btn small" id="btnEditTypes" title="Gérer les types">✏️</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Début</label>
+                <select id="fStart"></select>
+              </div>
+              <div>
+                <label>Fin</label>
+                <select id="fEnd"></select>
+              </div>
+            </div>
+
+            <div style="margin-top:10px">
+              <label>Classe / Groupe (optionnel)</label>
+              <div style="display:flex; gap:8px">
+                <select id="fClass"></select>
+                <button class="btn small" id="btnEditClasses" title="Gérer les classes">✏️</button>
+              </div>
+            </div>
+
+            <div style="margin-top:10px">
+              <label>Action / détail (optionnel)</label>
+              <input id="fAction" placeholder="Ex : devoirs, soutien, réunion, projet, entretien, ..."/>
+            </div>
+
+            <div style="margin-top:10px">
+              <label>Note (optionnel)</label>
+              <textarea id="fNote" placeholder="Ajoute une note rapide (ce que tu ne veux pas oublier)."></textarea>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="btnRow">
+              <button class="btn primary" id="btnAdd">✅ Ajouter</button>
+              <button class="btn" id="btnResetForm">↩️ Effacer</button>
+              <button class="btn" id="btnOpenImport">⬆️ Import</button>
+              <button class="btn" id="btnExport">⬇️ Export JSON</button>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="chips" aria-label="Raccourcis durée">
+              <div class="chip" data-dur="0.5">+ 0h30</div>
+              <div class="chip" data-dur="1">+ 1h</div>
+              <div class="chip" data-dur="1.5">+ 1h30</div>
+              <div class="chip" data-dur="2">+ 2h</div>
+              <div class="chip" data-dur="3">+ 3h</div>
+              <div class="chip" data-dur="4">+ 4h</div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="twoCols">
+              <div class="kpi">
+                <div class="t">Durée calculée</div>
+                <div class="v" id="durPreview">0h</div>
+                <div class="s">de <span id="durFrom">--</span> à <span id="durTo">--</span></div>
+              </div>
+              <div class="kpi">
+                <div class="t">Objectif mensuel</div>
+                <div class="v"><span id="goalNow">0h</span> / <span id="goalTotal">0h</span></div>
+                <div class="bar" style="margin-top:10px"><div id="goalBar"></div></div>
+                <div class="s" style="margin-top:8px">Réglable dans Paramètres</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card" id="quickCard" style="display:none">
+          <div class="cardHead">
+            <div>
+              <h2>Mode créneau (rapide)</h2>
+              <div class="hint">Clique des demi‑heures pour sélectionner un bloc, puis applique.</div>
+            </div>
+            <button class="btn small" id="btnCloseQuick">✖️</button>
+          </div>
+          <div class="cardBody">
+            <div class="row">
+              <div>
+                <label>Plage</label>
+                <select id="qRange">
+                  <option value="0830-1230">08h30 → 12h30</option>
+                  <option value="0830-1730">08h30 → 17h30</option>
+                  <option value="1300-1730">13h00 → 17h30</option>
+                </select>
+              </div>
+              <div>
+                <label>Jour</label>
+                <input type="date" id="qDate"/>
+              </div>
+            </div>
+
+            <div style="margin-top:12px" id="slotGrid"></div>
+
+            <div class="sep"></div>
+
+            <div class="btnRow">
+              <button class="btn primary" id="btnApplySlots">✅ Utiliser la sélection</button>
+              <button class="btn" id="btnClearSlots">🧽 Vider</button>
+            </div>
+
+            <div class="sep"></div>
+            <div class="muted" style="font-size:12px; font-weight:700">
+              Astuce : sélectionne un bloc continu (ex : 09:00 → 10:30). Le formulaire principal se remplit automatiquement.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Dernières séances</h2>
+              <div class="hint">Tu peux supprimer une ligne si besoin.</div>
+            </div>
+            <div class="right">
+              <button class="btn small" id="btnToday">Aujourd’hui</button>
+              <button class="btn small" id="btnWeek">Cette semaine</button>
+              <button class="btn small" id="btnMonth">Ce mois</button>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="kpis">
+              <div class="kpi">
+                <div class="t">Aujourd’hui</div>
+                <div class="v" id="kToday">0h</div>
+                <div class="s">sur la date sélectionnée</div>
+              </div>
+              <div class="kpi">
+                <div class="t">Semaine</div>
+                <div class="v" id="kWeek">0h</div>
+                <div class="s">lun → dim</div>
+              </div>
+              <div class="kpi">
+                <div class="t">Mois</div>
+                <div class="v" id="kMonth">0h</div>
+                <div class="s">mois courant</div>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="list" id="recentList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-actions" class="hidden">
+      <div class="grid">
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Filtrer et retrouver</h2>
+              <div class="hint">Recherche par mot, type, classe, période.</div>
+            </div>
+            <div class="right">
+              <button class="btn small" id="btnClearFilters">🧹 Reset</button>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="row">
+              <div>
+                <label>Recherche</label>
+                <input id="sQuery" placeholder="Ex : réunion, pacte, JP1, devoirs, ..." />
+              </div>
+              <div>
+                <label>Type</label>
+                <select id="sType"></select>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label>Classe</label>
+                <select id="sClass"></select>
+              </div>
+              <div>
+                <label>Période</label>
+                <select id="sPeriod">
+                  <option value="all">Tout</option>
+                  <option value="today">Aujourd’hui</option>
+                  <option value="week">Cette semaine</option>
+                  <option value="month">Ce mois</option>
+                  <option value="year">Cette année</option>
+                  <option value="custom">Personnalisé</option>
+                </select>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px" id="customRange" class="hidden">
+              <div>
+                <label>Du</label>
+                <input type="date" id="sFrom"/>
+              </div>
+              <div>
+                <label>Au</label>
+                <input type="date" id="sTo"/>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Créneau</th>
+                  <th>Type</th>
+                  <th>Classe</th>
+                  <th>Action / note</th>
+                  <th class="nowrap">Durée</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Totaux par classes / types</h2>
+              <div class="hint">Selon les filtres appliqués à gauche.</div>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="twoCols">
+              <div>
+                <h3 style="margin:0 0 8px; font-size:13px; color:var(--muted)">Par type</h3>
+                <div class="list" id="sumByType"></div>
+              </div>
+              <div>
+                <h3 style="margin:0 0 8px; font-size:13px; color:var(--muted)">Par classe</h3>
+                <div class="list" id="sumByClass"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-recap" class="hidden">
+      <div class="grid">
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Récapitulatif (automatique)</h2>
+              <div class="hint">Semaine / mois / année + suivi d’objectif.</div>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="kpis">
+              <div class="kpi">
+                <div class="t">Semaine en cours</div>
+                <div class="v" id="rWeek">0h</div>
+                <div class="s" id="rWeekSub">lun → dim</div>
+              </div>
+              <div class="kpi">
+                <div class="t">Mois en cours</div>
+                <div class="v" id="rMonth">0h</div>
+                <div class="s" id="rMonthSub">mois courant</div>
+              </div>
+              <div class="kpi">
+                <div class="t">Année</div>
+                <div class="v" id="rYear">0h</div>
+                <div class="s" id="rYearSub">année courante</div>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="twoCols">
+              <div class="kpi">
+                <div class="t">Progression objectif mensuel</div>
+                <div class="v"><span id="rGoalNow">0h</span> / <span id="rGoalTotal">0h</span></div>
+                <div class="bar" style="margin-top:10px"><div id="rGoalBar"></div></div>
+                <div class="s" style="margin-top:8px" id="rGoalLeft">—</div>
+              </div>
+              <div class="kpi">
+                <div class="t">Export rapide</div>
+                <div class="btnRow" style="margin-top:10px">
+                  <button class="btn" id="btnExportCSV">⬇️ Export CSV</button>
+                  <button class="btn" id="btnPrint">🖨️ Imprimer</button>
+                  <button class="btn danger" id="btnPurgeMonth">🗑️ Vider ce mois</button>
+                </div>
+                <div class="s" style="margin-top:10px">Le vidage du mois supprime seulement les séances du mois courant.</div>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <h3 style="margin:0 0 10px; font-size:13px; color:var(--muted)">Ce mois, par type</h3>
+            <div class="list" id="rMonthByType"></div>
+
+            <div class="sep"></div>
+
+            <h3 style="margin:0 0 10px; font-size:13px; color:var(--muted)">Ce mois, par classe</h3>
+            <div class="list" id="rMonthByClass"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Historique (12 derniers jours actifs)</h2>
+              <div class="hint">Pratique pour vérifier si tu as bien tout noté.</div>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="list" id="rDays"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-param" class="hidden">
+      <div class="grid">
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Paramètres</h2>
+              <div class="hint">Objectif mensuel, listes (types / classes), sauvegarde.</div>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="row">
+              <div>
+                <label>Objectif mensuel (en heures)</label>
+                <input type="number" min="0" step="0.5" id="pGoal" />
+              </div>
+              <div>
+                <label>Pas de temps</label>
+                <select id="pStep" disabled>
+                  <option selected>30 minutes (fixe)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="btnRow">
+              <button class="btn primary" id="btnSaveParams">💾 Enregistrer</button>
+              <button class="btn" id="btnBackup">⬇️ Sauvegarde complète</button>
+              <button class="btn" id="btnRestore">⬆️ Restaurer</button>
+              <button class="btn danger" id="btnResetAll">🗑️ Remise à zéro</button>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="twoCols">
+              <div>
+                <h3 style="margin:0 0 10px; font-size:13px; color:var(--muted)">Types (Pacte, HSE, ...)</h3>
+                <div class="list" id="pTypesList"></div>
+                <div class="btnRow" style="margin-top:10px">
+                  <button class="btn small" id="btnAddType">➕ Ajouter un type</button>
+                </div>
+              </div>
+              <div>
+                <h3 style="margin:0 0 10px; font-size:13px; color:var(--muted)">Classes / groupes</h3>
+                <div class="list" id="pClassesList"></div>
+                <div class="btnRow" style="margin-top:10px">
+                  <button class="btn small" id="btnAddClass">➕ Ajouter une classe</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHead">
+            <div>
+              <h2>Astuces d’usage</h2>
+              <div class="hint">Utilisation simple, rapide, sans surcharge.</div>
+            </div>
+          </div>
+          <div class="cardBody">
+            <ul style="margin:0; padding-left:18px; color:var(--muted); font-weight:700; line-height:1.6">
+              <li>Ajoute tes séances au fil de l’eau (même 30 minutes).</li>
+              <li>Utilise le Mode créneau si tu préfères cliquer des demi‑heures.</li>
+              <li>Les totaux se recalculent automatiquement (jour / semaine / mois / année).</li>
+              <li>Export JSON = sauvegarde fiable. Export CSV = pratique pour Excel.</li>
+              <li>Rien n’est envoyé sur internet : tout reste sur ton appareil.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="footTools">
+  <div class="footInner">
+    <div class="pill"><span class="k">Séances</span><strong id="countEntries">0</strong></div>
+    <div class="btnRow">
+      <button class="btn small" id="btnFocus">🧘 Mode focus</button>
+      <button class="btn small" id="btnProject">📽️ Mode projection</button>
+      <button class="btn small" id="btnHelp">❔ Aide</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <strong id="toastT">—</strong>
+  <span id="toastS">—</span>
+</div>
+
+<div class="modalBg" id="modalBg">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="mh">
+      <h3 id="modalTitle">—</h3>
+      <button class="btn small" id="modalClose">Fermer</button>
+    </div>
+    <div class="mb" id="modalBody"></div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json" class="hidden"/>
+
+<script>
+(() => {
+  const LS_KEY = "pacteTracker.v1";
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  const toast = (title, sub="") => {
+    const el = $("#toast");
+    $("#toastT").textContent = title;
+    $("#toastS").textContent = sub;
+    el.style.display = "block";
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => el.style.display = "none", 2400);
+  };
+
+  const nowISODate = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  };
+
+  const pad2 = (n) => String(n).padStart(2,"0");
+  const toMinutes = (hhmm) => { const [h,m] = hhmm.split(":").map(Number); return h*60+m; };
+  const fromMinutes = (mins) => `${pad2(Math.floor(mins/60))}:${pad2(mins%60)}`;
+  const diffHours = (start, end) => Math.max(0, (toMinutes(end)-toMinutes(start))/60);
+
+  const fmtHours = (h) => {
+    const rounded = Math.round(h*2)/2;
+    const whole = Math.floor(rounded);
+    const half = (rounded - whole) >= 0.5;
+    if(rounded === 0) return "0h";
+    if(!half) return `${whole}h`;
+    if(whole === 0) return "0h30";
+    return `${whole}h30`;
+  };
+
+  const isoWeekInfo = (dateStr) => {
+    const d = new Date(dateStr + "T12:00:00");
+    const day = (d.getDay() + 6) % 7; // 0=Mon
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - day);
+    mon.setHours(12,0,0,0);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const toISO = (x) => { const z = new Date(x); z.setMinutes(z.getMinutes() - z.getTimezoneOffset()); return z.toISOString().slice(0,10); };
+    return { mon: toISO(mon), sun: toISO(sun) };
+  };
+
+  const monthRange = (dateStr) => {
+    const d = new Date(dateStr + "T12:00:00");
+    const y = d.getFullYear(), m = d.getMonth();
+    const a = new Date(y, m, 1, 12);
+    const b = new Date(y, m+1, 0, 12);
+    const toISO = (x) => { const z = new Date(x); z.setMinutes(z.getMinutes() - z.getTimezoneOffset()); return z.toISOString().slice(0,10); };
+    return { from: toISO(a), to: toISO(b), y, m };
+  };
+
+  const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+
+  const defaults = () => ({
+    params: { monthlyGoalHours: 18, stepMinutes: 30 },
+    lists: {
+      types: ["PACTE", "HSE", "HSA", "Réunion", "Projet", "Autre"],
+      classes: ["Général", "Première AGORA", "Terminale AGORA", "Seconde GATL", "B1MELEC", "B2MELEC", "BTMELEC", "CAN 1", "HORT 2", "JP 1", "JP 2", "PSR 1", "PSR 2", "VAN"]
+    },
+    entries: []
+  });
+
+  const load = () => {
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return defaults();
+      const obj = JSON.parse(raw);
+      if(!obj.params) obj.params = defaults().params;
+      if(!obj.lists) obj.lists = defaults().lists;
+      if(!Array.isArray(obj.entries)) obj.entries = [];
+      return obj;
+    }catch(e){
+      return defaults();
+    }
+  };
+
+  let state = load();
+  const save = () => localStorage.setItem(LS_KEY, JSON.stringify(state));
+  const uid = () => Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+
+  const fDate = $("#fDate"), fType = $("#fType"), fStart = $("#fStart"), fEnd = $("#fEnd"), fClass = $("#fClass"),
+        fAction = $("#fAction"), fNote = $("#fNote");
+
+  const sQuery = $("#sQuery"), sType = $("#sType"), sClass = $("#sClass"), sPeriod = $("#sPeriod"),
+        sFrom = $("#sFrom"), sTo = $("#sTo");
+
+  const modalBg = $("#modalBg"), modalTitle = $("#modalTitle"), modalBody = $("#modalBody");
+
+  const setTab = (id) => {
+    $$("section[id^='tab-']").forEach(sec => sec.classList.toggle("hidden", sec.id !== id));
+    $$(".tabBtn").forEach(b => {
+      const on = b.dataset.tab === id;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    window.scrollTo({top:0, behavior:"smooth"});
+  };
+  $$(".tabBtn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+
+  const fillTimeSelect = (sel, startMin, endMin, stepMin) => {
+    sel.innerHTML = "";
+    for(let t=startMin; t<=endMin; t+=stepMin){
+      const opt = document.createElement("option");
+      opt.value = fromMinutes(t);
+      opt.textContent = fromMinutes(t);
+      sel.appendChild(opt);
+    }
+  };
+
+  const renderParamLists = () => {
+    const tHolder = $("#pTypesList");
+    const cHolder = $("#pClassesList");
+    if(!tHolder || !cHolder) return;
+
+    const makeList = (holder, items, kind) => {
+      holder.innerHTML = "";
+      if(items.length === 0){
+        holder.innerHTML = `<div class="muted" style="font-weight:800">Aucun élément.</div>`;
+        return;
+      }
+      items.forEach((x, idx) => {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <div class="meta">
+            <div class="title">${x}</div>
+            <div class="small">Ordre : ${idx+1}</div>
+          </div>
+          <div class="right">
+            <button class="btn small" data-up="${idx}" data-kind="${kind}">⬆️</button>
+            <button class="btn small" data-down="${idx}" data-kind="${kind}">⬇️</button>
+            <button class="btn small danger" data-rm="${idx}" data-kind="${kind}">Suppr</button>
+          </div>
+        `;
+        holder.appendChild(div);
+      });
+
+      holder.querySelectorAll("[data-up]").forEach(b => b.addEventListener("click", () => {
+        const i = Number(b.dataset.up);
+        const k = b.dataset.kind;
+        const arr = k === "type" ? state.lists.types : state.lists.classes;
+        if(i<=0) return;
+        [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
+        save(); refreshTypeClassSelects(); toast("Ordre modifié");
+      }));
+      holder.querySelectorAll("[data-down]").forEach(b => b.addEventListener("click", () => {
+        const i = Number(b.dataset.down);
+        const k = b.dataset.kind;
+        const arr = k === "type" ? state.lists.types : state.lists.classes;
+        if(i>=arr.length-1) return;
+        [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
+        save(); refreshTypeClassSelects(); toast("Ordre modifié");
+      }));
+      holder.querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", () => {
+        const i = Number(b.dataset.rm);
+        const k = b.dataset.kind;
+        const arr = k === "type" ? state.lists.types : state.lists.classes;
+        const removed = arr.splice(i,1)[0];
+        save(); refreshTypeClassSelects(); toast("Supprimé", removed);
+      }));
+    };
+
+    makeList(tHolder, state.lists.types, "type");
+    makeList(cHolder, state.lists.classes, "class");
+    $("#pGoal").value = Number(state.params.monthlyGoalHours)||0;
+  };
+
+  const refreshTypeClassSelects = () => {
+    const mk = (sel, items) => {
+      sel.innerHTML = "";
+      items.forEach(x => {
+        const o = document.createElement("option");
+        o.value = x;
+        o.textContent = x;
+        sel.appendChild(o);
+      });
+    };
+    mk(fType, state.lists.types);
+    mk(fClass, state.lists.classes);
+    mk(sType, ["Tous", ...state.lists.types]);
+    mk(sClass, ["Toutes", ...state.lists.classes]);
+    renderParamLists();
+  };
+
+  const ensureEndAfterStart = () => {
+    const a = toMinutes(fStart.value), b = toMinutes(fEnd.value);
+    if(b <= a){
+      const next = a + state.params.stepMinutes;
+      const max = toMinutes(fEnd.options[fEnd.options.length-1].value);
+      fEnd.value = fromMinutes(clamp(next, a+state.params.stepMinutes, max));
+    }
+    updateDurPreview();
+  };
+
+  const updateDurPreview = () => {
+    const h = diffHours(fStart.value, fEnd.value);
+    $("#durPreview").textContent = fmtHours(h);
+    $("#durFrom").textContent = fStart.value;
+    $("#durTo").textContent = fEnd.value;
+  };
+
+  const setDurationQuick = (hours) => {
+    const a = toMinutes(fStart.value);
+    const b = a + Math.round(hours*60);
+    const max = toMinutes(fEnd.options[fEnd.options.length-1].value);
+    fEnd.value = fromMinutes(clamp(b, a+state.params.stepMinutes, max));
+    updateDurPreview();
+  };
+
+  const cleanText = (s) => (s || "").toString().trim();
+
+  const buildEntryFromForm = () => {
+    const date = fDate.value || nowISODate();
+    const type = fType.value;
+    const start = fStart.value;
+    const end = fEnd.value;
+    const hours = diffHours(start, end);
+    const klass = fClass.value || "Général";
+    const action = cleanText(fAction.value);
+    const note = cleanText(fNote.value);
+
+    if(hours <= 0){
+      toast("Créneau invalide", "La fin doit être après le début.");
+      return null;
+    }
+
+    return { id: uid(), createdAt: new Date().toISOString(), date, type, start, end, hours, klass, action, note };
+  };
+
+  const addEntry = (entry) => {
+    state.entries.unshift(entry);
+    save();
+    toast("Séance ajoutée", `${entry.date} • ${entry.start}→${entry.end} • ${fmtHours(entry.hours)}`);
+    refreshAll();
+  };
+
+  const delEntry = (id) => {
+    const idx = state.entries.findIndex(e => e.id === id);
+    if(idx >= 0){
+      const removed = state.entries.splice(idx,1)[0];
+      save();
+      toast("Séance supprimée", `${removed.date} • ${fmtHours(removed.hours)}`);
+      refreshAll();
+    }
+  };
+
+  const resetForm = () => {
+    fDate.value = nowISODate();
+    fType.value = state.lists.types[0] || "PACTE";
+    fClass.value = state.lists.classes[0] || "Général";
+    fAction.value = "";
+    fNote.value = "";
+    fStart.value = "08:30";
+    fEnd.value = "09:30";
+    ensureEndAfterStart();
+  };
+
+  const sumHours = (entries) => entries.reduce((acc,e) => acc + (Number(e.hours)||0), 0);
+  const inRange = (dateStr, from, to) => dateStr >= from && dateStr <= to;
+  const entriesFor = ({from, to}) => state.entries.filter(e => inRange(e.date, from, to));
+  const entriesTodayForDate = (dateStr) => state.entries.filter(e => e.date === dateStr);
+  const entriesWeekOf = (dateStr) => { const w = isoWeekInfo(dateStr); return entriesFor({from:w.mon, to:w.sun}); };
+  const entriesMonthOf = (dateStr) => { const r = monthRange(dateStr); return entriesFor({from:r.from, to:r.to}); };
+  const entriesYearOf = (dateStr) => {
+    const d = new Date(dateStr + "T12:00:00");
+    const y = d.getFullYear();
+    return entriesFor({from:`${y}-01-01`, to:`${y}-12-31`});
+  };
+
+  const groupSum = (entries, key) => {
+    const map = new Map();
+    entries.forEach(e => {
+      const k = (e[key] || "—");
+      map.set(k, (map.get(k)||0) + (Number(e.hours)||0));
+    });
+    const arr = Array.from(map.entries()).map(([k,v]) => ({k, v})).sort((a,b)=> b.v - a.v);
+    return arr;
+  };
+
+  const renderRecent = (scope="week") => {
+    const dateStr = fDate.value || nowISODate();
+    let list = [];
+    if(scope==="today") list = entriesTodayForDate(dateStr);
+    if(scope==="week") list = entriesWeekOf(dateStr);
+    if(scope==="month") list = entriesMonthOf(dateStr);
+    list = list.slice(0, 10);
+
+    const holder = $("#recentList");
+    holder.innerHTML = "";
+    if(list.length === 0){
+      holder.innerHTML = `<div class="muted" style="font-weight:800">Aucune séance pour cette période.</div>`;
+      return;
+    }
+
+    list.forEach(e => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <div class="meta">
+          <div class="title">${e.date} • ${e.start}→${e.end} • ${fmtHours(e.hours)}</div>
+          <div class="small">${e.action ? e.action : "—"} ${e.note ? "• " + e.note : ""}</div>
+          <div class="tags">
+            <span class="tag accent">${e.type}</span>
+            <span class="tag">${e.klass || "—"}</span>
+          </div>
+        </div>
+        <div class="right">
+          <button class="btn small danger" data-del="${e.id}">Supprimer</button>
+        </div>
+      `;
+      holder.appendChild(div);
+    });
+
+    holder.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => delEntry(b.dataset.del)));
+  };
+
+  const renderKPIs = () => {
+    const dateStr = fDate.value || nowISODate();
+    const t = sumHours(entriesTodayForDate(dateStr));
+    const w = sumHours(entriesWeekOf(dateStr));
+    const m = sumHours(entriesMonthOf(dateStr));
+    $("#kToday").textContent = fmtHours(t);
+    $("#kWeek").textContent = fmtHours(w);
+    $("#kMonth").textContent = fmtHours(m);
+
+    const y = sumHours(entriesYearOf(dateStr));
+    $("#wkTotal").textContent = fmtHours(w);
+    $("#moTotal").textContent = fmtHours(m);
+    $("#yrTotal").textContent = fmtHours(y);
+
+    const goal = Number(state.params.monthlyGoalHours)||0;
+    $("#goalNow").textContent = fmtHours(m);
+    $("#goalTotal").textContent = fmtHours(goal);
+    const pct = goal <= 0 ? 0 : clamp((m/goal)*100, 0, 100);
+    $("#goalBar").style.width = pct.toFixed(1)+"%";
+
+    $("#countEntries").textContent = String(state.entries.length);
+  };
+
+  const renderRecap = () => {
+    const d = nowISODate();
+    const wInfo = isoWeekInfo(d);
+    const mInfo = monthRange(d);
+
+    const w = sumHours(entriesFor({from:wInfo.mon, to:wInfo.sun}));
+    const m = sumHours(entriesFor({from:mInfo.from, to:mInfo.to}));
+    const y = sumHours(entriesYearOf(d));
+
+    $("#rWeek").textContent = fmtHours(w);
+    $("#rWeekSub").textContent = `${wInfo.mon.replaceAll("-","/")} → ${wInfo.sun.replaceAll("-","/")}`;
+    $("#rMonth").textContent = fmtHours(m);
+    $("#rMonthSub").textContent = `${mInfo.from.replaceAll("-","/")} → ${mInfo.to.replaceAll("-","/")}`;
+    $("#rYear").textContent = fmtHours(y);
+    $("#rYearSub").textContent = `${(new Date().getFullYear())}`;
+
+    const goal = Number(state.params.monthlyGoalHours)||0;
+    $("#rGoalNow").textContent = fmtHours(m);
+    $("#rGoalTotal").textContent = fmtHours(goal);
+    const pct = goal <= 0 ? 0 : clamp((m/goal)*100, 0, 100);
+    $("#rGoalBar").style.width = pct.toFixed(1)+"%";
+    const left = Math.max(0, goal - m);
+    $("#rGoalLeft").textContent = goal <= 0 ? "Définis un objectif (Paramètres)" : `Reste à faire : ${fmtHours(left)}`;
+
+    const byType = groupSum(entriesFor({from:mInfo.from, to:mInfo.to}), "type");
+    const byClass = groupSum(entriesFor({from:mInfo.from, to:mInfo.to}), "klass");
+
+    const renderSumList = (holderId, arr) => {
+      const holder = $(holderId);
+      holder.innerHTML = "";
+      if(arr.length === 0){
+        holder.innerHTML = `<div class="muted" style="font-weight:800">Aucune donnée.</div>`;
+        return;
+      }
+      const max = arr[0].v || 1;
+      arr.forEach(x => {
+        const div = document.createElement("div");
+        div.className = "item";
+        const pct = clamp((x.v/max)*100, 0, 100);
+        div.innerHTML = `
+          <div class="meta" style="width:100%">
+            <div class="title">${x.k}</div>
+            <div class="small">${fmtHours(x.v)}</div>
+            <div class="bar" style="margin-top:8px"><div style="width:${pct.toFixed(1)}%"></div></div>
+          </div>
+        `;
+        holder.appendChild(div);
+      });
+    };
+
+    renderSumList("#rMonthByType", byType);
+    renderSumList("#rMonthByClass", byClass);
+
+    const map = new Map();
+    state.entries.forEach(e => map.set(e.date, (map.get(e.date)||0) + (Number(e.hours)||0)));
+    const days = Array.from(map.entries()).map(([k,v]) => ({k,v})).sort((a,b)=> b.k.localeCompare(a.k)).slice(0,12);
+
+    const rDays = $("#rDays");
+    rDays.innerHTML = "";
+    if(days.length === 0){
+      rDays.innerHTML = `<div class="muted" style="font-weight:800">Aucune séance pour l’instant.</div>`;
+    } else {
+      const maxd = days.reduce((mx,x)=>Math.max(mx,x.v), 1);
+      days.forEach(x => {
+        const div = document.createElement("div");
+        div.className = "item";
+        const pct = clamp((x.v/maxd)*100, 0, 100);
+        div.innerHTML = `
+          <div class="meta" style="width:100%">
+            <div class="title">${x.k}</div>
+            <div class="small">${fmtHours(x.v)}</div>
+            <div class="bar" style="margin-top:8px"><div style="width:${pct.toFixed(1)}%"></div></div>
+          </div>
+        `;
+        rDays.appendChild(div);
+      });
+    }
+  };
+
+  const renderActionsTable = () => {
+    const q = cleanText(sQuery.value).toLowerCase();
+    const type = sType.value === "Tous" ? null : sType.value;
+    const klass = sClass.value === "Toutes" ? null : sClass.value;
+
+    let from = "0000-01-01", to = "9999-12-31";
+    const d = nowISODate();
+    const w = isoWeekInfo(d);
+    const m = monthRange(d);
+    const y = `${(new Date().getFullYear())}`;
+
+    const per = sPeriod.value;
+    if(per === "today"){ from = d; to = d; }
+    if(per === "week"){ from = w.mon; to = w.sun; }
+    if(per === "month"){ from = m.from; to = m.to; }
+    if(per === "year"){ from = `${y}-01-01`; to = `${y}-12-31`; }
+    if(per === "custom"){
+      from = sFrom.value || from;
+      to = sTo.value || to;
+    }
+
+    let list = state.entries.filter(e => inRange(e.date, from, to));
+    if(type) list = list.filter(e => e.type === type);
+    if(klass) list = list.filter(e => (e.klass||"") === klass);
+    if(q){
+      list = list.filter(e => `${e.type} ${e.klass} ${e.action} ${e.note} ${e.start} ${e.end} ${e.date}`.toLowerCase().includes(q));
+    }
+
+    const tb = $("#tableBody");
+    tb.innerHTML = "";
+    list.slice(0, 200).forEach(e => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="nowrap">${e.date}</td>
+        <td class="nowrap">${e.start} → ${e.end}</td>
+        <td class="nowrap">${e.type}</td>
+        <td class="nowrap">${e.klass || "—"}</td>
+        <td>
+          <div style="font-weight:850">${e.action ? e.action : "—"}</div>
+          <div class="mini">${e.note ? e.note : ""}</div>
+        </td>
+        <td class="nowrap" style="font-weight:950">${fmtHours(e.hours)}</td>
+        <td class="right">
+          <button class="btn small danger" data-del="${e.id}">Suppr</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => delEntry(b.dataset.del)));
+
+    const byType = groupSum(list, "type");
+    const byClass = groupSum(list, "klass");
+
+    const renderCompact = (holderId, arr) => {
+      const holder = $(holderId);
+      holder.innerHTML = "";
+      if(arr.length === 0){
+        holder.innerHTML = `<div class="muted" style="font-weight:800">Aucune donnée.</div>`;
+        return;
+      }
+      const max = arr[0].v || 1;
+      arr.slice(0, 14).forEach(x => {
+        const div = document.createElement("div");
+        div.className = "item";
+        const pct = clamp((x.v/max)*100, 0, 100);
+        div.innerHTML = `
+          <div class="meta" style="width:100%">
+            <div class="title">${x.k}</div>
+            <div class="small">${fmtHours(x.v)}</div>
+            <div class="bar" style="margin-top:8px"><div style="width:${pct.toFixed(1)}%"></div></div>
+          </div>
+        `;
+        holder.appendChild(div);
+      });
+    };
+
+    renderCompact("#sumByType", byType);
+    renderCompact("#sumByClass", byClass);
+  };
+
+  const openModal = (title, html) => {
+    modalTitle.textContent = title;
+    modalBody.innerHTML = html;
+    modalBg.style.display = "flex";
+  };
+  const closeModal = () => modalBg.style.display = "none";
+  $("#modalClose").addEventListener("click", closeModal);
+  modalBg.addEventListener("click", (e) => { if(e.target === modalBg) closeModal(); });
+
+  const askAddItem = (kind) => {
+    openModal(kind === "type" ? "Ajouter un type" : "Ajouter une classe", `
+      <div class="gridMini">
+        <div>
+          <label>Nom</label>
+          <input id="newItem" placeholder="${kind === "type" ? "Ex : PACTE" : "Ex : B2MELEC"}"/>
+        </div>
+        <div>
+          <label>Ajout</label>
+          <button class="btn primary" id="doAdd">✅ Ajouter</button>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <div class="muted" style="font-size:12px; font-weight:750">Conseil : garde des libellés courts et stables (ils servent aux filtres).</div>
+    `);
+    setTimeout(() => $("#newItem")?.focus(), 50);
+    $("#doAdd").addEventListener("click", () => {
+      const v = cleanText($("#newItem").value);
+      if(!v) return toast("Nom vide");
+      const arr = kind === "type" ? state.lists.types : state.lists.classes;
+      if(arr.includes(v)) return toast("Existe déjà", v);
+      arr.push(v);
+      save(); refreshTypeClassSelects();
+      closeModal();
+      toast("Ajouté", v);
+    });
+  };
+
+  $("#btnAddType").addEventListener("click", () => askAddItem("type"));
+  $("#btnAddClass").addEventListener("click", () => askAddItem("class"));
+  $("#btnEditTypes").addEventListener("click", () => setTab("tab-param"));
+  $("#btnEditClasses").addEventListener("click", () => setTab("tab-param"));
+
+  const download = (filename, text, mime="application/json") => {
+    const blob = new Blob([text], {type:mime});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  };
+
+  $("#btnExport").addEventListener("click", () => {
+    const payload = { exportedAt: new Date().toISOString(), ...state };
+    download(`PACTE_suivi_${nowISODate()}.json`, JSON.stringify(payload, null, 2));
+    toast("Export JSON prêt");
+  });
+
+  const fileInput = $("#fileInput");
+  const openImport = () => { fileInput.value = ""; fileInput.click(); };
+  $("#btnOpenImport").addEventListener("click", openImport);
+
+  fileInput.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    try{
+      const text = await f.text();
+      const obj = JSON.parse(text);
+      if(!obj.entries || !obj.lists) throw new Error("Format invalide");
+      state = obj;
+      if(!state.params) state.params = defaults().params;
+      if(!state.lists.types) state.lists.types = defaults().lists.types;
+      if(!state.lists.classes) state.lists.classes = defaults().lists.classes;
+      if(!Array.isArray(state.entries)) state.entries = [];
+      save();
+      refreshAll();
+      toast("Import réussi", `${state.entries.length} séances`);
+    }catch(err){
+      toast("Import impossible", "Fichier non reconnu");
+    }
+  });
+
+  $("#btnBackup").addEventListener("click", () => {
+    const payload = { exportedAt: new Date().toISOString(), ...state };
+    download(`PACTE_backup_complet_${nowISODate()}.json`, JSON.stringify(payload, null, 2));
+    toast("Sauvegarde complète prête");
+  });
+
+  $("#btnRestore").addEventListener("click", openImport);
+
+  $("#btnExportCSV").addEventListener("click", () => {
+    const rows = [["date","start","end","hours","type","class","action","note","createdAt"]];
+    state.entries.slice().reverse().forEach(e => {
+      rows.push([e.date, e.start, e.end, (Number(e.hours)||0).toString(), (e.type||""), (e.klass||""), (e.action||""), (e.note||""), (e.createdAt||"")]);
+    });
+    const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(";")).join("\n");
+    download(`PACTE_suivi_${nowISODate()}.csv`, csv, "text/csv;charset=utf-8");
+    toast("Export CSV prêt");
+  });
+
+  $("#btnPrint").addEventListener("click", () => window.print());
+
+  $("#btnPurgeMonth").addEventListener("click", () => {
+    const d = nowISODate();
+    const r = monthRange(d);
+    const before = state.entries.length;
+    state.entries = state.entries.filter(e => !(e.date >= r.from && e.date <= r.to));
+    save(); refreshAll();
+    toast("Mois vidé", `${before - state.entries.length} séances supprimées`);
+  });
+
+  $("#btnResetAll").addEventListener("click", () => {
+    openModal("Remise à zéro", `
+      <div class="muted" style="font-weight:800; line-height:1.6">
+        Cette action supprime tout (séances + listes + paramètres).
+      </div>
+      <div class="sep"></div>
+      <div class="btnRow">
+        <button class="btn danger" id="doReset">🗑️ Oui, tout effacer</button>
+        <button class="btn" id="cancelReset">Annuler</button>
+      </div>
+    `);
+    $("#cancelReset").addEventListener("click", closeModal);
+    $("#doReset").addEventListener("click", () => {
+      state = defaults();
+      save(); refreshAll();
+      closeModal();
+      toast("Réinitialisé");
+    });
+  });
+
+  $("#btnSaveParams").addEventListener("click", () => {
+    const v = Number($("#pGoal").value);
+    state.params.monthlyGoalHours = isNaN(v) ? 0 : Math.max(0, v);
+    save(); refreshAll();
+    toast("Paramètres enregistrés");
+  });
+
+  $("#btnAdd").addEventListener("click", () => {
+    const entry = buildEntryFromForm();
+    if(!entry) return;
+    addEntry(entry);
+  });
+
+  $("#btnResetForm").addEventListener("click", () => { resetForm(); toast("Formulaire réinitialisé"); });
+  fStart.addEventListener("change", ensureEndAfterStart);
+  fEnd.addEventListener("change", updateDurPreview);
+
+  $$(".chip").forEach(c => c.addEventListener("click", () => setDurationQuick(Number(c.dataset.dur))));
+  $("#btnToday").addEventListener("click", () => renderRecent("today"));
+  $("#btnWeek").addEventListener("click", () => renderRecent("week"));
+  $("#btnMonth").addEventListener("click", () => renderRecent("month"));
+
+  const refreshActions = () => renderActionsTable();
+  sQuery.addEventListener("input", refreshActions);
+  sType.addEventListener("change", refreshActions);
+  sClass.addEventListener("change", refreshActions);
+  sPeriod.addEventListener("change", () => {
+    const on = sPeriod.value === "custom";
+    $("#customRange").style.display = on ? "grid" : "none";
+    refreshActions();
+  });
+  sFrom.addEventListener("change", refreshActions);
+  sTo.addEventListener("change", refreshActions);
+
+  $("#btnClearFilters").addEventListener("click", () => {
+    sQuery.value = "";
+    sType.value = "Tous";
+    sClass.value = "Toutes";
+    sPeriod.value = "all";
+    $("#customRange").style.display = "none";
+    refreshActions();
+    toast("Filtres réinitialisés");
+  });
+
+  let focusOn = false;
+  $("#btnFocus").addEventListener("click", () => {
+    focusOn = !focusOn;
+    document.body.style.filter = focusOn ? "contrast(1.05) saturate(1.05)" : "";
+    toast(focusOn ? "Mode focus activé" : "Mode focus désactivé");
+  });
+
+  let projectOn = false;
+  $("#btnProject").addEventListener("click", () => {
+    projectOn = !projectOn;
+    $(".footTools").style.display = projectOn ? "none" : "block";
+    $("#fNote").closest("div").style.display = projectOn ? "none" : "block";
+    toast(projectOn ? "Mode projection" : "Mode normal");
+  });
+
+  $("#btnHelp").addEventListener("click", () => {
+    openModal("Aide (rapide)", `
+      <div class="muted" style="font-weight:800; line-height:1.65">
+        <div style="margin-bottom:10px"><strong style="color:var(--text)">1)</strong> Onglet <strong style="color:var(--text)">Heures réalisées</strong> : ajoute une séance (date, type, créneau).</div>
+        <div style="margin-bottom:10px"><strong style="color:var(--text)">2)</strong> Onglet <strong style="color:var(--text)">Classes / actions</strong> : cherche et filtre.</div>
+        <div style="margin-bottom:10px"><strong style="color:var(--text)">3)</strong> Onglet <strong style="color:var(--text)">Récapitulatif</strong> : totaux + suivi objectif.</div>
+        <div style="margin-bottom:10px"><strong style="color:var(--text)">4)</strong> Tout est sauvegardé automatiquement sur ton appareil.</div>
+        <div class="sep"></div>
+        <div>Conseil : fais un <strong style="color:var(--text)">Export JSON</strong> une fois par semaine.</div>
+      </div>
+    `);
+  });
+
+  // Quick slots
+  const quickCard = $("#quickCard");
+  const btnQuick = $("#btnQuick");
+  const btnCloseQuick = $("#btnCloseQuick");
+  const qRange = $("#qRange");
+  const qDate = $("#qDate");
+  const slotGrid = $("#slotGrid");
+  let slotState = [];
+  const buildSlots = () => {
+    const [a,b] = qRange.value.split("-").map(x => x.slice(0,2)+":"+x.slice(2,4));
+    const startMin = toMinutes(a), endMin = toMinutes(b);
+    const step = state.params.stepMinutes;
+    slotState = [];
+    for(let t=startMin; t<endMin; t+=step) slotState.push({ t, on:false });
+    renderSlots();
+  };
+  const renderSlots = () => {
+    slotGrid.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.style.display = "grid";
+    wrap.style.gridTemplateColumns = "repeat(4, 1fr)";
+    wrap.style.gap = "8px";
+    slotState.forEach((s) => {
+      const b = document.createElement("button");
+      b.className = "btn small";
+      b.style.justifyContent = "center";
+      b.textContent = fromMinutes(s.t);
+      b.style.background = s.on ? "rgba(247,215,116,.18)" : "rgba(255,255,255,.05)";
+      b.style.borderColor = s.on ? "rgba(247,215,116,.55)" : "rgba(255,255,255,.16)";
+      b.addEventListener("click", () => { s.on = !s.on; renderSlots(); });
+      wrap.appendChild(b);
+    });
+    slotGrid.appendChild(wrap);
+  };
+  const applySlotsToForm = () => {
+    const picked = slotState.filter(s => s.on).map(s => s.t).sort((a,b)=>a-b);
+    if(picked.length === 0){ toast("Aucun créneau", "Clique au moins une demi‑heure."); return; }
+    const step = state.params.stepMinutes;
+    for(let i=1;i<picked.length;i++){
+      if(picked[i] !== picked[i-1] + step){ toast("Sélection non continue", "Sélectionne un bloc continu."); return; }
+    }
+    const start = fromMinutes(picked[0]);
+    const end = fromMinutes(picked[picked.length-1] + step);
+    fDate.value = qDate.value || nowISODate();
+    fStart.value = start;
+    fEnd.value = end;
+    ensureEndAfterStart();
+    toast("Créneau appliqué", `${start}→${end}`);
+  };
+  btnQuick.addEventListener("click", () => {
+    quickCard.style.display = (quickCard.style.display === "none" || !quickCard.style.display) ? "block" : "none";
+    if(quickCard.style.display === "block"){ qDate.value = fDate.value || nowISODate(); buildSlots(); toast("Mode créneau ouvert"); }
+  });
+  btnCloseQuick.addEventListener("click", () => quickCard.style.display = "none");
+  qRange.addEventListener("change", buildSlots);
+  $("#btnApplySlots").addEventListener("click", applySlotsToForm);
+  $("#btnClearSlots").addEventListener("click", () => { slotState.forEach(s => s.on=false); renderSlots(); });
+
+  const init = () => {
+    fDate.value = nowISODate();
+    qDate.value = nowISODate();
+    fillTimeSelect(fStart, toMinutes("07:30"), toMinutes("18:00"), state.params.stepMinutes);
+    fillTimeSelect(fEnd, toMinutes("08:00"), toMinutes("18:30"), state.params.stepMinutes);
+    refreshTypeClassSelects();
+    resetForm();
+    updateDurPreview();
+    renderRecent("week");
+    renderKPIs();
+    renderRecap();
+
+    $("#customRange").style.display = "none";
+    sType.value = "Tous";
+    sClass.value = "Toutes";
+    renderActionsTable();
+    $("#subline").textContent = "Hors‑ligne • Sauvegarde automatique • Export JSON / CSV";
+  };
+
+  const refreshAll = () => {
+    renderKPIs();
+    renderRecent("week");
+    renderRecap();
+    refreshTypeClassSelects();
+    renderActionsTable();
+  };
+
+  fDate.addEventListener("change", () => { renderKPIs(); renderRecent("week"); });
+
+  init();
+})();
+</script>
+</body>
+</html>
