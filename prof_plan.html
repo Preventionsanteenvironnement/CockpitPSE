@@ -6,500 +6,378 @@
     <title>Plan de Classe - Pilotage & Stats</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #121212; color: white; font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; }
-
-        /* SIDEBAR */
-        #sidebar { width: 340px; background: #1e1e1e; border-right: 1px solid #333; padding: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; overflow-y: auto; }
+        /* === BASE === */
+        :root { --bg: #121212; --panel: #1e1e1e; --border: #333; --accent: #3b82f6; --text: #fff; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; }
         
-        h2 { font-size: 0.9rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #444; padding-bottom: 5px; margin: 0 0 5px 0; letter-spacing: 1px; }
-        select, input[type="number"] { width: 100%; padding: 10px; background: #333; border: 1px solid #555; color: white; border-radius: 6px; font-weight: bold; margin-bottom: 5px; }
-        
-        .pool-container { min-height: 80px; max-height: 150px; border: 2px dashed #444; background: #252525; padding: 10px; border-radius: 8px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
-        
-        /* Étiquettes */
-        .chip { 
-            background: #3498db; color: white; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; 
-            cursor: grab; user-select: none; border: 2px solid transparent; z-index: 100;
-        }
-        .chip:active { cursor: grabbing; transform: scale(1.1); }
-        .chip.warn { background: #e74c3c !important; border-color: #c0392b !important; }
-        .chip.good { background: #2ecc71 !important; border-color: #27ae60 !important; }
-
-        .btn-action { width: 100%; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; margin-top: 5px; display: flex; align-items: center; justify-content: center; gap: 10px;}
-        .btn-push { background: #2ecc71; color: white; font-size: 1rem; padding: 15px; }
-        .btn-push:hover { background: #27ae60; }
-        .btn-open { background: #9b59b6; color: white; }
-        .btn-archi { background: #f39c12; color: white; }
-        .btn-archi.active { background: #d35400; border: 2px solid #e67e22; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
-        .btn-tool { background: #444; color: #ddd; font-size: 0.8rem; }
-        .btn-hist { background: #34495e; color: #aab7c4; } /* Bouton Historique */
-        .btn-hist:hover { background: #2c3e50; color: white; }
-
-        .grid-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-
-        /* MAIN AREA */
-        #main { flex-grow: 1; padding: 20px; background: #121212; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        
-        #room-container {
-            display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px;
-            background: #1a1a1a; border-radius: 20px; border: 1px solid #333; transition: 0.3s;
+        /* === SIDEBAR (Menu Gauche) === */
+        #sidebar { 
+            width: 320px; background: var(--panel); border-right: 1px solid var(--border); 
+            padding: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 50; 
+            overflow-y: auto; flex-shrink: 0; transition: transform 0.3s ease;
         }
         
-        .board {
-            background: #34495e; color: #bdc3c7; font-weight: bold; letter-spacing: 2px;
-            display: flex; align-items: center; justify-content: center; border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-transform: uppercase; font-size: 0.9rem;
+        h2 { font-size: 0.85rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #444; padding-bottom: 5px; margin: 0 0 5px 0; letter-spacing: 1px; }
+        select, input[type="number"], input[type="text"] { 
+            width: 100%; padding: 12px; background: #2a2a2a; border: 1px solid #444; 
+            color: white; border-radius: 8px; font-weight: bold; margin-bottom: 5px; box-sizing: border-box;
         }
-        .board.horizontal { width: 80%; height: 30px; }
-        .board.vertical { width: 30px; height: 80%; writing-mode: vertical-rl; transform: rotate(180deg); }
-
-        #grid { display: grid; gap: 15px; transition: 0.3s; }
-
-        /* Cases */
-        .desk {
-            width: 110px; height: 70px; border-radius: 8px; display: flex; align-items: center; justify-content: center; 
-            position: relative; font-weight: bold; color: #ecf0f1; transition: 0.2s; user-select: none;
-        }
-        .desk.type-1 { background: #2c3e50; border: 2px solid #34495e; }
-        .desk.type-0 { border: 2px dashed #333; opacity: 0.3; }
-        .desk.type-2 { background: #555; opacity: 0.6; border: none; }
-        .desk.type-2::after { content: "🧱 MUR"; font-size: 0.7rem; color: #aaa; }
-        .desk.type-3 { background: #d35400; border: 3px solid #e67e22; color: white; }
-        .desk.type-3::after { content: "🚪 PORTE"; font-size: 0.8rem; }
-        .desk.type-4 { background: #2980b9; border: 3px solid #3498db; color: white; }
-        .desk.type-4::after { content: "🪟 FENÊTRE"; font-size: 0.8rem; }
-        .desk.drag-over { border-color: #f1c40f; background: rgba(241, 196, 15, 0.2); transform: scale(1.05); }
+        button { cursor: pointer; border: none; }
         
-        .remove-btn { 
-            position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; background: #e74c3c; border-radius: 50%; color: white; 
-            display: none; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; z-index: 200; 
+        .action-btn { width: 100%; padding: 12px; background: #333; color: white; border-radius: 8px; font-weight: bold; margin-bottom: 5px; text-align: left; display: flex; align-items: center; justify-content: space-between; transition: 0.2s; }
+        .action-btn:hover { background: #444; }
+        .btn-primary { background: var(--accent); color: white; text-align: center; justify-content: center; }
+        .btn-primary:hover { background: #2563eb; }
+
+        .pool-container { 
+            min-height: 80px; background: #181818; border: 2px dashed #444; border-radius: 8px; 
+            padding: 10px; display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start;
         }
-        body:not(.architect-mode) .desk.type-1:hover .remove-btn { display: flex; }
 
-        body.architect-mode .desk { cursor: crosshair; }
-        body.architect-mode .desk:hover { filter: brightness(1.3); transform: scale(1.05); }
-        body.architect-mode .chip { opacity: 0.2; pointer-events: none; }
+        /* === ZONE PRINCIPALE (Grille) === */
+        #main-area { flex-grow: 1; position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        
+        /* Header Mobile (invisible sur PC) */
+        #mobile-header { display: none; padding: 15px; background: var(--panel); border-bottom: 1px solid var(--border); align-items: center; justify-content: space-between; }
+        #menu-toggle { background: none; color: white; font-size: 1.5rem; border: none; padding: 5px; }
 
-        /* Notification */
-        #notif-overlay { position: fixed; bottom: 20px; right: 20px; background: #27ae60; color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; transform: translateY(100px); transition: 0.3s; z-index: 999; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        #notif-overlay.show { transform: translateY(0); }
-
-        /* Modal Historique */
-        #history-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000;
-            display: none; align-items: center; justify-content: center;
+        #grid-container { 
+            flex-grow: 1; padding: 20px; overflow: auto; 
+            display: flex; align-items: center; justify-content: center;
+            background-image: radial-gradient(#333 1px, transparent 1px); background-size: 20px 20px;
         }
-        .modal-content {
-            background: #1e1e1e; border: 1px solid #444; border-radius: 12px; width: 400px; max-height: 80vh;
-            display: flex; flex-direction: column; padding: 20px;
-        }
-        .hist-list { overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .hist-item {
-            background: #2a2a2a; padding: 15px; border-radius: 8px; cursor: pointer; border: 1px solid #333; transition: 0.2s;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .hist-item:hover { background: #34495e; border-color: #3498db; }
-        .hist-date { font-weight: bold; color: white; }
-        .hist-info { font-size: 0.8rem; color: #888; }
 
-    
+        #classroom { 
+            display: grid; gap: 10px; padding: 20px; background: #1a1a1a; 
+            border: 2px solid #444; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: 0.3s;
+        }
 
-        /* MOBILE_PATCH */
-        .chip.touch-selected { outline: 3px solid #3498db; box-shadow: 0 0 0 3px rgba(52,152,219,.25); }
-        @media (max-width: 900px) {
-            body { display:block; height:auto; min-height:100vh; overflow:auto; }
-            #mobileMenuBtn { display:block; }
-            #sidebar { position:fixed; top:0; left:0; height:100vh; transform:translateX(-105%); transition:transform .18s ease; z-index:99998; overflow:auto; }
-            body.sidebar-open #sidebar { transform:translateX(0); }
-            body.sidebar-open #sidebarBackdrop { display:block; }
-            #main { padding: 14px; overflow:visible; }
-            #room-container { width: 100%; max-width: 100%; padding: 14px; }
-            #grid { gap: 10px; }
+        /* TABLES & ÉLÈVES */
+        .desk { 
+            width: 100px; height: 60px; background: #2d2d2d; border-radius: 6px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 0.8rem; font-weight: bold; cursor: pointer; border: 2px solid #3d3d3d;
+            position: relative; user-select: none; transition: 0.2s;
+        }
+        .desk:hover { border-color: #666; }
+        .desk.filled { background: #1e3a8a; border-color: var(--accent); color: white; }
+        .desk.selected { box-shadow: 0 0 0 3px #fbbf24; z-index: 10; transform: scale(1.05); }
+        .desk.wall { background: repeating-linear-gradient(45deg, #222, #222 10px, #111 10px, #111 20px); border: none; pointer-events: none; opacity: 0.5; }
+        .desk.prof { background: #7f1d1d; color: #fecaca; border: 1px solid #ef4444; }
+
+        .student-tag { padding: 4px 8px; background: #444; color: white; border-radius: 4px; font-size: 0.8rem; cursor: grab; user-select: none; border: 1px solid #555; }
+        .student-tag:active { cursor: grabbing; background: var(--accent); }
+
+        /* Tableau (Board) */
+        .board-indicator { 
+            grid-column: 1 / -1; height: 10px; background: #22c55e; 
+            border-radius: 5px; margin-bottom: 10px; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); 
+        }
+
+        /* === RESPONSIVE MOBILE === */
+        @media (max-width: 768px) {
+            body { flex-direction: column; height: 100vh; overflow: hidden; }
+            
+            #sidebar { 
+                position: fixed; top: 0; left: 0; bottom: 0; width: 85%; max-width: 320px;
+                transform: translateX(-100%); box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            }
+            #sidebar.open { transform: translateX(0); }
+            
+            /* Overlay pour fermer le menu */
+            #overlay {
+                display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40;
+                backdrop-filter: blur(2px);
+            }
+            #overlay.visible { display: block; }
+
+            #mobile-header { display: flex; z-index: 30; }
+            
+            #grid-container { padding: 10px; align-items: flex-start; } /* Scroll facile */
+            
+            /* Ajustement taille des tables sur mobile */
+            .desk { width: 80px; height: 50px; font-size: 0.7rem; }
         }
     </style>
 </head>
 <body>
 
-    <button id="mobileMenuBtn" class="btn-action btn-tool" aria-label="Menu" style="position:fixed;top:12px;left:12px;z-index:99999;display:none;">☰</button>
-    <div id="sidebarBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;z-index:99990;"></div>
+    <div id="overlay" onclick="toggleMenu()"></div>
 
     <div id="sidebar">
-        <button class="btn-action btn-open" onclick="window.openScreen()">📺 OUVRIR PROJECTION</button>
-
+        <h1 style="margin:0 0 10px 0; font-size:1.2rem; display:flex; justify-content:space-between; align-items:center;">
+            PLAN DE CLASSE
+            <button onclick="toggleMenu()" style="background:none; color:white; font-size:1.5rem; display:none;" class="mobile-close">×</button>
+        </h1>
+        
         <div>
-            <h2>1. Classe</h2>
-            <select id="classSelect" onchange="window.loadClass()"><option value="">-- Choisir --</option></select>
-        </div>
-
-        <div>
-            <h2>2. Salle & Tableau</h2>
-            <div style="display:flex; gap:5px; margin-bottom:5px;">
-                <input type="number" id="nbRows" value="5" min="2" max="10" title="Lignes" onchange="window.buildGrid()">
-                <input type="number" id="nbCols" value="6" min="2" max="10" title="Colonnes" onchange="window.buildGrid()">
-            </div>
-            <select id="boardPos" onchange="window.updateBoardPosition()">
-                <option value="top">Tableau : HAUT ⬆️</option>
-                <option value="bottom">Tableau : BAS ⬇️</option>
-                <option value="left">Tableau : GAUCHE ⬅️</option>
-                <option value="right">Tableau : DROITE ➡️</option>
+            <h2>1. CONFIGURATION</h2>
+            <select id="classSelect" onchange="loadClass(this.value)">
+                <option value="">-- Choisir une classe --</option>
+                <option value="2GATL">2nde GATL</option>
+                <option value="1AGORA">1ère AGORA</option>
+                <option value="TAGORA">Terminale AGORA</option>
             </select>
-            <button id="btnArchi" class="btn-action btn-archi" onclick="window.toggleArchitect()">🛠️ MODE ARCHITECTE</button>
-        </div>
-
-        <div>
-            <h2>Élèves (Clic Droit = Stats)</h2>
-            <div id="student-pool" class="pool-container" ondrop="window.dropToPool(event)" ondragover="window.allowDrop(event)"></div>
-        </div>
-
-        <div>
-            <h2>Zone Absents</h2>
-            <div id="absent-pool" class="pool-container" style="border-color:#f39c12" ondrop="window.dropToAbsent(event)" ondragover="window.allowDrop(event)"></div>
-        </div>
-
-        <div>
-            <h2>Outils</h2>
-            <div class="grid-tools">
-                <button class="btn-action btn-tool" onclick="window.randomizeAll()">🎲 Mélanger</button>
-                <button class="btn-action btn-tool" onclick="window.autoFill()">🪄 Combler</button>
-                <button class="btn-action btn-tool" onclick="window.resetGrid()">🗑️ Vider</button>
-                <button class="btn-action btn-tool" style="background:#d35400;" onclick="window.resetStatus()">🔄 Status</button>
+            <div style="display:flex; gap:5px;">
+                <input type="number" id="nbRows" value="4" min="2" max="10" onchange="buildGrid()">
+                <input type="number" id="nbCols" value="5" min="2" max="10" onchange="buildGrid()">
             </div>
-            
-            <button class="btn-action btn-hist" onclick="window.openHistory()">📜 Voir l'Historique</button>
-            
-            <button class="btn-action btn-push" onclick="window.pushToScreen()">🚀 ENVOYER & SAUVER</button>
+            <select id="boardPos" onchange="buildGrid()">
+                <option value="top">Tableau en HAUT</option>
+                <option value="bottom">Tableau en BAS</option>
+            </select>
         </div>
+
+        <div>
+            <h2>2. ÉLÈVES (Drag & Drop)</h2>
+            <div class="pool-container" id="studentPool" ondragover="allowDrop(event)" ondrop="dropToPool(event)">
+                </div>
+            <div style="margin-top:5px; display:flex; gap:5px;">
+                <input type="text" id="newStudentName" placeholder="Ajouter élève..." onkeypress="if(event.key==='Enter') addStudentManual()">
+                <button onclick="addStudentManual()" style="background:#444; color:white; padding:0 10px; border-radius:6px;">+</button>
+            </div>
+        </div>
+
+        <div>
+            <h2>3. ACTIONS</h2>
+            <button class="action-btn" onclick="autoPlace()">🎲 Placement Aléatoire</button>
+            <button class="action-btn" onclick="resetPlacements()">🧹 Tout retirer</button>
+            <button class="action-btn" onclick="toggleEditMode()">🧱 Mode Murs/Vides</button>
+            <button class="action-btn btn-primary" onclick="pushToScreen()">🚀 PROJETER / SAUVER</button>
+        </div>
+
+        <div id="notif" style="margin-top:auto; padding:10px; background:#22c55e; color:#052e16; border-radius:6px; display:none; text-align:center; font-weight:bold;"></div>
     </div>
 
-    <div id="main">
-        <div id="room-container">
-            <div id="board" class="board horizontal">TABLEAU</div>
-            <div id="grid"></div>
-        </div>
-    </div>
+    <div id="main-area">
+        <div id="mobile-header">
+            <button id="menu-toggle" onclick="toggleMenu()">☰ Menu</button>
+            <span style="font-weight:900;">Plan De Classe</span>
+            <div style="width:30px;"></div> </div>
 
-    <div id="notif-overlay">Notification</div>
-
-    <div id="history-modal" onclick="if(event.target===this) this.style.display='none'">
-        <div class="modal-content">
-            <h2 style="border:none; margin-bottom:10px;">📜 Historique des Plans</h2>
-            <div id="hist-list" class="hist-list">Chargement...</div>
-            <button class="btn-action btn-tool" onclick="document.getElementById('history-modal').style.display='none'" style="margin-top:20px;">Fermer</button>
+        <div id="grid-container">
+            <div id="classroom"></div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55", measurementId: "G-7R9N0JL6GG" };
-        const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-        const CLASS_DATA = {
-            "Première AGORA": ["Farah", "Younes", "Grégory", "Giovanni", "Basma", "Clara", "Nesrin", "Manar", "Ines", "Maelys", "Sara", "Shaina", "Amelia", "Zeynep", "Iacopo", "Denise", "Walid", "Ayoub"],
-            "Terminale AGORA": ["Wissam", "Makine", "Anes", "Meri", "Wael", "Amelia", "Chaïma", "Aïcha", "Inès", "Amira", "Marlyse", "Hatim", "Christopher", "Amina", "Mohamed", "Zakarya", "Merveille", "Sarah"],
-            "Seconde GATL": ["Jihan", "Ayman", "Élya", "Sonia", "Kenza", "Antoine", "Gladi", "Naïla", "Mohamed", "Dallia", "Dalal", "Anais", "Angham", "Hiba", "Luna", "Shamira"],
-            "B1MELEC": ["Abdulmohaymen", "Kais", "Nahi", "Kaïs", "Thibaud", "Noah", "Edmon"],
-            "B2MELEC": ["Eddine", "Salahdine", "Yasser", "Mohammed", "Nassim", "Ebubekir", "Kévin", "Eymen"],
-            "BTMELEC": ["Ibrahim", "Lina", "Thimoty", "Nabil", "Antoine"],
-            "CAN 1": ["Vladyslav", "Juliette", "Alassane", "Celia", "Maëlia", "Sybella", "Célian", "Efe"],
-            "HORT 2": ["Kalimullah", "Rym", "Lucie", "Bogdan", "Léo", "Hakim", "Louis"],
-            "JP 1": ["Farès", "Aaron", "Samy", "Lucas", "Bakary", "Samira", "Nolan", "Alpha"],
-            "JP 2": ["Kais", "Hori", "Milan", "Luca", "Noham"],
-            "PSR 1": ["Emanuel", "Margaux", "Kalyss", "Arturo", "Mathéo", "Pierre", "André", "Ketib", "Morgan"],
-            "PSR 2": ["Mahmoud", "Diego", "Mathis", "Syriana", "Fedwa", "Lashwana"],
-            "VAN": ["Tilio", "Lea", "Sheryne", "Salima", "Séfana", "Benedith", "Cristina", "Allian", "Ilian", "Mory"]
+        // --- GESTION MOBILE ---
+        window.toggleMenu = () => {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('visible');
         };
-
-        let state = { placements: {}, structure: {}, students: [], absents: [], status: {} };
-        let isArchitectMode = false;
-        const TYPES = [0, 1, 2, 3, 4];
-
-        window.onload = () => {
-            const sel = document.getElementById('classSelect');
-            Object.keys(CLASS_DATA).forEach(cls => {
-                let opt = document.createElement('option'); opt.value = cls; opt.innerText = cls; sel.appendChild(opt);
-            });
-            initStructure(100);
-            window.buildGrid();
-        };
-
-        window.openScreen = () => window.open('ecran_plan.html', 'projection_salle');
-
-        function showNotif(msg, color="#27ae60") {
-            const el = document.getElementById('notif-overlay');
-            el.innerText = msg; el.style.background = color; el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 3000);
+        // Afficher le bouton fermer seulement sur mobile
+        if(window.innerWidth <= 768) {
+            document.querySelector('.mobile-close').style.display = 'block';
         }
 
-        // --- GESTION HISTORIQUE (NOUVEAU) ---
-        window.openHistory = async () => {
-            const cls = document.getElementById('classSelect').value;
-            if(!cls) return alert("Sélectionnez d'abord une classe !");
-
-            const modal = document.getElementById('history-modal');
-            const list = document.getElementById('hist-list');
-            modal.style.display = 'flex';
-            list.innerHTML = '<div style="color:#888; text-align:center;">Chargement...</div>';
-
-            const hCol = collection(db, "classe_historique");
-            // Note: Firebase demande parfois un index pour le tri composé. Si erreur, on triera en JS.
-            const q = query(hCol, where("className", "==", cls), orderBy("timestamp", "desc"));
-            
-            try {
-                const snap = await getDocs(q);
-                list.innerHTML = "";
-                if(snap.empty) { list.innerHTML = '<div style="color:#888; text-align:center;">Aucune sauvegarde trouvée.</div>'; return; }
-
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    const dateObj = new Date(d.timestamp);
-                    const dateStr = dateObj.toLocaleDateString() + " à " + dateObj.toLocaleTimeString().slice(0,5);
-                    const count = Object.keys(d.placements || {}).length;
-
-                    const item = document.createElement('div');
-                    item.className = 'hist-item';
-                    item.innerHTML = `
-                        <div>
-                            <div class="hist-date">${dateStr}</div>
-                            <div class="hist-info">${count} élèves placés</div>
-                        </div>
-                        <div style="font-size:1.2rem;">↪️</div>
-                    `;
-                    item.onclick = () => loadHistoryState(d);
-                    list.appendChild(item);
-                });
-            } catch(e) {
-                console.error(e);
-                list.innerHTML = '<div style="color:#e74c3c;">Erreur index (Voir console).</div>';
-            }
+        // --- LOGIQUE PLAN DE CLASSE ---
+        let state = {
+            students: [], // Liste complète
+            placements: {}, // { "0-0": "Nom", "0-1": null }
+            structure: {}, // { "0-0": 1 (normal), "0-1": 0 (vide/mur) }
+            editMode: false
         };
-
-        function loadHistoryState(data) {
-            if(!confirm("Charger ce plan ? (Attention, le plan actuel sera écrasé)")) return;
-            
-            document.getElementById('nbRows').value = data.rows || 5;
-            document.getElementById('nbCols').value = data.cols || 6;
-            
-            state.placements = data.placements || {};
-            // Si l'historique n'a pas de structure (vieux plans), on met tout en tables
-            state.structure = data.structure || {}; 
-            
-            // Recharger la grille
-            initStructure(data.rows * data.cols);
-            window.buildGrid();
-            renderPools();
-            
-            document.getElementById('history-modal').style.display = 'none';
-            showNotif("Plan restauré depuis l'historique !", "#3498db");
-        }
-
-        // --- STATISTIQUES (Profils) ---
-        window.showStudentStats = async (name) => {
-            const cls = document.getElementById('classSelect').value;
-            if(!cls) return;
-            showNotif(`📊 Analyse de ${name}...`, "#34495e");
-
-            const hCol = collection(db, "classe_historique");
-            const q = query(hCol, where("className", "==", cls));
-            const snap = await getDocs(q);
-            
-            if(snap.empty) { showNotif("Pas d'historique.", "#e74c3c"); return; }
-
-            let counts = { total: 0, front: 0, middle: 0, back: 0 };
-            snap.forEach(doc => {
-                const data = doc.data();
-                let idx = -1;
-                if(data.placements) {
-                    for (const [key, val] of Object.entries(data.placements)) { if (val === name) idx = parseInt(key); }
-                }
-                if(idx !== -1) {
-                    counts.total++;
-                    const row = Math.floor(idx / data.cols);
-                    if(row < 2) counts.front++;
-                    else if(row < 4) counts.middle++;
-                    else counts.back++;
-                }
-            });
-
-            if(counts.total === 0) { showNotif(`${name} n'a jamais été placé.`, "#f39c12"); return; }
-
-            let profil = "";
-            let totalScore = (counts.front * 1) + (counts.middle * 3) + (counts.back * 5);
-            let average = totalScore / counts.total;
-
-            if (average < 2.5) { profil = "🦅 L'AIGLE (Toujours Devant)"; } 
-            else if (average > 3.5) { profil = "🦉 LE HIBOU (Toujours au Fond)"; } 
-            else { profil = "🦎 LE CAMÉLÉON (Au Milieu / Change)"; }
-
-            alert(`🕵️ RAPPORT : ${name}\n\n📍 PROFIL : ${profil}\n\n📊 Stats :\n- Devant : ${counts.front}\n- Milieu : ${counts.middle}\n- Fond : ${counts.back}\n\n(Sur ${counts.total} cours)`);
-        };
-
-        // --- CORE GRID ---
-        window.updateBoardPosition = () => {
-            const pos = document.getElementById('boardPos').value;
-            const container = document.getElementById('room-container');
-            const board = document.getElementById('board');
-            board.className = "board";
-            if(pos === 'top') { container.style.flexDirection = 'column'; board.classList.add('horizontal'); }
-            if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
-            if(pos === 'left') { container.style.flexDirection = 'row'; board.classList.add('vertical'); }
-            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; board.classList.add('vertical'); }
-        };
-
-        function initStructure(n) { for(let i=0; i<n; i++) if(state.structure[i] === undefined) state.structure[i] = 1; }
 
         window.buildGrid = () => {
-            const r = document.getElementById('nbRows').value;
-            const c = document.getElementById('nbCols').value;
-            const grid = document.getElementById('grid');
-            grid.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
-            grid.innerHTML = "";
-            const total = r * c;
-            initStructure(total);
+            const rows = parseInt(document.getElementById('nbRows').value);
+            const cols = parseInt(document.getElementById('nbCols').value);
+            const boardPos = document.getElementById('boardPos').value;
+            const container = document.getElementById('classroom');
+            
+            container.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+            container.innerHTML = "";
 
-            for(let i=0; i<total; i++) {
-                let cell = document.createElement('div');
-                let type = state.structure[i];
-                cell.className = `desk type-${type}`;
-                cell.dataset.idx = i;
-
-                if(isArchitectMode) cell.onclick = () => cycleType(i);
-                else if(type === 1) { cell.ondrop = (e) => dropToDesk(e, i); cell.ondragover = allowDrop; }
-
-                if(type === 1 && state.placements[i]) {
-                    const name = state.placements[i];
-                    let stClass = state.status[name] || "";
-                    let chip = document.createElement('div');
-                    chip.className = `chip ${stClass}`;
-                    chip.innerText = name;
-                    
-                    if(!isArchitectMode) {
-                        chip.draggable = true;
-                        chip.ondragstart = (e) => { e.dataTransfer.setData("text", name); };
-                        chip.ondblclick = (e) => { e.stopPropagation(); toggleStatus(name); };
-                        chip.oncontextmenu = (e) => { e.preventDefault(); window.showStudentStats(name); };
-                        let rmBtn = document.createElement('div');
-                        rmBtn.className = "remove-btn";
-                        rmBtn.innerText = "✕";
-                        rmBtn.onclick = () => removeStudent(i);
-                        cell.appendChild(rmBtn);
-                    }
-                    cell.appendChild(chip);
-                }
-                grid.appendChild(cell);
+            // Tableau
+            if(boardPos === 'top') {
+                const board = document.createElement('div'); board.className = 'board-indicator'; board.innerText = "TABLEAU"; board.style.textAlign='center'; board.style.color='#0f5132'; board.style.fontSize='0.7rem'; board.style.fontWeight='bold';
+                container.appendChild(board);
             }
+
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    const idx = r*cols + c;
+                    const cellId = `${r}-${c}`;
+                    
+                    // Init structure si nouvelle
+                    if(state.structure[idx] === undefined) state.structure[idx] = 1;
+
+                    const cell = document.createElement('div');
+                    cell.className = 'desk';
+                    cell.id = 'desk-'+idx;
+                    
+                    // Gestion Type de case
+                    if(state.structure[idx] === 0) {
+                        cell.classList.add('wall');
+                    } else if (state.structure[idx] === 2) {
+                        cell.classList.add('prof');
+                        cell.innerText = "PROF";
+                    } else {
+                        // Place élève
+                        const studentName = state.placements[idx];
+                        if(studentName) {
+                            cell.classList.add('filled');
+                            cell.innerText = studentName;
+                            cell.draggable = true;
+                            cell.ondragstart = (e) => dragStudent(e, studentName, idx);
+                        } else {
+                            cell.innerText = "";
+                            cell.ondragover = allowDrop;
+                            cell.ondrop = (e) => dropToDesk(e, idx);
+                        }
+                    }
+
+                    // Clic pour mode édition
+                    cell.onclick = () => handleCellClick(idx);
+
+                    container.appendChild(cell);
+                }
+            }
+
+            // Tableau bas
+            if(boardPos === 'bottom') {
+                const board = document.createElement('div'); board.className = 'board-indicator'; board.style.marginTop='10px';
+                container.appendChild(board);
+            }
+            
+            renderPools();
         };
 
-        window.loadClass = () => {
-            const cls = document.getElementById('classSelect').value;
-            if(!cls) return;
-            state.students = [...CLASS_DATA[cls]];
-            state.placements = {}; state.absents = []; state.status = {};
-            buildGrid(); renderPools();
-        };
-
-        function renderPools() {
-            const pool = document.getElementById('student-pool');
-            const absent = document.getElementById('absent-pool');
-            pool.innerHTML = ""; absent.innerHTML = "";
+        window.renderPools = () => {
+            const pool = document.getElementById('studentPool');
+            pool.innerHTML = "";
             const placed = Object.values(state.placements);
-
-            state.students.forEach(name => {
-                if(!placed.includes(name)) {
-                    let chip = document.createElement('div');
-                    let stClass = state.status[name] || "";
-                    chip.className = `chip ${stClass}`;
-                    chip.innerText = name;
-                    chip.draggable = true;
-                    chip.ondragstart = (e) => e.dataTransfer.setData("text", name);
-                    chip.ondblclick = () => toggleStatus(name);
-                    chip.oncontextmenu = (e) => { e.preventDefault(); window.showStudentStats(name); };
-
-                    if(state.absents.includes(name)) absent.appendChild(chip);
-                    else pool.appendChild(chip);
+            
+            state.students.forEach(s => {
+                if(!placed.includes(s)) {
+                    const tag = document.createElement('div');
+                    tag.className = 'student-tag';
+                    tag.innerText = s;
+                    tag.draggable = true;
+                    tag.ondragstart = (e) => dragStudent(e, s, -1); // -1 = vient du pool
+                    
+                    // Support tactile basique (click to place serait mieux pour mobile pur, mais drag desktop OK)
+                    tag.onclick = () => {
+                        if(window.innerWidth <= 768) {
+                            // Sur mobile, clic = mettre dans la première case libre
+                            const emptyIdx = Object.keys(state.structure).find(k => state.structure[k]===1 && !state.placements[k]);
+                            if(emptyIdx) {
+                                state.placements[emptyIdx] = s;
+                                buildGrid();
+                            }
+                        }
+                    };
+                    
+                    pool.appendChild(tag);
                 }
             });
-        }
+        };
 
         // --- DRAG & DROP ---
-        window.allowDrop = (e) => { e.preventDefault(); e.target.closest('.desk')?.classList.add('drag-over'); };
-        document.addEventListener('dragleave', (e) => e.target.closest('.desk')?.classList.remove('drag-over'));
-
-        window.dropToDesk = (e, idx) => {
+        window.allowDrop = (e) => e.preventDefault();
+        window.dragStudent = (e, name, fromIdx) => {
+            e.dataTransfer.setData("name", name);
+            e.dataTransfer.setData("fromIdx", fromIdx);
+        };
+        window.dropToDesk = (e, toIdx) => {
             e.preventDefault();
-            document.querySelectorAll('.desk').forEach(d => d.classList.remove('drag-over'));
-            const name = e.dataTransfer.getData("text");
-            if(!name) return;
+            const name = e.dataTransfer.getData("name");
+            const fromIdx = parseInt(e.dataTransfer.getData("fromIdx"));
 
-            const oldIdx = Object.keys(state.placements).find(k => state.placements[k] === name);
-            const targetOccupant = state.placements[idx];
+            if(state.structure[toIdx] !== 1) return; // Pas sur un mur
 
-            if(targetOccupant) { if(oldIdx) state.placements[oldIdx] = targetOccupant; } 
-            else { if(oldIdx) delete state.placements[oldIdx]; }
-            state.placements[idx] = name;
-            if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
-            buildGrid(); renderPools();
-        };
-
-        window.dropToPool = (e) => {
-            e.preventDefault(); const name = e.dataTransfer.getData("text");
-            removePlacement(name);
-            if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
-            buildGrid(); renderPools();
-        };
-
-        window.dropToAbsent = (e) => {
-            e.preventDefault(); const name = e.dataTransfer.getData("text");
-            removePlacement(name);
-            if(!state.absents.includes(name)) state.absents.push(name);
-            buildGrid(); renderPools();
-        };
-
-        function removePlacement(name) {
-            const key = Object.keys(state.placements).find(k => state.placements[k] === name);
-            if(key) delete state.placements[key];
-        }
-        window.removeStudent = (idx) => { delete state.placements[idx]; buildGrid(); renderPools(); };
-
-        window.toggleArchitect = () => {
-            isArchitectMode = !isArchitectMode;
-            document.body.classList.toggle('architect-mode');
-            const btn = document.getElementById('btnArchi');
-            btn.classList.toggle('active');
-            buildGrid(); 
-        };
-        function cycleType(idx) {
-            let next = (state.structure[idx] + 1) % TYPES.length;
-            if(state.structure[idx] === 1 && next !== 1 && state.placements[idx]) {
-                delete state.placements[idx]; renderPools();
+            // Si vient d'une autre table, on vide l'ancienne
+            if(fromIdx !== -1) delete state.placements[fromIdx];
+            
+            // Si la table cible est occupée, on échange (swap)
+            if(state.placements[toIdx]) {
+                if(fromIdx !== -1) state.placements[fromIdx] = state.placements[toIdx];
+                // Si vient du pool, l'occupant retourne au pool (automatique car écrasé)
             }
-            state.structure[idx] = next; buildGrid();
-        }
 
-        window.toggleStatus = (name) => {
-            if(!state.status[name]) state.status[name] = "warn";
-            else if(state.status[name] === "warn") state.status[name] = "good";
-            else delete state.status[name];
-            buildGrid(); renderPools();
+            state.placements[toIdx] = name;
+            buildGrid();
         };
-        window.resetStatus = () => { state.status = {}; buildGrid(); renderPools(); };
-        window.resetGrid = () => { if(confirm("Vider ?")) { state.placements = {}; buildGrid(); renderPools(); } };
-        
-        window.randomizeAll = () => {
-            if(!confirm("Mélanger ?")) return;
-            let active = state.students.filter(n => !state.absents.includes(n));
-            for(let i=active.length-1; i>0; i--){ const j=Math.floor(Math.random()*(i+1)); [active[i], active[j]]=[active[j], active[i]]; }
+        window.dropToPool = (e) => {
+            e.preventDefault();
+            const fromIdx = parseInt(e.dataTransfer.getData("fromIdx"));
+            if(fromIdx !== -1) {
+                delete state.placements[fromIdx];
+                buildGrid();
+            }
+        };
+
+        // --- EDIT MODE (Murs/Vides) ---
+        window.toggleEditMode = () => {
+            state.editMode = !state.editMode;
+            showNotif(state.editMode ? "🧱 Mode Construction ACTIF : Cliquez sur les cases" : "✅ Mode Placement ACTIF");
+        };
+
+        window.handleCellClick = (idx) => {
+            if(!state.editMode) {
+                // Sur mobile, clic sur une case vide = retirer l'élève
+                if(window.innerWidth <= 768 && state.placements[idx]) {
+                    if(confirm("Retirer " + state.placements[idx] + " ?")) {
+                        delete state.placements[idx];
+                        buildGrid();
+                    }
+                }
+                return; 
+            }
+            
+            // Cycle : 1 (Table) -> 0 (Mur/Vide) -> 2 (Bureau Prof) -> 1
+            let s = state.structure[idx];
+            s = (s === 1) ? 0 : (s === 0 ? 2 : 1);
+            state.structure[idx] = s;
+            
+            // Si on transforme en mur, on vire l'élève
+            if(s !== 1) delete state.placements[idx];
+            
+            buildGrid();
+        };
+
+        // --- DATA & FIREBASE ---
+        window.addStudentManual = () => {
+            const input = document.getElementById('newStudentName');
+            const val = input.value.trim();
+            if(val && !state.students.includes(val)) {
+                state.students.push(val);
+                input.value = "";
+                renderPools();
+            }
+        };
+
+        window.loadClass = async (className) => {
+            if(!className) return;
+            // Ici on simule une liste. Idéalement, charger depuis Firebase 'classes_listes'
+            // Pour l'exemple, on met des faux élèves si la liste est vide
+            if(state.students.length === 0) {
+                state.students = ["Léo", "Mia", "Tom", "Léa", "Noé", "Zoé", "Ben", "Eva", "Sam", "Ana", "Luc", "Ines"];
+            }
+            // Reset placements
             state.placements = {};
-            let tableIndices = [];
-            const total = document.getElementById('nbRows').value * document.getElementById('nbCols').value;
-            for(let i=0; i<total; i++) { if(state.structure[i] === 1) tableIndices.push(i); }
-            active.forEach((name, i) => { if(i < tableIndices.length) state.placements[tableIndices[i]] = name; });
-            buildGrid(); renderPools();
+            buildGrid();
         };
 
-        window.autoFill = () => {
-            let available = state.students.filter(n => !Object.values(state.placements).includes(n) && !state.absents.includes(n));
+        window.autoPlace = () => {
+            // Mélanger les élèves restants
+            const placed = Object.values(state.placements);
+            const available = state.students.filter(s => !placed.includes(s));
+            
+            // Mélange Fisher-Yates
+            for (let i = available.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [available[i], available[j]] = [available[j], available[i]];
+            }
+
             const total = document.getElementById('nbRows').value * document.getElementById('nbCols').value;
             for(let i=0; i<total; i++) {
                 if(!state.placements[i] && state.structure[i] === 1 && available.length > 0) {
@@ -510,86 +388,49 @@
             buildGrid(); renderPools();
         };
 
+        window.resetPlacements = () => {
+            if(confirm("Tout vider ?")) {
+                state.placements = {};
+                buildGrid();
+            }
+        };
+
         window.pushToScreen = async () => {
-            window.open('ecran_plan.html', 'projection_salle');
             const cls = document.getElementById('classSelect').value;
             const r = document.getElementById('nbRows').value;
             const c = document.getElementById('nbCols').value;
             const bPos = document.getElementById('boardPos').value;
 
+            // Sauvegarde Cloud
             await setDoc(doc(db, "classe_etat", "config"), {
                 className: cls, rows: parseInt(r), cols: parseInt(c),
                 placements: state.placements, structure: state.structure, boardPos: bPos, timestamp: Date.now()
             });
 
+            // Sauvegarde Historique (Optionnel)
             if(cls) {
                 await addDoc(collection(db, "classe_historique"), {
                     className: cls, rows: parseInt(r), cols: parseInt(c),
-                    placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure // On sauve aussi les murs
+                    placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure 
                 });
             }
             showNotif("🚀 Plan Envoyé & Sauvegardé !");
+            
+            // Ouvrir l'écran de projection si sur PC
+            if(window.innerWidth > 768) {
+                window.open('ecran_plan.html', 'projection_salle');
+            }
         };
 
-    
-        /* TOUCH_PATCH */
-        const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-
-        // Menu mobile (sidebar off-canvas)
-        const menuBtn = document.getElementById('mobileMenuBtn');
-        const backdrop = document.getElementById('sidebarBackdrop');
-        const closeSidebar = () => { document.body.classList.remove('sidebar-open'); };
-        const openSidebar = () => { document.body.classList.add('sidebar-open'); };
-        if(menuBtn){
-            menuBtn.addEventListener('click', () => {
-                if(document.body.classList.contains('sidebar-open')) closeSidebar();
-                else openSidebar();
-            });
-        }
-        if(backdrop){
-            backdrop.addEventListener('click', closeSidebar);
+        function showNotif(msg) {
+            const n = document.getElementById('notif');
+            n.innerText = msg; n.style.display = 'block';
+            setTimeout(() => n.style.display='none', 3000);
         }
 
-        // Helper sans drag&drop: tap pour sélectionner un élève, tap sur une table pour placer
-        let touchSelectedName = null;
+        // Init
+        buildGrid();
 
-        const placeToDesk = (name, idx) => {
-            if(!name && name !== '') return;
-            const oldIdxKey = Object.keys(state.placements).find(k => state.placements[k] === name);
-            const targetOccupant = state.placements[idx];
-
-            if(targetOccupant) { if(oldIdxKey !== undefined) state.placements[oldIdxKey] = targetOccupant; }
-            else { if(oldIdxKey !== undefined) delete state.placements[oldIdxKey]; }
-
-            state.placements[idx] = name;
-            if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
-            buildGrid(); renderPools();
-        };
-
-        document.addEventListener('click', (e) => {
-            if(!isCoarsePointer) return;
-            if(isArchitectMode) return;
-
-            const chip = e.target.closest && e.target.closest('.chip');
-            if(chip){
-                const name = (chip.innerText || '').trim();
-                if(!name) return;
-                touchSelectedName = name;
-
-                document.querySelectorAll('.chip').forEach(c => c.classList.remove('touch-selected'));
-                chip.classList.add('touch-selected');
-                return;
-            }
-
-            const desk = e.target.closest && e.target.closest('.desk');
-            if(desk && touchSelectedName){
-                const idx = Number(desk.dataset.idx);
-                if(Number.isFinite(idx)){
-                    placeToDesk(touchSelectedName, idx);
-                }
-            }
-        });
-    
-</script>
+    </script>
 </body>
 </html>
