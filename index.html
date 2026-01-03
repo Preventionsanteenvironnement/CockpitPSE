@@ -166,6 +166,73 @@
             .live-summary{ font-size: 1.02rem; }
         }
 
+
+        /* ===== RESPONSIVE MOBILE (sidebar drawer) ===== */
+        .menu-overlay{
+            display:none;
+            position:fixed;
+            inset:0;
+            background: rgba(15,23,42,0.55);
+            backdrop-filter: blur(2px);
+            z-index: 999;
+        }
+        .menu-btn{
+            display:none;
+            border:none;
+            background:#0f172a;
+            color:#fff;
+            width:44px;
+            height:44px;
+            border-radius:12px;
+            font-size:20px;
+            font-weight:900;
+            cursor:pointer;
+            align-items:center;
+            justify-content:center;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            flex-shrink:0;
+        }
+
+        @media (max-width: 980px){
+            body{ height:auto; overflow:auto; display:block; }
+            .sidebar{
+                position: fixed;
+                top: 0; left: 0; bottom: 0;
+                height: 100vh;
+                width: min(86vw, 340px);
+                transform: translateX(-110%);
+                transition: transform .25s ease;
+                z-index: 1000;
+                padding: 18px;
+            }
+            .main-content{
+                padding: 16px;
+                min-height: 100vh;
+                overflow: visible;
+            }
+            header{
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 16px;
+                padding-bottom: 14px;
+            }
+            h1{ font-size: 1.35rem; }
+            .clock-time{ font-size: 1.15rem; }
+            .menu-btn{ display:inline-flex; }
+            .dashboard-grid{ grid-template-columns: 1fr; gap: 14px; }
+            .widget{ min-height: auto; padding: 16px; border-radius: 14px; }
+            .quick-actions{ grid-template-columns: 1fr; }
+            .btn-quick{ padding: 14px; }
+            .course-time{ width: 68px; }
+            summary{ padding: 14px; }
+            .content-links{ padding: 12px; gap: 8px; }
+            .btn-yellow, .btn-blue-outline{ width: 100%; justify-content: space-between; }
+        }
+
+        /* Menu open state */
+        body.menu-open .sidebar{ transform: translateX(0); }
+        body.menu-open .menu-overlay{ display:block; }
+
 </style>
 </head>
 <body>
@@ -183,8 +250,11 @@
         <div class="nav-item" data-theme="sites" onclick="showView('view-sites', this)">🌐 7. Sites Internet</div>
     </nav>
 
+    <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()" aria-hidden="true"></div>
+
     <main class="main-content">
         <header>
+            <button id="menuBtn" class="menu-btn" aria-label="Menu" onclick="toggleMenu()">☰</button>
             <h1 id="page-title">Tableau de Bord</h1>
             <div class="header-infos">
                 <div class="clock-time" id="clock">--:--</div>
@@ -378,7 +448,7 @@
 <div id="view-eval" class="view-section">
             <h2 style="color:var(--col-eval)">Évaluation & Suivi</h2>
             <details open><summary>📋 Suivi & Analyses</summary><div class="content-links">
-                <a href="page prof.html" target="_blank" class="btn-yellow">📊 PageProf (Suivi)</a>
+                <a href="page_prof.html" target="_blank" class="btn-yellow">📊 PageProf (Suivi)</a>
                 <a href="#" class="btn-yellow">📈 Générateur</a>
             
 <a href="#" class="btn-yellow">📊 Tableau de bord <span class="badge-soon">🚧 Bientôt</span></a>
@@ -510,6 +580,7 @@
                 <a href="eleve_meteo.html" class="btn btn-yellow">🧠 Ma météo <span class="badge-role role-eleve">Élèves</span></a>
                 <a href="prof_meteo.html" class="btn btn-yellow">🧠 Météo <span class="badge-role role-prof">Prof</span></a>
 
+                <a href="ecran_classe.html" class="btn btn-blue-outline">📺 Écran Classe <span class="badge-role role-prof">Prof</span></a>
                 <a href="ecran_plat.html" class="btn btn-blue-outline">📺 Écran Plat <span class="badge-role role-prof">Prof</span></a>
               </div>
             </details>
@@ -520,7 +591,7 @@
                 <a href="#" class="btn btn-yellow">👥 Travail de groupe <span class="badge-soon">🚧 Bientôt</span></a>
                 <a href="#" class="btn btn-yellow">👥 Travail de groupe <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
 
-                <a href="prof_mindmap.html" class="btn btn-yellow">🗣️ carte mentale collective <span class="badge-soon">🚧 Bientôt</span></a>
+                <a href="#" class="btn btn-yellow">🗣️ Débat structuré <span class="badge-soon">🚧 Bientôt</span></a>
                 <a href="#" class="btn btn-yellow">🗣️ Débat structuré <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
               </div>
             </details>
@@ -543,8 +614,6 @@
 
                 <a href="eleve_vraifaux.html" class="btn btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-eleve">Élèves</span></a>
                 <a href="prof_vraifaux.html" class="btn btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-prof">Prof</span></a>
-                 <a href="ecran_classe.html" class="btn btn-blue-outline">📺 Écran Classe prof vrai/faux <span class="badge-role role-prof">Prof</span></a>
-
 
                 <a href="#" class="btn btn-yellow">🎮 Quiz en direct <span class="badge-soon">🚧 Bientôt</span></a>
                 <a href="#" class="btn btn-yellow">🎮 Quiz en direct <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
@@ -599,6 +668,10 @@
         const CLASSES = ["Première AGORA", "Terminale AGORA", "Seconde GATL", "B1MELEC", "B2MELEC", "BTMELEC", "CAN 1", "HORT 2", "JP 1", "JP 2", "PSR 1", "PSR 2", "VAN"];
 
         let activeClass = null, offset = 0, evs = [];
+
+        window.openMenu = () => document.body.classList.add('menu-open');
+        window.closeMenu = () => document.body.classList.remove('menu-open');
+        window.toggleMenu = () => document.body.classList.toggle('menu-open');
 
         window.addMemo = async () => { const i = document.getElementById('memo-input'), t = document.getElementById('memo-target').value; if(i.value.trim()==="") return; await addDoc(memosCol, { text: i.value, target: t, timestamp: Date.now() }); i.value = ""; };
         window.deleteMemo = async (id) => await deleteDoc(doc(db, "cockpit_memos", id));
@@ -661,10 +734,12 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(id).classList.add('active'); el.classList.add('active');
             document.getElementById('page-title').innerText = el.innerText;
-        };
+            if (window.innerWidth <= 980) closeMenu();
+};
         setInterval(() => { const n = new Date(); document.getElementById('clock').innerText = n.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); document.getElementById('date').innerText = n.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'}); render(); }, 60000);
         setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }, 1000);
         init();
+        window.addEventListener('resize', () => { if (window.innerWidth > 980) closeMenu(); });
     </script>
 </body>
 </html>
