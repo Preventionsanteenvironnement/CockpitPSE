@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>QQOQCP - Pilotage Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; user-select: none; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 300px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 20; flex-shrink: 0; }
+        .sidebar.hidden { display: none; }
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        .sidebar-section { flex-grow: 1; overflow-y: auto; padding: 10px; border-bottom: 1px solid #334155; }
+        .section-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-bottom: 10px; display:flex; justify-content:space-between; }
+
+        /* GRID PRINCIPALE (7 ZONES) */
+        .main-content { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; position: relative; }
+        .qqoqcp-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; /* 3 Colonnes */
+            grid-template-rows: 1fr 1fr 0.8fr;  /* 3 Lignes */
+            gap: 15px; 
+            height: 100%; 
+            padding-bottom: 60px;
+        }
+
+        /* ZONES */
+        .zone { 
+            border-radius: 12px; padding: 10px; border: 2px solid rgba(255,255,255,0.1); 
+            background: rgba(255,255,255,0.02); transition: 0.2s; cursor: pointer; display: flex; flex-direction: column;
+        }
+        .zone:hover { background: rgba(255,255,255,0.05); }
+        .zone.active { border: 4px solid white; box-shadow: 0 0 20px rgba(255,255,255,0.1); background: rgba(255,255,255,0.08); transform: scale(1.01); z-index: 10; }
+
+        .zone-header { font-weight: 800; text-transform: uppercase; font-size: 1rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .zone-content { flex-grow: 1; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; }
+        
+        /* COULEURS DES 7 ZONES */
+        .z-Qui .zone-header { color: #60a5fa; } .z-Qui { border-top: 4px solid #3b82f6; } /* Bleu */
+        .z-Quoi .zone-header { color: #f87171; } .z-Quoi { border-top: 4px solid #ef4444; } /* Rouge */
+        .z-Ou .zone-header { color: #4ade80; } .z-Ou { border-top: 4px solid #22c55e; } /* Vert */
+        
+        .z-Quand .zone-header { color: #fb923c; } .z-Quand { border-top: 4px solid #f97316; } /* Orange */
+        .z-Comment .zone-header { color: #c084fc; } .z-Comment { border-top: 4px solid #a855f7; } /* Violet */
+        .z-Combien .zone-header { color: #2dd4bf; } .z-Combien { border-top: 4px solid #14b8a6; } /* Turquoise */
+        
+        .z-Pourquoi .zone-header { color: #facc15; } .z-Pourquoi { border-top: 4px solid #eab308; grid-column: 1 / -1; } /* Jaune (Large) */
+
+        /* ITEMS */
+        .item-tag { background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; display: flex; align-items: center; gap: 5px; border-left: 3px solid rgba(255,255,255,0.5); }
+        .del-btn { cursor: pointer; opacity: 0.5; font-size: 0.7rem; margin-left: 5px; }
+        .del-btn:hover { opacity: 1; color: #ef4444; }
+
+        /* WIDGETS */
+        .ambient-widget { position: absolute; bottom: 15px; right: 15px; background: #1e293b; padding: 10px 20px; border-radius: 10px; display: flex; gap: 20px; align-items: center; border: 1px solid #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 100; }
+        .chrono { font-family: monospace; font-size: 1.5rem; font-weight: bold; color: #3b82f6; cursor: pointer; width: 80px; text-align: center; }
+        .chrono.alert { color: #ef4444; animation: pulse 1s infinite; }
+        .sono-box { width: 100px; height: 15px; background: #0f172a; border-radius: 4px; overflow: hidden; border: 1px solid #475569; position: relative; }
+        .sono-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width 0.05s; }
+
+        /* UI DIVERS */
+        .btn-projection { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; z-index: 50; }
+        .idea-card { background: #334155; padding: 8px; margin-bottom: 5px; border-radius: 4px; font-size: 0.9rem; }
+        .idea-input { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: white; padding: 5px; border-radius: 4px; margin: 5px 0; display: none; }
+        .btn-act { border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; margin-right:3px; }
+        
+        .student-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 8px; margin-bottom: 5px; border-radius: 6px; border: 1px solid #334155; font-size: 0.85rem; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        #debug-status { position: fixed; bottom: 0; left: 0; font-size: 0.7rem; padding: 2px; background: black; color: lime; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>QQOQCP PROF</h2>
+            <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓 Ouvert</button>
+        </div>
+        
+        <div class="sidebar-section" style="flex: 1;">
+            <div class="section-title">En Attente <span onclick="clearAll()" style="cursor:pointer;">(Vider)</span></div>
+            <div id="waiting-room"></div>
+        </div>
+
+        <div class="sidebar-section" style="height: 150px; background:#162032;">
+            <div class="section-title">👥 Présents <span id="student-count">(0)</span></div>
+            <div id="student-list"></div>
+        </div>
+        <div id="debug-status">Chargement...</div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+
+        <div class="qqoqcp-grid">
+            <div class="zone z-Qui" onclick="selectZone('Qui')" id="zone-Qui">
+                <div class="zone-header">👤 QUI ?</div><div class="zone-content" id="list-Qui"></div>
+            </div>
+            <div class="zone z-Quoi" onclick="selectZone('Quoi')" id="zone-Quoi">
+                <div class="zone-header">📦 QUOI ?</div><div class="zone-content" id="list-Quoi"></div>
+            </div>
+            <div class="zone z-Ou" onclick="selectZone('Ou')" id="zone-Ou">
+                <div class="zone-header">📍 OÙ ?</div><div class="zone-content" id="list-Ou"></div>
+            </div>
+
+            <div class="zone z-Quand" onclick="selectZone('Quand')" id="zone-Quand">
+                <div class="zone-header">⏳ QUAND ?</div><div class="zone-content" id="list-Quand"></div>
+            </div>
+            <div class="zone z-Comment" onclick="selectZone('Comment')" id="zone-Comment">
+                <div class="zone-header">🛠️ COMMENT ?</div><div class="zone-content" id="list-Comment"></div>
+            </div>
+            <div class="zone z-Combien" onclick="selectZone('Combien')" id="zone-Combien">
+                <div class="zone-header">🔢 COMBIEN ?</div><div class="zone-content" id="list-Combien"></div>
+            </div>
+
+            <div class="zone z-Pourquoi" onclick="selectZone('Pourquoi')" id="zone-Pourquoi">
+                <div class="zone-header">❓ POURQUOI ?</div><div class="zone-content" id="list-Pourquoi"></div>
+            </div>
+        </div>
+
+        <div class="ambient-widget">
+            <div onclick="handleChronoClick()"><div class="chrono" id="chrono">00:00</div></div>
+            <div style="display:flex; align-items:center;">
+                <div class="sono-box"><div class="sono-bar" id="sono-bar"></div></div>
+                <span style="font-size:0.6rem; color:#64748b; margin-left:5px;">Micro</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
+        
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            document.getElementById('debug-status').innerText = "🟢 Firebase Connecté";
+        } catch(e) {
+            document.getElementById('debug-status').innerText = "🔴 ERREUR: " + e.message;
+        }
+
+        let activeZone = 'Qui'; // Par défaut
+        let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
+
+        // INIT
+        if(isProjection) {
+            document.getElementById('sidebar').classList.add('hidden');
+            document.querySelector('.btn-projection').style.display = 'none';
+        } else {
+            setTimeout(() => selectZone('Qui'), 1000);
+        }
+
+        window.toggleProjection = () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("mode", "projection");
+            window.open(url.toString(), "_blank");
+        };
+
+        // SELECTION ZONE
+        window.selectZone = async (code) => {
+            if(isProjection) return;
+            document.querySelectorAll('.zone').forEach(z => z.classList.remove('active'));
+            const el = document.getElementById('zone-'+code);
+            if(el) el.classList.add('active');
+            
+            activeZone = code;
+            
+            // Labels complets pour l'élève
+            const labels = { 
+                Qui: "Qui ?", Quoi: "Quoi ?", Ou: "Où ?", 
+                Quand: "Quand ?", Comment: "Comment ?", Combien: "Combien ?", 
+                Pourquoi: "Pourquoi ?" 
+            };
+
+            try { await setDoc(doc(db, "qqoqcp_config", "global"), { currentZone: code, currentLabel: labels[code] }, { merge: true }); } catch(e){}
+        };
+
+        // AFFICHAGE ITEMS
+        onSnapshot(collection(db, "qqoqcp_items"), (snap) => {
+            const cats = ['Qui','Quoi','Ou','Quand','Comment','Combien','Pourquoi'];
+            cats.forEach(c => { const z = document.getElementById('list-'+c); if(z) z.innerHTML=""; });
+            
+            snap.forEach(d => {
+                const data = d.data();
+                const container = document.getElementById('list-' + data.category);
+                if(container) {
+                    const div = document.createElement('div');
+                    div.className = 'item-tag';
+                    const delHtml = isProjection ? '' : `<span class="del-btn" onclick="delItem('${d.id}')">❌</span>`;
+                    div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
+                    container.appendChild(div);
+                }
+            });
+        });
+        window.delItem = async (id) => { if(confirm("Suppr?")) await deleteDoc(doc(db, "qqoqcp_items", id)); };
+
+        // SALLE D'ATTENTE (PROF)
+        if(!isProjection) {
+            const q = query(collection(db, "qqoqcp_ideas"), where("status", "==", "waiting"));
+            onSnapshot(q, (snap) => {
+                const div = document.getElementById('waiting-room');
+                div.innerHTML = "";
+                if(snap.empty) div.innerHTML = "<div style='color:#64748b;text-align:center;font-size:0.8rem;margin-top:10px;'>Vide...</div>";
+                
+                snap.forEach(d => {
+                    const data = d.data();
+                    const card = document.createElement('div');
+                    card.className = 'idea-card';
+                    card.innerHTML = `
+                        <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">👤 ${escapeHtml(data.student)}</div>
+                        <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
+                        <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
+                        <div style="display:flex;">
+                            <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
+                            <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
+                            <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
+                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
+                        </div>
+                    `;
+                    div.appendChild(card);
+                });
+            });
+        }
+
+        window.toggleEdit = (btn) => {
+            const parent = btn.closest('.idea-card');
+            const display = parent.querySelector('.text-display');
+            const input = parent.querySelector('.idea-input');
+            if (input.style.display === 'none' || !input.style.display) {
+                input.style.display = 'block'; display.style.display = 'none'; input.focus(); btn.style.background = '#22c55e';
+            } else {
+                display.innerText = input.value; input.style.display = 'none'; display.style.display = 'block'; btn.style.background = '#f59e0b';
+            }
+        };
+
+        window.doAccept = async (id, btn) => {
+            const input = btn.closest('.idea-card').querySelector('.idea-input');
+            await addDoc(collection(db, "qqoqcp_items"), { text: input.value, category: activeZone });
+            await updateDoc(doc(db, "qqoqcp_ideas", id), { status: "accepted" });
+        };
+        window.doReject = async (id) => await updateDoc(doc(db, "qqoqcp_ideas", id), { status: "rejected" });
+        window.doLike = async (id) => await updateDoc(doc(db, "qqoqcp_ideas", id), { feedback: true });
+        window.clearAll = async () => {
+            if(!confirm("Tout vider ?")) return;
+            const snap = await getDocs(query(collection(db, "qqoqcp_ideas"), where("status", "==", "waiting")));
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.update(doc(db, "qqoqcp_ideas", d.id), { status: "rejected" }));
+            await batch.commit();
+        };
+
+        // GESTION ELEVES
+        if(!isProjection) {
+            onSnapshot(collection(db, "qqoqcp_presence"), (snap) => {
+                const list = document.getElementById('student-list'); list.innerHTML = "";
+                let count = 0;
+                snap.forEach(d => {
+                    count++;
+                    const div = document.createElement('div');
+                    div.style.cssText = "display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #333; font-size:0.8rem;";
+                    div.innerHTML = `<span>👤 ${escapeHtml(d.id)}</span> <button onclick="callStudent('${d.id}')" style="background:#eab308;border:none;border-radius:4px;cursor:pointer;">📢</button>`;
+                    list.appendChild(div);
+                });
+                document.getElementById('student-count').innerText = `(${count})`;
+            });
+        }
+        window.callStudent = (name) => {
+            setDoc(doc(db, "qqoqcp_config", "global"), { solicitedStudent: name }, { merge: true });
+            setTimeout(() => setDoc(doc(db, "qqoqcp_config", "global"), { solicitedStudent: null }, { merge: true }), 5000);
+        };
+
+        // LOCK, CHRONO, SONO
+        let isLocked = false;
+        window.toggleLock = async () => {
+            isLocked = !isLocked;
+            const b = document.getElementById('btn-lock');
+            b.innerText = isLocked ? "🔒 Verrouillé" : "🔓 Ouvert";
+            b.style.color = isLocked ? "#ef4444" : "#22c55e";
+            await setDoc(doc(db, "qqoqcp_config", "global"), { isLocked: isLocked }, { merge: true });
+        };
+
+        let ti, ir=false, ts=0;
+        window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur (min)?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };
+        function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+        navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ 
+            const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); 
+            function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); 
+        }).catch(()=>{});
+
+        function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
+    </script>
+</body>
+</html>
