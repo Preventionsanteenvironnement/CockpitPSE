@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Plan de Classe - Écran</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #eef2f5; color: #333; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        #header { height: 80px; background: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
+        #class-title { font-size: 2.5rem; font-weight: 900; color: #2c3e50; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Salle dynamique */
+        #classroom {
+            flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 30px 30px;
+        }
+
+        /* Tableau Mobile */
+        .board {
+            background: #34495e; color: #bdc3c7; font-weight: bold; letter-spacing: 2px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-size: 1rem; margin: 20px;
+        }
+        .board.horizontal { width: 60%; height: 30px; }
+        .board.vertical { width: 30px; height: 60%; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+        /* Grille */
+        #grid { display: grid; gap: 20px; padding: 20px; transition: 0.5s; }
+
+        /* CASES */
+        .cell {
+            width: 140px; height: 90px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative; transition: all 0.3s;
+        }
+
+        /* TYPES (Identiques au prof) */
+        .cell.type-1 { background: white; box-shadow: 0 6px 0 #cbd5e1; border: 2px solid #e2e8f0; } /* Table */
+        .student-name { font-size: 1.5rem; font-weight: 800; color: #2c3e50; text-align: center; line-height: 1.1; }
+
+        .cell.type-0 { border: 2px dashed rgba(203, 213, 225, 0.5); opacity: 0; } /* Vide */
+
+        .cell.type-2 { background: #94a3b8; opacity: 0.5; border-radius: 4px; } /* Mur */
+        .cell.type-2::after { content: "🧱"; font-size: 2rem; opacity: 0.5; }
+
+        .cell.type-3 { background: #fcd34d; border: 4px solid #f59e0b; opacity: 0.9; } /* Porte */
+        .cell.type-3::after { content: "🚪 PORTE"; font-weight: bold; color: #b45309; font-size: 0.9rem; }
+
+        .cell.type-4 { background: #e0f2fe; border: 4px solid #38bdf8; opacity: 0.8; } /* Fenêtre */
+        .cell.type-4::after { content: "🪟"; font-size: 2rem; }
+
+        .pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.27); }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        #waiting-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; color: #94a3b8; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div id="header"><div id="class-title">...</div></div>
+
+    <div id="classroom">
+        <div id="board" class="board horizontal">TABLEAU</div>
+        <div id="grid"></div>
+        <div id="waiting-msg">En attente du plan...</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55", measurementId: "G-7R9N0JL6GG" };
+        const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+
+        onSnapshot(doc(db, "classe_etat", "config"), (docSnap) => {
+            if (docSnap.exists()) { renderPlan(docSnap.data()); }
+        });
+
+        function renderPlan(data) {
+            const grid = document.getElementById('grid');
+            const title = document.getElementById('class-title');
+            const wait = document.getElementById('waiting-msg');
+            const board = document.getElementById('board');
+            const container = document.getElementById('classroom');
+
+            if(!data.className) { wait.style.display = 'block'; title.innerText = "..."; grid.innerHTML = ""; return; }
+            wait.style.display = 'none';
+            title.innerText = data.className;
+            grid.style.gridTemplateColumns = `repeat(${data.cols}, 1fr)`;
+            grid.innerHTML = "";
+
+            // Position Tableau
+            board.className = "board";
+            const pos = data.boardPos || 'top';
+            if(pos === 'top') { container.style.flexDirection = 'column'; board.classList.add('horizontal'); }
+            if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
+            if(pos === 'left') { container.style.flexDirection = 'row'; board.classList.add('vertical'); }
+            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; board.classList.add('vertical'); }
+
+            const total = data.rows * data.cols;
+            
+            for(let i=0; i<total; i++) {
+                const type = (data.structure && data.structure[i] !== undefined) ? data.structure[i] : 1;
+                const student = data.placements[i];
+                
+                const cell = document.createElement('div');
+                cell.className = `cell type-${type}`;
+                
+                if(type === 1 && student) {
+                    cell.innerHTML = `<span class="student-name">${student}</span>`;
+                    cell.classList.add('pop');
+                }
+                grid.appendChild(cell);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cockpit Professeur CPS - FINAL</title>
+    <style>
+        /* BASE */
+        body { margin: 0; background: #121212; color: white; font-family: 'Segoe UI', Verdana, sans-serif; overflow: hidden; display: flex; flex-direction: column; height: 100vh; font-size: 18px; }
+        .hidden { display: none !important; }
+        
+        /* HEADER SONOMÈTRE */
+        #header-bar { 
+            height: 100px; 
+            background: #1e1e1e; border-bottom: 2px solid #333; 
+            display: flex; align-items: center; padding: 0 30px; 
+            justify-content: space-between;
+        }
+        .sono-label { font-weight:900; color:#888; font-size: 1.5rem; letter-spacing: 1px;}
+        .sono-wrapper { flex-grow: 1; margin: 0 40px; }
+        
+        #sono-bg { width: 100%; height: 40px; background: #333; border-radius: 20px; overflow: hidden; position: relative; }
+        #sono-fill { height: 100%; width: 0%; background: #2ecc71; transition: width 0.1s linear, background 0.2s; }
+        
+        /* CHIFFRE ROUGE */
+        #sono-val { font-size: 4.5rem; line-height: 1; font-weight: 900; width: 220px; text-align: right; font-variant-numeric: tabular-nums; color: #ff5252; text-shadow: 0 0 10px rgba(255, 82, 82, 0.3); margin-top: 5px; }
+        .alert-text { color: #ff0000 !important; animation: blink 0.5s infinite; text-shadow: 0 0 20px red; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* DASHBOARD GRID */
+        #grid { display: grid; grid-template-columns: 22% 43% 35%; height: calc(100% - 180px); width: 100%; }
+        
+        .panel { border-right: 2px solid #333; padding: 20px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        
+        h2 { color: #aaa; font-size: 1.4rem; font-weight: 800; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 25px; width: 100%; text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; }
+
+        /* 1. BATTERIE */
+        #batt-container { width: 90px; height: 180px; border: 6px solid #fff; border-radius: 12px; padding: 5px; position: relative; margin-top: 20px; }
+        #batt-cap { width: 30px; height: 10px; background: #fff; position: absolute; top: -18px; left: 24px; }
+        #batt-lvl { width: 100%; height: 0%; background: #2ecc71; position: absolute; bottom: 5px; left: 5px; width: calc(100% - 10px); transition: 1s; }
+        #batt-txt { font-size: 4rem; font-weight: 900; margin-top: 20px; }
+
+        /* 2. MÉTÉO */
+        #cloud-zone { width: 100%; height: 100%; position: relative; }
+        .bubble { 
+            position: absolute; display: flex; flex-direction: column; align-items: center; 
+            animation: popIn 0.5s ease-out; background: rgba(40,40,40,0.95); padding: 10px 15px; border-radius: 15px; border: 2px solid #555; transition: all 1s ease; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .b-emo { font-size: 3.5rem; } 
+        .b-txt { font-size: 1.2rem; color: #fff; margin-top: 0px; font-weight: 900; text-shadow: 2px 2px 0 #000; }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        #center-trend { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1; opacity: 0.4; transition: 1s; }
+        #dom-icon { font-size: 12rem; filter: drop-shadow(0 0 30px rgba(255,255,255,0.3)); }
+        #dom-label { font-size: 2.5rem; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: 5px; margin-top: -20px; text-shadow: 3px 3px 0 #000;}
+
+        /* 3. DÉFIS & BESOINS */
+        .stat-row { width: 100%; margin-bottom: 25px; }
+        .stat-label { display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 8px; align-items: center; }
+        .sub-legend { font-size: 1rem; color: #ccc; font-style: normal; margin-left: 10px; font-weight: normal; }
+        .bar-bg { width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 0%; background: #3498db; transition: 1s; }
+        .defi-list { width: 100%; margin-top: 15px; }
+        .defi-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #333; align-items: center; font-size: 1.1rem; font-weight: 500;}
+        .defi-item span:first-child { width: 85%; white-space: normal; line-height: 1.2; } 
+        .defi-count { background: #444; padding: 5px 12px; border-radius: 15px; font-size: 1.1rem; font-weight: bold; color: white; min-width: 30px; text-align: center;}
+
+        /* FOOTER COACHING */
+        #footer-coach { 
+            height: 80px; background: #1a1a1a; border-top: 2px solid #333;
+            display: flex; justify-content: space-between; align-items: center; padding: 0 30px;
+        }
+        #coach-msg { font-size: 1.6rem; color: #4ca1af; font-weight: bold; font-style: italic; display: flex; align-items: center; }
+        #coach-icon { font-size: 2.5rem; margin-right: 20px; }
+        .btn-action { padding: 12px 30px; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; font-size: 1.2rem; margin-left: 15px;}
+
+        /* --- ÉTAPE SAS (OVERLAY) --- */
+        #step-sas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 500; display: none; /* Caché par défaut */
+            flex-direction: column; justify-content: center; align-items: center; color: white;
+        }
+        .rules-grid { display: flex; justify-content: space-around; width: 80%; margin-bottom: 50px; align-items: flex-end;}
+        .rule-item { display: flex; flex-direction: column; align-items: center; animation: fadeUp 1s forwards; width: 40%; }
+        
+        /* STYLE DES IMAGES DANS LE SAS */
+        .rule-img { 
+            height: 250px; 
+            width: auto; 
+            margin-bottom: 20px; 
+            border-radius: 15px; 
+            border: 4px solid white; 
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+            object-fit: cover;
+        } 
+        
+        .rule-text { font-size: 2.5rem; font-weight: bold; text-transform: uppercase; color: #ccc; }
+        #timer-display { font-size: 12rem; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* MODAL */
+        #modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.95); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { text-align: center; background: #222; padding: 50px; border-radius: 20px; border: 2px solid #555; }
+    </style>
+</head>
+<body>
+
+    <div id="header-bar">
+        <div class="sono-label">SONOMÈTRE</div>
+        <div class="sono-wrapper">
+            <div id="sono-bg"><div id="sono-fill"></div></div>
+        </div>
+        <div id="sono-val">-- dB</div>
+    </div>
+
+    <div id="grid">
+        <div class="panel">
+            <h2>Énergie</h2>
+            <div id="batt-container"><div id="batt-cap"></div><div id="batt-lvl"></div></div>
+            <div id="batt-txt">--%</div>
+        </div>
+
+        <div class="panel" style="padding:0;">
+            <div id="cloud-zone">
+                <div id="center-trend">
+                    <div id="dom-icon">☁️</div>
+                    <div id="dom-label">...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" style="align-items: flex-start; overflow-y: auto;">
+            <h2>Besoins (Posture)</h2>
+            <div class="stat-row">
+                <div class="stat-label"><span>🎧 Solo <span class="sub-legend">(Calme)</span></span><span id="p-solo">0%</span></div>
+                <div class="bar-bg"><div class="bar-fill" id="b-solo" style="background:#3498db;"></div></div>
+            </div>
+            <div class="stat-row">
+                <div class="stat-label"><span>🤝 Entraide <span class="sub-legend">(Binôme)</span></span><span id="p-help">0%</span></div>
+                <div class="bar-bg"><div class="bar-fill" id="b-help" style="background:#e67e22;"></div></div>
+            </div>
+            <div class="stat-row">
+                <div class="stat-label"><span>🗣️ Oral <span class="sub-legend">(Participer)</span></span><span id="p-oral">0%</span></div>
+                <div class="bar-bg"><div class="bar-fill" id="b-oral" style="background:#2ecc71;"></div></div>
+            </div>
+            <h2 style="margin-top:20px;">🔥 Top Défis</h2>
+            <div class="defi-list" id="defi-list"><div style="color:#666; font-style:italic; text-align:center; font-size: 1.2rem;">En attente...</div></div>
+        </div>
+    </div>
+
+    <div id="footer-coach">
+        <div id="coach-msg">
+            <span id="coach-icon">💡</span> 
+            <span id="coach-text">En attente des élèves...</span>
+        </div>
+        <div>
+            <button class="btn-action" style="background:#8e44ad; color:white;" onclick="startSas()">🚀 SAS (Transition)</button>
+            <button class="btn-action" style="background:#3498db; color:white;" onclick="openBilan()">🏁 Bilan</button>
+            <button class="btn-action btn-reset" style="background:#c0392b; color:white;" onclick="resetData()">🗑️ Reset</button>
+        </div>
+    </div>
+
+    <div id="step-sas">
+        <div class="rules-grid">
+            <div class="rule-item">
+                <img src="phonemodeavion.jpg" class="rule-img" alt="Mode Avion"> 
+                <div class="rule-text">Mode Avion</div>
+                <div style="color:#555; font-size:1.5rem; margin-top:10px;">Téléphones rangés</div>
+            </div>
+            <div class="rule-item" style="animation-delay: 0.3s;">
+                <img src="portevuecourspse.jpg" class="rule-img" alt="Matériel">
+                <div class="rule-text">Matériel Prêt</div>
+                <div style="color:#555; font-size:1.5rem; margin-top:10px;">Trousse & Porte-vue</div>
+            </div>
+        </div>
+        <div style="color:#3498db; font-size:2rem; letter-spacing: 3px;">PRÉPARATION DU COURS</div>
+        <div id="timer-display">02:00</div>
+        <button class="btn-action" style="margin-top:30px; background:#333; color:#555;" onclick="stopSas()">Annuler / Passer</button>
+    </div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h1 style="color:#aaa; font-size: 2rem;">Bilan Sonore du cours</h1>
+            <div style="font-size:10rem; font-weight:900; color:#2ecc71;" id="bilan-val">0 dB</div>
+            <p id="bilan-msg" style="font-size:2rem; font-weight:bold;">Calme.</p>
+            <br>
+            <button class="btn-action" style="background:#555; color:white;" onclick="document.getElementById('modal').style.display='none'">Fermer</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // TA CLÉ
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.firebasestorage.app",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55",
+            measurementId: "G-7R9N0JL6GG"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        let maxDb = 0; 
+        let isMonitoring = true;
+        let bubbleSlots = Array(16).fill(false); 
+        const forbiddenSlots = [5, 6, 9, 10]; 
+
+        // --- GESTION DU SAS (TIMER) ---
+        let sasInterval;
+        window.startSas = () => {
+            document.getElementById('step-sas').style.display = 'flex';
+            let timeLeft = 120; // 2 minutes (Change ici si tu veux plus/moins)
+            const display = document.getElementById('timer-display');
+            
+            sasInterval = setInterval(() => {
+                let m = Math.floor(timeLeft / 60);
+                let s = timeLeft % 60;
+                s = s < 10 ? '0' + s : s;
+                m = m < 10 ? '0' + m : m;
+                display.innerText = `${m}:${s}`;
+                
+                if(timeLeft < 10) display.style.color = "#ff5252";
+                else display.style.color = "white";
+
+                timeLeft--;
+                if(timeLeft < 0) {
+                    stopSas();
+                }
+            }, 1000);
+        };
+
+        window.stopSas = () => {
+            clearInterval(sasInterval);
+            // Animation de sortie
+            document.getElementById('step-sas').style.opacity = '0';
+            document.getElementById('step-sas').style.transition = 'opacity 1s';
+            setTimeout(() => {
+                document.getElementById('step-sas').style.display = 'none';
+                document.getElementById('step-sas').style.opacity = '1'; // Reset pour la prochaine fois
+            }, 1000);
+        };
+
+        // --- FIREBASE LOGIC ---
+        onSnapshot(collection(db, "meteo_finale_v2"), (snap) => {
+            let totalEn = 0; let count = 0;
+            let postures = { solo:0, help:0, oral:0 };
+            let defis = {}; let emotions = {};
+
+            snap.docChanges().forEach(change => {
+                if(change.type === "added") {
+                    const d = change.doc.data();
+                    spawnBubble(d.emoji, d.emotion); 
+                }
+            });
+
+            snap.forEach(doc => {
+                const d = doc.data();
+                count++;
+                totalEn += parseInt(d.energie);
+                if(d.social) postures[d.social] = (postures[d.social] || 0) + 1;
+                if(d.defi) defis[d.defi] = (defis[d.defi] || 0) + 1;
+                if(d.emotion) emotions[d.emotion] = (emotions[d.emotion] || 0) + 1;
+            });
+
+            if(count > 0) {
+                const avgEn = Math.round(totalEn / count);
+                const batH = document.getElementById('batt-lvl');
+                batH.style.height = avgEn + "%";
+                document.getElementById('batt-txt').innerText = avgEn + "%";
+                batH.style.background = avgEn < 30 ? "#e74c3c" : (avgEn < 60 ? "#f1c40f" : "#2ecc71");
+
+                updateBar('solo', postures.solo, count);
+                updateBar('help', postures.help, count);
+                updateBar('oral', postures.oral, count);
+
+                let domE = "☁️"; let maxE = 0; let domName = "Variable";
+                for(let [e, c] of Object.entries(emotions)) {
+                    if(c > maxE) { maxE = c; domName = e; }
+                }
+                const mapEmoji = {'Joie':'🤩','Calme':'😎','Fatigue':'😴','Colère':'😡','Stress':'😰','Concentré':'🤔'};
+                if(mapEmoji[domName]) domE = mapEmoji[domName];
+
+                const centerT = document.getElementById("center-trend");
+                document.getElementById("dom-icon").innerText = domE;
+                document.getElementById("dom-label").innerText = domName;
+                centerT.style.opacity = 0.8;
+
+                updateDefis(defis);
+                updateCoach(avgEn, domName);
+            }
+        });
+
+        function updateBar(id, val, total) {
+            const pct = Math.round((val/total)*100);
+            document.getElementById('b-'+id).style.width = pct + "%";
+            document.getElementById('p-'+id).innerText = pct + "%";
+        }
+
+        function updateDefis(defisObj) {
+            const zone = document.getElementById('defi-list');
+            zone.innerHTML = "";
+            const sorted = Object.entries(defisObj).sort((a,b) => b[1] - a[1]);
+            
+            sorted.forEach(([txt, num]) => {
+                zone.innerHTML += `
+                    <div class="defi-item">
+                        <span>${txt}</span>
+                        <span class="defi-count">${num}</span>
+                    </div>`;
+            });
+        }
+
+        function updateCoach(energie, emotion) {
+            const txt = document.getElementById("coach-text");
+            const ico = document.getElementById("coach-icon");
+            let msg = ""; let ic = "💡";
+
+            if(energie < 35) {
+                msg = "Batterie faible. On démarre en douceur.";
+                ic = "🔋";
+            } else if (energie > 75) {
+                msg = "Grosse énergie ! On canalise ça sur l'exo.";
+                ic = "🔥";
+            } else {
+                msg = "Énergie équilibrée. Parfait pour bosser.";
+                ic = "🚀";
+            }
+            if(emotion === "Colère" || emotion === "Stress") {
+                msg = "Tensions ? On respire 3 fois avant de commencer.";
+                ic = "🧘";
+            }
+            txt.innerText = msg;
+            ico.innerText = ic;
+        }
+
+        function spawnBubble(emoji, text) {
+            const zone = document.getElementById('cloud-zone');
+            let slot = -1; let attempts = 0;
+            while(attempts < 8) {
+                let r = Math.floor(Math.random() * 16);
+                if(!bubbleSlots[r] && !forbiddenSlots.includes(r)) { slot = r; break; }
+                attempts++;
+            }
+            if(slot === -1) { do { slot = Math.floor(Math.random() * 16); } while (forbiddenSlots.includes(slot)); }
+            
+            bubbleSlots[slot] = true;
+            setTimeout(() => { bubbleSlots[slot] = false; }, 4000); 
+
+            const row = Math.floor(slot / 4); const col = slot % 4;
+            const top = (row * 22) + (Math.random() * 10) + 2; 
+            const left = (col * 22) + (Math.random() * 10) + 2;
+
+            const b = document.createElement('div');
+            b.className = 'bubble';
+            b.style.left = left + "%"; b.style.top = top + "%";
+            b.innerHTML = `<span class="b-emo">${emoji}</span><span class="b-txt">${text}</span>`;
+            zone.appendChild(b);
+        }
+
+        // --- SONOMÈTRE ---
+        async function startMic() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const ctx = new AudioContext();
+                const analyser = ctx.createAnalyser();
+                const src = ctx.createMediaStreamSource(stream);
+                const script = ctx.createScriptProcessor(2048, 1, 1);
+                src.connect(analyser); analyser.connect(script); script.connect(ctx.destination);
+
+                script.onaudioprocess = () => {
+                    if(!isMonitoring) return;
+                    const arr = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(arr);
+                    let sum = 0; for(let i=0; i<arr.length; i++) sum+=arr[i];
+                    
+                    let db = Math.round((sum/arr.length/130)*100);
+                    if(db<10) db=10;
+
+                    const fill = document.getElementById('sono-fill');
+                    const val = document.getElementById('sono-val');
+                    
+                    fill.style.width = db + "%";
+                    val.innerText = db + " dB";
+                    
+                    if(db > maxDb) maxDb = db;
+
+                    if(db > 60) {
+                        if(db > 80) {
+                            fill.style.background = "#ff4444";
+                            val.classList.add("alert-text");
+                        } else {
+                            fill.style.background = "#f1c40f"; 
+                            val.classList.remove("alert-text");
+                        }
+                    } else {
+                        fill.style.background = "#2ecc71";
+                        val.classList.remove("alert-text");
+                    }
+                };
+            } catch(e) { console.error(e); }
+        }
+        startMic();
+
+        window.openBilan = () => {
+            document.getElementById('modal').style.display = 'flex';
+            const v = document.getElementById('bilan-val');
+            v.innerText = maxDb + " dB";
+            const msg = document.getElementById('bilan-msg');
+            if(maxDb > 85) { v.style.color="#ff4444"; msg.innerText = "⚠️ Trop bruyant !"; }
+            else if (maxDb > 70) { v.style.color="#f1c40f"; msg.innerText = "⚠️ Limite."; }
+            else { v.style.color="#2ecc71"; msg.innerText = "✅ Bravo ! Calme."; }
+        };
+
+        window.resetData = async () => {
+            if(confirm("Effacer toutes les données ?")) {
+                const btn = document.querySelector('.btn-reset');
+                if(btn) btn.innerText = "Nettoyage...";
+                const snap = await getDocs(collection(db, "meteo_finale_v2"));
+                const promises = [];
+                snap.forEach(d => promises.push(deleteDoc(d.ref)));
+                await Promise.all(promises); 
+                location.reload();
+            }
+        };
+    </script>
+</body>
+</html>

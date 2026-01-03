@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vrai/Faux - Écran Classe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #121212; color: white; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        #header-q { height: 25vh; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; background: #1a1a1a; border-bottom: 2px solid #333; }
+        #display-question { font-size: 3.5rem; font-weight: 900; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.2); line-height: 1.2; }
+
+        #results-container { flex-grow: 1; display: flex; gap: 100px; align-items: flex-end; justify-content: center; padding-bottom: 50px; }
+        .bar-wrapper { width: 25%; height: 85%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+        .bar { width: 100%; background: #555; border-radius: 20px 20px 0 0; transition: height 0.8s, opacity 0.5s; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; min-height: 0px; opacity: 1; }
+        .bar-label { font-size: 4rem; font-weight: 900; margin-top: 30px; text-transform: uppercase; letter-spacing: 5px; }
+        .bar-val { font-size: 5rem; font-weight: 900; color: white; margin-bottom: 20px; text-shadow: 0 4px 15px rgba(0,0,0,0.6); z-index: 2; }
+        
+        #bar-vrai { background: #27ae60; box-shadow: 0 0 50px rgba(39, 174, 96, 0.4); }
+        #bar-faux { background: #c0392b; box-shadow: 0 0 50px rgba(192, 57, 43, 0.4); }
+
+        #waiting-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #121212; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .waiting-text { font-size: 2rem; color: #555; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div id="waiting-overlay"><div style="font-size: 5rem;">🚀</div><div class="waiting-text">En attente du prof...</div></div>
+    <div id="header-q"><div id="display-question">...</div></div>
+    <div id="results-container">
+        <div class="bar-wrapper"><div class="bar" id="bar-vrai" style="height: 0%;"><span class="bar-val" id="val-vrai">0%</span></div><div class="bar-label" style="color:#27ae60">VRAI</div></div>
+        <div class="bar-wrapper"><div class="bar" id="bar-faux" style="height: 0%;"><span class="bar-val" id="val-faux">0%</span></div><div class="bar-label" style="color:#c0392b">FAUX</div></div>
+    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55", measurementId: "G-7R9N0JL6GG" };
+        const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+        let totalVotes = 0; let counts = { VRAI: 0, FAUX: 0 }; let correctAnswer = "";
+
+        // 1. ECOUTE CONFIG (QUESTION + REVELATION)
+        onSnapshot(doc(db, "vraifaux_etat", "config"), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const overlay = document.getElementById('waiting-overlay');
+                if(data.question && data.question.length > 0) {
+                    overlay.style.display = 'none';
+                    document.getElementById('display-question').innerText = data.question;
+                    correctAnswer = data.correctAnswer;
+                    
+                    if(data.showResult) {
+                        // EFFET REVELATION
+                        if(correctAnswer === "VRAI") document.getElementById('bar-faux').style.opacity = 0.2;
+                        else document.getElementById('bar-vrai').style.opacity = 0.2;
+                    } else {
+                        // RESET
+                        document.getElementById('bar-faux').style.opacity = 1;
+                        document.getElementById('bar-vrai').style.opacity = 1;
+                    }
+                } else { overlay.style.display = 'flex'; }
+            }
+        });
+
+        // 2. ECOUTE VOTES
+        onSnapshot(collection(db, "vraifaux_reponses"), (snap) => {
+            counts = { VRAI: 0, FAUX: 0 }; totalVotes = 0;
+            snap.forEach(doc => { const data = doc.data(); if(data.vote) { counts[data.vote]++; totalVotes++; } });
+            updateBars();
+        });
+
+        function updateBars() {
+            const pVrai = totalVotes === 0 ? 0 : Math.round((counts.VRAI / totalVotes) * 100);
+            const pFaux = totalVotes === 0 ? 0 : Math.round((counts.FAUX / totalVotes) * 100);
+            document.getElementById('bar-vrai').style.height = pVrai + "%"; document.getElementById('val-vrai').innerText = pVrai + "%";
+            document.getElementById('bar-faux').style.height = pFaux + "%"; document.getElementById('val-faux').innerText = pFaux + "%";
+        }
+    </script>
+</body>
+</html>

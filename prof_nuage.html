@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Nuage Live Prof - PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #121212; color: white; font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+        /* BARRE DE COMMANDE */
+        #control-bar {
+            height: 80px; background: #1e1e1e; border-bottom: 1px solid #333;
+            display: flex; align-items: center; padding: 0 20px; justify-content: space-between; z-index: 100;
+        }
+
+        .question-wrapper { display: flex; gap: 10px; flex-grow: 1; max-width: 40%; }
+        #q-input { flex-grow: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; font-size: 1.1rem; }
+        .btn-launch { background: #3498db; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn-launch:hover { background: #2980b9; }
+
+        .tools-wrapper { display: flex; gap: 15px; align-items: center; }
+        
+        .tool-box { background: #333; padding: 5px 15px; border-radius: 8px; display: flex; align-items: center; gap: 10px; border: 1px solid #444; }
+        .timer-input { background: transparent; border: none; color: white; font-size: 1.5rem; font-weight: bold; width: 50px; text-align: center; border-bottom: 2px solid #555; }
+        .timer-display { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; display: none; }
+        .timer-urgent { color: #e74c3c; animation: pulse 0.5s infinite; }
+
+        .btn-small { background: #555; border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; transition: 0.2s;}
+        .btn-small:hover { background: #777; transform: scale(1.1); }
+        .btn-active { background: #2ecc71 !important; }
+
+        /* BOUTON CADENAS */
+        #btn-lock { 
+            width: 40px; height: 40px; font-size: 1.2rem; background: #2ecc71; color: white; 
+            border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); transition: 0.3s;
+        }
+        #btn-lock.locked { background: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.3); }
+
+        #sono-fill { width: 10px; height: 30px; background: #2ecc71; border-radius: 5px; transition: height 0.1s; display: inline-block;}
+        .btn-reset { background: #c0392b; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+
+        /* QUESTION & NUAGE */
+        #display-question { text-align: center; font-size: 2.5rem; font-weight: 800; color: #fff; margin-top: 20px; text-shadow: 0 0 20px rgba(255,255,255,0.2); height: 60px; z-index: 10; }
+        #cloud-container { flex-grow: 1; position: relative; overflow: hidden; margin: 20px; border: 2px dashed #333; border-radius: 20px; }
+
+        .word-tag { position: absolute; white-space: nowrap; font-weight: 800; cursor: pointer; transition: all 0.5s ease-out; animation: float 20s infinite linear; text-shadow: 2px 2px 0px rgba(0,0,0,0.5); user-select: none; }
+        .word-tag:hover { z-index: 100; transform: scale(1.2); color: #ff0000 !important; text-decoration: line-through; }
+        
+        .dropped { animation: none !important; transition: top 1s cubic-bezier(0.175, 0.885, 0.32, 1.27), transform 1s ease; top: 92% !important; opacity: 0.7; }
+
+        @keyframes float { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(10px, 15px) rotate(2deg); } 50% { transform: translate(-5px, -10px) rotate(-1deg); } 75% { transform: translate(-15px, 5px) rotate(1deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .pop { animation: popAnim 0.3s ease-out; }
+        @keyframes popAnim { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+        /* Couleurs Néons */
+        .c1 { color: #00f2ea; text-shadow: 0 0 15px #00f2ea; }
+        .c2 { color: #ff0050; text-shadow: 0 0 15px #ff0050; }
+        .c3 { color: #f9f871; text-shadow: 0 0 15px #f9f871; }
+        .c4 { color: #00ff87; text-shadow: 0 0 15px #00ff87; }
+        .c5 { color: #be00ff; text-shadow: 0 0 15px #be00ff; }
+    </style>
+</head>
+<body>
+
+    <div id="control-bar">
+        <div class="question-wrapper">
+            <input type="text" id="q-input" placeholder="Question..." value="Un mot pour définir...">
+            <button class="btn-launch" onclick="updateQuestion()">Lancer 📡</button>
+        </div>
+
+        <div class="tools-wrapper">
+            
+            <button id="btn-lock" onclick="toggleLock()" title="Verrouiller/Déverrouiller les élèves">🔓</button>
+
+            <div class="tool-box">
+                <span>⏳</span>
+                <div id="timer-edit">
+                    <input type="number" id="minutes-input" class="timer-input" value="2" min="1" max="60">
+                    <span style="font-size:0.8rem; color:#aaa;">min</span>
+                </div>
+                <span id="timer-display" class="timer-display">00:00</span>
+                <button id="btn-play" class="btn-small" onclick="toggleTimer()">▶</button>
+                <button class="btn-small" onclick="resetTimer()">↺</button>
+            </div>
+            
+            <div class="tool-box">
+                <span>🔊</span>
+                <div style="height:30px; width:10px; background:#333; border-radius:5px; overflow:hidden; position:relative;">
+                    <div id="sono-lvl" style="position:absolute; bottom:0; left:0; width:100%; height:10%; background:#2ecc71;"></div>
+                </div>
+            </div>
+
+            <button class="btn-reset" onclick="resetCloud()">🗑️</button>
+        </div>
+    </div>
+
+    <div id="display-question">...</div>
+    <div id="cloud-container"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#333;">En attente...</div></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.firebasestorage.app",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55",
+            measurementId: "G-7R9N0JL6GG"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- GESTION NUAGE ---
+        const wordsMap = new Map(); 
+        const container = document.getElementById('cloud-container');
+        const colors = ['c1', 'c2', 'c3', 'c4', 'c5'];
+
+        onSnapshot(collection(db, "nuage_mots"), (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    const data = change.doc.data();
+                    const cleanWord = data.text.toUpperCase();
+                    addOrUpdateWord(cleanWord, change.doc.id);
+                }
+            });
+        });
+
+        function addOrUpdateWord(text, docId) {
+            let existingKey = null;
+            for(let [key, val] of wordsMap.entries()) { if(key === text) existingKey = key; }
+
+            if (existingKey) {
+                const obj = wordsMap.get(existingKey);
+                obj.count++;
+                obj.ids.push(docId);
+                updateSize(obj);
+            } else {
+                createWordElement(text, docId);
+            }
+        }
+
+        function createWordElement(text, docId) {
+            const el = document.createElement('div');
+            el.innerText = text;
+            el.className = `word-tag ${colors[Math.floor(Math.random() * colors.length)]}`;
+            const x = Math.random() * 80 + 10;
+            const y = Math.random() * 80 + 10;
+            el.style.left = x + "%"; el.style.top = y + "%"; el.style.fontSize = "2.5rem";
+            el.onclick = () => sniperWord(text);
+            container.appendChild(el);
+            el.classList.add('pop');
+            setTimeout(() => el.classList.remove('pop'), 300);
+            wordsMap.set(text, { element: el, count: 1, ids: [docId] });
+        }
+
+        function updateSize(obj) {
+            const el = obj.element;
+            const newSize = 2.5 + Math.log2(obj.count);
+            el.style.fontSize = newSize + "rem";
+            el.classList.add('pop');
+            setTimeout(() => el.classList.remove('pop'), 300);
+        }
+
+        window.sniperWord = async (text) => {
+            if(confirm(`Supprimer "${text}" ?`)) {
+                const obj = wordsMap.get(text);
+                if(obj) {
+                    obj.element.remove();
+                    wordsMap.delete(text);
+                    const batch = writeBatch(db);
+                    obj.ids.forEach(id => { batch.delete(doc(db, "nuage_mots", id)); });
+                    await batch.commit();
+                }
+            }
+        };
+
+        window.updateQuestion = async () => {
+            const q = document.getElementById('q-input').value;
+            document.getElementById('display-question').innerText = q;
+            // On lance la question et on OUVRE les votes automatiquement
+            await setDoc(doc(db, "nuage_etat", "config"), { question: q, isOpen: true });
+            setLockState(true);
+        };
+
+        window.resetCloud = async () => {
+            if(confirm("Tout effacer ?")) {
+                const snap = await getDocs(collection(db, "nuage_mots"));
+                const promises = snap.docs.map(d => deleteDoc(d.ref));
+                await Promise.all(promises);
+                location.reload();
+            }
+        };
+
+        // --- GESTION DU CADENAS (LOCK) ---
+        let isSessionOpen = true;
+        const lockBtn = document.getElementById('btn-lock');
+
+        window.toggleLock = async () => {
+            isSessionOpen = !isSessionOpen; // Inverse
+            // Envoi à Firebase (pour bloquer les élèves)
+            await updateDoc(doc(db, "nuage_etat", "config"), { isOpen: isSessionOpen });
+            setLockState(isSessionOpen);
+        };
+
+        function setLockState(isOpen) {
+            isSessionOpen = isOpen;
+            if(isOpen) {
+                lockBtn.innerText = "🔓";
+                lockBtn.classList.remove('locked');
+            } else {
+                lockBtn.innerText = "🔒";
+                lockBtn.classList.add('locked');
+            }
+        }
+
+        // --- GESTION TIMER ---
+        let timerInterval;
+        let totalSeconds = 0;
+        let isRunning = false;
+
+        window.toggleTimer = () => {
+            const btn = document.getElementById('btn-play');
+            const editMode = document.getElementById('timer-edit');
+            const displayMode = document.getElementById('timer-display');
+            const input = document.getElementById('minutes-input');
+
+            if (!isRunning) {
+                if(totalSeconds === 0) {
+                    let mins = parseInt(input.value) || 2;
+                    totalSeconds = mins * 60;
+                }
+                editMode.style.display = 'none';
+                displayMode.style.display = 'block';
+                btn.innerText = "⏸";
+                btn.classList.add('btn-active');
+                isRunning = true;
+                timerInterval = setInterval(tick, 1000);
+                tick();
+            } else {
+                clearInterval(timerInterval);
+                isRunning = false;
+                btn.innerText = "▶";
+                btn.classList.remove('btn-active');
+            }
+        };
+
+        function tick() {
+            if (totalSeconds <= 0) {
+                endTimerEffect();
+                return;
+            }
+            totalSeconds--;
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const s = (totalSeconds % 60).toString().padStart(2, '0');
+            const display = document.getElementById('timer-display');
+            display.innerText = `${m}:${s}`;
+            if(totalSeconds < 10) display.classList.add('timer-urgent');
+            else display.classList.remove('timer-urgent');
+        }
+
+        function endTimerEffect() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            document.getElementById('timer-display').innerText = "FIN !";
+            document.getElementById('btn-play').innerText = "▶";
+            
+            // 1. Effet Gravité
+            const allWords = document.querySelectorAll('.word-tag');
+            allWords.forEach(word => {
+                word.classList.add('dropped');
+                const rot = Math.random() * 60 - 30;
+                word.style.transform = `rotate(${rot}deg)`;
+            });
+
+            // 2. VERROUILLAGE AUTOMATIQUE DES ÉLÈVES
+            updateDoc(doc(db, "nuage_etat", "config"), { isOpen: false });
+            setLockState(false); // Visuel Prof
+        }
+
+        window.resetTimer = () => {
+            clearInterval(timerInterval);
+            isRunning = false;
+            totalSeconds = 0;
+            document.getElementById('timer-edit').style.display = 'block';
+            document.getElementById('timer-display').style.display = 'none';
+            document.getElementById('timer-display').classList.remove('timer-urgent');
+            document.getElementById('btn-play').innerText = "▶";
+            document.getElementById('btn-play').classList.remove('btn-active');
+            
+            const allWords = document.querySelectorAll('.word-tag');
+            allWords.forEach(word => {
+                word.classList.remove('dropped');
+                word.style.top = (Math.random() * 80 + 10) + "%";
+                word.style.transform = "none";
+            });
+        };
+
+        // --- SONOMÈTRE ---
+        async function initSono() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioContext = new AudioContext();
+                const analyser = audioContext.createAnalyser();
+                const microphone = audioContext.createMediaStreamSource(stream);
+                const scriptProcessor = audioContext.createScriptProcessor(256, 1, 1);
+                microphone.connect(analyser); analyser.connect(scriptProcessor); scriptProcessor.connect(audioContext.destination);
+                scriptProcessor.onaudioprocess = function() {
+                    const array = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(array);
+                    let values = 0; for (let i = 0; i < array.length; i++) values += array[i];
+                    const pct = Math.min(100, (values / array.length) * 2);
+                    const bar = document.getElementById('sono-lvl');
+                    bar.style.height = pct + "%";
+                    if(pct > 80) bar.style.background = "#e74c3c";
+                    else if(pct > 50) bar.style.background = "#f1c40f";
+                    else bar.style.background = "#2ecc71";
+                };
+            } catch(e) {}
+        }
+        initSono();
+
+    </script>
+</body>
+</html>
