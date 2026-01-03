@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Page prof – Copies devoir PSE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f4f5;
+      margin: 0;
+      padding: 0;
+    }
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px 60px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 0.25rem;
+    }
+    p {
+      font-size: 0.95rem;
+      color: #4b5563;
+    }
+    .card {
+      margin-top: 16px;
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+    tr:hover td {
+      background: #f9fafb;
+    }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    .btn-refresh {
+      margin-bottom: 10px;
+      background: #6b7280;
+    }
+    .status {
+      margin-top: 8px;
+      font-size: 0.85rem;
+    }
+    .status.ok {
+      color: #16a34a;
+    }
+    .status.err {
+      color: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Page prof – Copies devoir PSE</h1>
+    <p>
+      Cette page liste les copies envoyées depuis le devoir en ligne.
+      Clique sur « Télécharger JSON pour la grille » pour récupérer un fichier à ouvrir dans ta grille d’évaluation.
+    </p>
+
+    <div class="card">
+      <button class="btn btn-refresh" id="refresh-btn">🔄 Actualiser la liste</button>
+      <div id="status" class="status"></div>
+
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nom</th>
+              <th>Prénom</th>
+              <th>Classe</th>
+              <th>Date d’envoi</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="copies-body">
+            <tr><td colspan="6">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // --- CONFIGURATION VALIDÉE ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+      authDomain: "devoirs-pse.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.firebasestorage.app",
+      messagingSenderId: "614730413904",
+      appId: "1:614730413904:web:a5dd478af5de30f6bede55",
+      measurementId: "G-7R9N0JL6GG"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const tbody = document.getElementById("copies-body");
+    const statusEl = document.getElementById("status");
+    const refreshBtn = document.getElementById("refresh-btn");
+
+    function setStatus(msg, type = "") {
+      statusEl.textContent = msg;
+      statusEl.className = "status";
+      if (type) statusEl.classList.add(type);
+    }
+
+    function downloadJSONForGrid(copy) {
+      const exportObj = {
+        type: copy.type || "copie_eleve_pse",
+        nom: copy.nom || "",
+        prenom: copy.prenom || "",
+        classe: copy.classe || "",
+        reponses: copy.reponses || {},
+        meta: copy.meta || {}
+      };
+
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      const safeNom = (copy.nom || "eleve").replace(/[^\w\-]+/g, "_");
+      const safeClasse = (copy.classe || "classe").replace(/[^\w\-]+/g, "_");
+      const filename = `copie_${safeClasse}_${safeNom}.json`;
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function loadCopies() {
+      try {
+        setStatus("Chargement des copies…");
+        tbody.innerHTML = `<tr><td colspan="6">Chargement…</td></tr>`;
+
+        // --- C'EST ICI QUE C'ÉTAIT MODIFIÉ ---
+        // On remet "bacpro" car c'est le nom visible sur votre capture d'écran
+        const snap = await getDocs(collection(db, "bacpro"));
+        
+        const rows = [];
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          rows.push({
+            id: docSnap.id,
+            ...data
+          });
+        });
+
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="6">Aucune copie trouvée pour l’instant.</td></tr>`;
+          setStatus("0 copie trouvée.");
+          return;
+        }
+
+        rows.sort((a, b) => {
+          const da = a.meta?.createdAt || "";
+          const dbv = b.meta?.createdAt || "";
+          return dbv.localeCompare(da);
+        });
+
+        tbody.innerHTML = "";
+        rows.forEach((row, index) => {
+          const tr = document.createElement("tr");
+
+          const dateStr = row.meta && row.meta.createdAt
+            ? new Date(row.meta.createdAt).toLocaleString("fr-FR")
+            : "—";
+
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${row.nom || ""}</td>
+            <td>${row.prenom || ""}</td>
+            <td>${row.classe || ""}</td>
+            <td>${dateStr}</td>
+            <td></td>
+          `;
+
+          const btnCell = tr.lastElementChild;
+          const btn = document.createElement("button");
+          btn.className = "btn";
+          btn.type = "button";
+          btn.textContent = "Télécharger JSON pour la grille";
+          btn.addEventListener("click", () => downloadJSONForGrid(row));
+          btnCell.appendChild(btn);
+
+          tbody.appendChild(tr);
+        });
+
+        setStatus(`${rows.length} copie(s) chargée(s).`, "ok");
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="6">Erreur technique.</td></tr>`;
+        setStatus("Erreur de connexion à Firebase : " + err.message, "err");
+      }
+    }
+
+    refreshBtn.addEventListener("click", loadCopies);
+    loadCopies();
+  </script>
+</body>
+</html>
