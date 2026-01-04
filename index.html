@@ -59,7 +59,20 @@
         .alert-item.context-active { background: #fee2e2; border: 2px solid #ef4444; color: #b91c1c; font-weight: bold; animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
 
-        /* ACCORDÉONS TIROIRS */
+        
+        /* AGENDA */
+        .right-stack{ display:flex; flex-direction:column; gap:25px; }
+        .agenda-form{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+        .agenda-form input, .agenda-form select{ padding:8px; border-radius:6px; border:1px solid #ddd; }
+        .agenda-form input[type="date"], .agenda-form input[type="time"]{ width: 130px; }
+        .agenda-form .wide{ flex:1; min-width: 170px; }
+        .agenda-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+        .agenda-item{ background:#fff; border:1px solid #e2e8f0; padding:10px 12px; border-radius:10px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; font-size:0.9rem; }
+        .agenda-item.soon{ border-color:#f59e0b; background:#fffbeb; }
+        .agenda-meta{ font-size:0.82rem; color:#64748b; margin-top:2px; }
+        .agenda-tag{ font-weight:800; }
+
+/* ACCORDÉONS TIROIRS */
         details { background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
         summary { padding: 15px; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
         details[open] > summary { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
@@ -233,6 +246,35 @@
         body.menu-open .sidebar{ transform: translateX(0); }
         body.menu-open .menu-overlay{ display:block; }
 
+
+        /* PLANNING + AGENDA (fusion) */
+        .course-item.is-agenda { background: #eef2ff; border: 1px solid #c7d2fe; }
+        .course-item.is-agenda .course-time { color: #3730a3; }
+        .course-item.is-agenda b { color: #1f2937; }
+
+        /* TIMELINE (modal) */
+        .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:9998; padding:14px;}
+        .modal{ width:min(1100px, 96vw); max-height:88vh; overflow:auto; background:#fff; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+        .modal header{ position:sticky; top:0; background:#fff; padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:10px; z-index:1;}
+        .modal header h3{ margin:0; font-size:1rem; }
+        .modal .content{ padding:12px 14px 16px; }
+        .timeline-wrap{ display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:12px; }
+        .month-col{ border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#ffffff; }
+        .month-title{ font-weight:800; font-size:.95rem; margin:0 0 8px; display:flex; justify-content:space-between; align-items:center; }
+        .month-bar{ display:flex; flex-wrap:wrap; gap:2px; }
+        .daycell{ width:10px; height:10px; border-radius:3px; background:#f1f5f9; border:1px solid #e2e8f0; box-sizing:border-box; position:relative; }
+        .daycell.vac{ background:#fde68a; border-color:#f59e0b; }
+        .daycell.pfmp{ background:#bbf7d0; border-color:#22c55e; }
+        .daycell.course::after{ content:""; position:absolute; inset:2px; border-radius:2px; border:1px solid #3b82f6; opacity:.75; }
+        .daycell.agenda::before{ content:""; position:absolute; width:4px; height:4px; border-radius:50%; background:#111827; right:1px; bottom:1px; }
+        .legend{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 0; font-size:.85rem; color:#475569; font-weight:700;}
+        .legend span{ display:inline-flex; align-items:center; gap:6px; }
+        .dot{ width:10px; height:10px; border-radius:3px; border:1px solid #e2e8f0; background:#f1f5f9; display:inline-block; }
+        .dot.vac{ background:#fde68a; border-color:#f59e0b; }
+        .dot.pfmp{ background:#bbf7d0; border-color:#22c55e; }
+        .dot.course{ background:#f1f5f9; border-color:#3b82f6; box-shadow: inset 0 0 0 1px #3b82f6; }
+        .dot.agenda{ background:#111827; border-color:#111827; border-radius:50%; width:8px; height:8px; }
+
 </style>
 </head>
 <body>
@@ -260,7 +302,8 @@
                 <div class="clock-time" id="clock">--:--</div>
                 <div class="clock-date" id="date">--</div>
                 <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
-            </div>
+                <div id="inboxBadge" title="Nouvelles copies" style="display:none;min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:#111827;color:#fff;font-weight:900;font-size:12px;align-items:center;justify-content:center;"></div>
+                </div>
         </header>
 
         <div id="dashboard" class="view-section active">
@@ -271,10 +314,11 @@
             </div>
             <div class="dashboard-grid">
                 <div class="widget">
-                    <h3>📅 Planning <div style="font-size:0.8rem;"><button onclick="changeDate(-1)">◀</button> <span id="planning-date-label">...</span> <button onclick="changeDate(1)">▶</button></div></h3>
+                    <h3>📅 Planning <div style="font-size:0.8rem;"><button onclick="changeDate(-1)">◀</button> <span id="planning-date-label">...</span> <button onclick="changeDate(1)">▶</button> <button onclick="openTimeline()" title="Timeline" style="margin-left:8px;background:#0f172a;color:white;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;">Timeline</button></div></h3>
                     <ul class="planning-list" id="planning-list"></ul>
                 </div>
-                <div class="widget">
+                                <div class="right-stack">
+<div class="widget memo-widget">
                     <h3>💡 Pense-Bête Contextuel</h3>
                     <div style="display:flex;gap:5px;margin-bottom:15px;">
                         <select id="memo-target" style="padding:8px;border-radius:6px;border:1px solid #ddd;"></select>
@@ -283,7 +327,30 @@
                     </div>
                     <ul class="alert-list" id="memo-list"></ul>
                 </div>
-            </div>
+            
+                <div class="widget agenda-widget">
+                    <h3>🗓️ Agenda</h3>
+                    <div class="agenda-form">
+                        <select id="agenda-type">
+                            <option value="Réunion">Réunion</option>
+                            <option value="Parents">Parents</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Personnel">Personnel</option>
+                            <option value="Classe">Classe</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                        <input id="agenda-date" type="date" aria-label="Date">
+                        <input id="agenda-time" type="time" aria-label="Heure">
+                    </div>
+                    <div class="agenda-form">
+                        <input id="agenda-title" class="wide" placeholder="Titre (réunion, rdv...)" aria-label="Titre">
+                        <input id="agenda-place" class="wide" placeholder="Lieu (optionnel)" aria-label="Lieu">
+                        <button onclick="addAgenda()" style="background:#0f172a;color:white;border:none;padding:8px 15px;border-radius:6px;">+</button>
+                    </div>
+                    <ul class="agenda-list" id="agenda-list"></ul>
+                </div>
+                </div>
+</div>
         </div>
 
         <div id="view-pedago" class="view-section">
@@ -539,7 +606,7 @@
 <a href="#" class="btn-yellow">📄 Emplois du temps stage <span class="badge-soon">🚧 Bientôt</span></a>
 </div></details>
             <details><summary>🤝 PACTE</summary><div class="content-links">
-<a href="Heuressup.html" class="btn-yellow">⏱️ Heures réalisées <span class="badge-soon">🕦</span></a>
+<a href="#" class="btn-yellow">⏱️ Heures réalisées <span class="badge-soon">🚧 Bientôt</span></a>
 <a href="#" class="btn-yellow">👥 Classes / actions <span class="badge-soon">🚧 Bientôt</span></a>
 <a href="#" class="btn-yellow">🧾 Récapitulatif <span class="badge-soon">🚧 Bientôt</span></a>
 </div></details>
@@ -668,16 +735,82 @@
 </div></details>
         </div>
     </main>
+<div id="toast" style="position:fixed;bottom:18px;right:18px;display:none;max-width:320px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:white;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:9999"></div>
 
-    <script type="module">
+    
+        <!-- TIMELINE MODAL -->
+        <div class="modal-backdrop" id="timelineModal" role="dialog" aria-modal="true" aria-label="Timeline année scolaire">
+            <div class="modal">
+                <header>
+                    <h3>📆 Timeline année scolaire</h3>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button onclick="closeTimeline()" style="border:1px solid #e2e8f0;background:#fff;cursor:pointer;padding:8px 10px;border-radius:10px;font-weight:800;">Fermer</button>
+                    </div>
+                </header>
+                <div class="content">
+                    <div class="timeline-wrap" id="timelineGrid"></div>
+                    <div class="legend">
+                        <span><i class="dot vac"></i> Vacances</span>
+                        <span><i class="dot pfmp"></i> PFMP / Stage</span>
+                        <span><i class="dot course"></i> Cours</span>
+                        <span><i class="dot agenda"></i> Agenda</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+<script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
         const app = initializeApp(firebaseConfig); const db = getFirestore(app); const memosCol = collection(db, "cockpit_memos");
+                const agendaCol = collection(db, "cockpit_agenda");
+const copiesCol = collection(db, "bacpro");
+        const toast = document.getElementById("toast");
+        const inboxBadge = document.getElementById("inboxBadge");
+        let unseenCopies = 0;
+        let firstCopiesSnapshot = true;
+
+        function showToast(msg){
+        if(!toast) return;
+        toast.textContent = msg;
+        toast.style.display = "block";
+        clearTimeout(window.__toastTimer);
+        window.__toastTimer = setTimeout(() => toast.style.display = "none", 2600);
+        }
+
+        function setBadge(n){
+        if(!inboxBadge) return;
+        inboxBadge.style.display = n > 0 ? "flex" : "none";
+        inboxBadge.textContent = String(n);
+        }
+        const copiesQuery = query(
+        copiesCol,
+        orderBy("meta.createdAt", "desc"),
+        limit(20)
+        );
+
+        onSnapshot(copiesQuery, (snap) => {
+        if(firstCopiesSnapshot){
+        firstCopiesSnapshot = false;
+        return;
+        }
+
+        let added = 0;
+        snap.docChanges().forEach((ch) => {
+        if(ch.type === "added") added++;
+        });
+
+        if(added > 0){
+        unseenCopies += added;
+        setBadge(unseenCopies);
+        showToast("Nouvelle copie reçue : +" + added);
+        }
+        });
         const CLASSES = ["Première AGORA", "Terminale AGORA", "Seconde GATL", "B1MELEC", "B2MELEC", "BTMELEC", "CAN 1", "HORT 2", "JP 1", "JP 2", "PSR 1", "PSR 2", "VAN"];
 
-        let activeClass = null, offset = 0, evs = [];
+        let activeClass = null, offset = 0, evs = [], agendaEvents = [];
 
         window.openMenu = () => document.body.classList.add('menu-open');
         window.closeMenu = () => document.body.classList.remove('menu-open');
@@ -686,7 +819,77 @@
         window.addMemo = async () => { const i = document.getElementById('memo-input'), t = document.getElementById('memo-target').value; if(i.value.trim()==="") return; await addDoc(memosCol, { text: i.value, target: t, timestamp: Date.now() }); i.value = ""; };
         window.deleteMemo = async (id) => await deleteDoc(doc(db, "cockpit_memos", id));
 
-        onSnapshot(query(memosCol, orderBy("timestamp", "desc")), (snap) => {
+        
+
+        window.addAgenda = async () => {
+            const typeEl = document.getElementById('agenda-type');
+            const dateEl = document.getElementById('agenda-date');
+            const timeEl = document.getElementById('agenda-time');
+            const titleEl = document.getElementById('agenda-title');
+            const placeEl = document.getElementById('agenda-place');
+
+            const title = (titleEl?.value || '').trim();
+            if(!title){ showToast("Agenda : ajoute un titre"); return; }
+
+            const type = (typeEl?.value || 'Autre').trim();
+            const date = (dateEl?.value || new Date().toISOString().slice(0,10));
+            const time = (timeEl?.value || '08:00');
+            const dt = new Date(`${date}T${time}:00`);
+            const datetime = isNaN(dt.getTime()) ? Date.now() : dt.getTime();
+
+            await addDoc(agendaCol, {
+                type,
+                title,
+                place: (placeEl?.value || '').trim(),
+                datetime,
+                createdAt: new Date().toISOString()
+            });
+
+            if(titleEl) titleEl.value = "";
+            if(placeEl) placeEl.value = "";
+        };
+
+        window.deleteAgenda = async (id) => await deleteDoc(doc(db, "cockpit_agenda", id));
+
+        onSnapshot(query(agendaCol, orderBy("datetime", "asc"), limit(50)), (snap) => {
+            agendaEvents = [];
+            snap.forEach(d => { const a = d.data(); if(a && typeof a.datetime === "number") agendaEvents.push({ id:d.id, type:a.type||'Autre', title:a.title||'', place:a.place||'', datetime:a.datetime }); });
+
+            const list = document.getElementById('agenda-list');
+            if(!list) return;
+            list.innerHTML = "";
+
+            const now = Date.now();
+            const keepFrom = now - (24*60*60*1000); // garde un peu d'historique (24h)
+
+            snap.forEach(d => {
+                const a = d.data();
+                if(!a || typeof a.datetime !== "number") return;
+                if(a.datetime < keepFrom) return;
+
+                const dt = new Date(a.datetime);
+                const isSoon = (a.datetime - now) <= (24*60*60*1000) && (a.datetime - now) >= -(24*60*60*1000);
+
+                const li = document.createElement('li');
+                li.className = `agenda-item ${isSoon ? 'soon' : ''}`;
+
+                const dateTxt = dt.toLocaleString('fr-FR', { weekday:'short', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+                const place = (a.place || '').trim();
+
+                li.innerHTML = `
+                    <div>
+                        <div><span class="agenda-tag">[${a.type || 'Autre'}]</span> ${a.title || ''}</div>
+                        <div class="agenda-meta">${dateTxt}${place ? " • " + place : ""}</div>
+                    </div>
+                    <button onclick="deleteAgenda('${d.id}')" style="border:none;background:none;cursor:pointer;">✕</button>
+                `;
+                list.appendChild(li);
+            });
+        
+            try{ render(); }catch(e){}
+});
+
+onSnapshot(query(memosCol, orderBy("timestamp", "desc")), (snap) => {
             const list = document.getElementById('memo-list'); list.innerHTML = "";
             snap.forEach(d => {
                 const m = d.data(); const isMatch = activeClass && activeClass.includes(m.target) && m.target !== 'General';
@@ -699,10 +902,137 @@
         const URL = "https://0692390y.index-education.net/pronote/ical/mesinformations.ics?icalsecurise=5FCC8714D0288D0C735DBB51F2A682873D9407D68F403E748C4860B26B18CFA16BE48C43C48C24A416FA30C689813A61&version=2025.2.8&param=900A75DF9ED8C62E212781A9E4DCC937";
         window.changeDate = (o) => { offset += o; render(); };
 
-        async function init() {
+        
+        window.openTimeline = () => {
+            const modal = document.getElementById('timelineModal');
+            if(modal){ modal.style.display = 'flex'; }
+            buildTimeline();
+        };
+        window.closeTimeline = () => {
+            const modal = document.getElementById('timelineModal');
+            if(modal){ modal.style.display = 'none'; }
+        };
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape'){ try{ closeTimeline(); }catch(_){} }
+        });
+        // clic sur le fond pour fermer
+        (function(){
+            const modal = document.getElementById('timelineModal');
+            if(modal){
+                modal.addEventListener('click', (e) => {
+                    if(e.target === modal){ closeTimeline(); }
+                });
+            }
+        })();
+
+        function buildTimeline(){
+            const grid = document.getElementById('timelineGrid');
+            if(!grid) return;
+            if(!evs || !evs.length){
+                grid.innerHTML = "<div class='month-col'><p style='margin:0;color:#475569;font-weight:800;'>Planning non chargé.</p></div>";
+                return;
+            }
+
+            // bornes
+            const starts = evs.filter(e=>e.start).map(e=>e.start.getTime());
+            const ends = evs.filter(e=>e.end).map(e=>e.end.getTime());
+            const minT = Math.min(...starts);
+            const maxT = Math.max(...ends);
+
+            const start = new Date(minT);
+            const end = new Date(maxT);
+            const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+            const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+            // map jour -> tags
+            const map = {};
+            const keyOf = (d) => {
+                const y=d.getFullYear();
+                const m=String(d.getMonth()+1).padStart(2,'0');
+                const da=String(d.getDate()).padStart(2,'0');
+                return `${y}-${m}-${da}`;
+            };
+            const addTag = (k, tag) => {
+                if(!map[k]) map[k] = { vac:false, pfmp:false, course:false, agenda:false };
+                map[k][tag] = true;
+            };
+
+            // événements ICS (cours / vacances / PFMP)
+            evs.forEach(e => {
+                if(!e.start || !e.end) return;
+                const s = new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
+                const ee = new Date(e.end.getFullYear(), e.end.getMonth(), e.end.getDate());
+                // itère jour par jour (end non inclus)
+                for(let d=new Date(s); d<=ee; d.setDate(d.getDate()+1)){
+                    const k = keyOf(d);
+                    const sum = (e.summary||"").toLowerCase();
+                    if(sum.includes("vacances")) addTag(k, "vac");
+                    else if(sum.includes("pfmp") || sum.includes("stage")) addTag(k, "pfmp");
+                    else addTag(k, "course");
+                    // évite de dépasser si événement d'une journée (end=next day)
+                    if(d.getTime() === ee.getTime() && e.end.getHours()===0 && e.end.getMinutes()===0) break;
+                }
+            });
+
+            // agenda cockpit
+            (agendaEvents||[]).forEach(a => {
+                if(typeof a.datetime !== "number") return;
+                const d = new Date(a.datetime);
+                addTag(keyOf(d), "agenda");
+            });
+
+            // construit colonnes mois
+            const months = [];
+            for(let d=new Date(startMonth); d<=endMonth; d.setMonth(d.getMonth()+1)){
+                months.push(new Date(d.getFullYear(), d.getMonth(), 1));
+                if(months.length>18) break;
+            }
+
+            const fmt = (d) => d.toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
+            grid.innerHTML = "";
+            months.forEach(mo => {
+                const y = mo.getFullYear();
+                const m = mo.getMonth();
+                const daysInMonth = new Date(y, m+1, 0).getDate();
+
+                const col = document.createElement('div');
+                col.className = "month-col";
+
+                const title = document.createElement('div');
+                title.className = "month-title";
+                title.innerHTML = `<span>${fmt(mo)}</span><span style="color:#64748b;font-weight:900;font-size:.85rem;">${daysInMonth}j</span>`;
+                col.appendChild(title);
+
+                const bar = document.createElement('div');
+                bar.className = "month-bar";
+
+                for(let day=1; day<=daysInMonth; day++){
+                    const d = new Date(y, m, day);
+                    const k = keyOf(d);
+                    const cell = document.createElement('div');
+                    cell.className = "daycell";
+                    const tags = map[k];
+                    if(tags){
+                        if(tags.vac) cell.classList.add("vac");
+                        if(tags.pfmp) cell.classList.add("pfmp");
+                        if(tags.course) cell.classList.add("course");
+                        if(tags.agenda) cell.classList.add("agenda");
+                    }
+                    cell.title = `${d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'})}`;
+                    bar.appendChild(cell);
+                }
+
+                col.appendChild(bar);
+                grid.appendChild(col);
+            });
+        }
+
+async function init() {
             const s = document.getElementById('memo-target'); s.innerHTML = '<option value="General">Général</option>';
             CLASSES.forEach(c => { const o = document.createElement('option'); o.value = c; o.innerText = c; s.appendChild(o); });
-            try {
+                        const ad = document.getElementById("agenda-date"); if(ad) ad.value = new Date().toISOString().slice(0,10);
+            const at = document.getElementById("agenda-time"); if(at) at.value = new Date().toTimeString().slice(0,5);
+try {
                 const res = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(URL));
                 const text = await res.text(); evs = parse(text); render();
             } catch(e) { console.error(e); }
@@ -727,11 +1057,24 @@
             document.getElementById('planning-date-label').innerText = target.toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
             list.innerHTML = ""; activeClass = null;
             const day = evs.filter(e => e.start && e.start.toDateString() === target.toDateString()).sort((a,b)=>a.start-b.start);
-            if(!day.length) list.innerHTML = "<li>Vacances / Aucun cours</li>";
-            day.forEach(e => {
+            const ag = (agendaEvents||[]).filter(a => {
+                const dt = new Date(a.datetime);
+                return dt.toDateString() === target.toDateString();
+            }).map(a => ({
+                _kind: "agenda",
+                start: new Date(a.datetime),
+                end: new Date(a.datetime + 30*60*1000),
+                summary: `[${a.type||'Agenda'}] ${a.title||''}`.trim(),
+                location: (a.place||'').trim()
+            }));
+
+            const items = [...day.map(e => ({...e, _kind:"course"})), ...ag].sort((a,b)=>a.start-b.start);
+
+            if(!items.length) list.innerHTML = "<li>Vacances / Aucun cours</li>";
+            items.forEach(e => {
                 const isNow = new Date() >= e.start && new Date() <= e.end;
-                if(isNow) activeClass = e.summary;
-                const li = document.createElement('li'); li.className = `course-item ${isNow ? 'active-course' : ''}`;
+                if(isNow && e._kind !== 'agenda') activeClass = e.summary;
+                const li = document.createElement('li'); li.className = `course-item ${isNow ? 'active-course' : ''} ${e._kind==='agenda' ? 'is-agenda' : ''}`;
                 li.innerHTML = `<div class="course-time">${e.start.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div><div class="course-details"><b>${e.summary}</b><br><small>${e.location||''}</small></div>`;
                 list.appendChild(li);
             });
