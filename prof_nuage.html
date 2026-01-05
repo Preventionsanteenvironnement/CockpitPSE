@@ -2,121 +2,286 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Participation Live</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <title>Nuage Live - Prof (Validation)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        /* STYLE MOBILE */
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; padding: 20px; font-family: 'Inter', sans-serif; background: #f0f4f8; color: #333; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+        /* BASE */
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; user-select: none; }
+        
+        /* SIDEBAR (GAUCHE) */
+        .sidebar { width: 350px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 20; flex-shrink: 0; }
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        
+        /* ZONES SIDEBAR */
+        .sidebar-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid #334155; }
+        .sec-head { padding: 10px 15px; background: #162032; border-bottom: 1px solid #334155; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .sec-list { flex: 1; overflow-y: auto; padding: 10px; }
 
-        /* LOGIN */
-        #login-screen { position: fixed; inset: 0; background: #f0f4f8; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        
-        /* APP */
-        #app-screen { display: none; flex-direction: column; height: 100%; }
-        .header { flex-shrink: 0; text-align: center; margin-bottom: 20px; }
-        .label { text-transform: uppercase; font-size: 0.7rem; font-weight: 900; color: #94a3b8; letter-spacing: 1px; margin-bottom: 8px; }
-        .question-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; min-height: 80px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; color: #0f172a; text-align: center; }
-        .input-wrapper { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
-        
-        input[type="text"] { width: 100%; padding: 18px; border: 2px solid #cbd5e1; border-radius: 12px; font-size: 1.1rem; text-align: center; font-weight: bold; outline: none; transition: 0.3s; background: white; -webkit-appearance: none; margin-bottom: 15px; }
-        input[type="text"]:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
-        
-        button { width: 100%; padding: 18px; border: none; border-radius: 12px; background: #3b82f6; color: white; font-size: 1.1rem; font-weight: 800; cursor: pointer; box-shadow: 0 4px 0 #2563eb; transition: 0.1s; }
-        button:active { transform: translateY(4px); box-shadow: none; }
-        
-        .footer { height: 40px; text-align: center; margin-top: 20px; font-size: 0.8rem; color: #94a3b8; }
-        .status { font-weight: bold; font-size: 0.9rem; opacity: 0; transition: 0.3s; margin-top: 10px; text-align: center; }
-        .success { color: #10b981; } .error { color: #ef4444; }
+        /* INPUT QUESTION */
+        .control-input { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing: border-box; }
+        .btn-action { width: 100%; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; margin-top: 5px; }
+        .btn-blue { background: #3b82f6; color: white; } .btn-blue:hover { background: #2563eb; }
+        .btn-red { background: #ef4444; color: white; } .btn-red:hover { background: #dc2626; }
 
-        /* OVERLAYS */
-        #lock-overlay { position: absolute; inset: 0; background: rgba(240, 244, 248, 0.95); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        #alert-overlay { position: absolute; inset: 0; background: #ef4444; z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; animation: flash 0.5s infinite; }
-        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        /* CARTE "EN ATTENTE" (STYLE ITAMAMI) */
+        .idea-card { background: #334155; padding: 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid #475569; animation: slideIn 0.3s; }
+        .idea-user { font-size: 0.8rem; color: #94a3b8; font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .idea-text { font-size: 1.1rem; color: white; margin-bottom: 8px; word-break: break-word; font-weight: 600; }
+        .idea-input { width: 100%; background: #0f172a; border: 1px solid #475569; color: white; padding: 5px; margin-bottom: 8px; display: none; border-radius: 4px; }
+        
+        .card-actions { display: flex; gap: 5px; }
+        .btn-card { border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1; color: white; font-size: 1rem; }
+        
+        /* LISTE PRESENTS */
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+        .mega-btn { background: #f59e0b; border: none; border-radius: 4px; cursor: pointer; padding: 4px 8px; }
+
+        /* MAIN (NUAGE) */
+        .main-content { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; position: relative; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
+        .btn-projection { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        #display-question { text-align: center; font-size: 2rem; font-weight: 800; color: #fff; margin-top: 40px; text-shadow: 0 0 20px rgba(255,255,255,0.1); z-index: 10; min-height: 50px; }
+        #cloud-container { flex-grow: 1; position: relative; overflow: hidden; margin-top: 20px; border: 2px dashed rgba(255,255,255,0.1); border-radius: 12px; }
+        
+        .word-tag { position: absolute; white-space: nowrap; font-weight: 800; cursor: pointer; transition: all 0.5s ease-out; animation: float 20s infinite linear; text-shadow: 2px 2px 0px rgba(0,0,0,0.5); }
+        .word-tag:hover { z-index: 100; transform: scale(1.2); color: #ff0000 !important; text-decoration: line-through; }
+        
+        /* WIDGETS */
+        .ambient-widget { position: absolute; bottom: 15px; right: 15px; background: #1e293b; padding: 10px 20px; border-radius: 10px; display: flex; gap: 20px; align-items: center; border: 1px solid #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 100; }
+        .chrono { font-family: monospace; font-size: 1.5rem; font-weight: bold; color: #3b82f6; cursor: pointer; width: 80px; text-align: center; }
+        .chrono.alert { color: #ef4444; animation: pulse 1s infinite; }
+        .sono-box { width: 100px; height: 15px; background: #0f172a; border-radius: 4px; overflow: hidden; border: 1px solid #475569; position: relative; }
+        .sono-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width 0.05s; }
+
+        @keyframes float { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(10px, 15px) rotate(2deg); } 50% { transform: translate(-5px, -10px) rotate(-1deg); } 75% { transform: translate(-15px, 5px) rotate(1deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .pop { animation: popAnim 0.3s ease-out; }
+        @keyframes popAnim { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
+        .c1 { color: #00f2ea; } .c2 { color: #ff0050; } .c3 { color: #f9f871; } .c4 { color: #00ff87; } .c5 { color: #be00ff; }
     </style>
 </head>
 <body>
-    <div id="login-screen">
-        <h1 style="color:#0f172a; margin-bottom:30px;">👋 Bonjour !</h1>
-        <input type="text" id="username" placeholder="Ton Prénom ?" autocomplete="off">
-        <button onclick="joinSession()">REJOINDRE LE COURS</button>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2 style="margin:0; font-size:1.1rem;">NUAGE PROF</h2>
+            <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">🔓 Ouvert</button>
+        </div>
+        
+        <div style="padding:15px; border-bottom:1px solid #334155;">
+            <input type="text" id="q-input" class="control-input" placeholder="Question..." onchange="updateQuestion()">
+            <button class="btn-action btn-blue" onclick="updateQuestion()">LANCER LA QUESTION</button>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sec-head">
+                <span>⏳ En Attente</span>
+                <span onclick="clearWaiting()" style="cursor:pointer; color:#ef4444; font-size:0.7rem;">(Tout rejeter)</span>
+            </div>
+            <div id="waiting-list" class="sec-list"></div>
+        </div>
+
+        <div class="sidebar-section" style="flex:0.6;">
+            <div class="sec-head">
+                <span>👥 Présents <span id="student-count">(0)</span></span>
+            </div>
+            <div id="student-list" class="sec-list"></div>
+        </div>
+
+        <div style="padding:15px; border-top:1px solid #334155;">
+            <button class="btn-action btn-red" onclick="resetAll()">🗑️ RESET TOTAL (VIDER)</button>
+        </div>
     </div>
 
-    <div id="app-screen">
-        <div class="header">
-            <div class="label">Question en cours</div>
-            <div id="display-question" class="question-card">...</div>
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+        <div id="display-question">...</div>
+        <div id="cloud-container">
+            <div id="wait-msg" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#334155; font-weight:bold;">Le nuage se remplit...</div>
         </div>
-        <div class="input-wrapper">
-            <input type="text" id="word-input" placeholder="Ta réponse..." autocomplete="off">
-            <button id="btn-send" onclick="sendWord()">ENVOYER 🚀</button>
-            <div id="status-msg" class="status">Message envoyé !</div>
+        <div class="ambient-widget">
+            <div onclick="handleChronoClick()"><div class="chrono" id="chrono">00:00</div></div>
+            <div style="display:flex; align-items:center;">
+                <div class="sono-box"><div class="sono-bar" id="sono-bar"></div></div>
+                <span style="font-size:0.6rem; color:#64748b; margin-left:5px;">Micro</span>
+            </div>
         </div>
-        <div class="footer">Connecté en tant que <b id="display-name">...</b></div>
-        
-        <div id="lock-overlay"><div style="font-size:4rem;">🔒</div><div style="font-size:1.5rem; font-weight:900; color:#ef4444;">VOTES CLOS</div></div>
-        <div id="alert-overlay"><div style="font-size:4rem;">📢</div><div style="font-size:2rem; font-weight:900;">LE PROF T'APPELLE !</div></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc, getDocs, writeBatch, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        let myName = "";
+        const colors = ['c1', 'c2', 'c3', 'c4', 'c5'];
 
-        // LOGIN
-        window.joinSession = async () => {
-            const val = document.getElementById('username').value.trim();
-            if(!val) return;
-            myName = val;
-            document.getElementById('display-name').innerText = myName;
-            await addDoc(collection(db, "nuage_presence"), { name: myName, timestamp: Date.now() });
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-screen').style.display = 'flex';
+        // --- 1. ÉCOUTE DE LA "SALLE D'ATTENTE" (nuage_attente) ---
+        onSnapshot(collection(db, "nuage_attente"), (snap) => {
+            const list = document.getElementById('waiting-list');
+            list.innerHTML = "";
+            if(snap.empty) list.innerHTML = "<div style='color:#64748b; text-align:center; margin-top:10px;'>Vide...</div>";
+
+            snap.forEach(d => {
+                const data = d.data();
+                const card = document.createElement('div');
+                card.className = 'idea-card';
+                card.innerHTML = `
+                    <div class="idea-user">👤 ${data.student}</div>
+                    <div class="idea-text">${data.text}</div>
+                    <input type="text" class="idea-input" value="${data.text}">
+                    <div class="card-actions">
+                        <button class="btn-card" style="background:#f59e0b;" onclick="toggleEdit(this)">✏️</button>
+                        <button class="btn-card" style="background:#22c55e;" onclick="acceptWord('${d.id}', this)">✅</button>
+                        <button class="btn-card" style="background:#ef4444;" onclick="rejectWord('${d.id}')">❌</button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        });
+
+        // ACTIONS SALLE D'ATTENTE
+        window.toggleEdit = (btn) => {
+            const card = btn.closest('.idea-card');
+            const txt = card.querySelector('.idea-text');
+            const inp = card.querySelector('.idea-input');
+            if(inp.style.display === 'block') {
+                inp.style.display = 'none'; txt.style.display = 'block'; txt.innerText = inp.value;
+            } else {
+                inp.style.display = 'block'; txt.style.display = 'none'; inp.focus();
+            }
         };
 
-        // LISTENERS
-        onSnapshot(doc(db, "nuage_etat", "config"), (snap) => {
-            if(snap.exists()){
-                const d = snap.data();
-                document.getElementById('display-question').innerText = d.question || "En attente...";
-                const lock = document.getElementById('lock-overlay');
-                const inp = document.getElementById('word-input');
-                if(d.isOpen === false) { lock.style.display = "flex"; inp.blur(); } else { lock.style.display = "none"; }
-                
-                const alrt = document.getElementById('alert-overlay');
-                if(d.solicitedStudent && d.solicitedStudent.toLowerCase() === myName.toLowerCase()) {
-                    alrt.style.display = "flex"; if(navigator.vibrate) navigator.vibrate([500,200,500]);
-                } else { alrt.style.display = "none"; }
+        window.acceptWord = async (id, btn) => {
+            const card = btn.closest('.idea-card');
+            const finalTxt = card.querySelector('.idea-input').value; // Prend la valeur modifiée
+            // 1. Ajouter au Nuage Public
+            await addDoc(collection(db, "nuage_mots"), { text: finalTxt, timestamp: Date.now() });
+            // 2. Supprimer de l'attente
+            await deleteDoc(doc(db, "nuage_attente", id));
+        };
+
+        window.rejectWord = async (id) => await deleteDoc(doc(db, "nuage_attente", id));
+
+        window.clearWaiting = async () => {
+            if(!confirm("Tout rejeter ?")) return;
+            const snap = await getDocs(collection(db, "nuage_attente"));
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        };
+
+        // --- 2. ÉCOUTE DU NUAGE PUBLIC (nuage_mots) ---
+        onSnapshot(collection(db, "nuage_mots"), (snap) => {
+            snap.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    document.getElementById('wait-msg').style.display = "none";
+                    const data = change.doc.data();
+                    addWordVisual(data.text, change.doc.id);
+                }
+                if (change.type === "removed") {
+                    const el = document.querySelector(`.word-tag[data-id="${change.doc.id}"]`);
+                    if(el) el.remove();
+                }
+            });
+        });
+
+        function addWordVisual(text, docId) {
+            const cleanText = text.toUpperCase();
+            let existing = null;
+            document.querySelectorAll('.word-tag').forEach(el => { if(el.innerText === cleanText) existing = el; });
+
+            if(existing) {
+                let size = parseFloat(existing.style.fontSize);
+                existing.style.fontSize = (size + 0.5) + "rem";
+                existing.classList.add('pop'); setTimeout(()=>existing.classList.remove('pop'), 300);
+            } else {
+                const el = document.createElement('div');
+                el.innerText = cleanText;
+                el.className = `word-tag ${colors[Math.floor(Math.random() * colors.length)]}`;
+                el.style.left = (Math.random() * 80 + 10) + "%";
+                el.style.top = (Math.random() * 80 + 10) + "%";
+                el.style.fontSize = "2rem";
+                el.dataset.id = docId; 
+                // Clic sur le mot dans le nuage pour le supprimer si erreur
+                el.onclick = () => { if(confirm("Supprimer du tableau ?")) deleteDoc(doc(db, "nuage_mots", docId)); };
+                document.getElementById('cloud-container').appendChild(el);
+                el.classList.add('pop'); setTimeout(()=>el.classList.remove('pop'), 300);
+            }
+        }
+
+        // --- 3. GESTION PRÉSENCE (Même code qu'avant) ---
+        onSnapshot(collection(db, "nuage_presence"), (snap) => {
+            const list = document.getElementById('student-list');
+            list.innerHTML = "";
+            let count = 0;
+            snap.forEach(d => {
+                count++;
+                const div = document.createElement('div');
+                div.className = 'student-row';
+                div.innerHTML = `<span>👤 ${d.data().name}</span> <button onclick="alertStudent('${d.data().name}')" class="mega-btn">📢</button>`;
+                list.appendChild(div);
+            });
+            document.getElementById('student-count').innerText = `(${count})`;
+        });
+
+        window.alertStudent = async (name) => {
+            await setDoc(doc(db, "nuage_etat", "config"), { solicitedStudent: name }, { merge: true });
+            setTimeout(() => setDoc(doc(db, "nuage_etat", "config"), { solicitedStudent: null }, { merge: true }), 5000);
+        };
+
+        // --- 4. CONFIG GENERALE (Question & Reset) ---
+        onSnapshot(doc(db, "nuage_etat", "config"), (docSnap) => {
+            if(docSnap.exists()){
+                const d = docSnap.data();
+                if(d.question) {
+                    document.getElementById('display-question').innerText = d.question;
+                    document.getElementById('q-input').value = d.question;
+                }
+                if(d.isOpen !== undefined) {
+                    const btn = document.getElementById('btn-lock');
+                    btn.innerText = d.isOpen ? "🔓 Ouvert" : "🔒 Fermé";
+                    btn.style.color = d.isOpen ? "#22c55e" : "#ef4444";
+                    btn.style.borderColor = d.isOpen ? "#22c55e" : "#ef4444";
+                }
             }
         });
 
-        // SEND (VERS SALLE D'ATTENTE)
-        window.sendWord = async () => {
-            const inp = document.getElementById('word-input');
-            const txt = inp.value.trim();
-            if(!txt) return;
-            // Envoi dans 'nuage_attente' et non 'nuage_mots'
-            try {
-                await addDoc(collection(db, "nuage_attente"), { text: txt, student: myName, timestamp: Date.now() });
-                inp.value = "";
-                showStatus("Envoyé au prof ! (Attente validation)", "success");
-            } catch(e) { showStatus("Erreur (fermé ?)", "error"); }
+        window.updateQuestion = async () => {
+            const q = document.getElementById('q-input').value;
+            await setDoc(doc(db, "nuage_etat", "config"), { question: q, isOpen: true }, {merge:true});
         };
 
-        function showStatus(msg, type) {
-            const el = document.getElementById('status-msg');
-            el.innerText = msg; el.className = "status " + type; el.style.opacity = 1;
-            setTimeout(() => el.style.opacity = 0, 2000);
-        }
+        window.toggleLock = async () => {
+            const current = document.getElementById('btn-lock').innerText.includes("Ouvert");
+            await setDoc(doc(db, "nuage_etat", "config"), { isOpen: !current }, {merge:true});
+        };
 
-        document.getElementById('word-input').addEventListener('keypress', (e)=>{ if(e.key==='Enter') sendWord(); });
-        document.getElementById('username').addEventListener('keypress', (e)=>{ if(e.key==='Enter') joinSession(); });
+        window.resetAll = async () => {
+            if(!confirm("⚠️ ATTENTION : Cela vide TOUT (Attente, Nuage, Présents).\nConfirmer ?")) return;
+            const batch = writeBatch(db);
+            (await getDocs(collection(db, "nuage_mots"))).forEach(d => batch.delete(d.ref));
+            (await getDocs(collection(db, "nuage_attente"))).forEach(d => batch.delete(d.ref));
+            (await getDocs(collection(db, "nuage_presence"))).forEach(d => batch.delete(d.ref));
+            batch.set(doc(db, "nuage_etat", "config"), { question: "En attente...", isOpen: true });
+            await batch.commit();
+            location.reload();
+        };
+
+        // --- 5. PROJECTION & WIDGETS ---
+        window.toggleProjection = () => {
+            const w = window.open("", "_blank");
+            w.document.write(document.documentElement.outerHTML);
+            w.document.close();
+            const style = w.document.createElement('style');
+            style.innerHTML = `.sidebar { display: none !important; } .btn-projection { display: none !important; }`;
+            w.document.head.appendChild(style);
+        };
+        let ti, ir=false, ts=0;
+        window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur (min)?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };
+        function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+        navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); }).catch(()=>{});
     </script>
 </body>
 </html>
