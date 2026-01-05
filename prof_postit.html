@@ -2,78 +2,68 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Post-it Brainstorming - Prof</title>
+    <title>Post-it Manager - Prof</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Kalam:wght@700&display=swap" rel="stylesheet">
     <style>
+        /* BASE & LAYOUT (Comme Nuage) */
         body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; user-select: none; }
         
         /* SIDEBAR */
-        .sidebar { width: 300px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.3); }
-        .sidebar.hidden { display: none; }
+        .sidebar { width: 340px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.3); }
         .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
-        .sidebar-section { flex-grow: 1; overflow-y: auto; padding: 10px; border-bottom: 1px solid #334155; }
-        .section-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-bottom: 10px; display:flex; justify-content:space-between; }
+        
+        /* SECTIONS SIDEBAR */
+        .sidebar-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid #334155; }
+        .sec-head { padding: 10px 15px; background: #162032; border-bottom: 1px solid #334155; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .sec-list { flex: 1; overflow-y: auto; padding: 10px; }
 
-        /* TABLEAU (BOARD) */
-        .board { 
-            flex-grow: 1; position: relative; overflow: hidden; 
-            background-color: #0f172a;
-            background-image: radial-gradient(#334155 1px, transparent 1px);
-            background-size: 20px 20px; /* Effet grille */
-            cursor: grab;
-        }
+        /* INPUTS & BOUTONS */
+        .control-input { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing: border-box; }
+        .btn-action { width: 100%; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; margin-top: 5px; }
+        .btn-blue { background: #3b82f6; color: white; } .btn-blue:hover { background: #2563eb; }
+        .btn-red { background: #ef4444; color: white; } .btn-red:hover { background: #dc2626; }
+
+        /* CARTE EN ATTENTE */
+        .idea-card { background: #334155; padding: 10px; margin-bottom: 8px; border-radius: 6px; border-left: 5px solid #ccc; animation: slideIn 0.3s; }
+        .idea-info { font-size: 0.8rem; color: #94a3b8; font-weight: bold; margin-bottom: 5px; }
+        .idea-text { font-size: 1rem; color: white; margin-bottom: 8px; font-family: 'Kalam', cursive; }
+        .card-actions { display: flex; gap: 5px; }
+        .btn-card { border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1; color: white; }
+
+        /* PRESENTS */
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+        .mega-btn { background: #f59e0b; border: none; border-radius: 4px; cursor: pointer; padding: 4px 8px; }
+
+        /* MAIN BOARD */
+        .board { flex-grow: 1; position: relative; overflow: hidden; background-color: #0f172a; background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px; cursor: grab; }
         .board:active { cursor: grabbing; }
 
-        /* POST-IT */
-        .postit {
-            position: absolute;
-            width: 180px; min-height: 150px;
-            padding: 15px;
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
-            font-family: 'Kalam', cursive; /* Police manuscrite */
-            font-size: 1.1rem; color: #1e293b; line-height: 1.2;
-            display: flex; flex-direction: column; justify-content: center; text-align: center;
-            transform: rotate(-1deg); transition: transform 0.2s, box-shadow 0.2s;
-            cursor: grab;
-            animation: popIn 0.3s;
-        }
+        /* QUESTION DISPLAY */
+        #display-question { position: absolute; top: 80px; left: 0; right: 0; text-align: center; font-size: 2.5rem; font-weight: 800; color: rgba(255,255,255,0.1); pointer-events: none; user-select: none; z-index: 0; text-transform: uppercase; padding: 0 20px; }
+
+        /* POST-IT STYLE */
+        .postit { position: absolute; width: 180px; min-height: 150px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.4); font-family: 'Kalam', cursive; font-size: 1.1rem; color: #1e293b; line-height: 1.2; display: flex; flex-direction: column; justify-content: center; text-align: center; transform: rotate(-1deg); transition: transform 0.2s; cursor: grab; animation: popIn 0.3s; }
         .postit:hover { transform: scale(1.05) rotate(0deg); z-index: 100 !important; box-shadow: 10px 10px 25px rgba(0,0,0,0.5); }
-        .postit:active { cursor: grabbing; }
-        
         .postit .author { font-family: 'Inter', sans-serif; font-size: 0.6rem; text-transform: uppercase; opacity: 0.6; margin-bottom: 5px; font-weight: bold; }
-        
-        .delete-pin { 
-            position: absolute; top: -10px; right: -10px; 
-            width: 25px; height: 25px; background: #ef4444; color: white; 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-            font-size: 0.8rem; cursor: pointer; opacity: 0; transition: 0.2s; 
-            font-family: 'Inter', sans-serif; border: 2px solid white;
-        }
+        .delete-pin { position: absolute; top: -10px; right: -10px; width: 25px; height: 25px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; opacity: 0; border: 2px solid white; transition: 0.2s; font-family: 'Inter', sans-serif; }
         .postit:hover .delete-pin { opacity: 1; }
 
-        /* COULEURS */
-        .color-yellow { background: #fef08a; transform: rotate(1deg); }
-        .color-green { background: #bbf7d0; transform: rotate(-2deg); }
-        .color-blue { background: #bfdbfe; transform: rotate(2deg); }
-        .color-pink { background: #fbcfe8; transform: rotate(-1deg); }
-
-        /* UI */
-        .idea-card { background: #334155; padding: 8px; margin-bottom: 5px; border-radius: 4px; font-size: 0.9rem; border-left: 4px solid #ccc; }
-        .btn-act { border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; margin-right:3px; }
-        .btn-projection { position: absolute; top: 20px; left: 20px; z-index: 50; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        /* COLORS */
+        .c-yellow { background: #fef08a; border-left-color: #facc15; } .postit.c-yellow { transform: rotate(1deg); }
+        .c-green { background: #bbf7d0; border-left-color: #4ade80; } .postit.c-green { transform: rotate(-2deg); }
+        .c-blue { background: #bfdbfe; border-left-color: #60a5fa; } .postit.c-blue { transform: rotate(2deg); }
+        .c-pink { background: #fbcfe8; border-left-color: #f472b6; } .postit.c-pink { transform: rotate(-1deg); }
 
         /* WIDGETS */
+        .btn-projection { position: absolute; top: 15px; left: 15px; z-index: 50; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .ambient-widget { position: absolute; bottom: 20px; right: 20px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 10px; display: flex; gap: 15px; align-items: center; z-index: 50; border: 1px solid #334155; }
         .chrono { font-family: monospace; font-size: 1.5rem; font-weight: bold; color: #3b82f6; cursor: pointer; width: 80px; text-align: center; }
         .chrono.alert { color: #ef4444; animation: pulse 1s infinite; }
         .sono-box { width: 100px; height: 10px; background: #334155; border-radius: 4px; overflow: hidden; }
         .sono-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width 0.1s; }
-        
-        .student-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 5px; margin-bottom: 3px; border-radius: 4px; font-size: 0.8rem; }
-        .btn-call { background: #eab308; border:none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
 
-        #debug-status { position: fixed; bottom: 0; left: 0; font-size: 0.7rem; padding: 2px; background: black; color: lime; z-index: 1000; }
         @keyframes popIn { from { transform: scale(0) rotate(10deg); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
@@ -81,161 +71,148 @@
 
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2>POST-IT MANAGER</h2>
-            <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓</button>
+            <h2 style="margin:0; font-size:1.1rem;">POST-IT PROF</h2>
+            <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">🔓 Ouvert</button>
         </div>
         
-        <div class="sidebar-section" style="flex: 1;">
-            <div class="section-title">En Attente <span onclick="clearAll()" style="cursor:pointer;">(Tout rejeter)</span></div>
-            <div id="waiting-room"></div>
+        <div style="padding:15px; border-bottom:1px solid #334155;">
+            <input type="text" id="q-input" class="control-input" placeholder="Thème du brainstorming..." onchange="updateQuestion()">
+            <button class="btn-action btn-blue" onclick="updateQuestion()">LANCER LE THÈME</button>
         </div>
 
-        <div class="sidebar-section" style="height: 150px; background:#162032;">
-            <div class="section-title">👥 Présents <span id="student-count">(0)</span></div>
-            <div id="student-list"></div>
+        <div class="sidebar-section">
+            <div class="sec-head">
+                <span>⏳ En Attente</span>
+                <span onclick="clearWaiting()" style="cursor:pointer; color:#ef4444; font-size:0.7rem;">(Tout rejeter)</span>
+            </div>
+            <div id="waiting-room" class="sec-list"></div>
         </div>
-        <div id="debug-status">Init...</div>
+
+        <div class="sidebar-section" style="flex:0.6;">
+            <div class="sec-head">
+                <span>👥 Présents <span id="student-count">(0)</span></span>
+            </div>
+            <div id="student-list" class="sec-list"></div>
+        </div>
+
+        <div style="padding:15px; border-top:1px solid #334155;">
+            <button class="btn-action btn-red" onclick="resetAll()">🗑️ RESET TOTAL (VIDER)</button>
+        </div>
     </div>
 
     <div class="board" id="board">
         <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+        
+        <div id="display-question">...</div>
+
         <div class="ambient-widget">
             <div onclick="handleChronoClick()"><div class="chrono" id="chrono">00:00</div></div>
             <div style="display:flex; align-items:center;">
                 <div class="sono-box"><div class="sono-bar" id="sono-bar"></div></div>
             </div>
         </div>
-        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
-        
-        // CORRECTION ICI : Déclaration propre des variables
-        let app, db;
-        try { 
-            app = initializeApp(firebaseConfig); 
-            db = getFirestore(app); 
-            document.getElementById('debug-status').innerText = "🟢 Connecté"; 
-        } catch(e) { 
-            console.error(e);
-            document.getElementById('debug-status').innerText = "🔴 Erreur: " + e.message; 
-        }
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
-
-        // 1. SETUP
         if(isProjection) {
-            document.getElementById('sidebar').classList.add('hidden');
+            document.getElementById('sidebar').style.display = 'none';
             document.querySelector('.btn-projection').style.display = 'none';
-            document.getElementById('board').style.cursor = 'default'; // Pas de main en projection
+            document.getElementById('board').style.cursor = 'default';
         }
 
-        window.toggleProjection = () => {
-            const url = new URL(window.location.href);
-            url.searchParams.set("mode", "projection");
-            window.open(url.toString(), "_blank");
+        // --- 1. CONFIG & QUESTION ---
+        onSnapshot(doc(db, "postit_config", "global"), (snap) => {
+            if(snap.exists()){
+                const d = snap.data();
+                // Affichage Question
+                if(d.question) {
+                    document.getElementById('display-question').innerText = d.question;
+                    document.getElementById('q-input').value = d.question;
+                }
+                // Etat Cadenas
+                if(d.isLocked !== undefined) {
+                    const b = document.getElementById('btn-lock');
+                    b.innerText = d.isLocked ? "🔒 Fermé" : "🔓 Ouvert";
+                    b.style.color = d.isLocked ? "#ef4444" : "#22c55e";
+                    b.style.borderColor = d.isLocked ? "#ef4444" : "#22c55e";
+                }
+            }
+        });
+
+        window.updateQuestion = async () => {
+            const q = document.getElementById('q-input').value;
+            await setDoc(doc(db, "postit_config", "global"), { question: q, isLocked: false }, {merge:true});
         };
 
-        // 2. GESTION DES POST-ITS SUR LE TABLEAU (BOARD)
+        window.toggleLock = async () => {
+            const currentText = document.getElementById('btn-lock').innerText;
+            const isLocked = currentText.includes("Ouvert"); // Si ouvert, on verrouille
+            await setDoc(doc(db, "postit_config", "global"), { isLocked: isLocked }, {merge:true});
+        };
+
+        // --- 2. GESTION DU TABLEAU (BOARD) ---
         onSnapshot(collection(db, "postit_board"), (snap) => {
-            // Pour ne pas tout redessiner et casser le drag, on met à jour intelligemment
             const currentIds = [];
-            
             snap.forEach(d => {
-                const data = d.data();
                 currentIds.push(d.id);
-                
+                const data = d.data();
                 let el = document.getElementById(d.id);
                 
-                // Si n'existe pas, on crée
                 if(!el) {
                     el = document.createElement('div');
                     el.id = d.id;
-                    el.className = `postit color-${data.color || 'yellow'}`;
+                    el.className = `postit c-${data.color || 'yellow'}`;
+                    el.innerHTML = `<div class="author">${escapeHtml(data.student)}</div><div>${escapeHtml(data.text)}</div>`;
                     
-                    // Contenu
-                    const author = document.createElement('div'); author.className='author'; author.innerText = data.student || '?';
-                    const text = document.createElement('div'); text.innerText = data.text;
-                    el.appendChild(author);
-                    el.appendChild(text);
-
-                    // Bouton delete (Prof seulement)
                     if(!isProjection) {
                         const del = document.createElement('div'); del.className = 'delete-pin'; del.innerText = '×';
                         del.onclick = (e) => { e.stopPropagation(); deletePostit(d.id); };
                         el.appendChild(del);
-                        
-                        // Drag Events (Prof seulement)
                         el.onmousedown = (e) => startDrag(e, el);
                     }
-                    
                     document.getElementById('board').appendChild(el);
                 }
                 
-                // Mise à jour position (Si on ne drag pas actuellement cet élément)
+                // Maj position si on ne drag pas
                 if(draggedItem !== el) {
                     el.style.left = data.x + '%';
                     el.style.top = data.y + '%';
                 }
             });
-
-            // Supprimer les orphelins
-            document.querySelectorAll('.postit').forEach(el => {
-                if(!currentIds.includes(el.id)) el.remove();
-            });
+            // Nettoyage
+            document.querySelectorAll('.postit').forEach(el => { if(!currentIds.includes(el.id)) el.remove(); });
         });
 
-        // 3. LOGIQUE DRAG & DROP (SYNC)
+        // DRAG & DROP
         let draggedItem = null;
-        let startX, startY;
-
-        function startDrag(e, el) {
-            if(e.button !== 0) return; // Clic gauche seulement
-            draggedItem = el;
-            // Z-index top
-            el.style.zIndex = 1000;
-        }
-
+        function startDrag(e, el) { if(e.button!==0)return; draggedItem = el; el.style.zIndex = 1000; }
         window.addEventListener('mousemove', (e) => {
             if(draggedItem) {
                 e.preventDefault();
-                const board = document.getElementById('board');
-                const rect = board.getBoundingClientRect();
-                
-                // Calcul en pourcentage pour que ça marche sur l'écran géant
+                const rect = document.getElementById('board').getBoundingClientRect();
                 let x = ((e.clientX - rect.left) / rect.width) * 100;
                 let y = ((e.clientY - rect.top) / rect.height) * 100;
-                
-                // Centrer le curseur sur le postit (approx)
-                x -= 5; // Moitié largeur postit en %
-                y -= 5; // Moitié hauteur postit en %
-
-                draggedItem.style.left = x + '%';
-                draggedItem.style.top = y + '%';
+                draggedItem.style.left = (x-5) + '%'; draggedItem.style.top = (y-5) + '%';
             }
         });
-
         window.addEventListener('mouseup', async () => {
             if(draggedItem) {
-                draggedItem.style.zIndex = ''; // Reset z-index
                 const id = draggedItem.id;
-                
-                // Sauvegarde Firebase
-                await updateDoc(doc(db, "postit_board", id), {
-                    x: parseFloat(draggedItem.style.left),
-                    y: parseFloat(draggedItem.style.top)
-                });
-                
-                draggedItem = null;
+                await updateDoc(doc(db, "postit_board", id), { x: parseFloat(draggedItem.style.left), y: parseFloat(draggedItem.style.top) });
+                draggedItem.style.zIndex = ''; draggedItem = null;
             }
         });
+        window.deletePostit = async(id) => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, "postit_board", id)); };
 
-        window.deletePostit = async(id) => { if(confirm("Retirer ce post-it ?")) await deleteDoc(doc(db, "postit_board", id)); };
-
-        // 4. SALLE D'ATTENTE (PROF)
+        // --- 3. SALLE D'ATTENTE (WAITING) ---
         if(!isProjection) {
             const q = query(collection(db, "postit_ideas"), where("status", "==", "waiting"));
             onSnapshot(q, (snap) => {
@@ -245,16 +222,14 @@
                 
                 snap.forEach(d => {
                     const data = d.data();
-                    const colors = {'yellow':'🟨','green':'🟩','blue':'🟦','pink':'🟥'};
                     const card = document.createElement('div');
-                    card.className = `idea-card`;
-                    card.style.borderLeftColor = getHexColor(data.color);
+                    card.className = `idea-card c-${data.color}`;
                     card.innerHTML = `
-                        <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">${colors[data.color]||'⬜'} ${escapeHtml(data.student)}</div>
-                        <div style="margin:5px 0;">${escapeHtml(data.text)}</div>
-                        <div style="display:flex;">
-                            <button class="btn-act" style="background:#22c55e;color:#064e3b;flex:1;" onclick="acceptPostit('${d.id}', '${escapeHtml(data.text)}', '${data.color}', '${data.student}')">Afficher</button>
-                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="rejectPostit('${d.id}')">X</button>
+                        <div class="idea-info">👤 ${escapeHtml(data.student)}</div>
+                        <div class="idea-text">${escapeHtml(data.text)}</div>
+                        <div class="card-actions">
+                            <button class="btn-card" style="background:#22c55e;" onclick="acceptPostit('${d.id}', '${escapeHtml(data.text)}', '${data.color}', '${data.student}')">✔</button>
+                            <button class="btn-card" style="background:#ef4444;" onclick="rejectPostit('${d.id}')">✕</button>
                         </div>
                     `;
                     div.appendChild(card);
@@ -262,55 +237,56 @@
             });
         }
 
-        function getHexColor(c) {
-            if(c==='yellow') return '#fef08a';
-            if(c==='green') return '#bbf7d0';
-            if(c==='blue') return '#bfdbfe';
-            if(c==='pink') return '#fbcfe8';
-            return '#ccc';
-        }
-
-        // ACTIONS VALIDATION
         window.acceptPostit = async (id, text, color, student) => {
-            // Ajouter au Board (au centre par défaut avec un peu de random)
+            // Ajout au board (position random au centre)
             const randX = 40 + Math.random() * 20;
             const randY = 40 + Math.random() * 20;
-            
-            await addDoc(collection(db, "postit_board"), { 
-                text, color, student, x: randX, y: randY, timestamp: Date.now() 
-            });
-            // Supprimer de la salle d'attente
+            await addDoc(collection(db, "postit_board"), { text, color, student, x: randX, y: randY });
             await deleteDoc(doc(db, "postit_ideas", id));
         };
         window.rejectPostit = async (id) => await deleteDoc(doc(db, "postit_ideas", id));
-        window.clearAll = async () => {
+        window.clearWaiting = async () => {
             if(!confirm("Tout rejeter ?")) return;
             const snap = await getDocs(query(collection(db, "postit_ideas"), where("status", "==", "waiting")));
             const batch = writeBatch(db);
-            snap.forEach(d => batch.delete(doc(db, "postit_ideas", d.id)));
+            snap.forEach(d => batch.delete(d.ref));
             await batch.commit();
         };
 
-        // GESTION ELEVES
+        // --- 4. GESTION PRÉSENCE ---
         if(!isProjection) {
             onSnapshot(collection(db, "postit_presence"), (snap) => {
                 const list = document.getElementById('student-list'); list.innerHTML = "";
                 let count = 0;
-                snap.forEach(d => { count++; list.innerHTML += `<div class="student-item"><span>👤 ${escapeHtml(d.id)}</span> <button class="btn-call" onclick="call('${d.id}')">📢</button></div>`; });
+                snap.forEach(d => { count++; list.innerHTML += `<div class="student-row"><span>👤 ${escapeHtml(d.data().name)}</span> <button class="mega-btn" onclick="call('${d.data().name}')">📢</button></div>`; });
                 document.getElementById('student-count').innerText = `(${count})`;
             });
         }
         window.call = (name) => { setDoc(doc(db, "postit_config", "global"), { solicitedStudent: name }, { merge: true }); setTimeout(()=>setDoc(doc(db, "postit_config", "global"), { solicitedStudent: null }, { merge: true }), 5000); };
 
-        let isLocked = false;
-        window.toggleLock = async () => { isLocked = !isLocked; document.getElementById('btn-lock').innerText = isLocked ? "🔒" : "🔓"; await setDoc(doc(db, "postit_config", "global"), { isLocked: isLocked }, { merge: true }); };
+        // --- 5. RESET TOTAL ---
+        window.resetAll = async () => {
+            if(!confirm("⚠️ ATTENTION : Cela efface TOUT (Post-its, Attente, Présents).\nContinuer ?")) return;
+            const batch = writeBatch(db);
+            (await getDocs(collection(db, "postit_board"))).forEach(d => batch.delete(d.ref));
+            (await getDocs(collection(db, "postit_ideas"))).forEach(d => batch.delete(d.ref));
+            (await getDocs(collection(db, "postit_presence"))).forEach(d => batch.delete(d.ref));
+            batch.set(doc(db, "postit_config", "global"), { question: "POST-IT", isLocked: false, solicitedStudent: null });
+            await batch.commit();
+            location.reload();
+        };
 
+        // UI UTILS
+        window.toggleProjection = () => {
+            const url = new URL(window.location.href); url.searchParams.set("mode", "projection"); window.open(url.toString(), "_blank");
+        };
+        function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
+        
+        // WIDGETS
         let ti, ir=false, ts=0;
         window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };
         function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
         navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); }).catch(()=>{});
-
-        function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
     </script>
 </body>
 </html>
