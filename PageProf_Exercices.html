@@ -64,6 +64,9 @@
     .btn-refresh{
       background:#6b7280;
     }
+    .btn-reset{
+      background:#0f172a;
+    }
     .status{
       margin-top:10px;
       font-size:.9rem;
@@ -87,6 +90,21 @@
       font-weight:700;
       font-size:.78rem;
     }
+    .filters{
+      margin-top:12px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+    .filters input,
+    .filters select{
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid #e5e7eb;
+      font-size:.85rem;
+      min-width:160px;
+    }
   </style>
 </head>
 <body>
@@ -101,6 +119,14 @@
       <div class="row">
         <button class="btn btn-refresh" id="refresh-btn">Actualiser</button>
         <div id="status" class="status muted"></div>
+      </div>
+
+      <div class="filters">
+        <input id="filter-identifiant" type="text" placeholder="Filtrer par identifiant…" />
+        <select id="filter-classe">
+          <option value="">Toutes les classes</option>
+        </select>
+        <button class="btn btn-reset" id="clear-filters-btn" type="button">Réinitialiser les filtres</button>
       </div>
 
       <div style="overflow-x:auto;margin-top:12px;">
@@ -145,6 +171,12 @@
     const statusEl = document.getElementById("status");
     const refreshBtn = document.getElementById("refresh-btn");
 
+    const filterIdInput = document.getElementById("filter-identifiant");
+    const filterClasseSelect = document.getElementById("filter-classe");
+    const clearFiltersBtn = document.getElementById("clear-filters-btn");
+
+    let allRows = [];
+
     function setStatus(text, cls="muted"){
       statusEl.className = "status " + cls;
       statusEl.textContent = text;
@@ -157,20 +189,18 @@
       return d.toLocaleString("fr-FR");
     }
 
-    // On normalise un document Firestore, en gérant
-    // 1) l’ancien format simple
-    // 2) le nouveau format avec meta / resultat
+    // Normalisation d’un document Firestore
     function normalize(docSnap){
       const data = docSnap.data() || {};
       const meta = data.meta || {};
       const res  = data.resultat || {};
 
-      const createdAt = meta.createdAt || data.createdAt || "";
+      const createdAt   = meta.createdAt || data.createdAt || "";
       const identifiant = meta.nom || data.identifiant || "";
-      const classe = meta.classe || data.classe || "";
-      const support = meta.support || data.exercice || "";
-      const score = res.score || data.score || "";
-      const url = res.url || data.url || "";
+      const classe      = meta.classe || data.classe || "";
+      const support     = meta.support || data.exercice || "";
+      const score       = res.score || data.score || "";
+      const url         = res.url || data.url || "";
 
       return {
         id: docSnap.id,
@@ -185,7 +215,6 @@
     }
 
     function downloadJSON(row){
-      // On exporte le document brut tel qu’il est dans Firestore
       const blob = new Blob([JSON.stringify(row.raw, null, 2)], {type:"application/json"});
       const url = URL.createObjectURL(blob);
 
@@ -204,26 +233,38 @@
       URL.revokeObjectURL(url);
     }
 
-    async function load(){
-      try{
-        setStatus("Chargement…");
-        tbody.innerHTML = `<tr><td colspan="8">Chargement…</td></tr>`;
+    function buildClasseOptions(){
+      if(!filterClasseSelect) return;
+      const classes = Array.from(new Set(allRows.map(r => r.classe).filter(Boolean))).sort();
+      filterClasseSelect.innerHTML = '<option value="">Toutes les classes</option>';
+      classes.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        filterClasseSelect.appendChild(opt);
+      });
+    }
 
-        // On lit toujours la collection exercices
-        const snap = await getDocs(collection(db, "exercices"));
-        const rows = [];
-        snap.forEach(d => rows.push(normalize(d)));
+    function renderTable(){
+      if(!tbody) return;
 
-        if(!rows.length){
-          tbody.innerHTML = `<tr><td colspan="8">Aucun résultat pour l’instant.</td></tr>`;
-          setStatus("0 résultat.");
-          return;
-        }
+      let rows = allRows.slice();
 
-        // Tri du plus récent au plus ancien
-        rows.sort((a,b)=> String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+      const idFilter = (filterIdInput?.value || "").trim().toLowerCase();
+      const classeFilter = (filterClasseSelect?.value || "").trim();
 
-        tbody.innerHTML = "";
+      if(idFilter){
+        rows = rows.filter(r => (r.identifiant || "").toLowerCase().includes(idFilter));
+      }
+      if(classeFilter){
+        rows = rows.filter(r => (r.classe || "") === classeFilter);
+      }
+
+      tbody.innerHTML = "";
+
+      if(!rows.length){
+        tbody.innerHTML = `<tr><td colspan="8">Aucun résultat avec ces filtres.</td></tr>`;
+      } else {
         rows.forEach((row, i)=>{
           const tr = document.createElement("tr");
 
@@ -261,8 +302,32 @@
           tr.appendChild(jsonCell);
           tbody.appendChild(tr);
         });
+      }
 
-        setStatus(rows.length + " résultat(s).", "ok");
+      setStatus(`${rows.length} résultat(s) affiché(s) sur ${allRows.length}.`, "ok");
+    }
+
+    async function load(){
+      try{
+        setStatus("Chargement…");
+        tbody.innerHTML = `<tr><td colspan="8">Chargement…</td></tr>`;
+
+        const snap = await getDocs(collection(db, "exercices"));
+        const rows = [];
+        snap.forEach(d => rows.push(normalize(d)));
+
+        if(!rows.length){
+          allRows = [];
+          tbody.innerHTML = `<tr><td colspan="8">Aucun résultat pour l’instant.</td></tr>`;
+          setStatus("0 résultat.", "ok");
+          return;
+        }
+
+        rows.sort((a,b)=> String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+        allRows = rows;
+
+        buildClasseOptions();
+        renderTable();
       }catch(e){
         console.error(e);
         tbody.innerHTML = `<tr><td colspan="8">Erreur technique.</td></tr>`;
@@ -270,7 +335,26 @@
       }
     }
 
-    refreshBtn.addEventListener("click", load);
+    refreshBtn.addEventListener("click", () => {
+      if(filterIdInput) filterIdInput.value = "";
+      if(filterClasseSelect) filterClasseSelect.value = "";
+      load();
+    });
+
+    if(filterIdInput){
+      filterIdInput.addEventListener("input", renderTable);
+    }
+    if(filterClasseSelect){
+      filterClasseSelect.addEventListener("change", renderTable);
+    }
+    if(clearFiltersBtn){
+      clearFiltersBtn.addEventListener("click", () => {
+        if(filterIdInput) filterIdInput.value = "";
+        if(filterClasseSelect) filterClasseSelect.value = "";
+        renderTable();
+      });
+    }
+
     load();
   </script>
 </body>
