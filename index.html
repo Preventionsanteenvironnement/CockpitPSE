@@ -851,6 +851,8 @@
     const filterExo    = document.getElementById("scores-filter-exo");
 
     let allScores = [];
+    let sortKey = "date";
+    let sortDir = "desc";
 
     async function loadScores() {
       if (!btnRefresh) return;
@@ -858,8 +860,8 @@
       statusEl.textContent = "Chargement des copies depuis Firestore…";
 
       try {
-        // adapte ici le nom de collection si besoin ("bacpro" ou "exercices")
-        const snap = await getDocs(collection(db, "bacpro"));
+        // Collection unique pour les exercices individuels
+        const snap = await getDocs(collection(db, "exercices"));
         allScores = [];
         snap.forEach(docSnap => {
           const data = docSnap.data() || {};
@@ -877,23 +879,53 @@
       }
     }
 
+    function getValueForSort(item, key) {
+      const meta = item.meta || {};
+      const res  = item.resultat || {};
+      switch (key) {
+        case "nom":      return (meta.nom || "").toLowerCase();
+        case "classe":   return (meta.classe || "").toLowerCase();
+        case "exercice": return (meta.support || "").toLowerCase();
+        case "score":    return typeof res.score === "number" ? res.score : (parseFloat(res.score) || 0);
+        case "date":
+          return meta.createdAt ? new Date(meta.createdAt).getTime() : 0;
+        default:         return "";
+      }
+    }
+
     function renderScores() {
       const nameVal  = (filterName?.value || "").toLowerCase();
       const classVal = filterClass?.value || "";
       const exoVal   = filterExo?.value || "";
 
       const rows = allScores
-        .slice()
-        .sort((a,b) => new Date(b.meta?.createdAt || 0) - new Date(a.meta?.createdAt || 0))
         .filter(item => {
-          const nom    = (item.meta?.nom || "").toLowerCase();
-          const classe = item.meta?.classe || "";
-          const sup    = item.meta?.support || "";
+          const meta = item.meta || {};
+          const nom    = (meta.nom || "").toLowerCase();
+          const classe = meta.classe || "";
+          const sup    = meta.support || "";
           if (nameVal && !nom.includes(nameVal)) return false;
           if (classVal && classe !== classVal) return false;
           if (exoVal && sup !== exoVal) return false;
           return true;
+        })
+        .sort((a,b) => {
+          const va = getValueForSort(a, sortKey);
+          const vb = getValueForSort(b, sortKey);
+          let cmp = 0;
+          if (va < vb) cmp = -1;
+          else if (va > vb) cmp = 1;
+          return sortDir === "asc" ? cmp : -cmp;
         });
+
+      // Mise à jour des flèches sur les en-têtes
+      const headers = document.querySelectorAll("#scores-table th.sortable");
+      headers.forEach(th => {
+        th.classList.remove("sort-asc","sort-desc");
+        if (th.dataset.sort === sortKey) {
+          th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
+        }
+      });
 
       tbody.innerHTML = "";
 
@@ -944,7 +976,7 @@
     window.deleteScore = async function(id) {
       if (!confirm("Supprimer définitivement cette copie ?")) return;
       try {
-        await deleteDoc(doc(db, "bacpro", id)); // adapte ici si tu changes la collection
+        await deleteDoc(doc(db, "exercices", id)); // suppression dans la collection exercices
         allScores = allScores.filter(s => s.id !== id);
         renderScores();
       } catch (e) {
@@ -963,6 +995,27 @@
     if (filterName)  filterName.addEventListener("input", renderScores);
     if (filterClass) filterClass.addEventListener("change", renderScores);
     if (filterExo)   filterExo.addEventListener("change", renderScores);
+
+    // Tri au clic sur les en-têtes
+    const sortableHeaders = document.querySelectorAll("#scores-table th.sortable");
+    sortableHeaders.forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (!key) return;
+        if (sortKey === key) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          // par défaut : score/date en desc, le reste en asc
+          if (key === "date" || key === "score") {
+            sortDir = "desc";
+          } else {
+            sortDir = "asc";
+          }
+        }
+        renderScores();
+      });
+    });
 
     loadScores();
   </script>
