@@ -515,10 +515,11 @@
                 <th class="sortable" data-sort="exercice">Exercice</th>
                 <th class="sortable" data-sort="score">Score</th>
                 <th class="sortable" data-sort="date">Date d’envoi</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="scores-tbody">
-              <tr><td colspan="6" class="scores-empty">Connexion aux scores à brancher (l’interface est prête).</td></tr>
+              <tr><td colspan="7" class="scores-empty">Connexion aux scores à brancher (l’interface est prête).</td></tr>
             </tbody>
           </table>
         </div>
@@ -821,6 +822,149 @@
     // INIT
     renderMemos();
     renderAgenda();
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ⚠️ À REMPLACER PAR TON VRAI CONFIG (copie depuis un ancien fichier qui fonctionne)
+    const firebaseConfig = {
+      apiKey: "TON_API_KEY",
+      authDomain: "TON_PROJET.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.appspot.com",
+      messagingSenderId: "TON_SENDER_ID",
+      appId: "TON_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const btnRefresh   = document.getElementById("scores-btn-refresh");
+    const tbody        = document.getElementById("scores-tbody");
+    const counterEl    = document.getElementById("scores-counter");
+    const statusEl     = document.getElementById("scores-status");
+    const lastUpdateEl = document.getElementById("scores-last-update");
+    const filterName   = document.getElementById("scores-filter-name");
+    const filterClass  = document.getElementById("scores-filter-class");
+    const filterExo    = document.getElementById("scores-filter-exo");
+
+    let allScores = [];
+
+    async function loadScores() {
+      if (!btnRefresh) return;
+      btnRefresh.disabled = true;
+      statusEl.textContent = "Chargement des copies depuis Firestore…";
+
+      try {
+        // adapte ici le nom de collection si besoin ("bacpro" ou "exercices")
+        const snap = await getDocs(collection(db, "bacpro"));
+        allScores = [];
+        snap.forEach(docSnap => {
+          const data = docSnap.data() || {};
+          allScores.push({ id: docSnap.id, ...data });
+        });
+        renderScores();
+        const now = new Date();
+        lastUpdateEl.textContent = "Dernière mise à jour : " + now.toLocaleString("fr-FR");
+        statusEl.textContent = "Connecté à Firestore.";
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = "Erreur de connexion à Firestore : " + (e.message || e);
+      } finally {
+        btnRefresh.disabled = false;
+      }
+    }
+
+    function renderScores() {
+      const nameVal  = (filterName?.value || "").toLowerCase();
+      const classVal = filterClass?.value || "";
+      const exoVal   = filterExo?.value || "";
+
+      const rows = allScores
+        .slice()
+        .sort((a,b) => new Date(b.meta?.createdAt || 0) - new Date(a.meta?.createdAt || 0))
+        .filter(item => {
+          const nom    = (item.meta?.nom || "").toLowerCase();
+          const classe = item.meta?.classe || "";
+          const sup    = item.meta?.support || "";
+          if (nameVal && !nom.includes(nameVal)) return false;
+          if (classVal && classe !== classVal) return false;
+          if (exoVal && sup !== exoVal) return false;
+          return true;
+        });
+
+      tbody.innerHTML = "";
+
+      if (!rows.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="7" class="scores-empty">Aucune copie trouvée pour l’instant.</td>';
+        tbody.appendChild(tr);
+      } else {
+        const exoSet = new Set();
+        rows.forEach((item, index) => {
+          const meta = item.meta || {};
+          const res  = item.resultat || {};
+          exoSet.add(meta.support || "");
+          const dateStr = meta.createdAt
+            ? new Date(meta.createdAt).toLocaleString("fr-FR")
+            : "";
+
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>"+(index+1)+"</td>"+
+            "<td>"+(meta.nom || "")+"</td>"+
+            "<td>"+(meta.classe || "")+"</td>"+
+            "<td>"+(meta.support || "")+"</td>"+
+            "<td>"+(res.score || "")+"</td>"+
+            "<td>"+dateStr+"</td>"+
+            '<td><button type="button" onclick="deleteScore(\''+item.id+'\')">🗑️</button></td>';
+          tbody.appendChild(tr);
+        });
+
+        // mettre à jour la liste des exercices dans le filtre
+        if (filterExo) {
+          const current = filterExo.value;
+          filterExo.innerHTML = '<option value="">Tous les exercices</option>';
+          Array.from(exoSet).filter(Boolean).sort().forEach(label => {
+            const opt = document.createElement("option");
+            opt.value = label;
+            opt.textContent = label;
+            filterExo.appendChild(opt);
+          });
+          filterExo.value = current;
+        }
+      }
+
+      const n = rows.length;
+      counterEl.textContent = n + (n > 1 ? " enregistrements" : " enregistrement");
+    }
+
+    window.deleteScore = async function(id) {
+      if (!confirm("Supprimer définitivement cette copie ?")) return;
+      try {
+        await deleteDoc(doc(db, "bacpro", id)); // adapte ici si tu changes la collection
+        allScores = allScores.filter(s => s.id !== id);
+        renderScores();
+      } catch (e) {
+        alert("Erreur lors de la suppression : " + (e.message || e));
+      }
+    };
+
+    if (btnRefresh) {
+      btnRefresh.disabled = false;
+      btnRefresh.addEventListener("click", loadScores);
+    }
+    if (filterName)  filterName.disabled  = false;
+    if (filterClass) filterClass.disabled = false;
+    if (filterExo)   filterExo.disabled   = false;
+
+    if (filterName)  filterName.addEventListener("input", renderScores);
+    if (filterClass) filterClass.addEventListener("change", renderScores);
+    if (filterExo)   filterExo.addEventListener("change", renderScores);
+
+    loadScores();
   </script>
 </body>
 </html>
