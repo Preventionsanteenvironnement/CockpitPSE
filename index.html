@@ -485,7 +485,7 @@
       <h2 style="color:var(--col-eval);">Scores exercices (en ligne)</h2>
       <div class="scores-card">
         <div class="scores-toolbar">
-          <span class="scores-pill">📊 Vue globale des exercices envoyés (FireStore – à connecter)</span>
+          <span class="scores-pill">📊 Vue globale des exercices envoyés (Firestore)</span>
           <button id="scores-btn-refresh" class="scores-button" type="button" disabled>🔄 Actualiser</button>
           <div id="scores-counter" class="scores-counter">0 enregistrement</div>
         </div>
@@ -694,7 +694,7 @@
     setInterval(updateClock,1000);
     updateClock();
 
-    // SIMPLE PLANNING (à adapter si besoin)
+    // SIMPLE PLANNING
     let planningOffset = 0;
     const planningData = [
       {time:"08h30",label:"CAP – PSE",room:"Salle 12"},
@@ -828,7 +828,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // ⚠️ À REMPLACER PAR TON VRAI CONFIG (copie depuis un ancien fichier qui fonctionne)
     const firebaseConfig = {
       apiKey: "TON_API_KEY",
       authDomain: "TON_PROJET.firebaseapp.com",
@@ -851,8 +850,7 @@
     const filterExo    = document.getElementById("scores-filter-exo");
 
     let allScores = [];
-    let sortKey = "date";
-    let sortDir = "desc";
+    let currentSort = { field: "date", dir: "desc" };
 
     async function loadScores() {
       if (!btnRefresh) return;
@@ -860,7 +858,7 @@
       statusEl.textContent = "Chargement des copies depuis Firestore…";
 
       try {
-        // Collection unique pour les exercices individuels
+        // collection pour tous les exercices individuels
         const snap = await getDocs(collection(db, "exercices"));
         allScores = [];
         snap.forEach(docSnap => {
@@ -879,18 +877,52 @@
       }
     }
 
-    function getValueForSort(item, key) {
-      const meta = item.meta || {};
-      const res  = item.resultat || {};
-      switch (key) {
-        case "nom":      return (meta.nom || "").toLowerCase();
-        case "classe":   return (meta.classe || "").toLowerCase();
-        case "exercice": return (meta.support || "").toLowerCase();
-        case "score":    return typeof res.score === "number" ? res.score : (parseFloat(res.score) || 0);
+    function compareByField(a, b, field, dir) {
+      const metaA = a.meta || {};
+      const metaB = b.meta || {};
+      const resA  = a.resultat || {};
+      const resB  = b.resultat || {};
+      let va = "";
+      let vb = "";
+
+      switch (field) {
+        case "nom":
+          va = (metaA.nom || "").toLowerCase();
+          vb = (metaB.nom || "").toLowerCase();
+          break;
+        case "classe":
+          va = (metaA.classe || "").toLowerCase();
+          vb = (metaB.classe || "").toLowerCase();
+          break;
+        case "exercice":
+          va = (metaA.support || "").toLowerCase();
+          vb = (metaB.support || "").toLowerCase();
+          break;
+        case "score":
+          // essai de conversion en nombre si possible
+          const na = parseFloat((resA.score || "").toString().replace(",","."));
+          const nb = parseFloat((resB.score || "").toString().replace(",","."));
+          if (!isNaN(na) && !isNaN(nb)) {
+            va = na; vb = nb;
+          } else {
+            va = (resA.score || "").toString();
+            vb = (resB.score || "").toString();
+          }
+          break;
         case "date":
-          return meta.createdAt ? new Date(meta.createdAt).getTime() : 0;
-        default:         return "";
+        default:
+          va = metaA.createdAt ? new Date(metaA.createdAt).getTime() : 0;
+          vb = metaB.createdAt ? new Date(metaB.createdAt).getTime() : 0;
+          break;
       }
+
+      let diff;
+      if (typeof va === "number" && typeof vb === "number") {
+        diff = va - vb;
+      } else {
+        diff = va < vb ? -1 : va > vb ? 1 : 0;
+      }
+      return dir === "asc" ? diff : -diff;
     }
 
     function renderScores() {
@@ -899,6 +931,7 @@
       const exoVal   = filterExo?.value || "";
 
       const rows = allScores
+        .slice()
         .filter(item => {
           const meta = item.meta || {};
           const nom    = (meta.nom || "").toLowerCase();
@@ -909,23 +942,7 @@
           if (exoVal && sup !== exoVal) return false;
           return true;
         })
-        .sort((a,b) => {
-          const va = getValueForSort(a, sortKey);
-          const vb = getValueForSort(b, sortKey);
-          let cmp = 0;
-          if (va < vb) cmp = -1;
-          else if (va > vb) cmp = 1;
-          return sortDir === "asc" ? cmp : -cmp;
-        });
-
-      // Mise à jour des flèches sur les en-têtes
-      const headers = document.querySelectorAll("#scores-table th.sortable");
-      headers.forEach(th => {
-        th.classList.remove("sort-asc","sort-desc");
-        if (th.dataset.sort === sortKey) {
-          th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
-        }
-      });
+        .sort((a,b) => compareByField(a,b,currentSort.field,currentSort.dir));
 
       tbody.innerHTML = "";
 
@@ -955,7 +972,7 @@
           tbody.appendChild(tr);
         });
 
-        // mettre à jour la liste des exercices dans le filtre
+        // mise à jour de la liste des exercices dans le filtre
         if (filterExo) {
           const current = filterExo.value;
           filterExo.innerHTML = '<option value="">Tous les exercices</option>';
@@ -976,7 +993,7 @@
     window.deleteScore = async function(id) {
       if (!confirm("Supprimer définitivement cette copie ?")) return;
       try {
-        await deleteDoc(doc(db, "exercices", id)); // suppression dans la collection exercices
+        await deleteDoc(doc(db, "exercices", id));
         allScores = allScores.filter(s => s.id !== id);
         renderScores();
       } catch (e) {
@@ -996,23 +1013,19 @@
     if (filterClass) filterClass.addEventListener("change", renderScores);
     if (filterExo)   filterExo.addEventListener("change", renderScores);
 
-    // Tri au clic sur les en-têtes
-    const sortableHeaders = document.querySelectorAll("#scores-table th.sortable");
-    sortableHeaders.forEach(th => {
+    // tri au clic sur les en-têtes
+    document.querySelectorAll("#scores-table th.sortable").forEach(th => {
       th.addEventListener("click", () => {
-        const key = th.dataset.sort;
-        if (!key) return;
-        if (sortKey === key) {
-          sortDir = sortDir === "asc" ? "desc" : "asc";
+        const field = th.dataset.sort;
+        if (currentSort.field === field) {
+          currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
         } else {
-          sortKey = key;
-          // par défaut : score/date en desc, le reste en asc
-          if (key === "date" || key === "score") {
-            sortDir = "desc";
-          } else {
-            sortDir = "asc";
-          }
+          currentSort.field = field;
+          currentSort.dir = "asc";
         }
+        document.querySelectorAll("#scores-table th.sortable")
+          .forEach(t => t.classList.remove("sort-asc","sort-desc"));
+        th.classList.add(currentSort.dir === "asc" ? "sort-asc" : "sort-desc");
         renderScores();
       });
     });
