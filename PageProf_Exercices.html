@@ -23,6 +23,10 @@
     .muted{color:#6b7280}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
     .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700;font-size:.78rem}
+    th.sortable{cursor:pointer;user-select:none}
+    th.sortable::after{content:"";margin-left:4px;font-size:.7rem;color:#9ca3af}
+    th.sortable.sort-asc::after{content:"▲"}
+    th.sortable.sort-desc::after{content:"▼"}
   </style>
 </head>
 <body>
@@ -41,11 +45,11 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>Date</th>
-              <th>Identifiant</th>
-              <th>Classe</th>
-              <th>Thème / Support</th>
-              <th>Score</th>
+              <th class="sortable" data-sort="date">Date</th>
+              <th class="sortable" data-sort="nom">Identifiant</th>
+              <th class="sortable" data-sort="classe">Classe</th>
+              <th class="sortable" data-sort="support">Thème / Support</th>
+              <th class="sortable" data-sort="score">Score</th>
               <th>Lien</th>
               <th>JSON</th>
               <th>Suppr.</th>
@@ -59,146 +63,223 @@
     </div>
   </div>
 
-<script type="module">
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  <script type="module">
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-  authDomain: "devoirs-pse.firebaseapp.com",
-  projectId: "devoirs-pse",
-  storageBucket: "devoirs-pse.firebasestorage.app",
-  messagingSenderId: "614730413904",
-  appId: "1:614730413904:web:a5dd478af5de30f6bede55"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+      authDomain: "devoirs-pse.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.firebasestorage.app",
+      messagingSenderId: "614730413904",
+      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-const tbody = document.getElementById("body");
-const statusEl = document.getElementById("status");
-const refreshBtn = document.getElementById("refresh-btn");
+    const tbody = document.getElementById("body");
+    const statusEl = document.getElementById("status");
+    const refreshBtn = document.getElementById("refresh-btn");
 
-function setStatus(text, cls="muted"){
-  statusEl.className = "status " + cls;
-  statusEl.textContent = text;
-}
+    let allRows = [];
+    let currentSortKey = "date";
+    let currentSortDir = "desc";
 
-function asDate(iso){
-  if(!iso) return "—";
-  const d = new Date(iso);
-  if(String(d) === "Invalid Date") return iso;
-  return d.toLocaleString("fr-FR");
-}
-
-function downloadJSON(row){
-  const obj = {
-    type: row.meta?.type || "exercice",
-    createdAt: row.meta?.createdAt || "",
-    identifiant: row.meta?.nom || "",
-    classe: row.meta?.classe || "",
-    support: row.meta?.support || "",
-    score: row.resultat?.score || "",
-    url: row.resultat?.url || "",
-    titre: row.resultat?.titre || ""
-  };
-  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const safe = (row.meta?.support || "exercice").replace(/[^\w\-]+/g,"_").slice(0,60);
-  const filename = "exercice_" + safe + "_" + (row.meta?.createdAt || "").replace(/[^\w\-]+/g,"_").slice(0,30) + ".json";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename || "exercice.json";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-async function deleteEntry(id){
-  if(!confirm("Supprimer définitivement cette entrée ?")) return;
-  try{
-    await deleteDoc(doc(db, "exercices", id));
-    load();
-  }catch(e){
-    alert("Erreur suppression : " + e.message);
-  }
-}
-
-async function load(){
-  try{
-    setStatus("Chargement…");
-    tbody.innerHTML = `<tr><td colspan="9">Chargement…</td></tr>`;
-
-    const snap = await getDocs(collection(db, "exercices"));
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-
-    if(!rows.length){
-      tbody.innerHTML = `<tr><td colspan="9">Aucun résultat pour l’instant.</td></tr>`;
-      setStatus("0 résultat.");
-      return;
+    function setStatus(text, cls="muted"){
+      statusEl.className = "status " + cls;
+      statusEl.textContent = text;
     }
 
-    rows.sort((a,b)=> String(b.meta?.createdAt||"").localeCompare(String(a.meta?.createdAt||"")));
+    function asDate(iso){
+      if(!iso) return "—";
+      const d = new Date(iso);
+      if(String(d) === "Invalid Date") return iso;
+      return d.toLocaleString("fr-FR");
+    }
 
-    tbody.innerHTML = "";
-    rows.forEach((row, i)=>{
-      const tr = document.createElement("tr");
+    function parseScore(scoreText){
+      if(!scoreText) return 0;
+      const n = parseFloat(String(scoreText).split("/")[0].replace(",", "."));
+      return isNaN(n) ? 0 : n;
+    }
 
-      const linkCell = document.createElement("td");
-      if(row.resultat?.url){
-        const a = document.createElement("a");
-        a.href = row.resultat.url;
-        a.target = "_blank";
-        a.rel = "noopener";
-        a.textContent = "Ouvrir";
-        a.className = "pill";
-        linkCell.appendChild(a);
-      }else{
-        linkCell.textContent = "—";
-        linkCell.className = "muted";
+    function updateSortIndicators(){
+      const headers = document.querySelectorAll("th[data-sort]");
+      headers.forEach(h=>{
+        h.classList.remove("sort-asc","sort-desc");
+        const key = h.getAttribute("data-sort");
+        if(key === currentSortKey){
+          h.classList.add(currentSortDir === "asc" ? "sort-asc" : "sort-desc");
+        }
+      });
+    }
+
+    function sortRows(rows){
+      rows.sort((a,b)=>{
+        let va, vb;
+
+        if(currentSortKey === "nom"){
+          va = (a.meta?.nom || "").toLowerCase();
+          vb = (b.meta?.nom || "").toLowerCase();
+        }else if(currentSortKey === "classe"){
+          va = (a.meta?.classe || "").toLowerCase();
+          vb = (b.meta?.classe || "").toLowerCase();
+        }else if(currentSortKey === "support"){
+          va = (a.meta?.support || "").toLowerCase();
+          vb = (b.meta?.support || "").toLowerCase();
+        }else if(currentSortKey === "score"){
+          va = parseScore(a.resultat?.score || "");
+          vb = parseScore(b.resultat?.score || "");
+        }else if(currentSortKey === "date"){
+          va = new Date(a.meta?.createdAt || 0).getTime() || 0;
+          vb = new Date(b.meta?.createdAt || 0).getTime() || 0;
+        }else{
+          va = 0;
+          vb = 0;
+        }
+
+        if(va < vb) return currentSortDir === "asc" ? -1 : 1;
+        if(va > vb) return currentSortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    function renderTable(){
+      if(!allRows.length){
+        tbody.innerHTML = `<tr><td colspan="9">Aucun résultat pour l’instant.</td></tr>`;
+        return;
       }
 
-      const jsonCell = document.createElement("td");
-      const b = document.createElement("button");
-      b.className = "btn";
-      b.textContent = "JSON";
-      b.type = "button";
-      b.addEventListener("click", ()=> downloadJSON(row));
-      jsonCell.appendChild(b);
+      const rows = [...allRows];
+      sortRows(rows);
+      tbody.innerHTML = "";
 
-      const delCell = document.createElement("td");
-      const del = document.createElement("button");
-      del.className = "btn btn-del";
-      del.textContent = "X";
-      del.addEventListener("click", ()=> deleteEntry(row.id));
-      delCell.appendChild(del);
+      rows.forEach((row, i)=>{
+        const tr = document.createElement("tr");
 
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${asDate(row.meta?.createdAt)}</td>
-        <td>${row.meta?.nom || "—"}</td>
-        <td>${row.meta?.classe || "—"}</td>
-        <td>${row.meta?.support || "—"}</td>
-        <td>${row.resultat?.score || "—"}</td>
-      `;
-      tr.appendChild(linkCell);
-      tr.appendChild(jsonCell);
-      tr.appendChild(delCell);
-      tbody.appendChild(tr);
+        const linkCell = document.createElement("td");
+        if(row.resultat?.url){
+          const a = document.createElement("a");
+          a.href = row.resultat.url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = "Ouvrir";
+          a.className = "pill";
+          linkCell.appendChild(a);
+        }else{
+          linkCell.textContent = "—";
+          linkCell.className = "muted";
+        }
+
+        const jsonCell = document.createElement("td");
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = "JSON";
+        b.type = "button";
+        b.addEventListener("click", ()=> downloadJSON(row));
+        jsonCell.appendChild(b);
+
+        const delCell = document.createElement("td");
+        const del = document.createElement("button");
+        del.className = "btn btn-del";
+        del.textContent = "X";
+        del.addEventListener("click", ()=> deleteEntry(row.id));
+        delCell.appendChild(del);
+
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${asDate(row.meta?.createdAt)}</td>
+          <td>${row.meta?.nom || "—"}</td>
+          <td>${row.meta?.classe || "—"}</td>
+          <td>${row.meta?.support || "—"}</td>
+          <td>${row.resultat?.score || "—"}</td>
+        `;
+        tr.appendChild(linkCell);
+        tr.appendChild(jsonCell);
+        tr.appendChild(delCell);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function downloadJSON(row){
+      const obj = {
+        type: row.meta?.type || "exercice",
+        createdAt: row.meta?.createdAt || "",
+        identifiant: row.meta?.nom || "",
+        classe: row.meta?.classe || "",
+        support: row.meta?.support || "",
+        score: row.resultat?.score || "",
+        url: row.resultat?.url || "",
+        titre: row.resultat?.titre || ""
+      };
+      const blob = new Blob([JSON.stringify(obj, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const safe = (row.meta?.support || "exercice").replace(/[^\w\-]+/g,"_").slice(0,60);
+      const filename = "exercice_" + safe + "_" + (row.meta?.createdAt || "").replace(/[^\w\-]+/g,"_").slice(0,30) + ".json";
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "exercice.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function deleteEntry(id){
+      if(!confirm("Supprimer définitivement cette entrée ?")) return;
+      try{
+        await deleteDoc(doc(db, "exercices", id));
+        load();
+      }catch(e){
+        alert("Erreur suppression : " + e.message);
+      }
+    }
+
+    async function load(){
+      try{
+        setStatus("Chargement…");
+        tbody.innerHTML = `<tr><td colspan="9">Chargement…</td></tr>`;
+
+        const snap = await getDocs(collection(db, "exercices"));
+        const rows = [];
+        snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+
+        allRows = rows;
+
+        if(!allRows.length){
+          tbody.innerHTML = `<tr><td colspan="9">Aucun résultat pour l’instant.</td></tr>`;
+          setStatus("0 résultat.");
+          updateSortIndicators();
+          return;
+        }
+
+        renderTable();
+        updateSortIndicators();
+        setStatus(allRows.length + " résultat(s).", "ok");
+      }catch(e){
+        tbody.innerHTML = `<tr><td colspan="9">Erreur technique.</td></tr>`;
+        setStatus("Erreur Firebase : " + e.message, "err");
+      }
+    }
+
+    document.querySelectorAll("th[data-sort]").forEach(th=>{
+      th.addEventListener("click", ()=>{
+        const key = th.getAttribute("data-sort");
+        if(currentSortKey === key){
+          currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+        }else{
+          currentSortKey = key;
+          currentSortDir = "asc";
+        }
+        updateSortIndicators();
+        renderTable();
+      });
     });
 
-    setStatus(rows.length + " résultat(s).", "ok");
-  }catch(e){
-    tbody.innerHTML = `<tr><td colspan="9">Erreur technique.</td></tr>`;
-    setStatus("Erreur Firebase : " + e.message, "err");
-  }
-}
-
-refreshBtn.addEventListener("click", load);
-load();
-</script>
-
+    refreshBtn.addEventListener("click", load);
+    load();
+  </script>
 </body>
 </html>
