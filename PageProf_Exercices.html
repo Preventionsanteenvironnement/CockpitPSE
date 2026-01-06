@@ -67,6 +67,9 @@
     .btn-reset{
       background:#0f172a;
     }
+    .btn-delete{
+      background:#dc2626;
+    }
     .status{
       margin-top:10px;
       font-size:.9rem;
@@ -141,10 +144,11 @@
               <th>Score</th>
               <th>Lien</th>
               <th>JSON</th>
+              <th>Supprimer</th>
             </tr>
           </thead>
           <tbody id="body">
-            <tr><td colspan="8">Chargement…</td></tr>
+            <tr><td colspan="9">Chargement…</td></tr>
           </tbody>
         </table>
       </div>
@@ -153,7 +157,7 @@
 
   <script type="module">
     import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -233,9 +237,30 @@
       URL.revokeObjectURL(url);
     }
 
+    async function deleteRow(row){
+      const ok = window.confirm(
+        "Supprimer définitivement cette copie ?\\n\\n" +
+        "Identifiant : " + (row.identifiant || "—") + "\\n" +
+        "Classe : " + (row.classe || "—") + "\\n" +
+        "Exercice : " + (row.exercice || "—")
+      );
+      if(!ok) return;
+
+      try{
+        await deleteDoc(doc(db, "exercices", row.id));
+        setStatus("Copie supprimée.", "ok");
+        allRows = allRows.filter(r => r.id !== row.id);
+        renderTable();
+      }catch(e){
+        console.error(e);
+        setStatus("Erreur lors de la suppression : " + e.message, "err");
+      }
+    }
+
     function buildClasseOptions(){
       if(!filterClasseSelect) return;
       const classes = Array.from(new Set(allRows.map(r => r.classe).filter(Boolean))).sort();
+      const current = filterClasseSelect.value || "";
       filterClasseSelect.innerHTML = '<option value="">Toutes les classes</option>';
       classes.forEach(c => {
         const opt = document.createElement("option");
@@ -243,6 +268,7 @@
         opt.textContent = c;
         filterClasseSelect.appendChild(opt);
       });
+      if(current) filterClasseSelect.value = current;
     }
 
     function renderTable(){
@@ -263,7 +289,7 @@
       tbody.innerHTML = "";
 
       if(!rows.length){
-        tbody.innerHTML = `<tr><td colspan="8">Aucun résultat avec ces filtres.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9">Aucun résultat avec ces filtres.</td></tr>`;
       } else {
         rows.forEach((row, i)=>{
           const tr = document.createElement("tr");
@@ -290,6 +316,15 @@
           b.addEventListener("click", ()=> downloadJSON(row));
           jsonCell.appendChild(b);
 
+          const delCell = document.createElement("td");
+          const delBtn = document.createElement("button");
+          delBtn.className = "btn btn-delete";
+          delBtn.textContent = "🗑️";
+          delBtn.type = "button";
+          delBtn.title = "Supprimer cette copie";
+          delBtn.addEventListener("click", ()=> deleteRow(row));
+          delCell.appendChild(delBtn);
+
           tr.innerHTML = `
             <td>${i+1}</td>
             <td>${asDate(row.createdAt)}</td>
@@ -300,6 +335,7 @@
           `;
           tr.appendChild(linkCell);
           tr.appendChild(jsonCell);
+          tr.appendChild(delCell);
           tbody.appendChild(tr);
         });
       }
@@ -310,7 +346,7 @@
     async function load(){
       try{
         setStatus("Chargement…");
-        tbody.innerHTML = `<tr><td colspan="8">Chargement…</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9">Chargement…</td></tr>`;
 
         const snap = await getDocs(collection(db, "exercices"));
         const rows = [];
@@ -318,7 +354,7 @@
 
         if(!rows.length){
           allRows = [];
-          tbody.innerHTML = `<tr><td colspan="8">Aucun résultat pour l’instant.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="9">Aucun résultat pour l’instant.</td></tr>`;
           setStatus("0 résultat.", "ok");
           return;
         }
@@ -330,7 +366,7 @@
         renderTable();
       }catch(e){
         console.error(e);
-        tbody.innerHTML = `<tr><td colspan="8">Erreur technique.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9">Erreur technique.</td></tr>`;
         setStatus("Erreur Firebase : " + e.message, "err");
       }
     }
