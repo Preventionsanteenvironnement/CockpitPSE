@@ -108,6 +108,18 @@
       font-size:.85rem;
       min-width:160px;
     }
+    .stats-box{
+      margin-top:8px;
+      padding:8px 10px;
+      border-radius:10px;
+      background:#f9fafb;
+      font-size:.85rem;
+      color:#374151;
+      border:1px solid #e5e7eb;
+    }
+    .stats-box b{
+      font-weight:700;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +142,11 @@
           <option value="">Toutes les classes</option>
         </select>
         <button class="btn btn-reset" id="clear-filters-btn" type="button">Réinitialiser les filtres</button>
+      </div>
+
+      <!-- Petit résumé des stats selon le filtre -->
+      <div id="stats" class="stats-box">
+        Stats en cours de calcul…
       </div>
 
       <div style="overflow-x:auto;margin-top:12px;">
@@ -178,6 +195,7 @@
     const filterIdInput = document.getElementById("filter-identifiant");
     const filterClasseSelect = document.getElementById("filter-classe");
     const clearFiltersBtn = document.getElementById("clear-filters-btn");
+    const statsEl = document.getElementById("stats");
 
     let allRows = [];
 
@@ -239,9 +257,9 @@
 
     async function deleteRow(row){
       const ok = window.confirm(
-        "Supprimer définitivement cette copie ?\\n\\n" +
-        "Identifiant : " + (row.identifiant || "—") + "\\n" +
-        "Classe : " + (row.classe || "—") + "\\n" +
+        "Supprimer définitivement cette copie ?\n\n" +
+        "Identifiant : " + (row.identifiant || "—") + "\n" +
+        "Classe : " + (row.classe || "—") + "\n" +
         "Exercice : " + (row.exercice || "—")
       );
       if(!ok) return;
@@ -269,6 +287,75 @@
         filterClasseSelect.appendChild(opt);
       });
       if(current) filterClasseSelect.value = current;
+    }
+
+    // Parse un score de type "12 / 15" ou "18/20"
+    function parseScore(scoreStr){
+      if(!scoreStr) return null;
+      const m = scoreStr.match(/(\d+)\s*\/\s*(\d+)/);
+      if(!m) return null;
+      const num = parseFloat(m[1]);
+      const den = parseFloat(m[2]);
+      if(!den) return null;
+      return { num, den };
+    }
+
+    // Calcule les stats pour les lignes filtrées
+    function updateStats(rows){
+      if(!statsEl){
+        return;
+      }
+
+      const total = allRows.length;
+      const filtered = rows.length;
+      const idsSet = new Set(rows.map(r => r.identifiant).filter(Boolean));
+      const nbIds = idsSet.size;
+
+      const idFilter = (filterIdInput?.value || "").trim();
+
+      if(!filtered){
+        statsEl.innerHTML = "Aucune copie trouvée avec ces filtres. Total en base : <b>" +
+                            total + "</b> copie(s).";
+        return;
+      }
+
+      // Stats globales sur le filtre
+      let html = "Filtre actuel : <b>" + filtered + "</b> copie(s), " +
+                 "<b>" + nbIds + "</b> identifiant(s) différent(s) (sur " +
+                 total + " copie(s) au total en base).";
+
+      // Si on a filtré sur un identifiant précis, on calcule moyenne et meilleur score
+      if(idFilter){
+        const rowsForId = rows.filter(r => (r.identifiant || "").toLowerCase().includes(idFilter.toLowerCase()));
+        let sum20 = 0;
+        let count = 0;
+        let best20 = null;
+
+        rowsForId.forEach(r => {
+          const ps = parseScore(r.score);
+          if(ps){
+            const val20 = 20 * ps.num / ps.den;
+            sum20 += val20;
+            count++;
+            if(best20 === null || val20 > best20){
+              best20 = val20;
+            }
+          }
+        });
+
+        if(count > 0){
+          const avg20 = sum20 / count;
+          html += "<br>Pour l’identifiant <b>" + idFilter + "</b> : " +
+                  "<b>" + rowsForId.length + "</b> tentative(s) avec " +
+                  "moyenne ≈ <b>" + avg20.toFixed(1) + " / 20</b> " +
+                  "et meilleur score ≈ <b>" + best20.toFixed(1) + " / 20</b>.";
+        } else {
+          html += "<br>Pour l’identifiant <b>" + idFilter + "</b> : " +
+                  rowsForId.length + " tentative(s), mais aucun score lisible du type « 12 / 20 » pour calculer une moyenne.";
+        }
+      }
+
+      statsEl.innerHTML = html;
     }
 
     function renderTable(){
@@ -341,13 +428,18 @@
       }
 
       setStatus(`${rows.length} résultat(s) affiché(s) sur ${allRows.length}.`, "ok");
+      updateStats(rows);
     }
 
     async function load(){
       try{
         setStatus("Chargement…");
         tbody.innerHTML = `<tr><td colspan="9">Chargement…</td></tr>`;
+        if(statsEl){
+          statsEl.textContent = "Stats en cours de calcul…";
+        }
 
+        // On lit tous les exercices de la collection "exercices"
         const snap = await getDocs(collection(db, "exercices"));
         const rows = [];
         snap.forEach(d => rows.push(normalize(d)));
@@ -356,6 +448,9 @@
           allRows = [];
           tbody.innerHTML = `<tr><td colspan="9">Aucun résultat pour l’instant.</td></tr>`;
           setStatus("0 résultat.", "ok");
+          if(statsEl){
+            statsEl.textContent = "Aucune copie pour l’instant dans la collection exercices.";
+          }
           return;
         }
 
@@ -368,6 +463,9 @@
         console.error(e);
         tbody.innerHTML = `<tr><td colspan="9">Erreur technique.</td></tr>`;
         setStatus("Erreur Firebase : " + e.message, "err");
+        if(statsEl){
+          statsEl.textContent = "Impossible de calculer les stats (erreur Firebase).";
+        }
       }
     }
 
