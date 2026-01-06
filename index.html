@@ -687,7 +687,7 @@
             </div></details>
         </div>
 
-        <!-- SCORES EXERCICES (statique pour l’instant, n’empêche pas le site de fonctionner) -->
+        <!-- SCORES EXERCICES (connecté Firestore) -->
         <div id="view-scores" class="view-section">
           <h2 style="color:var(--col-eval)">Scores exercices (en ligne)</h2>
           <div class="scores-card">
@@ -981,6 +981,18 @@
     let unseenCopies = 0;
     let firstCopiesSnapshot = true;
 
+    // Scores exercices – références DOM
+    const scoresBtnRefresh = document.getElementById("scores-btn-refresh");
+    const scoresFilterName = document.getElementById("scores-filter-name");
+    const scoresFilterClass = document.getElementById("scores-filter-class");
+    const scoresFilterExo = document.getElementById("scores-filter-exo");
+    const scoresTbody = document.getElementById("scores-tbody");
+    const scoresCounter = document.getElementById("scores-counter");
+    const scoresStatus = document.getElementById("scores-status");
+    const scoresLastUpdate = document.getElementById("scores-last-update");
+
+    let scoresData = [];
+
     function showToast(msg){
         if(!toast) return;
         toast.textContent = msg;
@@ -995,6 +1007,7 @@
         inboxBadge.textContent = String(n);
     }
 
+    // Badge temps réel pour nouvelles copies (toutes activités confondues)
     const copiesQuery = query(
         copiesCol,
         orderBy("meta.createdAt", "desc"),
@@ -1015,6 +1028,8 @@
                 showToast("Nouvelle copie reçue : +" + added);
             }
         }
+    }, (error) => {
+        console.error("Erreur badge copies :", error);
     });
 
     const CLASSES = [
@@ -1034,12 +1049,21 @@
         const i = document.getElementById('memo-input');
         const t = document.getElementById('memo-target').value;
         if(!i || i.value.trim()==="") return;
-        await addDoc(memosCol, { text: i.value, target: t, timestamp: Date.now() });
-        i.value = "";
+        try{
+          await addDoc(memosCol, { text: i.value, target: t, timestamp: Date.now() });
+          i.value = "";
+        }catch(e){
+          console.error("Erreur mémo :", e);
+          showToast("Erreur lors de l’enregistrement du mémo");
+        }
     };
 
     window.deleteMemo = async (id) => {
-        await deleteDoc(doc(db, "cockpit_memos", id));
+        try{
+          await deleteDoc(doc(db, "cockpit_memos", id));
+        }catch(e){
+          console.error("Erreur suppression mémo :", e);
+        }
     };
 
     window.addAgenda = async () => {
@@ -1061,22 +1085,32 @@
         const dt = new Date(`${date}T${time}:00`);
         const datetime = isNaN(dt.getTime()) ? Date.now() : dt.getTime();
 
-        await addDoc(agendaCol, {
-            type,
-            title,
-            place: (placeEl?.value || '').trim(),
-            datetime,
-            createdAt: new Date().toISOString()
-        });
+        try{
+          await addDoc(agendaCol, {
+              type,
+              title,
+              place: (placeEl?.value || '').trim(),
+              datetime,
+              createdAt: new Date().toISOString()
+          });
 
-        if(titleEl) titleEl.value = "";
-        if(placeEl) placeEl.value = "";
+          if(titleEl) titleEl.value = "";
+          if(placeEl) placeEl.value = "";
+        }catch(e){
+          console.error("Erreur agenda :", e);
+          showToast("Erreur lors de l’enregistrement de l’agenda");
+        }
     };
 
     window.deleteAgenda = async (id) => {
-        await deleteDoc(doc(db, "cockpit_agenda", id));
+        try{
+          await deleteDoc(doc(db, "cockpit_agenda", id));
+        }catch(e){
+          console.error("Erreur suppression agenda :", e);
+        }
     };
 
+    // Agenda live
     onSnapshot(query(agendaCol, orderBy("datetime", "asc"), limit(50)), (snap) => {
         agendaEvents = [];
         snap.forEach(d => {
@@ -1127,8 +1161,11 @@
         });
 
         try{ render(); }catch(e){}
+    }, (error) => {
+        console.error("Erreur écoute agenda :", error);
     });
 
+    // Mémos live
     onSnapshot(query(memosCol, orderBy("timestamp", "desc")), (snap) => {
         const list = document.getElementById('memo-list');
         if(!list) return;
@@ -1141,6 +1178,8 @@
             li.innerHTML = `<div><b>[${m.target}]</b> ${m.text}</div><button onclick="deleteMemo('${d.id}')" style="border:none;background:none;cursor:pointer;">✕</button>`;
             list.appendChild(li);
         });
+    }, (error) => {
+        console.error("Erreur écoute mémos :", error);
     });
 
     const URL = "https://0692390y.index-education.net/pronote/ical/mesinformations.ics?icalsecurise=5FCC8714D0288D0C735DBB51F2A682873D9407D68F403E748C4860B26B18CFA16BE48C43C48C24A416FA30C689813A61&version=2025.2.8&param=900A75DF9ED8C62E212781A9E4DCC937";
@@ -1285,7 +1324,7 @@
             evs = parse(text);
             render();
         } catch(e) {
-            console.error(e);
+            console.error("Erreur chargement iCal :", e);
         }
     }
 
@@ -1385,7 +1424,173 @@
         if(clock) clock.innerText = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     }, 1000);
 
+    // ----------- MODULE SCORES EXERCICES -----------
+
+    function renderScoresTable() {
+        if (!scoresTbody) return;
+
+        let rows = scoresData.slice();
+
+        const nameFilter = (scoresFilterName?.value || "").trim().toLowerCase();
+        const classFilter = (scoresFilterClass?.value || "").trim();
+        const exoFilter = (scoresFilterExo?.value || "").trim();
+
+        if (nameFilter) {
+            rows = rows.filter(r => (r.nomComplet || "").toLowerCase().includes(nameFilter));
+        }
+        if (classFilter) {
+            rows = rows.filter(r => (r.classe || "") === classFilter);
+        }
+        if (exoFilter) {
+            rows = rows.filter(r => (r.exercice || "") === exoFilter);
+        }
+
+        scoresTbody.innerHTML = "";
+
+        if (!rows.length) {
+            scoresTbody.innerHTML = `<tr><td colspan="6" class="scores-empty">Aucune copie trouvée avec ces filtres.</td></tr>`;
+        } else {
+            rows.forEach((r, index) => {
+                const tr = document.createElement("tr");
+
+                let scoreClass = "";
+                if (typeof r.scoreNum === "number") {
+                    if (r.scoreNum >= 12) scoreClass = "score-good";
+                    else if (r.scoreNum >= 8) scoreClass = "score-mid";
+                    else scoreClass = "score-bad";
+                }
+
+                tr.innerHTML = `
+                  <td class="mono">${index + 1}</td>
+                  <td>${r.nomComplet || ""}</td>
+                  <td><span class="badge-class">${r.classe || ""}</span></td>
+                  <td>${r.exercice || ""}</td>
+                  <td class="${scoreClass}">${r.scoreTexte || ""}</td>
+                  <td class="mono">${r.dateFr || ""}</td>
+                `;
+                scoresTbody.appendChild(tr);
+            });
+        }
+
+        if (scoresCounter) {
+            scoresCounter.textContent = rows.length + (rows.length > 1 ? " enregistrements" : " enregistrement");
+        }
+    }
+
+    function initScoresModule() {
+        if (!scoresTbody || !scoresBtnRefresh) return;
+
+        scoresStatus.textContent = "Connexion à Firestore en cours…";
+        scoresBtnRefresh.disabled = true;
+
+        const qScores = query(
+            copiesCol,
+            orderBy("meta.createdAt", "desc"),
+            limit(200)
+        );
+
+        onSnapshot(qScores, (snap) => {
+            scoresData = [];
+            const exoSet = new Set();
+
+            snap.forEach(d => {
+                const data = d.data() || {};
+                const meta = data.meta || {};
+                const res = data.resultat || {};
+
+                const createdAt = meta.createdAt || null;
+                let dateFr = "";
+                if (createdAt) {
+                    const dt = new Date(createdAt);
+                    if (!isNaN(dt.getTime())) {
+                        dateFr = dt.toLocaleString("fr-FR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                        });
+                    }
+                }
+
+                const scoreTexte = res.score || "";
+                let scoreNum = null;
+                const m = /(\d+)/.exec(scoreTexte);
+                if (m) scoreNum = parseInt(m[1], 10);
+
+                const support = meta.support || (res.titre || "Exercice");
+
+                if (support) exoSet.add(support);
+
+                const nom = (meta.nom || "").trim();
+                const prenom = (meta.prenom || "").trim();
+                const nomComplet = [nom, prenom].filter(Boolean).join(" ").trim() || (nom || prenom);
+
+                scoresData.push({
+                    id: d.id,
+                    nomComplet,
+                    classe: meta.classe || "",
+                    exercice: support,
+                    scoreTexte,
+                    scoreNum,
+                    dateFr
+                });
+            });
+
+            // Remplir la liste des exercices (support)
+            if (scoresFilterExo) {
+                const current = scoresFilterExo.value;
+                scoresFilterExo.innerHTML = `<option value="">Tous les exercices</option>`;
+                Array.from(exoSet).sort().forEach(s => {
+                    const opt = document.createElement("option");
+                    opt.value = s;
+                    opt.textContent = s;
+                    scoresFilterExo.appendChild(opt);
+                });
+                if (current) scoresFilterExo.value = current;
+            }
+
+            if (scoresFilterName) scoresFilterName.disabled = false;
+            if (scoresFilterClass) scoresFilterClass.disabled = false;
+            if (scoresFilterExo) scoresFilterExo.disabled = false;
+            scoresBtnRefresh.disabled = false;
+
+            if (scoresStatus) scoresStatus.textContent = "Connexion Firestore active – scores mis à jour automatiquement.";
+            if (scoresLastUpdate) {
+                scoresLastUpdate.textContent = "Dernière mise à jour : " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+            }
+
+            renderScoresTable();
+        }, (error) => {
+            console.error("Erreur scores exercices :", error);
+            if (scoresStatus) scoresStatus.textContent = "Impossible de charger les scores (droits ou connexion).";
+            if (scoresTbody) {
+                scoresTbody.innerHTML = `<tr><td colspan="6" class="scores-empty">Erreur de connexion à Firestore pour les scores. Le reste du cockpit reste utilisable.</td></tr>`;
+            }
+            if (scoresBtnRefresh) scoresBtnRefresh.disabled = true;
+            if (scoresFilterName) scoresFilterName.disabled = true;
+            if (scoresFilterClass) scoresFilterClass.disabled = true;
+            if (scoresFilterExo) scoresFilterExo.disabled = true;
+        });
+
+        // Filtres + bouton
+        if (scoresBtnRefresh) {
+            scoresBtnRefresh.addEventListener("click", () => {
+                if (scoresFilterName) scoresFilterName.value = "";
+                if (scoresFilterClass) scoresFilterClass.value = "";
+                if (scoresFilterExo) scoresFilterExo.value = "";
+                unseenCopies = 0;
+                setBadge(0);
+                renderScoresTable();
+            });
+        }
+        if (scoresFilterName) scoresFilterName.addEventListener("input", renderScoresTable);
+        if (scoresFilterClass) scoresFilterClass.addEventListener("change", renderScoresTable);
+        if (scoresFilterExo) scoresFilterExo.addEventListener("change", renderScoresTable);
+    }
+
     init();
+    initScoresModule();
     window.addEventListener('resize', () => { if (window.innerWidth > 980) closeMenu(); });
 </script>
 </body>
