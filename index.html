@@ -1,1663 +1,826 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cockpit Professeur - Pilotage Global</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-body: #f1f5f9; --bg-sidebar: #0f172a; --text-main: #1e293b; --text-muted: #64748b;
-            --col-pedago: #3b82f6; --col-eval: #f59e0b; --col-class: #10b981; --col-proj: #8b5cf6; 
-            --col-admin: #f97316; --col-live-web: #795548; --col-sites: #607d8b; 
-        }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cockpit Professeur – Pilotage Global</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg-body:#f1f5f9; --bg-sidebar:#0f172a; --text-main:#1e293b; --text-muted:#64748b;
+      --col-pedago:#3b82f6; --col-eval:#f59e0b; --col-class:#10b981; --col-proj:#8b5cf6;
+      --col-admin:#f97316; --col-live-web:#795548; --col-sites:#607d8b;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Inter',sans-serif;
+      background-color:var(--bg-body); color:var(--text-main);
+      display:flex; height:100vh; overflow:hidden;
+    }
 
-        /* SIDEBAR */
-        .sidebar { width: 300px; background-color: var(--bg-sidebar); color: white; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; overflow-y: auto; gap: 10px; }
-        .brand { font-size: 1.3rem; font-weight: 800; color: white; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; letter-spacing: 1px; }
-        .nav-category { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #64748b; margin: 15px 0 5px 0; }
-        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-weight: 600; color: #cbd5e1; border-left: 4px solid transparent; }
-        .nav-item:hover { background-color: rgba(255,255,255,0.05); color: white; }
-        .nav-item.active { background-color: rgba(255,255,255,0.1); color: white; }
-        .nav-item[data-theme="pedago"].active { border-left-color: var(--col-pedago); }
-        .nav-item[data-theme="eval"].active { border-left-color: var(--col-eval); }
-        .nav-item[data-theme="class"].active { border-left-color: var(--col-class); }
-        .nav-item[data-theme="proj"].active { border-left-color: var(--col-proj); }
-        .nav-item[data-theme="admin"].active { border-left-color: var(--col-admin); }
-        .nav-item[data-theme="live"].active { border-left-color: var(--col-live-web); }
-        .nav-item[data-theme="sites"].active { border-left-color: var(--col-sites); }
+    /* SIDEBAR */
+    .sidebar{
+      width:300px; background-color:var(--bg-sidebar); color:#fff;
+      display:flex; flex-direction:column; padding:20px; flex-shrink:0;
+      overflow-y:auto; gap:10px;
+    }
+    .brand{
+      font-size:1.3rem; font-weight:800; margin-bottom:20px;
+      letter-spacing:1px; display:flex; align-items:center; gap:10px;
+    }
+    .nav-category{
+      font-size:.75rem; text-transform:uppercase; letter-spacing:1px;
+      font-weight:700; color:#64748b; margin:15px 0 5px;
+    }
+    .nav-item{
+      display:flex; align-items:center; gap:12px;
+      padding:12px 15px; border-radius:8px;
+      cursor:pointer; transition:.2s;
+      font-weight:600; color:#cbd5e1; border-left:4px solid transparent;
+    }
+    .nav-item:hover{background:rgba(255,255,255,.05); color:#fff;}
+    .nav-item.active{background:rgba(255,255,255,.10); color:#fff;}
+    .nav-item[data-theme="pedago"].active{border-left-color:var(--col-pedago);}
+    .nav-item[data-theme="eval"].active{border-left-color:var(--col-eval);}
+    .nav-item[data-theme="class"].active{border-left-color:var(--col-class);}
+    .nav-item[data-theme="proj"].active{border-left-color:var(--col-proj);}
+    .nav-item[data-theme="admin"].active{border-left-color:var(--col-admin);}
+    .nav-item[data-theme="live"].active{border-left-color:var(--col-live-web);}
+    .nav-item[data-theme="sites"].active{border-left-color:var(--col-sites);}
 
-        /* MAIN CONTENT */
-        .main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; position: relative; }
-        header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; }
-        h1 { margin: 0; font-size: 2rem; font-weight: 800; color: var(--text-main); }
-        .header-infos { text-align: right; }
-        .clock-time { font-size: 1.5rem; font-weight: 800; color: var(--text-main); }
-        .clock-date { font-size: 0.9rem; color: var(--text-muted); }
-        .vacation-badge { margin-top: 5px; font-size: 0.8rem; background: #dbeafe; color: #2563eb; padding: 4px 10px; border-radius: 20px; font-weight: bold; border: 1px solid #bfdbfe; }
+    /* MAIN */
+    .main-content{
+      flex:1; padding:40px; overflow-y:auto;
+      display:flex; flex-direction:column; position:relative;
+    }
+    header{
+      display:flex; justify-content:space-between; align-items:flex-end;
+      margin-bottom:30px; border-bottom:1px solid #e2e8f0; padding-bottom:20px;
+    }
+    h1{margin:0; font-size:2rem; font-weight:800; color:var(--text-main);}
+    .header-infos{text-align:right;}
+    .clock-time{font-size:1.5rem; font-weight:800;}
+    .clock-date{font-size:.9rem; color:var(--text-muted);}
+    .vacation-badge{
+      margin-top:5px; font-size:.8rem;
+      background:#dbeafe; color:#2563eb;
+      padding:4px 10px; border-radius:20px;
+      border:1px solid #bfdbfe; font-weight:bold;
+    }
 
-        .view-section { display: none; animation: fadeUp 0.4s ease-out; }
-        .view-section.active { display: block; }
+    .view-section{display:none; animation:fadeUp .4s ease-out;}
+    .view-section.active{display:block;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
-        @keyframes fadeUp {
-          from { opacity:0; transform:translateY(6px); }
-          to { opacity:1; transform:translateY(0); }
-        }
+    .quick-actions{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:15px; margin-bottom:30px;
+    }
+    .btn-quick{
+      background:#fff; border:1px solid #e2e8f0; padding:15px;
+      border-radius:12px; text-align:left; cursor:pointer;
+      transition:.2s; display:flex; align-items:center; gap:15px;
+      box-shadow:0 2px 4px rgba(0,0,0,.02);
+      text-decoration:none; color:inherit;
+    }
+    .btn-quick span:last-child{display:block; font-size:.8rem; color:var(--text-muted);}
+    .btn-quick:hover{
+      transform:translateY(-2px); box-shadow:0 5px 15px rgba(0,0,0,.05);
+      border-color:var(--col-pedago);
+    }
 
-        /* DASHBOARD GRID */
-        .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
-        .btn-quick { background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; text-align: left; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); text-decoration: none; color: inherit; }
-        .btn-quick span:last-child { display:block; font-size:0.8rem; color:var(--text-muted); }
-        .btn-quick:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: var(--col-pedago); }
-        
-        .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
-        .widget { background: white; border-radius: 16px; padding: 25px; border: 1px solid #e2e8f0; display:flex; flex-direction: column; min-height: 400px;}
-        .widget h3 { margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center; }
+    .dashboard-grid{display:grid; grid-template-columns:2fr 1fr; gap:25px;}
+    .widget{
+      background:#fff; border-radius:16px; padding:25px;
+      border:1px solid #e2e8f0; display:flex; flex-direction:column; min-height:320px;
+    }
+    .widget h3{
+      margin:0 0 15px; padding-bottom:10px;
+      border-bottom:2px solid #f1f5f9;
+      font-size:1.1rem; display:flex; justify-content:space-between; align-items:center;
+    }
 
-        .planning-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; }
-        .course-item { padding: 15px; border-bottom: 1px solid #f8fafc; display: flex; align-items: center; border-radius: 8px; }
-        .course-item.active-course { background: #dcfce7; border: 2px solid #22c55e; }
-        .course-time { font-weight: 800; font-size: 0.9rem; color: #475569; width: 75px; }
-        .course-details small { color:#64748b; }
+    .planning-list{list-style:none; margin:0; padding:0; overflow-y:auto;}
+    .course-item{
+      padding:12px; border-bottom:1px solid #f8fafc;
+      display:flex; align-items:flex-start; gap:10px; border-radius:8px;
+    }
+    .course-item.active-course{background:#dcfce7; border:2px solid #22c55e;}
+    .course-time{width:70px; font-weight:800; font-size:.9rem; color:#475569;}
+    .course-details{flex:1;}
+    .course-details small{color:#64748b;}
 
-        /* MÉMOS */
-        .alert-item { background: #fff; border: 1px solid #e2e8f0; padding: 12px; margin-bottom: 8px; border-radius: 8px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
-        .alert-item.context-active { background: #fee2e2; border: 2px solid #ef4444; color: #b91c1c; font-weight: bold; animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+    .right-stack{display:flex; flex-direction:column; gap:25px;}
 
-        /* AGENDA */
-        .right-stack{ display:flex; flex-direction:column; gap:25px; }
-        .agenda-form{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-        .agenda-form input, .agenda-form select{ padding:8px; border-radius:6px; border:1px solid #ddd; }
-        .agenda-form input[type="date"], .agenda-form input[type="time"]{ width: 130px; }
-        .agenda-form .wide{ flex:1; min-width: 170px; }
-        .agenda-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
-        .agenda-item{ background:#fff; border:1px solid #e2e8f0; padding:10px 12px; border-radius:10px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; font-size:0.9rem; }
-        .agenda-item.soon{ border-color:#f59e0b; background:#fffbeb; }
-        .agenda-meta{ font-size:0.82rem; color:#64748b; margin-top:2px; }
-        .agenda-tag{ font-weight:800; }
+    /* MEMO */
+    .alert-list{list-style:none; margin:0; padding:0;}
+    .alert-item{
+      background:#fff; border:1px solid #e2e8f0; padding:8px 10px;
+      border-radius:8px; font-size:.9rem;
+      display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;
+    }
+    .alert-item.context-active{
+      background:#fee2e2; border:2px solid #ef4444; color:#b91c1c; font-weight:bold;
+      animation:pulse-red 1.5s infinite;
+    }
+    @keyframes pulse-red{0%,100%{transform:scale(1);}50%{transform:scale(1.02);}}
 
-        /* ACCORDÉONS TIROIRS */
-        details { background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
-        summary { padding: 15px; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-        details[open] > summary { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
-        .content-links { padding: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
-        .btn-yellow { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem; }
-        .btn-blue-outline { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+    /* AGENDA */
+    .agenda-form{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+    .agenda-form input,.agenda-form select{
+      padding:8px; border-radius:6px; border:1px solid #ddd; font-size:.85rem;
+    }
+    .agenda-form .wide{flex:1; min-width:170px;}
+    .agenda-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+    .agenda-item{
+      background:#fff; border:1px solid #e2e8f0; padding:10px 12px;
+      border-radius:10px; display:flex; justify-content:space-between; gap:10px; font-size:.9rem;
+    }
+    .agenda-item.soon{border-color:#f59e0b; background:#fffbeb;}
+    .agenda-meta{font-size:.8rem; color:#64748b; margin-top:2px;}
 
-        .badge-soon{
-          display:inline-block;
-          font-size:11px;
-          padding:2px 8px;
-          border-radius:999px;
-          margin-left:8px;
-          border:1px solid rgba(255,255,255,.22);
-          background:rgba(255,255,255,.12);
-          vertical-align:middle;
-        }
+    /* DETAILS / ACCORDIONS */
+    details{
+      background:#fff; border:1px solid #e2e8f0;
+      border-radius:8px; margin-bottom:10px; overflow:hidden;
+    }
+    summary{
+      padding:15px; font-weight:600; cursor:pointer;
+      list-style:none; display:flex; justify-content:space-between; align-items:center;
+    }
+    details[open]>summary{background:#f1f5f9; border-bottom:1px solid #e2e8f0;}
+    .content-links{
+      padding:15px; display:flex; flex-wrap:wrap; gap:10px;
+    }
 
-        /* CLARTÉ VISUELLE : COURS (CAP / BAC PRO) */
-        #course-structure > summary{
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.14);
-        }
-        #course-structure details > summary{
-            margin-top: 8px;
-        }
-        #course-structure .lvl-cap > summary{
-            background: rgba(37,99,235,0.12);
-            border-left: 6px solid rgba(37,99,235,0.9);
-            font-weight: 900;
-        }
-        #course-structure .lvl-bacpro > summary{
-            background: rgba(22,163,74,0.12);
-            border-left: 6px solid rgba(22,163,74,0.9);
-            font-weight: 900;
-        }
-        #course-structure .lvl-cap > details > summary{
-            background: rgba(37,99,235,0.08);
-            border-left: 4px solid rgba(37,99,235,0.55);
-            font-weight: 800;
-        }
-        #course-structure .lvl-cap > details > details > summary{
-            background: rgba(37,99,235,0.05);
-            border-left: 3px solid rgba(37,99,235,0.35);
-            font-weight: 700;
-        }
-        #course-structure .lvl-bacpro > details > summary{
-            background: rgba(22,163,74,0.08);
-            border-left: 4px solid rgba(22,163,74,0.55);
-            font-weight: 800;
-        }
-        #course-structure .lvl-bacpro > details > details > summary{
-            background: rgba(22,163,74,0.05);
-            border-left: 3px solid rgba(22,163,74,0.35);
-            font-weight: 700;
-        }
-        #course-structure .content-links{
-            padding-left: 10px;
-        }
+    .btn-yellow{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 16px; background:#fffbeb; color:#b45309;
+      border:1px solid #fcd34d; border-radius:6px;
+      text-decoration:none; font-weight:600; font-size:.85rem;
+    }
+    .btn-blue-outline{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 16px; background:#f0f9ff; color:#0369a1;
+      border:1px solid #bae6fd; border-radius:6px;
+      text-decoration:none; font-weight:600; font-size:.85rem; cursor:pointer;
+    }
+    .badge-soon{
+      display:inline-block; font-size:11px; padding:2px 8px;
+      border-radius:999px; margin-left:6px;
+      border:1px solid rgba(0,0,0,.05); background:#fef3c7; color:#92400e;
+    }
 
-        /* CLASSE EN TEMPS RÉEL */
-        .live-block{
-            margin-top: 12px;
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 14px;
-            overflow: hidden;
-            background: rgba(255,255,255,0.03);
-        }
-        .live-summary{
-            font-weight: 900;
-            letter-spacing: 0.2px;
-            padding: 14px 16px;
-            background: rgba(255,255,255,0.05);
-        }
-        .live-links{
-            padding: 14px 12px;
-        }
-        .badge-role{
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 900;
-            margin-left: 10px;
-            border: 1px solid rgba(0,0,0,0.08);
-            white-space: nowrap;
-        }
-        .role-eleve{
-            background: rgba(245, 158, 11, 0.18);
-            color: #a16207;
-            border-color: rgba(245, 158, 11, 0.28);
-        }
-        .role-prof{
-            background: rgba(59, 130, 246, 0.18);
-            color: #1d4ed8;
-            border-color: rgba(59, 130, 246, 0.28);
-        }
-        @media (max-width: 980px){
-            #course-structure details > summary{ font-size: 0.98rem; }
-            .live-summary{ font-size: 1.02rem; }
-        }
+    /* STRUCTURE CAP / BAC PRO (visuel) */
+    #course-structure>summary{
+      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    }
+    #course-structure .lvl-cap>summary{
+      background:rgba(37,99,235,.12); border-left:6px solid rgba(37,99,235,.9); font-weight:900;
+    }
+    #course-structure .lvl-bacpro>summary{
+      background:rgba(22,163,74,.12); border-left:6px solid rgba(22,163,74,.9); font-weight:900;
+    }
 
-        /* RESPONSIVE MOBILE (sidebar drawer) */
-        .menu-overlay{
-            display:none;
-            position:fixed;
-            inset:0;
-            background: rgba(15,23,42,0.55);
-            backdrop-filter: blur(2px);
-            z-index: 999;
-        }
-        .menu-btn{
-            display:none;
-            border:none;
-            background:#0f172a;
-            color:#fff;
-            width:44px;
-            height:44px;
-            border-radius:12px;
-            font-size:20px;
-            font-weight:900;
-            cursor:pointer;
-            align-items:center;
-            justify-content:center;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-            flex-shrink:0;
-        }
+    /* LIVE */
+    .live-block{
+      margin-top:12px; border:1px solid rgba(0,0,0,.08);
+      border-radius:14px; overflow:hidden; background:#fff;
+    }
+    .live-summary{
+      font-weight:900; padding:14px 16px; background:#f1f5f9;
+    }
+    .live-links{padding:14px 12px;}
 
-        @media (max-width: 980px){
-            body{ height:auto; overflow:auto; display:block; }
-            .sidebar{
-                position: fixed;
-                top: 0; left: 0; bottom: 0;
-                height: 100vh;
-                width: min(86vw, 340px);
-                transform: translateX(-110%);
-                transition: transform .25s ease;
-                z-index: 1000;
-                padding: 18px;
-            }
-            .main-content{
-                padding: 16px;
-                min-height: 100vh;
-                overflow: visible;
-            }
-            header{
-                align-items: center;
-                gap: 12px;
-                margin-bottom: 16px;
-                padding-bottom: 14px;
-            }
-            h1{ font-size: 1.35rem; }
-            .clock-time{ font-size: 1.15rem; }
-            .menu-btn{ display:inline-flex; }
-            .dashboard-grid{ grid-template-columns: 1fr; gap: 14px; }
-            .widget{ min-height: auto; padding: 16px; border-radius: 14px; }
-            .quick-actions{ grid-template-columns: 1fr; }
-            .btn-quick{ padding: 14px; }
-            .course-time{ width: 68px; }
-            summary{ padding: 14px; }
-            .content-links{ padding: 12px; gap: 8px; }
-            .btn-yellow, .btn-blue-outline{ width: 100%; justify-content: space-between; }
-        }
+    .badge-role{
+      display:inline-flex; align-items:center;
+      padding:2px 10px; border-radius:999px;
+      font-size:12px; font-weight:900; margin-left:8px;
+      border:1px solid rgba(0,0,0,.08); white-space:nowrap;
+    }
+    .role-eleve{background:rgba(245,158,11,.18); color:#a16207;}
+    .role-prof{background:rgba(59,130,246,.18); color:#1d4ed8;}
 
-        body.menu-open .sidebar{ transform: translateX(0); }
-        body.menu-open .menu-overlay{ display:block; }
+    /* SCORES TABLE */
+    .scores-card{
+      background:#fff; border-radius:18px; border:1px solid #e2e8f0;
+      padding:18px 18px 12px; box-shadow:0 10px 30px rgba(15,23,42,.06);
+      max-width:1100px;
+    }
+    .scores-toolbar{
+      display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px;
+    }
+    .scores-pill{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:4px 10px; border-radius:999px; background:#fef3c7;
+      color:#92400e; font-size:.8rem; font-weight:700;
+    }
+    .scores-button{
+      border:none; border-radius:999px; padding:7px 14px;
+      font-size:.9rem; font-weight:600; cursor:pointer;
+      background:#0f172a; color:#fff; display:inline-flex; align-items:center; gap:6px;
+    }
+    .scores-button[disabled]{opacity:.6; cursor:default;}
+    .scores-counter{margin-left:auto; font-size:.85rem; color:#64748b;}
+    .scores-filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+    .scores-filters input,.scores-filters select{
+      border-radius:999px; border:1px solid #e2e8f0; padding:6px 11px; font-size:.85rem; min-width:120px;
+    }
+    .scores-table-wrap{margin-top:4px; border-radius:14px; border:1px solid #e5e7eb; overflow:auto;}
+    .results-table{width:100%; border-collapse:collapse; min-width:600px;}
+    .results-table thead{background:#f1f5f9; color:#475569;}
+    .results-table th,.results-table td{padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem;}
+    .results-table tr:hover{background:#f8fafc;}
+    .scores-empty{text-align:center; color:#64748b; padding:14px;}
+    .score-good{color:#16a34a; font-weight:700;}
+    .score-mid{color:#ca8a04; font-weight:700;}
+    .score-bad{color:#dc2626; font-weight:700;}
 
-        /* PLANNING + AGENDA (fusion) */
-        .course-item.is-agenda { background: #eef2ff; border: 1px solid #c7d2fe; }
-        .course-item.is-agenda .course-time { color: #3730a3; }
-        .course-item.is-agenda b { color: #1f2937; }
+    .results-table th.sortable{cursor:pointer;user-select:none;}
+    .results-table th.sortable::after{content:"";margin-left:4px;font-size:.7rem;color:#9ca3af;}
+    .results-table th.sortable.sort-asc::after{content:"▲";}
+    .results-table th.sortable.sort-desc::after{content:"▼";}
 
-        /* TIMELINE (modal) */
-        .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:9998; padding:14px;}
-        .modal{ width:min(1100px, 96vw); max-height:88vh; overflow:auto; background:#fff; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 20px 60px rgba(0,0,0,.25); }
-        .modal header{ position:sticky; top:0; background:#fff; padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:10px; z-index:1;}
-        .modal header h3{ margin:0; font-size:1rem; }
-        .modal .content{ padding:12px 14px 16px; }
-        .timeline-wrap{ display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:12px; }
-        .month-col{ border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#ffffff; }
-        .month-title{ font-weight:800; font-size:.95rem; margin:0 0 8px; display:flex; justify-content:space-between; align-items:center; }
-        .month-bar{ display:flex; flex-wrap:wrap; gap:2px; }
-        .daycell{ width:10px; height:10px; border-radius:3px; background:#f1f5f9; border:1px solid #e2e8f0; box-sizing:border-box; position:relative; }
-        .daycell.vac{ background:#fde68a; border-color:#f59e0b; }
-        .daycell.pfmp{ background:#bbf7d0; border-color:#22c55e; }
-        .daycell.course::after{ content:""; position:absolute; inset:2px; border-radius:2px; border:1px solid #3b82f6; opacity:.75; }
-        .daycell.agenda::before{ content:""; position:absolute; width:4px; height:4px; border-radius:50%; background:#111827; right:1px; bottom:1px; }
-        .legend{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 0; font-size:.85rem; color:#475569; font-weight:700;}
-        .legend span{ display:inline-flex; align-items:center; gap:6px; }
-        .dot{ width:10px; height:10px; border-radius:3px; border:1px solid #e2e8f0; background:#f1f5f9; display:inline-block; }
-        .dot.vac{ background:#fde68a; border-color:#f59e0b; }
-        .dot.pfmp{ background:#bbf7d0; border-color:#22c55e; }
-        .dot.course{ background:#f1f5f9; border-color:#3b82f6; box-shadow: inset 0 0 0 1px #3b82f6; }
-        .dot.agenda{ background:#111827; border-color:#111827; border-radius:50%; width:8px; height:8px; }
+    .scores-status-bar{
+      margin-top:10px; font-size:.8rem; color:#64748b;
+      display:flex; flex-wrap:wrap; gap:10px;
+    }
+    .scores-dot{
+      width:8px; height:8px; border-radius:999px; background:#22c55e; margin-right:6px;
+    }
 
-        /* Table “premium” (réutilisable) */
-        .tbl-wrap{
-          overflow:auto;
-          border:1px solid #e2e8f0;
-          border-radius:14px;
-          background:#fff;
-        }
-        .tbl{
-          width:100%;
-          border-collapse:separate;
-          border-spacing:0;
-          font-size:.92rem;
-          min-width: 760px;
-        }
-        .tbl thead th{
-          position: sticky;
-          top: 0;
-          z-index: 1;
-          background:#f8fafc;
-          text-align:left;
-          padding:10px 12px;
-          border-bottom:1px solid #e2e8f0;
-          font-weight:900;
-        }
-        .tbl tbody td{
-          padding:10px 12px;
-          border-bottom:1px solid #f1f5f9;
-          vertical-align:middle;
-        }
-        .tbl tbody tr:hover{
-          background:#f8fafc;
-        }
-        .tbl .muted{ color:#64748b; font-weight:700; }
-        .chip{
-          display:inline-flex; align-items:center; gap:8px;
-          padding:6px 10px;
-          border-radius:999px;
-          font-weight:900;
-          font-size:12px;
-          border:1px solid rgba(0,0,0,0.08);
-          white-space:nowrap;
-        }
-        .chip-ok{ background: rgba(34,197,94,0.16); color:#15803d; border-color: rgba(34,197,94,0.22); }
-        .chip-bad{ background: rgba(239,68,68,0.14); color:#b91c1c; border-color: rgba(239,68,68,0.22); }
-        .chip-mid{ background: rgba(245,158,11,0.14); color:#b45309; border-color: rgba(245,158,11,0.22); }
-        .mono{
-          font-variant-numeric: tabular-nums;
-          font-feature-settings: "tnum" 1;
-        }
+    /* MENU MOBILE */
+    .menu-overlay{
+      display:none; position:fixed; inset:0;
+      background:rgba(15,23,42,.55); backdrop-filter:blur(2px);
+      z-index:999;
+    }
+    .menu-btn{
+      display:none; border:none; background:#0f172a; color:#fff;
+      width:44px; height:44px; border-radius:12px;
+      font-size:20px; font-weight:900; cursor:pointer;
+      align-items:center; justify-content:center;
+      box-shadow:0 6px 18px rgba(0,0,0,.18); flex-shrink:0;
+    }
+    body.menu-open .sidebar{transform:translateX(0);}
+    body.menu-open .menu-overlay{display:block;}
 
-        /* Tableau scores exercices */
-        .results-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .results-table thead { background-color: #f1f5f9; color: #475569; font-weight: 700; text-align: left; }
-        .results-table th, .results-table td { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; }
-        .results-table tr:hover { background-color: #f8fafc; }
-        .score-good { color: #16a34a; font-weight:800; }
-        .score-mid { color: #ca8a04; font-weight:800; }
-        .score-bad { color: #dc2626; font-weight:800; }
-        .badge-class { background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:4px; font-size:0.75em; font-weight:700; }
-
-        .scores-card{
-          background:#ffffff;
-          border-radius:18px;
-          border:1px solid #e2e8f0;
-          padding:18px 18px 12px;
-          box-shadow:0 10px 30px rgba(15,23,42,.06);
-          max-width:1100px;
-        }
-        .scores-toolbar{
-          display:flex;
-          flex-wrap:wrap;
-          align-items:center;
-          gap:10px;
-          margin-bottom:12px;
-        }
-        .scores-pill{
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-          padding:4px 10px;
-          border-radius:999px;
-          background:#fef3c7;
-          color:#92400e;
-          font-size:.8rem;
-          font-weight:700;
-        }
-        .scores-button{
-          border:none;
-          border-radius:999px;
-          padding:7px 14px;
-          font-size:.9rem;
-          font-weight:600;
-          cursor:pointer;
-          background:#0f172a;
-          color:white;
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-        }
-        .scores-button[disabled]{opacity:.6;cursor:default;}
-        .scores-counter{
-          margin-left:auto;
-          font-size:.85rem;
-          color:#64748b;
-        }
-        .scores-filters{
-          display:flex;
-          gap:8px;
-          flex-wrap:wrap;
-          margin-bottom:8px;
-        }
-        .scores-filters input,
-        .scores-filters select{
-          border-radius:999px;
-          border:1px solid #e2e8f0;
-          padding:6px 11px;
-          font-size:.85rem;
-          min-width:120px;
-        }
-        .scores-table-wrap{
-          margin-top:4px;
-          border-radius:14px;
-          border:1px solid #e5e7eb;
-          overflow:auto;
-        }
-        .scores-empty{
-          padding:14px;
-          text-align:center;
-          font-size:.9rem;
-          color:#64748b;
-        }
-        .scores-status-bar{
-          margin-top:10px;
-          font-size:.8rem;
-          color:#64748b;
-          display:flex;
-          flex-wrap:wrap;
-          gap:10px;
-        }
-        .scores-dot{
-          width:8px;height:8px;border-radius:999px;background:#22c55e;
-          margin-right:6px;
-        }
-
-        .results-table th.sortable{cursor:pointer;user-select:none;}
-        .results-table th.sortable::after{content:"";margin-left:4px;font-size:.7rem;color:#9ca3af;}
-        .results-table th.sortable.sort-asc::after{content:"▲";}
-        .results-table th.sortable.sort-desc::after{content:"▼";}
-    </style>
+    @media(max-width:980px){
+      body{height:auto; overflow:auto; display:block;}
+      .sidebar{
+        position:fixed; top:0; left:0; bottom:0;
+        height:100vh; width:min(86vw,340px);
+        transform:translateX(-110%);
+        transition:transform .25s ease;
+        z-index:1000; padding:18px;
+      }
+      .main-content{padding:16px; min-height:100vh; overflow:visible;}
+      header{align-items:center; gap:12px; margin-bottom:16px; padding-bottom:14px;}
+      h1{font-size:1.35rem;}
+      .clock-time{font-size:1.15rem;}
+      .menu-btn{display:inline-flex;}
+      .dashboard-grid{grid-template-columns:1fr; gap:14px;}
+      .widget{min-height:auto; padding:16px; border-radius:14px;}
+      .quick-actions{grid-template-columns:1fr;}
+      .btn-quick{padding:14px;}
+      .course-time{width:68px;}
+      summary{padding:14px;}
+      .content-links{padding:12px; gap:8px;}
+      .btn-yellow,.btn-blue-outline{width:100%; justify-content:space-between;}
+    }
+  </style>
 </head>
 <body>
 
-    <nav class="sidebar">
-        <div class="brand">🚀 COCKPIT</div>
-        <div class="nav-item active" onclick="showView('dashboard', this)">🏠 Tableau de Bord</div>
-        <div class="nav-category">MES DOSSIERS</div>
-        <div class="nav-item" data-theme="pedago" onclick="showView('view-pedago', this)">🟦 1. Pédagogie & Cours</div>
-        <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 2. Évaluation & Suivi</div>
-        <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 2b. Scores exercices</div>
-        <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 3. Classes & Groupes</div>
-        <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 4. Projets & Transversal</div>
-        <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 5. Temps & Admin</div>
-        <div class="nav-item" data-theme="live" onclick="showView('view-live', this)">🟫 6. Classe en Temps Réel</div>
-        <div class="nav-item" data-theme="sites" onclick="showView('view-sites', this)">🌐 7. Sites Internet</div>
-    </nav>
+  <nav class="sidebar">
+    <div class="brand">🚀 COCKPIT</div>
+    <div class="nav-item active" onclick="showView('dashboard', this)">🏠 Tableau de bord</div>
 
-    <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()" aria-hidden="true"></div>
+    <div class="nav-category">Mes dossiers</div>
+    <div class="nav-item" data-theme="pedago" onclick="showView('view-pedago', this)">🟦 1. Pédagogie & cours</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 2. Évaluation & suivi</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 2b. Scores exercices</div>
+    <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 3. Classes & groupes</div>
+    <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 4. Projets & transversal</div>
+    <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 5. Temps & admin</div>
+    <div class="nav-item" data-theme="live" onclick="showView('view-live', this)">🟫 6. Classe en temps réel</div>
+    <div class="nav-item" data-theme="sites" onclick="showView('view-sites', this)">🌐 7. Sites internet</div>
+  </nav>
 
-    <main class="main-content">
-        <header>
-            <button id="menuBtn" class="menu-btn" aria-label="Menu" onclick="toggleMenu()">☰</button>
-            <h1 id="page-title">Tableau de Bord</h1>
-            <div class="header-infos">
-                <div class="clock-time" id="clock">--:--</div>
-                <div class="clock-date" id="date">--</div>
-                <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
-                <div id="inboxBadge" title="Nouvelles copies" style="display:none;min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:#111827;color:#fff;font-weight:900;font-size:12px;align-items:center;justify-content:center;"></div>
-            </div>
-        </header>
+  <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
 
-        <!-- DASHBOARD -->
-        <div id="dashboard" class="view-section active">
-            <div class="quick-actions">
-                <a href="prof_plan.html" target="_blank" class="btn-quick"><span>🪑</span><span><strong>Plan de Classe</strong><br>Piloter les places</span></a>
-                <a href="https://www.pronote.index-education.net/" target="_blank" class="btn-quick"><span>🎓</span><span><strong>Pronote Web</strong><br>Accès direct</span></a>
-                <button onclick="document.getElementById('memo-input').focus()" class="btn-quick"><span>🧠</span><span><strong>Mémo Ciblé</strong><br>Rappel contextuel</span></button>
-            </div>
-            <div class="dashboard-grid">
-                <div class="widget">
-                    <h3>📅 Planning <div style="font-size:0.8rem;"><button onclick="changeDate(-1)">◀</button> <span id="planning-date-label">...</span> <button onclick="changeDate(1)">▶</button> <button onclick="openTimeline()" title="Timeline" style="margin-left:8px;background:#0f172a;color:white;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;">Timeline</button></div></h3>
-                    <ul class="planning-list" id="planning-list"></ul>
-                </div>
-                <div class="right-stack">
-                    <div class="widget memo-widget">
-                        <h3>💡 Pense-Bête Contextuel</h3>
-                        <div style="display:flex;gap:5px;margin-bottom:15px;">
-                            <select id="memo-target" style="padding:8px;border-radius:6px;border:1px solid #ddd;"></select>
-                            <input id="memo-input" style="flex-grow:1;padding:8px;border-radius:6px;border:1px solid #ddd;" placeholder="Note...">
-                            <button onclick="addMemo()" style="background:#0f172a;color:white;border:none;padding:8px 15px;border-radius:6px;">+</button>
-                        </div>
-                        <ul class="alert-list" id="memo-list"></ul>
-                    </div>
-                
-                    <div class="widget agenda-widget">
-                        <h3>🗓️ Agenda</h3>
-                        <div class="agenda-form">
-                            <select id="agenda-type">
-                                <option value="Réunion">Réunion</option>
-                                <option value="Parents">Parents</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Personnel">Personnel</option>
-                                <option value="Classe">Classe</option>
-                                <option value="Autre">Autre</option>
-                            </select>
-                            <input id="agenda-date" type="date" aria-label="Date">
-                            <input id="agenda-time" type="time" aria-label="Heure">
-                        </div>
-                        <div class="agenda-form">
-                            <input id="agenda-title" class="wide" placeholder="Titre (réunion, rdv...)" aria-label="Titre">
-                            <input id="agenda-place" class="wide" placeholder="Lieu (optionnel)" aria-label="Lieu">
-                            <button onclick="addAgenda()" style="background:#0f172a;color:white;border:none;padding:8px 15px;border-radius:6px;">+</button>
-                        </div>
-                        <ul class="agenda-list" id="agenda-list"></ul>
-                    </div>
-                </div>
-            </div>
+  <main class="main-content">
+    <header>
+      <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">☰</button>
+      <h1 id="page-title">Tableau de bord</h1>
+      <div class="header-infos">
+        <div id="clock" class="clock-time">--:--</div>
+        <div id="date" class="clock-date">--</div>
+        <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
+        <div id="inboxBadge" style="display:none;min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:#111827;color:#fff;font-weight:900;font-size:12px;align-items:center;justify-content:center;"></div>
+      </div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="view-section active">
+      <div class="quick-actions">
+        <a href="prof_plan.html" target="_blank" class="btn-quick">
+          <span>🪑</span><span><strong>Plan de classe</strong><br>Pilotage des places</span>
+        </a>
+        <a href="https://www.pronote.index-education.net/" target="_blank" class="btn-quick">
+          <span>🎓</span><span><strong>Pronote Web</strong><br>Accès rapide</span>
+        </a>
+        <button class="btn-quick" type="button" onclick="document.getElementById('memo-input').focus()">
+          <span>🧠</span><span><strong>Mémo ciblé</strong><br>Rappel contextuel</span>
+        </button>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="widget">
+          <h3>
+            📅 Planning
+            <span style="font-size:.8rem;">
+              <button type="button" onclick="changeDate(-1)">◀</button>
+              <span id="planning-date-label">Aujourd’hui</span>
+              <button type="button" onclick="changeDate(1)">▶</button>
+            </span>
+          </h3>
+          <ul id="planning-list" class="planning-list"></ul>
         </div>
 
-        <!-- PÉDAGO -->
-        <div id="view-pedago" class="view-section">
-          <h2 style="color:var(--col-pedago)">Pédagogie & Cours</h2>
-
-          <details open>
-            <summary>📁 Séquences CAP</summary>
-            <div class="content-links">
-              <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🖥️ Séance projetée <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🧩 Activités rapides <span class="badge-soon">🚧 Bientôt</span></a>
-            </div>
-          </details>
-
-          <details>
-            <summary>📁 Séquences BAC PRO</summary>
-            <div class="content-links">
-              <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🖥️ Séance projetée <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🧩 Activités rapides <span class="badge-soon">🚧 Bientôt</span></a>
-            </div>
-          </details>
-
-          <details id="course-structure">
-            <summary>📚 Cours CAP & Bac Pro (structure)</summary>
-
-            <details class="lvl-cap">
-              <summary>CAP</summary>
-
-              <details>
-                <summary>Thématique A – L’individu et sa santé</summary>
-                <details><summary>Module A1 – Le système de santé</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A2 – Le sommeil</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A3 – L’activité physique</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A4 – Les addictions</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A5 – Sexualité / Contraception</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A6 – Prévenir les IST</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module A7 – L’alimentation adaptée</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-              </details>
-
-              <details>
-                <summary>Thématique B – L’environnement</summary>
-                <details><summary>Module B1 – Les ressources en eau</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module B2 – Le risque majeur</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module B3 – Les ressources en énergie</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module B4 – Le bruit au quotidien</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-              </details>
-
-              <details>
-                <summary>Thématique C – Milieu professionnel</summary>
-                <details><summary>Module C1 – Contrats de travail</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C2 – Enjeux santé sécurité</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C3 – Démarche de prévention</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C4 – Risques spécifiques</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C5 – Activité physique (travail)</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C6 – Acteurs de prévention</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C7 – Suivi médical</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module C8 – Secourisme</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-              </details>
-
-              <details>
-                <summary>Thématique D – Consommateur</summary>
-                <details><summary>Module D1 – L’assurance</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module D2 – Le budget</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-                <details><summary>Module D3 – Les achats</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a></div></details>
-              </details>
-            </details>
-
-            <details class="lvl-bacpro">
-              <summary>Bac Pro</summary>
-
-              <details>
-                <summary>Seconde Bac Pro</summary>
-                <details><summary>Thématique A</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours A1 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A2 (Sommeil) <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A3 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A4 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A5 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique B</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours B1 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours B2 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique C</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours C1 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C2 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-              </details>
-
-              <details>
-                <summary>Première Bac Pro</summary>
-                <details><summary>Thématique A</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours A6 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A7 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours A8 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique B</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours B3 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours B4 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique C</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours C3 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C4 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C5 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C6 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-              </details>
-
-              <details>
-                <summary>Terminale Bac Pro</summary>
-                <details><summary>Thématique A</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours A9 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique B</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours B5 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-                <details><summary>Thématique C</summary><div class="content-links">
-                  <a href="#" class="btn-yellow">📄 Cours C7 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C8 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C9 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C10 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C11 <span class="badge-soon">🚧 Bientôt</span></a>
-                  <a href="#" class="btn-yellow">📄 Cours C12 <span class="badge-soon">🚧 Bientôt</span></a>
-                </div></details>
-              </details>
-            </details>
-          </details>
-
-          <details><summary>📆 Progressions</summary><div class="content-links"></div></details>
-
-          <details>
-            <summary>📘 Référentiels PSE/PSR</summary>
-            <div class="content-links">
-              <a href="#" class="btn-yellow">📘 Référentiel PSE CAP <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">📘 Référentiel PSE BAC PRO <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">📘 Référentiel PSR <span class="badge-soon">🚧 Bientôt</span></a>
-            </div>
-          </details>
-
-          <details>
-            <summary>🧑‍🏫 PFMP / Stage</summary>
-            <div class="content-links">
-              <a href="#" class="btn-yellow">📆 Calendrier PFMP <span class="badge-soon">🚧 Bientôt</span></a>
-              <a href="#" class="btn-yellow">🗂️ Documents PFMP <span class="badge-soon">🚧 Bientôt</span></a>
-            </div>
-          </details>
-
-          <details>
-            <summary>🌡️ Météo de classe</summary>
-            <div class="content-links">
-              <a href="profmeteo.html" class="btn-blue-outline">🌡️ Ouvrir ProfMétéo</a>
-              <a href="#" class="btn-yellow">📊 Historique & tendances <span class="badge-soon">🚧 Bientôt</span></a>
-            </div>
-          </details>
-        </div>
-
-        <!-- ÉVALUATION -->
-        <div id="view-eval" class="view-section">
-            <h2 style="color:var(--col-eval)">Évaluation & Suivi</h2>
-            <details open><summary>📋 Suivi & Analyses</summary><div class="content-links">
-                <a href="pageprof.html" target="_blank" class="btn-yellow">📊 PageProf (Suivi)</a>
-                <a href="#" class="btn-yellow">📈 Générateur</a>
-                <a href="#" class="btn-yellow">📊 Tableau de bord <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧾 Grilles & barèmes <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📥 Exports (CSV/JSON) <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗃️ Archives <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>📝 Grilles d'évaluation</summary><div class="content-links">
-                <a href="#" class="btn-yellow">📄 Modèle CAP <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📄 Modèle BAC PRO <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧮 Barèmes (points) <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>📂 Historique</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🗓️ Notes & bilans <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗃️ Archives PDF prof <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📥 Exports <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>📊 Indicateurs MIMO</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🧠 Mémos rapides <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📌 À faire / Suivi <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📊 Stats (usage) <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-        </div>
-
-        <!-- SCORES EXERCICES (connecté Firestore) -->
-        <div id="view-scores" class="view-section">
-          <h2 style="color:var(--col-eval)">Scores exercices (en ligne)</h2>
-          <div class="scores-card">
-            <div class="scores-toolbar">
-              <span class="scores-pill">📊 Vue globale des exercices envoyés (connexion Firestore)</span>
-              <button id="scores-btn-refresh" type="button" class="scores-button" disabled>🔄 Actualiser</button>
-              <div id="scores-counter" class="scores-counter">0 enregistrement</div>
-            </div>
-            <div class="scores-filters">
-              <input id="scores-filter-name" type="text" placeholder="Filtrer par nom…" disabled>
-              <select id="scores-filter-class" disabled>
-                <option value="">Toutes les classes</option>
-                <option value="2nde Bac Pro">2nde Bac Pro</option>
-                <option value="1ère Bac Pro">1ère Bac Pro</option>
-                <option value="Tle Bac Pro">Tle Bac Pro</option>
-                <option value="CAP 1">CAP 1</option>
-                <option value="CAP 2">CAP 2</option>
-                <option value="Autre">Autre</option>
+        <div class="right-stack">
+          <div class="widget">
+            <h3>💡 Pense-bête</h3>
+            <div class="agenda-form">
+              <select id="memo-target">
+                <option value="dashboard">Tableau de bord</option>
+                <option value="view-pedago">Pédagogie</option>
+                <option value="view-eval">Évaluation</option>
+                <option value="view-class">Classes</option>
+                <option value="view-proj">Projets</option>
+                <option value="view-admin">Admin</option>
+                <option value="view-live">Classe live</option>
               </select>
-              <select id="scores-filter-exo" disabled>
-                <option value="">Tous les exercices</option>
+              <input id="memo-input" class="wide" placeholder="Note liée au contexte…" />
+              <button type="button" onclick="addMemo()">+</button>
+            </div>
+            <ul id="memo-list" class="alert-list"></ul>
+          </div>
+
+          <div class="widget">
+            <h3>🗓️ Agenda</h3>
+            <div class="agenda-form">
+              <select id="agenda-type">
+                <option value="Réunion">Réunion</option>
+                <option value="Parents">Parents</option>
+                <option value="Admin">Admin</option>
+                <option value="Classe">Classe</option>
+                <option value="Personnel">Personnel</option>
               </select>
+              <input id="agenda-date" type="date" />
+              <input id="agenda-time" type="time" />
             </div>
-            <div class="scores-table-wrap">
-              <table class="results-table" id="scores-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th class="sortable" data-sort="nom">Nom élève</th>
-                    <th class="sortable" data-sort="classe">Classe</th>
-                    <th class="sortable" data-sort="exercice">Exercice</th>
-                    <th class="sortable" data-sort="score">Score</th>
-                    <th class="sortable" data-sort="date">Date d’envoi</th>
-                  </tr>
-                </thead>
-                <tbody id="scores-tbody">
-                  <tr><td colspan="6" class="scores-empty">Connexion des scores à préparer (la page n’empêche pas le reste du cockpit de fonctionner).</td></tr>
-                </tbody>
-              </table>
+            <div class="agenda-form">
+              <input id="agenda-title" class="wide" placeholder="Titre…" />
+              <input id="agenda-place" class="wide" placeholder="Lieu (facultatif)…" />
+              <button type="button" onclick="addAgenda()">+</button>
             </div>
-            <div class="scores-status-bar">
-              <span><span class="scores-dot"></span><span id="scores-status">Connexion Firestore en temps réel pour les copies (badge en haut à droite)</span></span>
-              <span id="scores-last-update"></span>
-            </div>
+            <ul id="agenda-list" class="agenda-list"></ul>
           </div>
         </div>
+      </div>
+    </section>
 
-        <!-- CLASSES -->
-        <div id="view-class" class="view-section">
-            <h2 style="color:var(--col-class)">Classes & Groupes</h2>
-            <details open><summary>🪑 Plans de Classe</summary><div class="content-links">
-                <a href="prof_plan.html" target="_blank" class="btn-yellow">🚀 Piloter</a>
-                <button onclick="window.open('ecran_plan.html', 'proj')" class="btn-blue-outline">📺 Projeter</button>
-                <a href="#" class="btn-yellow">👥 Liste d'élèves <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">♿ Aménagements <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧩 Groupes / îlots <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>📋 Listes d'élèves</summary><div class="content-links">
-                <a href="#" class="btn-yellow">👤 Prénoms + classe <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📝 Notes utiles <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🔎 Recherche <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🧠 Besoins particuliers (TSA/PAP)</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🅰️ Police / consignes <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧩 Supports adaptés <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">✅ Suivi aménagements <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🤝 Tutorat</summary><div class="content-links">
-                <a href="#" class="btn-yellow">📌 Liste tuteurés <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗓️ Suivi séances <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📝 Notes / objectifs <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
+    <!-- PEDAGO -->
+    <section id="view-pedago" class="view-section">
+      <h2 style="color:var(--col-pedago);">Pédagogie & cours</h2>
+
+      <details open>
+        <summary>📁 Séquences CAP</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">Bientôt</span></a>
         </div>
+      </details>
 
-        <!-- PROJETS -->
-        <div id="view-proj" class="view-section">
-            <h2 style="color:var(--col-proj)">Projets & Transversalité</h2>
-            <details open><summary>🎨 Chef-d'œuvre</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🎨 CAP 1ère année <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🎨 CAP 2ème année <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧾 Grille Chef-d’œuvre <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🏢 Projets d'établissement</summary><div class="content-links">
-                <a href="#" class="btn-yellow">📄 Projet d'établissement <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📅 Réunions / CR <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📎 Pièces jointes <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🧠 CPS / Ateliers</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🧠 Modules CPS <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧰 Outils / supports <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📝 Bilans séances <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🚀 Parcours Avenir</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🧭 Séances orientation <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📌 Intervenants <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>☕ Café des parents</summary><div class="content-links">
-                <a href="#" class="btn-yellow">☕ Planning <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗂️ Supports <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
+      <details>
+        <summary>📁 Séquences Bac Pro</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">Bientôt</span></a>
         </div>
+      </details>
 
-        <!-- ADMIN -->
-        <div id="view-admin" class="view-section">
-            <h2 style="color:var(--col-admin)">Temps & Institution</h2>
-            <details open><summary>📅 Emploi du temps Prof</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🗓️ Vue semaine <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗓️ Vue mois <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🔗 Import iCal <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🏢 PFMP (Stages)</summary><div class="content-links">
-                <a href="#" class="btn-yellow">📆 Calendrier PFMP (classes) <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📄 Emplois du temps stage <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🤝 PACTE</summary><div class="content-links">
-                <a href="#" class="btn-yellow">⏱️ Heures réalisées <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">👥 Classes / actions <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧾 Récapitulatif <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details><summary>🔄 Remplacements</summary><div class="content-links">
-                <a href="#" class="btn-yellow">🕒 Suivi remplacements <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">📝 Notes / comptes-rendus <span class="badge-soon">🚧 Bientôt</span></a>
-            </div></details>
-            <details>
-              <summary>📚 Documents & Référentiels</summary>
-              <div class="content-links">
-                <a href="#" class="btn-yellow">📘 Référentiels (PDF) <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🗂️ Modèles / courriers <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn-yellow">🧾 Comptes-rendus réunions <span class="badge-soon">🚧 Bientôt</span></a>
-              </div>
-            </details>
-        </div>
+      <details id="course-structure">
+        <summary>📚 Structure des cours CAP / Bac Pro</summary>
 
-        <!-- LIVE -->
-        <div id="view-live" class="view-section">
-          <h2 style="color:var(--col-live-web)">🟫 6. Classe en Temps Réel</h2>
-          <div class="note">Organisation miroir : boutons <b>Élèves</b> (téléphones) + boutons <b>Prof</b> (pilotage / projection).</div>
-
-          <div class="card">
-
-            <h3>Animation Live</h3>
-
-            <details class="live-block" open>
-              <summary class="live-summary">🗨️ S’exprimer / Explorer</summary>
-              <div class="content-links live-links">
-                <a href="eleve_nuage.html" class="btn btn-yellow">🌥️ Nuage de mots <span class="badge-role role-eleve">Élèves</span></a>
-                <a href="prof_nuage.html" class="btn btn-yellow">☁️ Nuage <span class="badge-role role-prof">Prof</span></a>
-                <a href="prof_postit.html" class="btn btn-yellow">☁️ PostIt prof <span class="badge-role role-prof">Prof</span></a>
-
-                <a href="#" class="btn btn-yellow">💡 Brainstorming <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">💡 Brainstorming <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-
-                <a href="eleve_meteo.html" class="btn btn-yellow">🧠 Ma météo <span class="badge-role role-eleve">Élèves</span></a>
-                <a href="prof_meteo.html" class="btn btn-yellow">🧠 Météo <span class="badge-role role-prof">Prof</span></a>
-
-                <a href="ecran_classe.html" class="btn btn-blue-outline">📺 Écran Classe <span class="badge-role role-prof">Prof</span></a>
-                <a href="ecran_plat.html" class="btn btn-blue-outline">📺 Écran Plat <span class="badge-role role-prof">Prof</span></a>
-              </div>
-            </details>
-
-            <details class="live-block">
-              <summary class="live-summary">🤝 Travail collaboratif</summary>
-              <div class="content-links live-links">
-                <a href="#" class="btn btn-yellow">👥 Travail de groupe <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">👥 Travail de groupe <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-
-                <a href="prof_mindmap.html" class="btn btn-yellow">🗣️ carte mentale collective <span class="badge-soon">👇 ici</span></a>
-                <a href="ecran_mindmap.html" class="btn btn-yellow">🗣️ carte mentale écran <span class="badge-soon">👇 ici</span></a>
-                <a href="prof_itamami.html" class="btn btn-yellow">🗣️ ITAMAMI <span class="badge-soon">👇 ici</span></a>
-                <a href="prof_qqoqcp.html" class="btn btn-yellow">🗣️ QQOQCP <span class="badge-soon">👇 ici</span></a>
-                <a href="prof_pad.html" class="btn btn-yellow">🗣️ PAD <span class="badge-soon">👇 ici</span></a>
-                <a href="prof_ishikawa.html" class="btn btn-yellow">🗣️ ishikawa <span class="badge-soon">👇 ici</span></a>
-                <a href="#" class="btn btn-yellow">🗣️ Débat structuré <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-              </div>
-            </details>
-
-            <details class="live-block">
-              <summary class="live-summary">🎯 Autoévaluation & positionnement</summary>
-              <div class="content-links live-links">
-                <a href="#" class="btn btn-yellow">📊 Autoévaluation <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">📊 Autoévaluation <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-
-                <a href="#" class="btn btn-yellow">🎯 Positionnement <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">🎯 Positionnement <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-              </div>
-            </details>
-
-            <details class="live-block">
-              <summary class="live-summary">🎮 Jeux pédagogiques / Entraînement</summary>
-              <div class="content-links live-links">
-                <a href="#" class="btn btn-yellow">⏱️ QCM chronométré <span class="badge-soon">🚧 Bientôt</span></a>
-
-                <a href="eleve_vraifaux.html" class="btn btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-eleve">Élèves</span></a>
-                <a href="prof_vraifaux.html" class="btn btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-prof">Prof</span></a>
-                <a href="ecran_classe.html" class="btn btn-blue-outline">📺 Écran Classe prof vrai/faux <span class="badge-role role-prof">Prof</span></a>
-                  
-                <a href="#" class="btn btn-yellow">🎮 Quiz en direct <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">🎮 Quiz en direct <span class="badge-soon">🚧 Bientôt</span> <span class="badge-role role-prof">Prof</span></a>
-              </div>
-            </details>
-
-            <details class="live-block">
-              <summary class="live-summary">📤 Productions élèves</summary>
-              <div class="content-links live-links">
-                <a href="#" class="btn btn-yellow">📁 CAP 1re année – Rendre un devoir <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="devoirA3_cap_sedentarite_pse.html" class="btn btn-yellow">📁 CAP 2e année – Rendre un devoir A3 <span class="badge-soon">🚧 Bientôt</span></a>
-                <a href="#" class="btn btn-yellow">📁 Bac Pro – Rendre un devoir <span class="badge-soon">🚧 Bientôt</span></a>
-
-                <a href="#" class="btn btn-blue-outline">📥 Réception & suivi (Prof) <span class="badge-soon">🚧 Bientôt</span></a>
-              </div>
-            </details>
-
-            <details class="live-block" open>
-              <summary class="live-summary">🧘 Détente</summary>
-              <div class="content-links live-links">
-                <a href="ecran_bulle.html" class="btn btn-yellow">🤫 Bulle Silence <span class="badge-role role-prof">Prof</span></a>
-                <a href="ecran_zen.html" class="btn btn-yellow">🧘 Zen <span class="badge-role role-prof">Prof</span></a>
-              </div>
-            </details>
-
-          </div>
-        </div>
-
-        <!-- SITES -->
-        <div id="view-sites" class="view-section">
-            <h2 style="color:var(--col-sites)">Sites Internet Favoris</h2>
-            <details open><summary>🏢 Administratif</summary><div class="content-links">
-                <a href="https://portail.ac-lyon.fr/" target="_blank" class="btn-yellow">Académie</a>
-                <a href="https://eduscol.education.fr/" class="btn-yellow">Eduscol</a>
-                <a href="https://www.education.gouv.fr/bo" class="btn-yellow">BO Éducation nationale</a>
-                <a href="https://www.service-public.fr/" class="btn-yellow">Service-public</a>
-                <a href="https://preventionsanteenvironnement.github.io/projetdetablissement/" class="btn-yellow">Projet d'établissement</a>                
-                <a href="https://cas.ent.auvergnerhonealpes.fr/login?service=https:%2F%2F0692390Y.index-education.net%2Fpronote%2Fprofesseur.html" class="btn-yellow">Mail Pro / ENT</a>                
-                <a href="https://www.inrs.fr/" class="btn-yellow">INRS</a>
-                <a href="https://cas.ent.auvergnerhonealpes.fr/login?service=https:%2F%2F0692390Y.index-education.net%2Fpronote%2Fprofesseur.html" class="btn-yellow">Pronote</a>                
-            </div></details>
-            <details><summary>📚 Pédagogique</summary><div class="content-links">
-                <a href="https://eduscol.education.fr/" target="_blank" class="btn-yellow">Eduscol</a>
-                <a href="https://learningapps.org/" class="btn-yellow">LearningApps</a>
-                <a href="https://h5p.org/" class="btn-yellow">H5P</a>
-                <a href="Preventionsanteenvironnement/cps" class="btn-yellow">CPS</a>
-                <a href="https://preventionsanteenvironnement.github.io/PSE/" class="btn-yellow">PSE</a>
-            </div></details>
-        </div>
-    </main>
-
-    <div id="toast" style="position:fixed;bottom:18px;right:18px;display:none;max-width:320px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:white;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:9999"></div>
-
-    <!-- TIMELINE MODAL -->
-    <div class="modal-backdrop" id="timelineModal" role="dialog" aria-modal="true" aria-label="Timeline année scolaire">
-        <div class="modal">
-            <header>
-                <h3>📆 Timeline année scolaire</h3>
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <button onclick="closeTimeline()" style="border:1px solid #e2e8f0;background:#fff;cursor:pointer;padding:8px 10px;border-radius:10px;font-weight:800;">Fermer</button>
-                </div>
-            </header>
-            <div class="content">
-                <div class="timeline-wrap" id="timelineGrid"></div>
-                <div class="legend">
-                    <span><i class="dot vac"></i> Vacances</span>
-                    <span><i class="dot pfmp"></i> PFMP / Stage</span>
-                    <span><i class="dot course"></i> Cours</span>
-                    <span><i class="dot agenda"></i> Agenda</span>
-                </div>
+        <details class="lvl-cap">
+          <summary>CAP</summary>
+          <details>
+            <summary>Thématique A – L’individu et sa santé</summary>
+            <div class="content-links">
+              <a href="#" class="btn-yellow">A1 – Système de santé <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">A2 – Sommeil <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">A3 – Activité physique <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">A4 – Addictions <span class="badge-soon">Bientôt</span></a>
             </div>
+          </details>
+          <details>
+            <summary>Thématique B – Environnement</summary>
+            <div class="content-links">
+              <a href="#" class="btn-yellow">B1 – Ressource en eau <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">B2 – Risques majeurs <span class="badge-soon">Bientôt</span></a>
+            </div>
+          </details>
+        </details>
+
+        <details class="lvl-bacpro">
+          <summary>Bac Pro</summary>
+          <details>
+            <summary>Seconde Bac Pro</summary>
+            <div class="content-links">
+              <a href="#" class="btn-yellow">A – Santé <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">B – Environnement <span class="badge-soon">Bientôt</span></a>
+              <a href="#" class="btn-yellow">C – Travail <span class="badge-soon">Bientôt</span></a>
+            </div>
+          </details>
+        </details>
+      </details>
+
+      <details>
+        <summary>📘 Référentiels PSE</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">CAP PSE <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">Bac Pro PSE <span class="badge-soon">Bientôt</span></a>
         </div>
-    </div>
+      </details>
+    </section>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, doc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <!-- EVAL -->
+    <section id="view-eval" class="view-section">
+      <h2 style="color:var(--col-eval);">Évaluation & suivi</h2>
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-        authDomain: "devoirs-pse.firebaseapp.com",
-        projectId: "devoirs-pse",
-        storageBucket: "devoirs-pse.firebasestorage.app",
-        messagingSenderId: "614730413904",
-        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
-    };
+      <details open>
+        <summary>📊 PageProf & suivis</summary>
+        <div class="content-links">
+          <a href="pageprof.html" target="_blank" class="btn-yellow">📊 Ouvrir PageProf</a>
+          <a href="#" class="btn-yellow">📈 Tableau de bord <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">🧾 Grilles / barèmes <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const memosCol = collection(db, "cockpit_memos");
-    const agendaCol = collection(db, "cockpit_agenda");
-    const copiesCol = collection(db, "bacpro");
+      <details>
+        <summary>📂 Historique & exports</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">🗓️ Bilans <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">📥 Exports JSON / CSV <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+    </section>
 
-    const toast = document.getElementById("toast");
-    const inboxBadge = document.getElementById("inboxBadge");
-    let unseenCopies = 0;
-    let firstCopiesSnapshot = true;
+    <!-- SCORES EXERCICES -->
+    <section id="view-scores" class="view-section">
+      <h2 style="color:var(--col-eval);">Scores exercices (en ligne)</h2>
+      <div class="scores-card">
+        <div class="scores-toolbar">
+          <span class="scores-pill">📊 Vue globale des exercices envoyés (FireStore – à connecter)</span>
+          <button id="scores-btn-refresh" class="scores-button" type="button" disabled>🔄 Actualiser</button>
+          <div id="scores-counter" class="scores-counter">0 enregistrement</div>
+        </div>
 
-    // Scores exercices – références DOM
-    const scoresBtnRefresh = document.getElementById("scores-btn-refresh");
-    const scoresFilterName = document.getElementById("scores-filter-name");
-    const scoresFilterClass = document.getElementById("scores-filter-class");
-    const scoresFilterExo = document.getElementById("scores-filter-exo");
-    const scoresTbody = document.getElementById("scores-tbody");
-    const scoresCounter = document.getElementById("scores-counter");
-    const scoresStatus = document.getElementById("scores-status");
-    const scoresLastUpdate = document.getElementById("scores-last-update");
+        <div class="scores-filters">
+          <input id="scores-filter-name" type="text" placeholder="Filtrer par nom…" disabled />
+          <select id="scores-filter-class" disabled>
+            <option value="">Toutes les classes</option>
+            <option value="CAP1">CAP 1</option>
+            <option value="CAP2">CAP 2</option>
+            <option value="2nde Bac Pro">2nde Bac Pro</option>
+            <option value="1ère Bac Pro">1ère Bac Pro</option>
+            <option value="Tle Bac Pro">Tle Bac Pro</option>
+          </select>
+          <select id="scores-filter-exo" disabled>
+            <option value="">Tous les exercices</option>
+          </select>
+        </div>
 
-    let scoresData = [];
-    let scoresSortKey = "date";
-    let scoresSortDir = "desc";
+        <div class="scores-table-wrap">
+          <table id="scores-table" class="results-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th class="sortable" data-sort="nom">Nom élève</th>
+                <th class="sortable" data-sort="classe">Classe</th>
+                <th class="sortable" data-sort="exercice">Exercice</th>
+                <th class="sortable" data-sort="score">Score</th>
+                <th class="sortable" data-sort="date">Date d’envoi</th>
+              </tr>
+            </thead>
+            <tbody id="scores-tbody">
+              <tr><td colspan="6" class="scores-empty">Connexion aux scores à brancher (l’interface est prête).</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-    function showToast(msg){
-        if(!toast) return;
-        toast.textContent = msg;
-        toast.style.display = "block";
-        clearTimeout(window.__toastTimer);
-        window.__toastTimer = setTimeout(() => toast.style.display = "none", 2600);
+        <div class="scores-status-bar">
+          <span><span class="scores-dot"></span><span id="scores-status">En attente de connexion Firestore (badge en haut à droite quand les copies arrivent).</span></span>
+          <span id="scores-last-update"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLASSES -->
+    <section id="view-class" class="view-section">
+      <h2 style="color:var(--col-class);">Classes & groupes</h2>
+
+      <details open>
+        <summary>🪑 Plans de classe</summary>
+        <div class="content-links">
+          <a href="prof_plan.html" target="_blank" class="btn-yellow">🚀 Piloter</a>
+          <button class="btn-blue-outline" type="button" onclick="window.open('ecran_plan.html','proj')">📺 Afficher au tableau</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>📋 Listes d’élèves</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">👥 Listes <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">🔎 Recherche rapide <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+
+      <details>
+        <summary>🧩 Besoins particuliers</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">♿ Aménagements <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">📘 Dossiers MDPH / PAP <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+    </section>
+
+    <!-- PROJETS -->
+    <section id="view-proj" class="view-section">
+      <h2 style="color:var(--col-proj);">Projets & transversal</h2>
+
+      <details open>
+        <summary>🎨 Chef-d’œuvre</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">CAP 1re année <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">CAP 2e année <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+
+      <details>
+        <summary>🏫 Projet d’établissement</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">📄 Documents <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">🗓️ Réunions / CR <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+
+      <details>
+        <summary>🧠 Ateliers CPS</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">Séquences CPS <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">Outils d’animation <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="view-admin" class="view-section">
+      <h2 style="color:var(--col-admin);">Temps & institution</h2>
+
+      <details open>
+        <summary>📅 Emploi du temps</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">Vue semaine <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">Vue mois <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+
+      <details>
+        <summary>🏢 PFMP / stages</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">Calendrier PFMP <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">Suivi élèves <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+
+      <details>
+        <summary>🤝 Pacte / missions</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">Heures réalisées <span class="badge-soon">Bientôt</span></a>
+          <a href="#" class="btn-yellow">Bilans <span class="badge-soon">Bientôt</span></a>
+        </div>
+      </details>
+    </section>
+
+    <!-- LIVE -->
+    <section id="view-live" class="view-section">
+      <h2 style="color:var(--col-live-web);">Classe en temps réel</h2>
+
+      <details class="live-block" open>
+        <summary class="live-summary">🗨️ S’exprimer / Explorer</summary>
+        <div class="content-links live-links">
+          <a href="eleve_nuage.html" class="btn-yellow">🌥️ Nuage de mots <span class="badge-role role-eleve">Élèves</span></a>
+          <a href="prof_nuage.html" class="btn-yellow">☁️ Nuage – Prof <span class="badge-role role-prof">Prof</span></a>
+          <a href="eleve_meteo.html" class="btn-yellow">🧠 Météo élèves <span class="badge-role role-eleve">Élèves</span></a>
+          <a href="prof_meteo.html" class="btn-yellow">🧠 Météo – Prof <span class="badge-role role-prof">Prof</span></a>
+        </div>
+      </details>
+
+      <details class="live-block">
+        <summary class="live-summary">🎮 Jeux / entraînement</summary>
+        <div class="content-links live-links">
+          <a href="eleve_vraifaux.html" class="btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-eleve">Élèves</span></a>
+          <a href="prof_vraifaux.html" class="btn-yellow">✅/❌ Vrai / Faux – Prof <span class="badge-role role-prof">Prof</span></a>
+        </div>
+      </details>
+
+      <details class="live-block">
+        <summary class="live-summary">📤 Productions élèves</summary>
+        <div class="content-links live-links">
+          <a href="devoirA3_cap_sedentarite_pse.html" class="btn-yellow">📁 CAP – Devoir A3 sédentarité</a>
+        </div>
+      </details>
+
+      <details class="live-block">
+        <summary class="live-summary">🧘 Détente</summary>
+        <div class="content-links live-links">
+          <a href="ecran_bulle.html" class="btn-yellow">🤫 Bulle silence <span class="badge-role role-prof">Prof</span></a>
+          <a href="ecran_zen.html" class="btn-yellow">🧘 Zen <span class="badge-role role-prof">Prof</span></a>
+        </div>
+      </details>
+    </section>
+
+    <!-- SITES -->
+    <section id="view-sites" class="view-section">
+      <h2 style="color:var(--col-sites);">Sites internet favoris</h2>
+
+      <details open>
+        <summary>🏢 Administratif</summary>
+        <div class="content-links">
+          <a href="https://portail.ac-lyon.fr/" class="btn-yellow" target="_blank">Portail Académie</a>
+          <a href="https://eduscol.education.fr/" class="btn-yellow" target="_blank">Eduscol</a>
+          <a href="https://www.education.gouv.fr/bo" class="btn-yellow" target="_blank">BO Éducation</a>
+          <a href="https://www.service-public.fr/" class="btn-yellow" target="_blank">Service-public</a>
+          <a href="https://cas.ent.auvergnerhonealpes.fr" class="btn-yellow" target="_blank">ENT / Mail pro</a>
+        </div>
+      </details>
+
+      <details>
+        <summary>📚 Ressources pédagogiques</summary>
+        <div class="content-links">
+          <a href="https://www.inrs.fr/" class="btn-yellow" target="_blank">INRS</a>
+          <a href="https://www.santepubliquefrance.fr/" class="btn-yellow" target="_blank">Santé Publique France</a>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    // CLOCK
+    function updateClock(){
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2,"0");
+      const m = String(now.getMinutes()).padStart(2,"0");
+      const d = now.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+      document.getElementById("clock").textContent = h + ":" + m;
+      document.getElementById("date").textContent = d;
     }
+    setInterval(updateClock,1000);
+    updateClock();
 
-    function setBadge(n){
-        if(!inboxBadge) return;
-        inboxBadge.style.display = n > 0 ? "flex" : "none";
-        inboxBadge.textContent = String(n);
-    }
-
-    // Badge temps réel pour nouvelles copies (toutes activités confondues)
-    const copiesQuery = query(
-        copiesCol,
-        orderBy("meta.createdAt", "desc"),
-        limit(20)
-    );
-
-    onSnapshot(copiesQuery, (snap) => {
-        if(firstCopiesSnapshot){
-            firstCopiesSnapshot = false;
-        } else {
-            let added = 0;
-            snap.docChanges().forEach((ch) => {
-                if(ch.type === "added") added++;
-            });
-            if(added > 0){
-                unseenCopies += added;
-                setBadge(unseenCopies);
-                showToast("Nouvelle copie reçue : +" + added);
-            }
-        }
-    }, (error) => {
-        console.error("Erreur badge copies :", error);
-    });
-
-    const CLASSES = [
-        "Première AGORA", "Terminale AGORA", "Seconde GATL",
-        "B1MELEC", "B2MELEC", "BTMELEC",
-        "CAN 1", "HORT 2", "JP 1", "JP 2",
-        "PSR 1", "PSR 2", "VAN"
+    // SIMPLE PLANNING (à adapter si besoin)
+    let planningOffset = 0;
+    const planningData = [
+      {time:"08h30",label:"CAP – PSE",room:"Salle 12"},
+      {time:"10h00",label:"Bac Pro – PSE",room:"Salle 14"},
+      {time:"13h30",label:"Accompagnement perso",room:"CDI"}
     ];
+    function renderPlanning(){
+      const list = document.getElementById("planning-list");
+      const date = new Date();
+      date.setDate(date.getDate()+planningOffset);
+      const label = date.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"2-digit"});
+      document.getElementById("planning-date-label").textContent = label;
+      list.innerHTML = "";
+      planningData.forEach(c=>{
+        const li = document.createElement("li");
+        li.className = "course-item";
+        li.innerHTML = '<div class="course-time">'+c.time+'</div><div class="course-details"><strong>'+c.label+
+                       '</strong><br><small>'+c.room+'</small></div>';
+        list.appendChild(li);
+      });
+    }
+    function changeDate(delta){planningOffset+=delta;renderPlanning();}
+    renderPlanning();
 
-    let activeClass = null, offset = 0, evs = [], agendaEvents = [];
+    // LOCALSTORAGE HELPERS
+    function save(key,value){localStorage.setItem(key,JSON.stringify(value));}
+    function load(key,def){try{const v=JSON.parse(localStorage.getItem(key));return v??def;}catch(e){return def;}}
 
-    window.openMenu = () => document.body.classList.add('menu-open');
-    window.closeMenu = () => document.body.classList.remove('menu-open');
-    window.toggleMenu = () => document.body.classList.toggle('menu-open');
-
-    window.addMemo = async () => {
-        const i = document.getElementById('memo-input');
-        const t = document.getElementById('memo-target').value;
-        if(!i || i.value.trim()==="") return;
-        try{
-          await addDoc(memosCol, { text: i.value, target: t, timestamp: Date.now() });
-          i.value = "";
-        }catch(e){
-          console.error("Erreur mémo :", e);
-          showToast("Erreur lors de l’enregistrement du mémo");
-        }
-    };
-
-    window.deleteMemo = async (id) => {
-        try{
-          await deleteDoc(doc(db, "cockpit_memos", id));
-        }catch(e){
-          console.error("Erreur suppression mémo :", e);
-        }
-    };
-
-    window.addAgenda = async () => {
-        const typeEl = document.getElementById('agenda-type');
-        const dateEl = document.getElementById('agenda-date');
-        const timeEl = document.getElementById('agenda-time');
-        const titleEl = document.getElementById('agenda-title');
-        const placeEl = document.getElementById('agenda-place');
-
-        const title = (titleEl?.value || '').trim();
-        if(!title){
-            showToast("Agenda : ajoute un titre");
-            return;
-        }
-
-        const type = (typeEl?.value || 'Autre').trim();
-        const date = (dateEl?.value || new Date().toISOString().slice(0,10));
-        const time = (timeEl?.value || '08:00');
-        const dt = new Date(`${date}T${time}:00`);
-        const datetime = isNaN(dt.getTime()) ? Date.now() : dt.getTime();
-
-        try{
-          await addDoc(agendaCol, {
-              type,
-              title,
-              place: (placeEl?.value || '').trim(),
-              datetime,
-              createdAt: new Date().toISOString()
-          });
-
-          if(titleEl) titleEl.value = "";
-          if(placeEl) placeEl.value = "";
-        }catch(e){
-          console.error("Erreur agenda :", e);
-          showToast("Erreur lors de l’enregistrement de l’agenda");
-        }
-    };
-
-    window.deleteAgenda = async (id) => {
-        try{
-          await deleteDoc(doc(db, "cockpit_agenda", id));
-        }catch(e){
-          console.error("Erreur suppression agenda :", e);
-        }
-    };
-
-    // Agenda live
-    onSnapshot(query(agendaCol, orderBy("datetime", "asc"), limit(50)), (snap) => {
-        agendaEvents = [];
-        snap.forEach(d => {
-            const a = d.data();
-            if(a && typeof a.datetime === "number"){
-                agendaEvents.push({
-                    id: d.id,
-                    type: a.type || 'Autre',
-                    title: a.title || '',
-                    place: a.place || '',
-                    datetime: a.datetime
-                });
-            }
-        });
-
-        const list = document.getElementById('agenda-list');
-        if(!list) return;
-        list.innerHTML = "";
-
-        const now = Date.now();
-        const keepFrom = now - (24*60*60*1000);
-
-        snap.forEach(d => {
-            const a = d.data();
-            if(!a || typeof a.datetime !== "number") return;
-            if(a.datetime < keepFrom) return;
-
-            const dt = new Date(a.datetime);
-            const isSoon = (a.datetime - now) <= (24*60*60*1000) && (a.datetime - now) >= -(24*60*60*1000);
-
-            const li = document.createElement('li');
-            li.className = `agenda-item ${isSoon ? 'soon' : ''}`;
-
-            const dateTxt = dt.toLocaleString('fr-FR', {
-                weekday:'short', day:'2-digit', month:'2-digit',
-                hour:'2-digit', minute:'2-digit'
-            });
-            const place = (a.place || '').trim();
-
-            li.innerHTML = `
-                <div>
-                    <div><span class="agenda-tag">[${a.type || 'Autre'}]</span> ${a.title || ''}</div>
-                    <div class="agenda-meta">${dateTxt}${place ? " • " + place : ""}</div>
-                </div>
-                <button onclick="deleteAgenda('${d.id}')" style="border:none;background:none;cursor:pointer;">✕</button>
-            `;
-            list.appendChild(li);
-        });
-
-        try{ render(); }catch(e){}
-    }, (error) => {
-        console.error("Erreur écoute agenda :", error);
-    });
-
-    // Mémos live
-    onSnapshot(query(memosCol, orderBy("timestamp", "desc")), (snap) => {
-        const list = document.getElementById('memo-list');
-        if(!list) return;
-        list.innerHTML = "";
-        snap.forEach(d => {
-            const m = d.data();
-            const isMatch = activeClass && activeClass.includes(m.target) && m.target !== 'General';
-            const li = document.createElement('li');
-            li.className = `alert-item ${isMatch ? 'context-active' : ''}`;
-            li.innerHTML = `<div><b>[${m.target}]</b> ${m.text}</div><button onclick="deleteMemo('${d.id}')" style="border:none;background:none;cursor:pointer;">✕</button>`;
-            list.appendChild(li);
-        });
-    }, (error) => {
-        console.error("Erreur écoute mémos :", error);
-    });
-
-    const URL = "https://0692390y.index-education.net/pronote/ical/mesinformations.ics?icalsecurise=5FCC8714D0288D0C735DBB51F2A682873D9407D68F403E748C4860B26B18CFA16BE48C43C48C24A416FA30C689813A61&version=2025.2.8&param=900A75DF9ED8C62E212781A9E4DCC937";
-    window.changeDate = (o) => { offset += o; render(); };
-
-    window.openTimeline = () => {
-        const modal = document.getElementById('timelineModal');
-        if(modal){ modal.style.display = 'flex'; }
-        buildTimeline();
-    };
-    window.closeTimeline = () => {
-        const modal = document.getElementById('timelineModal');
-        if(modal){ modal.style.display = 'none'; }
-    };
-    window.addEventListener('keydown', (e) => {
-        if(e.key === 'Escape'){ try{ closeTimeline(); }catch(_){} }
-    });
-    (function(){
-        const modal = document.getElementById('timelineModal');
-        if(modal){
-            modal.addEventListener('click', (e) => {
-                if(e.target === modal){ closeTimeline(); }
-            });
-        }
-    })();
-
-    function buildTimeline(){
-        const grid = document.getElementById('timelineGrid');
-        if(!grid) return;
-        if(!evs || !evs.length){
-            grid.innerHTML = "<div class='month-col'><p style='margin:0;color:#475569;font-weight:800;'>Planning non chargé.</p></div>";
-            return;
-        }
-
-        const starts = evs.filter(e=>e.start).map(e=>e.start.getTime());
-        const ends = evs.filter(e=>e.end).map(e=>e.end.getTime());
-        const minT = Math.min(...starts);
-        const maxT = Math.max(...ends);
-
-        const start = new Date(minT);
-        const end = new Date(maxT);
-        const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
-        const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-
-        const map = {};
-        const keyOf = (d) => {
-            const y=d.getFullYear();
-            const m=String(d.getMonth()+1).padStart(2,'0');
-            const da=String(d.getDate()).padStart(2,'0');
-            return `${y}-${m}-${da}`;
-        };
-        const addTag = (k, tag) => {
-            if(!map[k]) map[k] = { vac:false, pfmp:false, course:false, agenda:false };
-            map[k][tag] = true;
-        };
-
-        evs.forEach(e => {
-            if(!e.start || !e.end) return;
-            const s = new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
-            const ee = new Date(e.end.getFullYear(), e.end.getMonth(), e.end.getDate());
-            for(let d=new Date(s); d<=ee; d.setDate(d.getDate()+1)){
-                const k = keyOf(d);
-                const sum = (e.summary||"").toLowerCase();
-                if(sum.includes("vacances")) addTag(k, "vac");
-                else if(sum.includes("pfmp") || sum.includes("stage")) addTag(k, "pfmp");
-                else addTag(k, "course");
-                if(d.getTime() === ee.getTime() && e.end.getHours()===0 && e.end.getMinutes()===0) break;
-            }
-        });
-
-        (agendaEvents||[]).forEach(a => {
-            if(typeof a.datetime !== "number") return;
-            const d = new Date(a.datetime);
-            addTag(keyOf(d), "agenda");
-        });
-
-        const months = [];
-        for(let d=new Date(startMonth); d<=endMonth; d.setMonth(d.getMonth()+1)){
-            months.push(new Date(d.getFullYear(), d.getMonth(), 1));
-            if(months.length>18) break;
-        }
-
-        const fmt = (d) => d.toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
-        grid.innerHTML = "";
-        months.forEach(mo => {
-            const y = mo.getFullYear();
-            const m = mo.getMonth();
-            const daysInMonth = new Date(y, m+1, 0).getDate();
-
-            const col = document.createElement('div');
-            col.className = "month-col";
-
-            const title = document.createElement('div');
-            title.className = "month-title";
-            title.innerHTML = `<span>${fmt(mo)}</span><span style="color:#64748b;font-weight:900;font-size:.85rem;">${daysInMonth}j</span>`;
-            col.appendChild(title);
-
-            const bar = document.createElement('div');
-            bar.className = "month-bar";
-
-            for(let day=1; day<=daysInMonth; day++){
-                const d = new Date(y, m, day);
-                const k = keyOf(d);
-                const cell = document.createElement('div');
-                cell.className = "daycell";
-                const tags = map[k];
-                if(tags){
-                    if(tags.vac) cell.classList.add("vac");
-                    if(tags.pfmp) cell.classList.add("pfmp");
-                    if(tags.course) cell.classList.add("course");
-                    if(tags.agenda) cell.classList.add("agenda");
-                }
-                cell.title = `${d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'})}`;
-                bar.appendChild(cell);
-            }
-
-            col.appendChild(bar);
-            grid.appendChild(col);
-        });
+    // MEMO
+    let memos = load("cockpit_memos",[]);
+    function renderMemos(){
+      const ul = document.getElementById("memo-list");
+      ul.innerHTML = "";
+      const current = document.querySelector(".view-section.active")?.id || "dashboard";
+      memos.forEach((m,i)=>{
+        const li = document.createElement("li");
+        li.className = "alert-item" + (m.target===current?" context-active":"");
+        li.innerHTML = '<span>'+m.text+'<br><small>'+m.target+'</small></span>'+
+                       '<button type="button" onclick="deleteMemo('+i+')">✕</button>';
+        ul.appendChild(li);
+      });
+    }
+    function addMemo(){
+      const target = document.getElementById("memo-target").value;
+      const text = document.getElementById("memo-input").value.trim();
+      if(!text) return;
+      memos.push({target,text,date:new Date().toISOString()});
+      save("cockpit_memos",memos);
+      document.getElementById("memo-input").value="";
+      renderMemos();
+    }
+    function deleteMemo(i){
+      memos.splice(i,1); save("cockpit_memos",memos); renderMemos();
     }
 
-    async function init() {
-        const s = document.getElementById('memo-target');
-        if(s){
-            s.innerHTML = '<option value="General">Général</option>';
-            CLASSES.forEach(c => {
-                const o = document.createElement('option');
-                o.value = c;
-                o.innerText = c;
-                s.appendChild(o);
-            });
-        }
-
-        const ad = document.getElementById("agenda-date");
-        if(ad) ad.value = new Date().toISOString().slice(0,10);
-        const at = document.getElementById("agenda-time");
-        if(at) at.value = new Date().toTimeString().slice(0,5);
-
-        try {
-            const res = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(URL));
-            const text = await res.text();
-            evs = parse(text);
-            render();
-        } catch(e) {
-            console.error("Erreur chargement iCal :", e);
-        }
+    // AGENDA
+    let agenda = load("cockpit_agenda",[]);
+    function renderAgenda(){
+      const ul = document.getElementById("agenda-list");
+      ul.innerHTML="";
+      const now = new Date();
+      agenda.sort((a,b)=>new Date(a.when)-new Date(b.when));
+      agenda.forEach((ev,i)=>{
+        const d = new Date(ev.when);
+        const soon = (d - now) < 7*24*3600*1000 && d>now;
+        const li = document.createElement("li");
+        li.className = "agenda-item"+(soon?" soon":"");
+        li.innerHTML =
+          '<div><strong>'+ev.title+'</strong><div class="agenda-meta">'+
+          d.toLocaleDateString("fr-FR")+' – '+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})+
+          ' • '+ev.type+(ev.place?(" • "+ev.place):"")+
+          '</div></div>'+
+          '<button type="button" onclick="deleteAgenda('+i+')">✕</button>';
+        ul.appendChild(li);
+      });
+    }
+    function addAgenda(){
+      const type = document.getElementById("agenda-type").value;
+      const date = document.getElementById("agenda-date").value;
+      const time = document.getElementById("agenda-time").value || "08:00";
+      const title = document.getElementById("agenda-title").value.trim();
+      const place = document.getElementById("agenda-place").value.trim();
+      if(!date || !title) return;
+      const when = new Date(date+"T"+time);
+      agenda.push({type,title,place,when});
+      save("cockpit_agenda",agenda);
+      document.getElementById("agenda-title").value="";
+      document.getElementById("agenda-place").value="";
+      renderAgenda();
+    }
+    function deleteAgenda(i){
+      agenda.splice(i,1); save("cockpit_agenda",agenda); renderAgenda();
     }
 
-    function parse(t) {
-        const res = [];
-        const lines = t.split(/\r\n|\n|\r/);
-        let c = {};
-        lines.forEach(l => {
-            if(l.startsWith("BEGIN:VEVENT")) c = {};
-            else if(l.startsWith("DTSTART")) c.start = pDate(l.split(':')[1]);
-            else if(l.startsWith("DTEND")) c.end = pDate(l.split(':')[1]);
-            else if(l.startsWith("SUMMARY")) c.summary = l.split(':')[1];
-            else if(l.startsWith("LOCATION")) c.location = l.split(':')[1];
-            else if(l.startsWith("END:VEVENT")) res.push(c);
-        });
-        return res;
+    // VUES
+    function showView(id,navEl){
+      document.querySelectorAll(".view-section").forEach(v=>v.classList.remove("active"));
+      const section = document.getElementById(id);
+      if(section){section.classList.add("active");}
+      document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+      if(navEl){navEl.classList.add("active");}
+      const titleMap = {
+        "dashboard":"Tableau de bord",
+        "view-pedago":"Pédagogie & cours",
+        "view-eval":"Évaluation & suivi",
+        "view-scores":"Scores exercices",
+        "view-class":"Classes & groupes",
+        "view-proj":"Projets & transversal",
+        "view-admin":"Temps & institution",
+        "view-live":"Classe en temps réel",
+        "view-sites":"Sites internet favoris"
+      };
+      document.getElementById("page-title").textContent = titleMap[id] || "Cockpit";
+      renderMemos();
     }
 
-    function pDate(s) {
-        if(!s)return null;
-        return new Date(`${s.substr(0,4)}-${s.substr(4,2)}-${s.substr(6,2)}T${s.substr(9,2)}:${s.substr(11,2)}:00Z`);
+    // MENU MOBILE
+    function toggleMenu(){
+      document.body.classList.toggle("menu-open");
+    }
+    function closeMenu(){
+      document.body.classList.remove("menu-open");
     }
 
-    function render() {
-        const list = document.getElementById('planning-list');
-        if(!list) return;
-        const target = new Date();
-        target.setDate(target.getDate() + offset);
-        const label = document.getElementById('planning-date-label');
-        if(label) label.innerText = target.toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
-        list.innerHTML = "";
-        activeClass = null;
-
-        const day = evs
-            .filter(e => e.start && e.start.toDateString() === target.toDateString())
-            .sort((a,b)=>a.start-b.start);
-
-        const ag = (agendaEvents||[]).filter(a => {
-            const dt = new Date(a.datetime);
-            return dt.toDateString() === target.toDateString();
-        }).map(a => ({
-            _kind: "agenda",
-            start: new Date(a.datetime),
-            end: new Date(a.datetime + 30*60*1000),
-            summary: `[${a.type||'Agenda'}] ${a.title||''}`.trim(),
-            location: (a.place||'').trim()
-        }));
-
-        const items = [...day.map(e => ({...e, _kind:"course"})), ...ag].sort((a,b)=>a.start-b.start);
-
-        if(!items.length){
-            list.innerHTML = "<li>Vacances / Aucun cours</li>";
-        } else {
-            items.forEach(e => {
-                const isNow = new Date() >= e.start && new Date() <= e.end;
-                if(isNow && e._kind !== 'agenda') activeClass = e.summary;
-                const li = document.createElement('li');
-                li.className = `course-item ${isNow ? 'active-course' : ''} ${e._kind==='agenda' ? 'is-agenda' : ''}`;
-                li.innerHTML = `<div class="course-time">${e.start.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div><div class="course-details"><b>${e.summary}</b><br><small>${e.location||''}</small></div>`;
-                list.appendChild(li);
-            });
-        }
-
-        const v = evs.find(e => e.summary && e.summary.includes("Vacances") && e.start > new Date());
-        const b = document.getElementById('vacation-badge');
-        if(v && b) {
-            const d = Math.ceil((v.start-new Date())/(1000*3600*24));
-            b.style.display='block';
-            b.innerText=`🏖️ Vacances dans ${d} jours`;
-        }
-    }
-
-    window.showView = (id, el) => {
-        document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        const view = document.getElementById(id);
-        if(view) view.classList.add('active');
-        if(el) el.classList.add('active');
-        const title = document.getElementById('page-title');
-        if(title && el) title.innerText = el.innerText;
-        if (window.innerWidth <= 980) closeMenu();
-    };
-
-    setInterval(() => {
-        const n = new Date();
-        const clock = document.getElementById('clock');
-        const date = document.getElementById('date');
-        if(clock) clock.innerText = n.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        if(date) date.innerText = n.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'});
-        render();
-    }, 60000);
-
-    setInterval(() => {
-        const clock = document.getElementById('clock');
-        if(clock) clock.innerText = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    }, 1000);
-
-    // ----------- MODULE SCORES EXERCICES -----------
-
-    function updateScoresSortIndicators() {
-        const headers = document.querySelectorAll("#scores-table thead th.sortable");
-        headers.forEach(h => {
-            h.classList.remove("sort-asc","sort-desc");
-            const key = h.getAttribute("data-sort");
-            if (key === scoresSortKey) {
-                h.classList.add(scoresSortDir === "asc" ? "sort-asc" : "sort-desc");
-            }
-        });
-    }
-
-    function renderScoresTable() {
-        if (!scoresTbody) return;
-
-        let rows = scoresData.slice();
-
-        const nameFilter = (scoresFilterName?.value || "").trim().toLowerCase();
-        const classFilter = (scoresFilterClass?.value || "").trim();
-        const exoFilter = (scoresFilterExo?.value || "").trim();
-
-        if (nameFilter) {
-            rows = rows.filter(r => (r.nomComplet || "").toLowerCase().includes(nameFilter));
-        }
-        if (classFilter) {
-            rows = rows.filter(r => (r.classe || "") === classFilter);
-        }
-        if (exoFilter) {
-            rows = rows.filter(r => (r.exercice || "") === exoFilter);
-        }
-
-        // Tri
-        rows.sort((a,b) => {
-            let va, vb;
-            if (scoresSortKey === "nom") {
-                va = (a.nomComplet || "").toLowerCase();
-                vb = (b.nomComplet || "").toLowerCase();
-            } else if (scoresSortKey === "classe") {
-                va = (a.classe || "").toLowerCase();
-                vb = (b.classe || "").toLowerCase();
-            } else if (scoresSortKey === "exercice") {
-                va = (a.exercice || "").toLowerCase();
-                vb = (b.exercice || "").toLowerCase();
-            } else if (scoresSortKey === "score") {
-                va = typeof a.scoreNum === "number" ? a.scoreNum : -Infinity;
-                vb = typeof b.scoreNum === "number" ? b.scoreNum : -Infinity;
-            } else if (scoresSortKey === "date") {
-                va = a.dateMs || 0;
-                vb = b.dateMs || 0;
-            } else {
-                va = 0;
-                vb = 0;
-            }
-
-            if (va < vb) return scoresSortDir === "asc" ? -1 : 1;
-            if (va > vb) return scoresSortDir === "asc" ? 1 : -1;
-            return 0;
-        });
-
-        scoresTbody.innerHTML = "";
-
-        if (!rows.length) {
-            scoresTbody.innerHTML = `<tr><td colspan="6" class="scores-empty">Aucune copie trouvée avec ces filtres.</td></tr>`;
-        } else {
-            rows.forEach((r, index) => {
-                const tr = document.createElement("tr");
-
-                let scoreClass = "";
-                if (typeof r.scoreNum === "number") {
-                    if (r.scoreNum >= 12) scoreClass = "score-good";
-                    else if (r.scoreNum >= 8) scoreClass = "score-mid";
-                    else scoreClass = "score-bad";
-                }
-
-                tr.innerHTML = `
-                  <td class="mono">${index + 1}</td>
-                  <td>${r.nomComplet || ""}</td>
-                  <td><span class="badge-class">${r.classe || ""}</span></td>
-                  <td>${r.exercice || ""}</td>
-                  <td class="${scoreClass}">${r.scoreTexte || ""}</td>
-                  <td class="mono">${r.dateFr || ""}</td>
-                `;
-                scoresTbody.appendChild(tr);
-            });
-        }
-
-        if (scoresCounter) {
-            scoresCounter.textContent = rows.length + (rows.length > 1 ? " enregistrements" : " enregistrement");
-        }
-
-        updateScoresSortIndicators();
-    }
-
-    function initScoresModule() {
-        if (!scoresTbody || !scoresBtnRefresh) return;
-
-        if (scoresStatus) scoresStatus.textContent = "Connexion à Firestore en cours…";
-        scoresBtnRefresh.disabled = true;
-
-        const qScores = query(
-            copiesCol,
-            orderBy("meta.createdAt", "desc"),
-            limit(200)
-        );
-
-        onSnapshot(qScores, (snap) => {
-            scoresData = [];
-            const exoSet = new Set();
-
-            snap.forEach(d => {
-                const data = d.data() || {};
-                const meta = data.meta || {};
-                const res = data.resultat || {};
-
-                const createdAt = meta.createdAt || null;
-                let dateFr = "";
-                let dateMs = null;
-                if (createdAt) {
-                    const dt = new Date(createdAt);
-                    if (!isNaN(dt.getTime())) {
-                        dateMs = dt.getTime();
-                        dateFr = dt.toLocaleString("fr-FR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit"
-                        });
-                    }
-                }
-
-                const scoreTexte = res.score || "";
-                let scoreNum = null;
-                const m = /(\d+)/.exec(scoreTexte);
-                if (m) scoreNum = parseInt(m[1], 10);
-
-                const support = meta.support || (res.titre || "Exercice");
-
-                if (support) exoSet.add(support);
-
-                const nom = (meta.nom || "").trim();
-                const prenom = (meta.prenom || "").trim();
-                const nomComplet = [nom, prenom].filter(Boolean).join(" ").trim() || (nom || prenom);
-
-                scoresData.push({
-                    id: d.id,
-                    nomComplet,
-                    classe: meta.classe || "",
-                    exercice: support,
-                    scoreTexte,
-                    scoreNum,
-                    dateFr,
-                    dateMs
-                });
-            });
-
-            // Remplir la liste des exercices (support)
-            if (scoresFilterExo) {
-                const current = scoresFilterExo.value;
-                scoresFilterExo.innerHTML = `<option value="">Tous les exercices</option>`;
-                Array.from(exoSet).sort().forEach(s => {
-                    const opt = document.createElement("option");
-                    opt.value = s;
-                    opt.textContent = s;
-                    scoresFilterExo.appendChild(opt);
-                });
-                if (current) scoresFilterExo.value = current;
-            }
-
-            if (scoresFilterName) scoresFilterName.disabled = false;
-            if (scoresFilterClass) scoresFilterClass.disabled = false;
-            if (scoresFilterExo) scoresFilterExo.disabled = false;
-            scoresBtnRefresh.disabled = false;
-
-            if (scoresStatus) scoresStatus.textContent = "Connexion Firestore active – scores mis à jour automatiquement.";
-            if (scoresLastUpdate) {
-                scoresLastUpdate.textContent = "Dernière mise à jour : " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
-            }
-
-            renderScoresTable();
-        }, (error) => {
-            console.error("Erreur scores exercices :", error);
-            if (scoresStatus) scoresStatus.textContent = "Impossible de charger les scores (droits ou connexion).";
-            if (scoresTbody) {
-                scoresTbody.innerHTML = `<tr><td colspan="6" class="scores-empty">Erreur de connexion à Firestore pour les scores. Le reste du cockpit reste utilisable.</td></tr>`;
-            }
-            if (scoresBtnRefresh) scoresBtnRefresh.disabled = true;
-            if (scoresFilterName) scoresFilterName.disabled = true;
-            if (scoresFilterClass) scoresFilterClass.disabled = true;
-            if (scoresFilterExo) scoresFilterExo.disabled = true;
-        });
-
-        // Filtres + bouton
-        if (scoresBtnRefresh) {
-            scoresBtnRefresh.addEventListener("click", () => {
-                if (scoresFilterName) scoresFilterName.value = "";
-                if (scoresFilterClass) scoresFilterClass.value = "";
-                if (scoresFilterExo) scoresFilterExo.value = "";
-                unseenCopies = 0;
-                setBadge(0);
-                renderScoresTable();
-            });
-        }
-        if (scoresFilterName) scoresFilterName.addEventListener("input", renderScoresTable);
-        if (scoresFilterClass) scoresFilterClass.addEventListener("change", renderScoresTable);
-        if (scoresFilterExo) scoresFilterExo.addEventListener("change", renderScoresTable);
-
-        // Tri en cliquant sur l'en-tête
-        const headers = document.querySelectorAll("#scores-table thead th.sortable");
-        headers.forEach(th => {
-            th.addEventListener("click", () => {
-                const key = th.getAttribute("data-sort");
-                if (scoresSortKey === key) {
-                    scoresSortDir = scoresSortDir === "asc" ? "desc" : "asc";
-                } else {
-                    scoresSortKey = key;
-                    scoresSortDir = "asc";
-                }
-                renderScoresTable();
-            });
-        });
-
-        updateScoresSortIndicators();
-    }
-
-    init();
-    initScoresModule();
-    window.addEventListener('resize', () => { if (window.innerWidth > 980) closeMenu(); });
-</script>
+    // INIT
+    renderMemos();
+    renderAgenda();
+  </script>
 </body>
 </html>
