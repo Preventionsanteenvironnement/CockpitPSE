@@ -419,6 +419,11 @@
           width:8px;height:8px;border-radius:999px;background:#22c55e;
           margin-right:6px;
         }
+
+        .results-table th.sortable{cursor:pointer;user-select:none;}
+        .results-table th.sortable::after{content:"";margin-left:4px;font-size:.7rem;color:#9ca3af;}
+        .results-table th.sortable.sort-asc::after{content:"▲";}
+        .results-table th.sortable.sort-desc::after{content:"▼";}
     </style>
 </head>
 <body>
@@ -712,15 +717,15 @@
               </select>
             </div>
             <div class="scores-table-wrap">
-              <table class="results-table">
+              <table class="results-table" id="scores-table">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Nom élève</th>
-                    <th>Classe</th>
-                    <th>Exercice</th>
-                    <th>Score</th>
-                    <th>Date d’envoi</th>
+                    <th class="sortable" data-sort="nom">Nom élève</th>
+                    <th class="sortable" data-sort="classe">Classe</th>
+                    <th class="sortable" data-sort="exercice">Exercice</th>
+                    <th class="sortable" data-sort="score">Score</th>
+                    <th class="sortable" data-sort="date">Date d’envoi</th>
                   </tr>
                 </thead>
                 <tbody id="scores-tbody">
@@ -992,6 +997,8 @@
     const scoresLastUpdate = document.getElementById("scores-last-update");
 
     let scoresData = [];
+    let scoresSortKey = "date";
+    let scoresSortDir = "desc";
 
     function showToast(msg){
         if(!toast) return;
@@ -1389,13 +1396,11 @@
         }
 
         const v = evs.find(e => e.summary && e.summary.includes("Vacances") && e.start > new Date());
-        if(v) {
+        const b = document.getElementById('vacation-badge');
+        if(v && b) {
             const d = Math.ceil((v.start-new Date())/(1000*3600*24));
-            const b = document.getElementById('vacation-badge');
-            if(b){
-                b.style.display='block';
-                b.innerText=`🏖️ Vacances dans ${d} jours`;
-            }
+            b.style.display='block';
+            b.innerText=`🏖️ Vacances dans ${d} jours`;
         }
     }
 
@@ -1426,6 +1431,17 @@
 
     // ----------- MODULE SCORES EXERCICES -----------
 
+    function updateScoresSortIndicators() {
+        const headers = document.querySelectorAll("#scores-table thead th.sortable");
+        headers.forEach(h => {
+            h.classList.remove("sort-asc","sort-desc");
+            const key = h.getAttribute("data-sort");
+            if (key === scoresSortKey) {
+                h.classList.add(scoresSortDir === "asc" ? "sort-asc" : "sort-desc");
+            }
+        });
+    }
+
     function renderScoresTable() {
         if (!scoresTbody) return;
 
@@ -1444,6 +1460,34 @@
         if (exoFilter) {
             rows = rows.filter(r => (r.exercice || "") === exoFilter);
         }
+
+        // Tri
+        rows.sort((a,b) => {
+            let va, vb;
+            if (scoresSortKey === "nom") {
+                va = (a.nomComplet || "").toLowerCase();
+                vb = (b.nomComplet || "").toLowerCase();
+            } else if (scoresSortKey === "classe") {
+                va = (a.classe || "").toLowerCase();
+                vb = (b.classe || "").toLowerCase();
+            } else if (scoresSortKey === "exercice") {
+                va = (a.exercice || "").toLowerCase();
+                vb = (b.exercice || "").toLowerCase();
+            } else if (scoresSortKey === "score") {
+                va = typeof a.scoreNum === "number" ? a.scoreNum : -Infinity;
+                vb = typeof b.scoreNum === "number" ? b.scoreNum : -Infinity;
+            } else if (scoresSortKey === "date") {
+                va = a.dateMs || 0;
+                vb = b.dateMs || 0;
+            } else {
+                va = 0;
+                vb = 0;
+            }
+
+            if (va < vb) return scoresSortDir === "asc" ? -1 : 1;
+            if (va > vb) return scoresSortDir === "asc" ? 1 : -1;
+            return 0;
+        });
 
         scoresTbody.innerHTML = "";
 
@@ -1475,12 +1519,14 @@
         if (scoresCounter) {
             scoresCounter.textContent = rows.length + (rows.length > 1 ? " enregistrements" : " enregistrement");
         }
+
+        updateScoresSortIndicators();
     }
 
     function initScoresModule() {
         if (!scoresTbody || !scoresBtnRefresh) return;
 
-        scoresStatus.textContent = "Connexion à Firestore en cours…";
+        if (scoresStatus) scoresStatus.textContent = "Connexion à Firestore en cours…";
         scoresBtnRefresh.disabled = true;
 
         const qScores = query(
@@ -1500,9 +1546,11 @@
 
                 const createdAt = meta.createdAt || null;
                 let dateFr = "";
+                let dateMs = null;
                 if (createdAt) {
                     const dt = new Date(createdAt);
                     if (!isNaN(dt.getTime())) {
+                        dateMs = dt.getTime();
                         dateFr = dt.toLocaleString("fr-FR", {
                             day: "2-digit",
                             month: "2-digit",
@@ -1533,7 +1581,8 @@
                     exercice: support,
                     scoreTexte,
                     scoreNum,
-                    dateFr
+                    dateFr,
+                    dateMs
                 });
             });
 
@@ -1587,6 +1636,23 @@
         if (scoresFilterName) scoresFilterName.addEventListener("input", renderScoresTable);
         if (scoresFilterClass) scoresFilterClass.addEventListener("change", renderScoresTable);
         if (scoresFilterExo) scoresFilterExo.addEventListener("change", renderScoresTable);
+
+        // Tri en cliquant sur l'en-tête
+        const headers = document.querySelectorAll("#scores-table thead th.sortable");
+        headers.forEach(th => {
+            th.addEventListener("click", () => {
+                const key = th.getAttribute("data-sort");
+                if (scoresSortKey === key) {
+                    scoresSortDir = scoresSortDir === "asc" ? "desc" : "asc";
+                } else {
+                    scoresSortKey = key;
+                    scoresSortDir = "asc";
+                }
+                renderScoresTable();
+            });
+        });
+
+        updateScoresSortIndicators();
     }
 
     init();
