@@ -103,7 +103,7 @@
       font-size:1.1rem; display:flex; justify-content:space-between; align-items:center;
     }
 
-    /* INTERVENTION : Styles spécifiques pour le tableau et radar CodePilote */
+    /* CODEPILOTE : STYLES TABLEAU & RADAR */
     .radar-container { height: 320px; display: flex; justify-content: center; margin-bottom: 10px; }
     .pill { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 2px;}
     .pill-green { background: #dcfce7; color: #166534; }
@@ -115,6 +115,33 @@
     .results-table thead { background:#f1f5f9; color:#475569; }
     .results-table th, .results-table td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; }
     .results-table tr:hover { background:#f8fafc; }
+
+    /* NOUVEAU : Styles pour la modale et les liens élèves */
+    .eleve-link { color: #2563eb; font-weight: 700; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: 0.2s; }
+    .eleve-link:hover { text-decoration-color: #2563eb; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+      z-index: 2000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; animation: fadeIn 0.3s; }
+    .modal-card {
+      background: #fff; width: 90%; max-width: 900px; max-height: 90vh; border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow-y: auto; display: flex; flex-direction: column;
+    }
+    .modal-header {
+      padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;
+      background: #f8fafc; position: sticky; top: 0; z-index: 10;
+    }
+    .modal-body { padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+    
+    .stat-box { background: #f1f5f9; padding: 15px; border-radius: 12px; text-align: center; }
+    .stat-val { font-size: 1.8rem; font-weight: 800; color: #0f172a; display: block; }
+    .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    
+    @media(max-width: 800px) { .modal-body { grid-template-columns: 1fr; } }
+
 
     /* Planning & Agenda styles */
     .planning-list{list-style:none; margin:0; padding:0; overflow-y:auto;}
@@ -260,6 +287,42 @@
   </style>
 </head>
 <body>
+
+  <div id="modalStudent" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-name" style="margin:0; color:#0f172a;">Élève</h2>
+          <span id="modal-class" style="color:#64748b; font-weight:500;">Classe</span>
+        </div>
+        <button class="close-modal" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <div style="display:flex; gap:15px; margin-bottom:20px;">
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-avg">--/20</span>
+              <span class="stat-label">Moyenne</span>
+            </div>
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-time">--</span>
+              <span class="stat-label">Temps Moyen</span>
+            </div>
+          </div>
+          <div style="height:300px;">
+            <canvas id="studentRadar"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top:0;">Historique des activités</h3>
+          <table class="results-table">
+            <thead><tr><th>Date</th><th>Exercice</th><th>Note</th></tr></thead>
+            <tbody id="modal-history"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <nav class="sidebar">
     <div class="brand">🚀 COCKPIT</div>
@@ -461,15 +524,14 @@
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Élève</th>
-                            <th>Classe</th>
-                            <th>Exercice</th>
+                            <th>Élève (Clic pour détail)</th> <th>Classe</th>
+                            <th>Temps</th> <th>Exercice</th>
                             <th>Note</th>
                             <th>Détail Compétences</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-eleves">
-                        <tr><td colspan="6" class="scores-empty">Cliquez sur "Actualiser" pour charger les copies.</td></tr>
+                        <tr><td colspan="7" class="scores-empty">Cliquez sur "Actualiser" pour charger les copies.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -790,143 +852,190 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    let myRadarChart = null; // Pour stocker le graphique
+    
+    let allData = []; // Stockage local des données
+    let globalChart = null;
+    let studentChart = null;
 
-    // Fonction Globale pour charger les données (appelée par le bouton Actualiser)
+    // Chargement Principal
     window.chargerDonnees = async function() {
-        console.log("Chargement Firebase...");
+        console.log("Chargement...");
         const btn = document.querySelector("button[onclick='chargerDonnees()']");
         if(btn) btn.innerText = "Chargement...";
-
-        // Connexion à la collection "evaluations_competences"
+        
         const q = query(collection(db, "evaluations_competences"), orderBy("date", "desc"));
+        const snap = await getDocs(q);
         
-        try {
-            const evalSnap = await getDocs(q);
-            
-            let totalNote = 0;
-            let countNote = 0;
-            let tbody = document.getElementById("tbody-eleves");
-            tbody.innerHTML = ""; // Vider le tableau
+        allData = [];
+        let totalNote=0, count=0;
+        let sums = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+        let counts = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
 
-            // Variables pour le Radar
-            let sumC1=0, sumC2=0, sumC3=0, sumC4=0, sumC5=0, sumC6=0;
-            let countC1=0, countC2=0, countC3=0, countC4=0, countC5=0, countC6=0;
+        const tbody = document.getElementById("tbody-eleves");
+        tbody.innerHTML = "";
 
-            if (evalSnap.empty) {
-                tbody.innerHTML = "<tr><td colspan='6' style='text-align:center'>Aucune copie reçue pour le moment.</td></tr>";
-                if(btn) btn.innerText = "🔄 Actualiser";
-                return;
-            }
-
-            evalSnap.forEach(doc => {
-                const data = doc.data();
-                
-                // Calcul moyenne
-                if(data.note_finale !== undefined) {
-                    totalNote += parseFloat(data.note_finale);
-                    countNote++;
-                }
-
-                // Calcul Radar (Agrégation)
-                if(data.competences) {
-                    if(data.competences.C1_Traiter_Info != null) { sumC1 += data.competences.C1_Traiter_Info; countC1++; }
-                    if(data.competences.C2_Analyse != null)      { sumC2 += data.competences.C2_Analyse; countC2++; }
-                    if(data.competences.C3_Expliquer != null)    { sumC3 += data.competences.C3_Expliquer; countC3++; }
-                    if(data.competences.C4_Solution != null)     { sumC4 += data.competences.C4_Solution; countC4++; }
-                    if(data.competences.C5_Argumenter != null)   { sumC5 += data.competences.C5_Argumenter; countC5++; }
-                    if(data.competences.C6_Communiquer != null)  { sumC6 += data.competences.C6_Communiquer; countC6++; }
-                }
-
-                // Remplir le tableau
-                let dateStr = "N/A";
-                if(data.date) dateStr = new Date(data.date.seconds * 1000).toLocaleDateString("fr-FR");
-
-                let badges = "";
-                if(data.competences) {
-                    badges += makeBadge("C1", data.competences.C1_Traiter_Info);
-                    badges += makeBadge("C2", data.competences.C2_Analyse);
-                    badges += makeBadge("C3", data.competences.C3_Expliquer);
-                    badges += makeBadge("C4", data.competences.C4_Solution);
-                    badges += makeBadge("C5", data.competences.C5_Argumenter);
-                    badges += makeBadge("C6", data.competences.C6_Communiquer);
-                }
-
-                let row = `<tr>
-                    <td>${dateStr}</td>
-                    <td><strong>${data.identifiant || "Anonyme"}</strong></td>
-                    <td>${data.classe || ""}</td>
-                    <td>${data.exercice_titre || "Exercice"}</td>
-                    <td style="font-weight:bold; color:#4f46e5;">${data.note_finale}/20</td>
-                    <td>${badges}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-
-            // Moyenne Globale
-            if(countNote > 0) {
-                document.getElementById("moyenne-globale").innerText = (totalNote / countNote).toFixed(1) + "/20";
-            }
-
-            // Dessiner le Radar
-            updateRadar(
-                countC1 ? sumC1/countC1 : 0,
-                countC2 ? sumC2/countC2 : 0,
-                countC3 ? sumC3/countC3 : 0,
-                countC4 ? sumC4/countC4 : 0,
-                countC5 ? sumC5/countC5 : 0,
-                countC6 ? sumC6/countC6 : 0
-            );
-
+        if (snap.empty) { 
+            tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucune donnée.</td></tr>"; 
             if(btn) btn.innerText = "🔄 Actualiser";
-
-        } catch (e) {
-            console.error("Erreur Firebase:", e);
-            alert("Erreur de connexion : " + e.message);
-            if(btn) btn.innerText = "Erreur";
+            return; 
         }
+
+        snap.forEach(doc => {
+            const d = doc.data();
+            allData.push(d); // On garde en mémoire pour le détail élève
+
+            // Stats globales
+            if(d.note_finale !== undefined) { totalNote += parseFloat(d.note_finale); count++; }
+            if(d.competences) {
+                for(let k in d.competences) {
+                    let key = k.substring(0,2); // C1, C2...
+                    if(d.competences[k] !== null && sums[key] !== undefined) {
+                        sums[key] += d.competences[k];
+                        counts[key]++;
+                    }
+                }
+            }
+
+            // Affichage Tableau
+            let dateStr = d.date ? new Date(d.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
+            
+            // Formatage du Temps
+            let timeStr = "-";
+            if(d.temps_secondes) {
+                let m = Math.floor(d.temps_secondes / 60);
+                let s = d.temps_secondes % 60;
+                timeStr = `${m}m ${s}s`;
+            }
+
+            // Badges
+            let badges = "";
+            if(d.competences) {
+                for(let [k,v] of Object.entries(d.competences)) {
+                    if(v!==null) badges += makeBadge(k.substring(0,2), v);
+                }
+            }
+
+            let row = `<tr>
+                <td>${dateStr}</td>
+                <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
+                <td>${d.classe || ""}</td>
+                <td>${timeStr}</td>
+                <td>${d.exercice_titre || ""}</td>
+                <td style="font-weight:bold; color:#4f46e5;">${d.note_finale}/20</td>
+                <td>${badges}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+
+        if(count>0) document.getElementById("moyenne-globale").innerText = (totalNote/count).toFixed(1) + "/20";
+        if(btn) btn.innerText = "🔄 Actualiser";
+
+        // Radar Global
+        updateChart("radarChart", globalChart, sums, counts, "Moyenne Classe", 'rgba(59, 130, 246, 0.2)', '#3b82f6');
     }
 
-    // Fonctions Utilitaires
-    function makeBadge(name, level) {
-        if(level === undefined || level === null) return "";
-        let colorClass = "pill-red";
-        if(level >= 1) colorClass = "pill-orange";
-        if(level >= 2) colorClass = "pill-green";
-        if(level === 3) colorClass = "pill-blue";
-        return `<span class="pill ${colorClass}">${name}:${level}</span>`;
-    }
+    // --- FONCTIONS DÉTAIL ÉLÈVE (MODAL) ---
+    window.openStudentDetail = function(studentId) {
+        // Filtrer les données de cet élève
+        const studentHistory = allData.filter(d => d.identifiant === studentId);
+        if(studentHistory.length === 0) return;
 
-    function updateRadar(c1, c2, c3, c4, c5, c6) {
-        const ctx = document.getElementById('radarChart');
-        if(!ctx) return;
+        const last = studentHistory[0]; // Le plus récent
+        document.getElementById("modal-name").innerText = last.identifiant;
+        document.getElementById("modal-class").innerText = last.classe;
+
+        // Calculs Stats Élève
+        let totalTime = 0, totalScore = 0;
+        let sums = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+        let counts = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+
+        let histHtml = "";
+        studentHistory.forEach(h => {
+            if(h.temps_secondes) totalTime += h.temps_secondes;
+            if(h.note_finale) totalScore += parseFloat(h.note_finale);
+            
+            // Radar
+            if(h.competences) {
+                for(let k in h.competences) {
+                    let key = k.substring(0,2);
+                    if(h.competences[k] !== null && sums[key] !== undefined) {
+                        sums[key] += h.competences[k];
+                        counts[key]++;
+                    }
+                }
+            }
+
+            // Ligne Historique
+            let d = h.date ? new Date(h.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
+            histHtml += `<tr><td>${d}</td><td>${h.exercice_titre}</td><td><strong>${h.note_finale}/20</strong></td></tr>`;
+        });
+
+        // Affichage Stats
+        let avgScore = (totalScore / studentHistory.length).toFixed(1);
+        let avgTime = Math.floor((totalTime / studentHistory.length) / 60) + "m " + Math.floor((totalTime / studentHistory.length) % 60) + "s";
         
-        // Détruire l'ancien graphique s'il existe pour éviter les bugs
-        if(myRadarChart) myRadarChart.destroy();
+        document.getElementById("modal-avg").innerText = avgScore + "/20";
+        document.getElementById("modal-time").innerText = avgTime;
+        document.getElementById("modal-history").innerHTML = histHtml;
 
-        myRadarChart = new Chart(ctx, {
+        // Ouvrir Modal
+        document.getElementById("modalStudent").classList.add("open");
+
+        // Dessiner Radar Élève
+        // Petit délai pour que le canvas soit visible
+        setTimeout(() => {
+            updateChart("studentRadar", studentChart, sums, counts, "Niveau de l'élève", 'rgba(16, 185, 129, 0.2)', '#10b981');
+        }, 100);
+    }
+
+    window.closeModal = function() {
+        document.getElementById("modalStudent").classList.remove("open");
+    }
+
+    // --- OUTILS GRAPHIQUES ---
+    function updateChart(canvasId, chartInstance, sums, counts, label, bgColor, borderColor) {
+        const ctx = document.getElementById(canvasId);
+        // Détruire l'instance précédente si elle existe (astuce Chart.js)
+        if(Chart.getChart(canvasId)) Chart.getChart(canvasId).destroy();
+
+        const dataArr = [
+            counts.C1 ? sums.C1/counts.C1 : 0,
+            counts.C2 ? sums.C2/counts.C2 : 0,
+            counts.C3 ? sums.C3/counts.C3 : 0,
+            counts.C4 ? sums.C4/counts.C4 : 0,
+            counts.C5 ? sums.C5/counts.C5 : 0,
+            counts.C6 ? sums.C6/counts.C6 : 0
+        ];
+
+        new Chart(ctx, {
             type: 'radar',
             data: {
                 labels: ['C1 Info', 'C2 Analyse', 'C3 Expliquer', 'C4 Solution', 'C5 Arg', 'C6 Com'],
                 datasets: [{
-                    label: 'Niveau Classe',
-                    data: [c1, c2, c3, c4, c5, c6],
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    borderColor: '#3b82f6',
-                    pointBackgroundColor: '#3b82f6'
+                    label: label,
+                    data: dataArr,
+                    backgroundColor: bgColor,
+                    borderColor: borderColor,
+                    pointBackgroundColor: borderColor
                 }]
             },
             options: {
-                scales: {
-                    r: { suggestedMin: 0, suggestedMax: 3 }
-                },
+                scales: { r: { suggestedMin: 0, suggestedMax: 3 } },
                 maintainAspectRatio: false
             }
         });
     }
 
-    // Chargement automatique au démarrage
-    // setTimeout(chargerDonnees, 1000); // Optionnel : Décommentez pour charger direct
+    function makeBadge(name, level) {
+        let c = "pill-red";
+        if(level >= 1) c = "pill-orange";
+        if(level >= 2) c = "pill-green";
+        if(level === 3) c = "pill-blue";
+        return `<span class="pill ${c}">${name}:${level}</span>`;
+    }
+    
+    // Auto-load
+    // chargerDonnees();
   </script>
 </body>
 </html>
