@@ -3,158 +3,398 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cockpit PSE – Pilotage Premium</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <title>Cockpit Professeur – Pilotage Global</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root{
-      --bg-body:#f8fafc; --bg-sidebar:#0f172a; --text-main:#1e293b; --text-muted:#64748b;
+      --bg-body:#f1f5f9; --bg-sidebar:#0f172a; --text-main:#1e293b; --text-muted:#64748b;
       --col-pedago:#3b82f6; --col-eval:#f59e0b; --col-class:#10b981; --col-proj:#8b5cf6;
-      --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --col-admin:#f97316; --col-live-web:#795548; --col-sites:#607d8b;
     }
-    *{box-sizing:border-box; transition: all 0.2s ease;}
-    body{ margin:0; font-family:'Inter',sans-serif; background-color:var(--bg-body); color:var(--text-main); display:flex; height:100vh; overflow:hidden; }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Inter',sans-serif;
+      background-color:var(--bg-body); color:var(--text-main);
+      display:flex; height:100vh; overflow:hidden;
+    }
 
-    /* SIDEBAR CORRIGÉE MOBILE */
+    /* SIDEBAR */
     .sidebar{
-      width:280px; background-color:var(--bg-sidebar); color:#fff;
-      display:flex; flex-direction:column; padding:24px; flex-shrink:0;
-      overflow-y:auto; z-index:1000;
+      width:300px; background-color:var(--bg-sidebar); color:#fff;
+      display:flex; flex-direction:column; padding:20px; flex-shrink:0;
+      overflow-y:auto; gap:10px;
     }
+    .brand{ font-size:1.3rem; font-weight:800; margin-bottom:20px; letter-spacing:1px; display:flex; align-items:center; gap:10px; }
+    .nav-category{ font-size:.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#64748b; margin:15px 0 5px; }
     .nav-item{
-      display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:10px;
-      cursor:pointer; margin-bottom:4px; color:#cbd5e1; font-weight:500; text-decoration:none;
+      display:flex; align-items:center; gap:12px; padding:12px 15px; border-radius:8px;
+      cursor:pointer; transition:.2s; font-weight:600; color:#cbd5e1; border-left:4px solid transparent;
     }
-    .nav-item:hover, .nav-item.active{ background:rgba(255,255,255,0.1); color:#fff; }
+    .nav-item:hover{background:rgba(255,255,255,.05); color:#fff;}
+    .nav-item.active{background:rgba(255,255,255,.10); color:#fff;}
+    .nav-item[data-theme="pedago"].active{border-left-color:var(--col-pedago);}
+    .nav-item[data-theme="eval"].active{border-left-color:var(--col-eval);}
+    .nav-item[data-theme="class"].active{border-left-color:var(--col-class);}
+    .nav-item[data-theme="proj"].active{border-left-color:var(--col-proj);}
+    .nav-item[data-theme="admin"].active{border-left-color:var(--col-admin);}
+    .nav-item[data-theme="live"].active{border-left-color:var(--col-live-web);}
+    .nav-item[data-theme="sites"].active{border-left-color:var(--col-sites);}
+
+    /* MAIN */
+    .main-content{ flex:1; padding:40px; overflow-y:auto; display:flex; flex-direction:column; position:relative; }
+    header{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px; border-bottom:1px solid #e2e8f0; padding-bottom:20px; }
+    h1{margin:0; font-size:2rem; font-weight:800; color:var(--text-main);}
+    .header-infos{text-align:right;}
+    .clock-time{font-size:1.5rem; font-weight:800;}
+    .clock-date{font-size:.9rem; color:var(--text-muted);}
+    .vacation-badge{ margin-top:5px; font-size:.8rem; background:#dbeafe; color:#2563eb; padding:4px 10px; border-radius:20px; border:1px solid #bfdbfe; font-weight:bold; }
+
+    .view-section{display:none; animation:fadeUp .4s ease-out;}
+    .view-section.active{display:block;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+    .quick-actions{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; margin-bottom:30px; }
+    .btn-quick{
+      background:#fff; border:1px solid #e2e8f0; padding:15px; border-radius:12px;
+      text-align:left; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:15px;
+      box-shadow:0 2px 4px rgba(0,0,0,.02); text-decoration:none; color:inherit;
+    }
+    .btn-quick:hover{ transform:translateY(-2px); box-shadow:0 5px 15px rgba(0,0,0,.05); border-color:var(--col-pedago); }
+
+    .dashboard-grid{display:grid; grid-template-columns:2fr 1fr; gap:25px;}
+    .widget{ background:#fff; border-radius:16px; padding:25px; border:1px solid #e2e8f0; display:flex; flex-direction:column; min-height:320px; }
+    .widget h3{ margin:0 0 15px; padding-bottom:10px; border-bottom:2px solid #f1f5f9; font-size:1.1rem; display:flex; justify-content:space-between; align-items:center; }
+
+    /* ZONE 1 : MÉTÉO DU SITE (AUDIENCE) */
+    .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .stat-card { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .stat-icon { width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+    .icon-blue { background: #e0f2fe; color: #0284c7; }
+    .icon-purple { background: #f3e8ff; color: #9333ea; }
+    .icon-green { background: #dcfce7; color: #16a34a; }
+    .stat-info h4 { margin: 0; color: #64748b; font-size: 0.85rem; text-transform: uppercase; }
+    .stat-info p { margin: 5px 0 0; font-size: 1.4rem; font-weight: 800; color: #0f172a; }
+
+    /* CODEPILOTE : BARRE D'OUTILS FILTRES */
+    .toolbar {
+      display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+    }
+    .filter-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+    .filter-select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; min-width: 150px; background: white; }
+
+    /* CODEPILOTE : STYLES TABLEAU & RADAR */
+    .radar-container { height: 320px; display: flex; justify-content: center; margin-bottom: 10px; }
+    .pill { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 2px;}
+    .pill-green { background: #dcfce7; color: #166534; }
+    .pill-orange { background: #ffedd5; color: #9a3412; }
+    .pill-red { background: #fee2e2; color: #991b1b; }
+    .pill-blue { background: #dbeafe; color: #1e40af; }
     
-    /* MAIN CONTENT */
-    .main-content{ flex:1; padding:32px; overflow-y:auto; position:relative; }
-    header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; background:white; padding:20px 32px; border-radius:16px; box-shadow:var(--card-shadow); }
-    h1{ margin:0; font-size:1.5rem; font-weight:800; color:#0f172a; }
+    .results-table { width:100%; border-collapse:collapse; min-width:600px; }
+    .results-table thead { background:#f1f5f9; color:#475569; }
+    /* Entêtes cliquables pour le tri */
+    .results-table th { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; cursor: pointer; user-select: none; }
+    .results-table th:hover { background: #e2e8f0; }
+    .results-table td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; }
+    .results-table tr:hover { background:#f8fafc; }
+    .scores-empty { text-align:center; padding: 20px; color: #64748b; }
 
-    /* STATS CARDS */
-    .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
-    .stat-card { background: white; padding: 24px; border-radius: 16px; box-shadow: var(--card-shadow); display: flex; align-items: center; gap: 20px; }
-    .stat-icon { width: 56px; height: 56px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: #f1f5f9; }
-    .stat-info p { margin: 4px 0 0; font-size: 1.5rem; font-weight: 800; }
+    /* Styles Modale */
+    .eleve-link { color: #2563eb; font-weight: 700; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: 0.2s; }
+    .eleve-link:hover { text-decoration-color: #2563eb; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; animation: fadeIn 0.3s; }
+    .modal-card { background: #fff; width: 90%; max-width: 900px; max-height: 90vh; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow-y: auto; display: flex; flex-direction: column; }
+    .modal-header { padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; position: sticky; top: 0; z-index: 10; }
+    .modal-body { padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+    .stat-box { background: #f1f5f9; padding: 15px; border-radius: 12px; text-align: center; }
+    .stat-val { font-size: 1.8rem; font-weight: 800; color: #0f172a; display: block; }
+    .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    @media(max-width: 800px) { .modal-body { grid-template-columns: 1fr; } }
 
-    /* GRILLE DYNAMIQUE */
-    .dashboard-grid{ display:grid; grid-template-columns: 2fr 1fr; gap:32px; }
-    .widget{ background:white; border-radius:20px; padding:24px; box-shadow:var(--card-shadow); border: 1px solid #f1f5f9; }
-    .widget h3 { margin:0 0 20px; font-size:1.1rem; font-weight:700; display:flex; justify-content:space-between; }
-
-    /* TABLEAU & PILLS */
-    .results-table { width:100%; border-collapse:collapse; }
-    .results-table th { text-align:left; padding:12px; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; border-bottom:2px solid #f1f5f9; cursor:pointer; }
-    .results-table td { padding:14px 12px; border-bottom:1px solid #f1f5f9; font-size:0.9rem; }
-    .eleve-link { color:var(--col-pedago); font-weight:700; cursor:pointer; text-decoration:underline; }
-    .pill { padding:4px 8px; border-radius:6px; font-size:0.7rem; font-weight:800; margin:2px; display:inline-block; }
-
-    /* MODALE ÉLÈVE (LE MICRO) */
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(8px); z-index:2000; align-items:center; justify-content:center; }
-    .modal-overlay.open { display:flex; }
-    .modal-card { background:white; width:90%; max-width:1000px; height:85vh; border-radius:24px; display:grid; grid-template-columns: 1fr 1.5fr; overflow:hidden; }
+    /* UTILS & RESPONSIVE */
+    .btn-yellow{ display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#fffbeb; color:#b45309; border:1px solid #fcd34d; border-radius:6px; text-decoration:none; font-weight:600; font-size:.85rem; }
+    .btn-blue-outline{ display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; text-decoration:none; font-weight:600; font-size:.85rem; cursor:pointer; }
+    .badge-soon{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; border:1px solid rgba(0,0,0,.05); background:#fef3c7; color:#92400e; }
     
-    /* MOBILE UI */
-    .menu-btn { display:none; border:none; background:none; font-size:1.5rem; cursor:pointer; }
-    @media(max-width:1024px){
-      .dashboard-grid { grid-template-columns: 1fr; }
-      .sidebar { position:fixed; left:-280px; height:100vh; transition: 0.3s; }
-      body.menu-open .sidebar { left:0; }
-      .menu-btn { display:block; }
+    details{ background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+    summary{ padding:15px; font-weight:600; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+    details[open]>summary{background:#f1f5f9; border-bottom:1px solid #e2e8f0;}
+    .content-links{ padding:15px; display:flex; flex-wrap:wrap; gap:10px; }
+    
+    #course-structure>summary{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); }
+    #course-structure .lvl-cap>summary{ background:rgba(37,99,235,.12); border-left:6px solid rgba(37,99,235,.9); font-weight:900; }
+    #course-structure .lvl-bacpro>summary{ background:rgba(22,163,74,.12); border-left:6px solid rgba(22,163,74,.9); font-weight:900; }
+
+    .live-block{ margin-top:12px; border:1px solid rgba(0,0,0,.08); border-radius:14px; overflow:hidden; background:#fff; }
+    .live-summary{ font-weight:900; padding:14px 16px; background:#f1f5f9; }
+    .live-links{padding:14px 12px;}
+    .badge-role{ display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:900; margin-left:8px; border:1px solid rgba(0,0,0,.08); white-space:nowrap; }
+    .role-eleve{background:rgba(245,158,11,.18); color:#a16207;}
+    .role-prof{background:rgba(59,130,246,.18); color:#1d4ed8;}
+
+    /* MENU MOBILE */
+    .menu-overlay{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(2px); z-index:999; }
+    .menu-btn{ display:none; border:none; background:#0f172a; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; font-weight:900; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,.18); flex-shrink:0; }
+    body.menu-open .sidebar{transform:translateX(0);}
+    body.menu-open .menu-overlay{display:block;}
+
+    @media(max-width:980px){
+      body{height:auto; overflow:auto; display:block;}
+      .sidebar{ position:fixed; top:0; left:0; bottom:0; height:100vh; width:min(86vw,340px); transform:translateX(-110%); transition:transform .25s ease; z-index:1000; padding:18px; }
+      .main-content{padding:16px; min-height:100vh; overflow:visible;}
+      header{align-items:center; gap:12px; margin-bottom:16px; padding-bottom:14px;}
+      h1{font-size:1.35rem;}
+      .clock-time{font-size:1.15rem;}
+      .menu-btn{display:inline-flex;}
+      .dashboard-grid{grid-template-columns:1fr; gap:14px;}
+      .widget{min-height:auto; padding:16px; border-radius:14px;}
+      .quick-actions{grid-template-columns:1fr;}
+      .btn-quick{padding:14px;}
+      .content-links{padding:12px; gap:8px;}
+      .btn-yellow,.btn-blue-outline{width:100%; justify-content:space-between;}
+      .stats-overview { grid-template-columns: 1fr; }
     }
   </style>
 </head>
-<body class="">
+<body>
 
   <div id="modalStudent" class="modal-overlay">
     <div class="modal-card">
-      <div style="padding:32px; border-right:1px solid #f1f5f9; background:#f8fafc;">
-        <button onclick="closeModal()" style="border:none; background:none; cursor:pointer; font-size:1.2rem;">✕</button>
-        <h2 id="modal-name" style="margin:20px 0 5px;">Nom Élève</h2>
-        <span id="modal-class" style="color:var(--text-muted);">Classe</span>
-        <div style="margin-top:30px; display:grid; gap:16px;">
-          <div style="background:white; padding:16px; border-radius:12px; text-align:center; box-shadow:var(--card-shadow);">
-             <span id="modal-avg" style="font-size:1.8rem; font-weight:800; color:var(--col-pedago);">--/20</span><br><small>Moyenne</small>
-          </div>
-          <div style="height:250px;"><canvas id="studentRadar"></canvas></div>
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-name" style="margin:0; color:#0f172a;">Élève</h2>
+          <span id="modal-class" style="color:#64748b; font-weight:500;">Classe</span>
         </div>
+        <button class="close-modal" onclick="closeModal()">×</button>
       </div>
-      <div style="padding:32px; overflow-y:auto;">
-        <h3>Historique Complet</h3>
-        <table class="results-table" id="modal-history"></table>
+      <div class="modal-body">
+        <div>
+          <div style="display:flex; gap:15px; margin-bottom:20px;">
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-avg">--/20</span>
+              <span class="stat-label">Moyenne</span>
+            </div>
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-time">--</span>
+              <span class="stat-label">Temps Moyen</span>
+            </div>
+          </div>
+          <div style="height:300px;">
+            <canvas id="studentRadar"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top:0;">Historique des activités</h3>
+          <table class="results-table">
+            <thead><tr><th>Date</th><th>Exercice</th><th>Note</th></tr></thead>
+            <tbody id="modal-history"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
   <nav class="sidebar">
-    <div style="font-weight:900; font-size:1.4rem; margin-bottom:40px;">🚀 COCKPIT</div>
-    <div class="nav-item active" onclick="showView('view-scores')">📊 Suivi & Compétences</div>
-    <div class="nav-item" onclick="showView('view-pedago')">📁 Pédagogie</div>
-    <div class="nav-item" onclick="showView('view-live')">🗨️ Live Classe</div>
+    <div class="brand">🚀 COCKPIT</div>
+    <div class="nav-item active" onclick="showView('dashboard', this)">🏠 Tableau de bord</div>
+    <div class="nav-category">Mes dossiers</div>
+    <div class="nav-item" data-theme="pedago" onclick="showView('view-pedago', this)">🟦 1. Pédagogie & cours</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 2. Évaluation & suivi</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 2b. Scores exercices</div>
+    <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 3. Classes & groupes</div>
+    <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 4. Projets & transversal</div>
+    <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 5. Temps & admin</div>
+    <div class="nav-item" data-theme="live" onclick="showView('view-live', this)">🟫 6. Classe en temps réel</div>
+    <div class="nav-item" data-theme="sites" onclick="showView('view-sites', this)">🌐 7. Sites internet</div>
   </nav>
+
+  <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
 
   <main class="main-content">
     <header>
-      <div style="display:flex; align-items:center; gap:15px;">
-        <button class="menu-btn" onclick="document.body.classList.toggle('menu-open')">☰</button>
-        <h1 id="page-title">Tableau de Bord Global</h1>
+      <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">☰</button>
+      <h1 id="page-title">Tableau de bord</h1>
+      <div class="header-infos">
+        <div id="clock" class="clock-time">--:--</div>
+        <div id="date" class="clock-date">--</div>
+        <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
       </div>
-      <button onclick="chargerDonnees()" style="background:var(--bg-sidebar); color:white; border:none; padding:10px 20px; border-radius:30px; cursor:pointer; font-weight:600;">🔄 Actualiser les données</button>
     </header>
 
-    <section id="view-scores" class="view-section">
-      <div class="stats-overview">
-        <div class="stat-card">
-          <div class="stat-icon" style="color:#3b82f6;">👥</div>
-          <div class="stat-info"><h4>Trafic Total</h4><p id="stat-total-views">--</p></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="color:#10b981;">📱</div>
-          <div class="stat-info"><h4>Supports</h4><p id="stat-device">--</p></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="color:#f59e0b;">🏆</div>
-          <div class="stat-info"><h4>Top Exercice</h4><p id="stat-top-page" style="font-size:1rem;">--</p></div>
-        </div>
+    <section id="dashboard" class="view-section active">
+      <div class="quick-actions">
+        <a href="prof_plan.html" target="_blank" class="btn-quick"><span>🪑</span><span><strong>Plan de classe</strong><br>Pilotage des places</span></a>
+        <a href="https://www.pronote.index-education.net/" target="_blank" class="btn-quick"><span>🎓</span><span><strong>Pronote Web</strong><br>Accès rapide</span></a>
+        <button class="btn-quick" type="button" onclick="document.getElementById('memo-input').focus()"><span>🧠</span><span><strong>Mémo ciblé</strong><br>Rappel contextuel</span></button>
       </div>
-
       <div class="dashboard-grid">
         <div class="widget">
-          <h3>Dernières Évaluations 
-            <div style="display:flex; gap:10px;">
-              <select id="filter-class" onchange="applyFilters()" style="padding:5px; border-radius:5px;"><option value="ALL">Classes</option></select>
-              <input type="text" id="filter-student" placeholder="Chercher..." onkeyup="applyFilters()" style="padding:5px; border-radius:5px; border:1px solid #ddd;">
-            </div>
-          </h3>
-          <div style="overflow-x:auto;">
-            <table class="results-table">
-              <thead>
-                <tr>
-                  <th onclick="sortData('date')">Date</th>
-                  <th onclick="sortData('identifiant')">Élève</th>
-                  <th onclick="sortData('classe')">Classe</th>
-                  <th onclick="sortData('note_finale')">Note</th>
-                  <th>Compétences</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-eleves"></tbody>
-            </table>
-          </div>
+          <h3>📅 Planning <span style="font-size:.8rem;"><button type="button" onclick="changeDate(-1)">◀</button><span id="planning-date-label">Aujourd’hui</span><button type="button" onclick="changeDate(1)">▶</button></span></h3>
+          <ul id="planning-list" class="planning-list"></ul>
         </div>
-
-        <div class="widget">
-          <h3>Radar de Compétences</h3>
-          <div style="height:300px;"><canvas id="radarChart"></canvas></div>
-          <div style="text-align:center; margin-top:20px;">
-            <span style="font-size:0.9rem; color:var(--text-muted);">Moyenne Sélection :</span><br>
-            <strong id="moyenne-globale" style="font-size:2rem; color:var(--col-pedago);">--</strong>
+        <div class="right-stack">
+          <div class="widget">
+            <h3>💡 Pense-bête</h3>
+            <div class="agenda-form">
+              <select id="memo-target"><option value="dashboard">Tableau de bord</option><option value="view-pedago">Pédagogie</option><option value="view-eval">Évaluation</option><option value="view-class">Classes</option><option value="view-proj">Projets</option><option value="view-admin">Admin</option><option value="view-live">Classe live</option></select>
+              <input id="memo-input" class="wide" placeholder="Note liée au contexte…" />
+              <button type="button" onclick="addMemo()">+</button>
+            </div>
+            <ul id="memo-list" class="alert-list"></ul>
+          </div>
+          <div class="widget">
+            <h3>🗓️ Agenda</h3>
+            <div class="agenda-form">
+              <select id="agenda-type"><option value="Réunion">Réunion</option><option value="Parents">Parents</option><option value="Admin">Admin</option><option value="Classe">Classe</option><option value="Personnel">Personnel</option></select>
+              <input id="agenda-date" type="date" /><input id="agenda-time" type="time" />
+            </div>
+            <div class="agenda-form">
+              <input id="agenda-title" class="wide" placeholder="Titre…" /><input id="agenda-place" class="wide" placeholder="Lieu..." />
+              <button type="button" onclick="addAgenda()">+</button>
+            </div>
+            <ul id="agenda-list" class="agenda-list"></ul>
           </div>
         </div>
       </div>
     </section>
+
+    <section id="view-scores" class="view-section">
+      <h2 style="color:var(--col-eval);">Suivi des Compétences & Notes</h2>
+      
+      <div class="stats-overview">
+        <div class="stat-card">
+          <div class="stat-icon icon-blue">👀</div>
+          <div class="stat-info"><h4>Trafic Total</h4><p id="stat-total-views">0</p></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon icon-purple">📱</div>
+          <div class="stat-info"><h4>Supports</h4><p id="stat-device" style="font-size:1rem; font-weight:600;">--</p></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon icon-green">🏆</div>
+          <div class="stat-info"><h4>Top Exercice</h4><p id="stat-top-page" style="font-size:1rem; font-weight:600;">--</p></div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+          <div class="widget">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span><strong>Dernières évaluations reçues</strong></span>
+                <button onclick="chargerDonnees()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+            </div>
+
+            <div class="toolbar">
+              <select id="filter-class" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Toutes les classes</option>
+              </select>
+              <input type="text" id="filter-student" class="filter-input" placeholder="🔍 Chercher un élève..." onkeyup="applyFilters()">
+              <select id="filter-exercice" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Tous les exercices</option>
+              </select>
+            </div>
+
+            <div style="overflow-x:auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortData('date')">Date ↕</th>
+                            <th onclick="sortData('identifiant')">Élève ↕</th>
+                            <th onclick="sortData('classe')">Classe ↕</th>
+                            <th onclick="sortData('temps_secondes')">Temps ↕</th>
+                            <th onclick="sortData('exercice_titre')">Exercice ↕</th>
+                            <th onclick="sortData('note_finale')">Note ↕</th>
+                            <th>Détail Compétences</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-eleves">
+                        <tr><td colspan="7" class="scores-empty">Cliquez sur "Actualiser" pour charger les données.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+          </div>
+
+          <div class="widget">
+              <h3>📊 Radar Moyen (Filtré)</h3>
+              <div class="radar-container"><canvas id="radarChart"></canvas></div>
+              <div style="text-align:center; margin-top:15px;">Moyenne : <strong id="moyenne-globale" style="color:#3b82f6; font-size:1.3rem;">--</strong></div>
+          </div>
+      </div>
+    </section>
+
+    <section id="view-pedago" class="view-section">
+      <h2 style="color:var(--col-pedago);">Pédagogie & cours</h2>
+      <details open><summary>📁 Séquences CAP</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>📁 Séquences Bac Pro</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">🗺️ Progression <span class="badge-soon">Bientôt</span></a></div></details>
+      <details id="course-structure"><summary>📚 Structure des cours CAP / Bac Pro</summary><details class="lvl-cap"><summary>CAP</summary><details><summary>Thématique A – L’individu et sa santé</summary><div class="content-links"><a href="#" class="btn-yellow">A1 – Système de santé <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">A2 – Sommeil <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">A3 – Activité physique <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">A4 – Addictions <span class="badge-soon">Bientôt</span></a></div></details><details><summary>Thématique B – Environnement</summary><div class="content-links"><a href="#" class="btn-yellow">B1 – Ressource en eau <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">B2 – Risques majeurs <span class="badge-soon">Bientôt</span></a></div></details></details><details class="lvl-bacpro"><summary>Bac Pro</summary><details><summary>Seconde Bac Pro</summary><div class="content-links"><a href="#" class="btn-yellow">A – Santé <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">B – Environnement <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">C – Travail <span class="badge-soon">Bientôt</span></a></div></details></details></details>
+      <details><summary>📘 Référentiels PSE</summary><div class="content-links"><a href="#" class="btn-yellow">CAP PSE <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">Bac Pro PSE <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-eval" class="view-section">
+      <h2 style="color:var(--col-eval);">Évaluation & suivi</h2>
+      <details open><summary>📊 PageProf & suivis</summary><div class="content-links"><a href="pageprof.html" target="_blank" class="btn-yellow">📊 Ouvrir PageProf</a><a href="#" class="btn-yellow">📈 Tableau de bord <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">🧾 Grilles / barèmes <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>📂 Historique & exports</summary><div class="content-links"><a href="#" class="btn-yellow">🗓️ Bilans <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">📥 Exports JSON / CSV <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-class" class="view-section">
+      <h2 style="color:var(--col-class);">Classes & groupes</h2>
+      <details open><summary>🪑 Plans de classe</summary><div class="content-links"><a href="prof_plan.html" target="_blank" class="btn-yellow">🚀 Piloter</a><button class="btn-blue-outline" type="button" onclick="window.open('ecran_plan.html','proj')">📺 Afficher au tableau</button></div></details>
+      <details><summary>📋 Listes d’élèves</summary><div class="content-links"><a href="#" class="btn-yellow">👥 Listes <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">🔎 Recherche rapide <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🧩 Besoins particuliers</summary><div class="content-links"><a href="#" class="btn-yellow">♿ Aménagements <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">📘 Dossiers MDPH / PAP <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-proj" class="view-section">
+      <h2 style="color:var(--col-proj);">Projets & transversal</h2>
+      <details open><summary>🎨 Chef-d’œuvre</summary><div class="content-links"><a href="#" class="btn-yellow">CAP 1re année <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">CAP 2e année <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🏫 Projet d’établissement</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Documents <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">🗓️ Réunions / CR <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🧠 Ateliers CPS</summary><div class="content-links"><a href="#" class="btn-yellow">Séquences CPS <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">Outils d’animation <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-admin" class="view-section">
+      <h2 style="color:var(--col-admin);">Temps & institution</h2>
+      <details open><summary>📅 Emploi du temps</summary><div class="content-links"><a href="#" class="btn-yellow">Vue semaine <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">Vue mois <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🏢 PFMP / stages</summary><div class="content-links"><a href="#" class="btn-yellow">Calendrier PFMP <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">Suivi élèves <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🤝 Pacte / missions</summary><div class="content-links"><a href="#" class="btn-yellow">Heures réalisées <span class="badge-soon">Bientôt</span></a><a href="#" class="btn-yellow">Bilans <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-live" class="view-section">
+      <h2 style="color:var(--col-live-web);">Classe en temps réel</h2>
+      <details class="live-block" open><summary class="live-summary">🗨️ S’exprimer / Explorer</summary><div class="content-links live-links"><a href="eleve_nuage.html" class="btn-yellow">🌥️ Nuage de mots <span class="badge-role role-eleve">Élèves</span></a><a href="prof_nuage.html" class="btn-yellow">☁️ Nuage – Prof <span class="badge-role role-prof">Prof</span></a><a href="eleve_meteo.html" class="btn-yellow">🧠 Météo élèves <span class="badge-role role-eleve">Élèves</span></a><a href="prof_meteo.html" class="btn-yellow">🧠 Météo – Prof <span class="badge-role role-prof">Prof</span></a></div></details>
+      <details class="live-block"><summary class="live-summary">🎮 Jeux / entraînement</summary><div class="content-links live-links"><a href="eleve_vraifaux.html" class="btn-yellow">✅/❌ Vrai / Faux <span class="badge-role role-eleve">Élèves</span></a><a href="prof_vraifaux.html" class="btn-yellow">✅/❌ Vrai / Faux – Prof <span class="badge-role role-prof">Prof</span></a></div></details>
+      <details class="live-block"><summary class="live-summary">📤 Productions élèves</summary><div class="content-links live-links"><a href="devoirA3_cap_sedentarite_pse.html" class="btn-yellow">📁 CAP – Devoir A3 sédentarité</a></div></details>
+      <details class="live-block"><summary class="live-summary">🧘 Détente</summary><div class="content-links live-links"><a href="ecran_bulle.html" class="btn-yellow">🤫 Bulle silence <span class="badge-role role-prof">Prof</span></a><a href="ecran_zen.html" class="btn-yellow">🧘 Zen <span class="badge-role role-prof">Prof</span></a></div></details>
+    </section>
+
+    <section id="view-sites" class="view-section">
+      <h2 style="color:var(--col-sites);">Sites internet favoris</h2>
+      <details open><summary>🏢 Administratif</summary><div class="content-links"><a href="https://portail.ac-lyon.fr/" class="btn-yellow" target="_blank">Portail Académie</a><a href="https://eduscol.education.fr/" class="btn-yellow" target="_blank">Eduscol</a><a href="https://www.education.gouv.fr/bo" class="btn-yellow" target="_blank">BO Éducation</a><a href="https://www.service-public.fr/" class="btn-yellow" target="_blank">Service-public</a><a href="https://cas.ent.auvergnerhonealpes.fr" class="btn-yellow" target="_blank">ENT / Mail pro</a></div></details>
+      <details><summary>📚 Ressources pédagogiques</summary><div class="content-links"><a href="https://www.inrs.fr/" class="btn-yellow" target="_blank">INRS</a><a href="https://www.santepubliquefrance.fr/" class="btn-yellow" target="_blank">Santé Publique France</a></div></details>
+    </section>
   </main>
+
+  <script>
+    // UX Basics (Horloge, Planning, Agenda, Memos, Menu)
+    function updateClock(){ const d=new Date(); document.getElementById("clock").innerText=d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0'); document.getElementById("date").innerText=d.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}); }
+    setInterval(updateClock,1000); updateClock();
+    let planningOffset = 0; const planningData = [ {time:"08h30",label:"CAP – PSE",room:"Salle 12"}, {time:"10h00",label:"Bac Pro – PSE",room:"Salle 14"}, {time:"13h30",label:"Accompagnement perso",room:"CDI"} ];
+    function renderPlanning(){ const list = document.getElementById("planning-list"); const date = new Date(); date.setDate(date.getDate()+planningOffset); document.getElementById("planning-date-label").textContent = date.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"2-digit"}); list.innerHTML = ""; planningData.forEach(c=>{ list.innerHTML += `<li class="course-item"><div class="course-time">${c.time}</div><div class="course-details"><strong>${c.label}</strong><br><small>${c.room}</small></div></li>`; }); }
+    function changeDate(delta){planningOffset+=delta;renderPlanning();} renderPlanning();
+    function save(key,value){localStorage.setItem(key,JSON.stringify(value));} function load(key,def){try{const v=JSON.parse(localStorage.getItem(key));return v??def;}catch(e){return def;}}
+    let memos = load("cockpit_memos",[]);
+    function renderMemos(){ const ul = document.getElementById("memo-list"); ul.innerHTML = ""; const current = document.querySelector(".view-section.active")?.id || "dashboard"; memos.forEach((m,i)=>{ ul.innerHTML += `<li class="alert-item${m.target===current?" context-active":""}"><span>${m.text}<br><small>${m.target}</small></span><button type="button" onclick="deleteMemo(${i})">✕</button></li>`; }); }
+    function addMemo(){ const t=document.getElementById("memo-target").value, v=document.getElementById("memo-input").value.trim(); if(v){memos.push({target:t,text:v}); save("cockpit_memos",memos); document.getElementById("memo-input").value=""; renderMemos();} }
+    function deleteMemo(i){ memos.splice(i,1); save("cockpit_memos",memos); renderMemos(); }
+    let agenda = load("cockpit_agenda",[]);
+    function renderAgenda(){ const ul = document.getElementById("agenda-list"); ul.innerHTML=""; const now=new Date(); agenda.sort((a,b)=>new Date(a.when)-new Date(b.when)); agenda.forEach((ev,i)=>{ const d=new Date(ev.when), soon=(d-now)<7*24*3600*1000 && d>now; ul.innerHTML += `<li class="agenda-item${soon?" soon":""}"><div><strong>${ev.title}</strong><div class="agenda-meta">${d.toLocaleDateString("fr-FR")} • ${ev.type}</div></div><button type="button" onclick="deleteAgenda(${i})">✕</button></li>`; }); }
+    function addAgenda(){ const type=document.getElementById("agenda-type").value, date=document.getElementById("agenda-date").value, title=document.getElementById("agenda-title").value.trim(); if(date&&title){ agenda.push({type,title,place:document.getElementById("agenda-place").value,when:new Date(date+"T"+(document.getElementById("agenda-time").value||"08:00"))}); save("cockpit_agenda",agenda); renderAgenda(); } }
+    function deleteAgenda(i){ agenda.splice(i,1); save("cockpit_agenda",agenda); renderAgenda(); }
+    function showView(id,navEl){ document.querySelectorAll(".view-section").forEach(v=>v.classList.remove("active")); document.getElementById(id).classList.add("active"); if(navEl){ document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active")); navEl.classList.add("active"); } renderMemos(); }
+    function toggleMenu(){document.body.classList.toggle("menu-open");} function closeMenu(){document.body.classList.remove("menu-open");}
+    renderMemos(); renderAgenda();
+  </script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
@@ -171,80 +411,211 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    let allData = [];
+    let allData = []; 
+    let filteredData = [];
+    let currentSort = { col: 'date', dir: 'desc' };
+    let globalChart = null;
 
-    window.chargerDonnees = async () => {
-      const snapEval = await getDocs(query(collection(db, "evaluations_competences"), orderBy("date", "desc")));
-      allData = snapEval.docs.map(doc => doc.data());
-      
-      const snapStats = await getDocs(collection(db, "statistiques_usage"));
-      processStats(snapStats);
-      
-      populateFilters();
-      applyFilters();
-    };
+    window.chargerDonnees = async function() {
+        const btn = document.querySelector("button[onclick='chargerDonnees()']");
+        if(btn) btn.innerText = "Chargement...";
+        
+        // 1. CHARGER RÉSULTATS
+        const qEval = query(collection(db, "evaluations_competences"), orderBy("date", "desc"));
+        const snapEval = await getDocs(qEval);
+        
+        allData = [];
+        let classes = new Set();
+        let exercices = new Set();
 
-    function processStats(snap) {
-      let total = snap.size, mobile = 0, pages = {};
-      snap.forEach(doc => {
-        const d = doc.data();
-        if(/Mobi|Android/i.test(d.device)) mobile++;
-        pages[d.page] = (pages[d.page] || 0) + 1;
-      });
-      document.getElementById("stat-total-views").innerText = total;
-      document.getElementById("stat-device").innerText = Math.round((mobile/total)*100) + "% Mobile";
-      document.getElementById("stat-top-page").innerText = Object.keys(pages).reduce((a, b) => pages[a] > pages[b] ? a : b, "--");
+        if (!snapEval.empty) {
+            snapEval.forEach(doc => {
+                const d = doc.data();
+                allData.push(d);
+                if(d.classe) classes.add(d.classe);
+                if(d.exercice_titre) exercices.add(d.exercice_titre);
+            });
+        }
+
+        // Remplir les filtres
+        const selClass = document.getElementById("filter-class");
+        const selExo = document.getElementById("filter-exercice");
+        // Garder selection si existe
+        const oldClass = selClass.value; 
+        const oldExo = selExo.value;
+
+        selClass.innerHTML = '<option value="ALL">Toutes les classes</option>';
+        classes.forEach(c => selClass.innerHTML += `<option value="${c}">${c}</option>`);
+        selClass.value = oldClass || "ALL";
+
+        selExo.innerHTML = '<option value="ALL">Tous les exercices</option>';
+        exercices.forEach(e => selExo.innerHTML += `<option value="${e}">${e}</option>`);
+        selExo.value = oldExo || "ALL";
+
+        // 2. CHARGER STATS (ZONE 1)
+        await chargerStats();
+        
+        applyFilters(); // Affiche le tableau et le radar
+        if(btn) btn.innerText = "🔄 Actualiser";
     }
 
-    window.applyFilters = () => {
-      const fClass = document.getElementById("filter-class").value;
-      const fName = document.getElementById("filter-student").value.toLowerCase();
-      const filtered = allData.filter(d => (fClass === "ALL" || d.classe === fClass) && d.identifiant.toLowerCase().includes(fName));
-      renderTable(filtered);
-      updateRadar(filtered);
-    };
-
-    function renderTable(data) {
-      const tbody = document.getElementById("tbody-eleves");
-      tbody.innerHTML = data.map(d => `
-        <tr>
-          <td>${new Date(d.date.seconds*1000).toLocaleDateString()}</td>
-          <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
-          <td>${d.classe}</td>
-          <td style="font-weight:800; color:var(--col-pedago);">${d.note_finale}/20</td>
-          <td>${Object.entries(d.competences).map(([k,v]) => `<span class="pill" style="background:${v>=2?'#dcfce7':'#fee2e2'}">${k.substring(0,2)}:${v}</span>`).join('')}</td>
-        </tr>
-      `).join('');
+    async function chargerStats() {
+        const qStats = query(collection(db, "statistiques_usage"));
+        const snapStats = await getDocs(qStats);
+        let totalViews=0, mobileCount=0, pageCounts={};
+        snapStats.forEach(doc => {
+            totalViews++; const d=doc.data();
+            if(d.device && /Mobi|Android/i.test(d.device)) mobileCount++;
+            if(d.page) pageCounts[d.page] = (pageCounts[d.page] || 0) + 1;
+        });
+        document.getElementById("stat-total-views").innerText = totalViews;
+        let mobilePct = totalViews>0 ? Math.round((mobileCount/totalViews)*100) : 0;
+        document.getElementById("stat-device").innerText = `${mobilePct}% Mobile`;
+        let topPage="Aucune", maxP=0;
+        for(let p in pageCounts) { if(pageCounts[p]>maxP) { maxP=pageCounts[p]; topPage=p; } }
+        document.getElementById("stat-top-page").innerText = topPage;
     }
 
-    // Graphique Radar
-    function updateRadar(data) {
-      const ctx = document.getElementById('radarChart');
-      if(window.mainChart) window.mainChart.destroy();
-      const averages = [0,0,0,0,0,0]; // Calcul des moyennes C1-C6 ici...
-      window.mainChart = new Chart(ctx, {
-        type: 'radar',
-        data: {
-          labels: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'],
-          datasets: [{ label: 'Moyenne Classe', data: [2.1, 1.8, 2.5, 1.9, 2.2, 2.0], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6' }]
-        },
-        options: { scales: { r: { min: 0, max: 3 } }, maintainAspectRatio: false }
-      });
+    // --- FILTRES & TRI ---
+    window.applyFilters = function() {
+        const fClass = document.getElementById("filter-class").value;
+        const fExo = document.getElementById("filter-exercice").value;
+        const fName = document.getElementById("filter-student").value.toLowerCase();
+
+        filteredData = allData.filter(d => {
+            if(fClass !== "ALL" && d.classe !== fClass) return false;
+            if(fExo !== "ALL" && d.exercice_titre !== fExo) return false;
+            if(fName && !d.identifiant.toLowerCase().includes(fName)) return false;
+            return true;
+        });
+
+        sortData(currentSort.col, false); // Relance le tri et l'affichage
     }
 
-    window.openStudentDetail = (id) => {
-      const student = allData.filter(d => d.identifiant === id);
-      document.getElementById("modal-name").innerText = id;
-      document.getElementById("modalStudent").classList.add("open");
-    };
-    window.closeModal = () => document.getElementById("modalStudent").classList.remove("open");
+    window.sortData = function(col, toggle=true) {
+        if(toggle) {
+            if(currentSort.col === col) currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+            else { currentSort.col = col; currentSort.dir = 'asc'; } // Default asc for new col
+            // Exception pour Date et Note : on préfère DESC par défaut
+            if((col === 'date' || col === 'note_finale') && toggle && currentSort.col !== col) currentSort.dir = 'desc';
+        }
 
-    function populateFilters() {
-      const classes = [...new Set(allData.map(d => d.classe))];
-      document.getElementById("filter-class").innerHTML = '<option value="ALL">Toutes les classes</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+        filteredData.sort((a,b) => {
+            let va = a[col], vb = b[col];
+            // Cas particuliers
+            if(col === 'date') { va = a.date.seconds; vb = b.date.seconds; }
+            if(col === 'note_finale' || col === 'temps_secondes') { va = Number(va||0); vb = Number(vb||0); }
+            if(typeof va === 'string') va = va.toLowerCase();
+            if(typeof vb === 'string') vb = vb.toLowerCase();
+
+            if(va < vb) return currentSort.dir === 'asc' ? -1 : 1;
+            if(va > vb) return currentSort.dir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        renderTable();
+        updateGlobalRadar();
     }
 
-    chargerDonnees();
+    function renderTable() {
+        const tbody = document.getElementById("tbody-eleves");
+        tbody.innerHTML = "";
+        if (filteredData.length === 0) { 
+            tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucun résultat ne correspond aux filtres.</td></tr>"; 
+            return;
+        }
+
+        filteredData.forEach(d => {
+            let dateStr = d.date ? new Date(d.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
+            let timeStr = "-";
+            if(d.temps_secondes) { let m=Math.floor(d.temps_secondes/60), s=d.temps_secondes%60; timeStr=`${m}m ${s}s`; }
+            let badges = "";
+            if(d.competences) { for(let [k,v] of Object.entries(d.competences)) { if(v!==null) badges += makeBadge(k.substring(0,2), v); } }
+
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
+                <td>${d.classe || ""}</td>
+                <td>${timeStr}</td>
+                <td>${d.exercice_titre || ""}</td>
+                <td style="font-weight:bold; color:#4f46e5;">${d.note_finale}/20</td>
+                <td>${badges}</td>
+            </tr>`;
+        });
+    }
+
+    function updateGlobalRadar() {
+        let sums={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0}, counts={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+        let totalNote=0, count=0;
+
+        filteredData.forEach(d => {
+            if(d.note_finale !== undefined) { totalNote += parseFloat(d.note_finale); count++; }
+            if(d.competences) {
+                for(let k in d.competences) {
+                    let key = k.substring(0,2);
+                    if(d.competences[k] !== null && sums[key] !== undefined) { sums[key] += d.competences[k]; counts[key]++; }
+                }
+            }
+        });
+
+        if(count>0) document.getElementById("moyenne-globale").innerText = (totalNote/count).toFixed(1) + "/20";
+        else document.getElementById("moyenne-globale").innerText = "--";
+
+        updateChart("radarChart", globalChart, sums, counts, "Moyenne Sélection", 'rgba(59, 130, 246, 0.2)', '#3b82f6');
+    }
+
+    // --- DETAIL ÉLÈVE ---
+    window.openStudentDetail = function(studentId) {
+        const studentHistory = allData.filter(d => d.identifiant === studentId);
+        if(studentHistory.length === 0) return;
+        const last = studentHistory[0];
+        document.getElementById("modal-name").innerText = last.identifiant;
+        document.getElementById("modal-class").innerText = last.classe;
+        let totalTime = 0, totalScore = 0;
+        let sums = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0}, counts = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+        let histHtml = "";
+        studentHistory.forEach(h => {
+            if(h.temps_secondes) totalTime += h.temps_secondes;
+            if(h.note_finale) totalScore += parseFloat(h.note_finale);
+            if(h.competences) {
+                for(let k in h.competences) {
+                    let key = k.substring(0,2);
+                    if(h.competences[k] !== null && sums[key] !== undefined) { sums[key] += h.competences[k]; counts[key]++; }
+                }
+            }
+            let d = h.date ? new Date(h.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
+            histHtml += `<tr><td>${d}</td><td>${h.exercice_titre}</td><td><strong>${h.note_finale}/20</strong></td></tr>`;
+        });
+        let avgScore = (totalScore / studentHistory.length).toFixed(1);
+        let avgTime = Math.floor((totalTime / studentHistory.length) / 60) + "m " + Math.floor((totalTime / studentHistory.length) % 60) + "s";
+        document.getElementById("modal-avg").innerText = avgScore + "/20";
+        document.getElementById("modal-time").innerText = avgTime;
+        document.getElementById("modal-history").innerHTML = histHtml;
+        document.getElementById("modalStudent").classList.add("open");
+        setTimeout(() => { updateChart("studentRadar", null, sums, counts, "Niveau de l'élève", 'rgba(16, 185, 129, 0.2)', '#10b981'); }, 100);
+    }
+    window.closeModal = function() { document.getElementById("modalStudent").classList.remove("open"); }
+
+    function updateChart(canvasId, chartInstance, sums, counts, label, bgColor, borderColor) {
+        const ctx = document.getElementById(canvasId);
+        if(Chart.getChart(canvasId)) Chart.getChart(canvasId).destroy();
+        const dataArr = [
+            counts.C1 ? sums.C1/counts.C1 : 0, counts.C2 ? sums.C2/counts.C2 : 0, counts.C3 ? sums.C3/counts.C3 : 0,
+            counts.C4 ? sums.C4/counts.C4 : 0, counts.C5 ? sums.C5/counts.C5 : 0, counts.C6 ? sums.C6/counts.C6 : 0
+        ];
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['C1 Info', 'C2 Analyse', 'C3 Expliquer', 'C4 Solution', 'C5 Arg', 'C6 Com'],
+                datasets: [{ label: label, data: dataArr, backgroundColor: bgColor, borderColor: borderColor, pointBackgroundColor: borderColor }]
+            },
+            options: { scales: { r: { suggestedMin: 0, suggestedMax: 3 } }, maintainAspectRatio: false }
+        });
+    }
+    function makeBadge(name, level) {
+        let c = "pill-red"; if(level >= 1) c = "pill-orange"; if(level >= 2) c = "pill-green"; if(level === 3) c = "pill-blue";
+        return `<span class="pill ${c}">${name}:${level}</span>`;
+    }
   </script>
 </body>
 </html>
