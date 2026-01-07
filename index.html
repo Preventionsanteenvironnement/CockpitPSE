@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cockpit Professeur – Pilotage Global</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root{
       --bg-body:#f1f5f9; --bg-sidebar:#0f172a; --text-main:#1e293b; --text-muted:#64748b;
@@ -100,6 +103,20 @@
       font-size:1.1rem; display:flex; justify-content:space-between; align-items:center;
     }
 
+    /* INTERVENTION : Styles spécifiques pour le tableau et radar CodePilote */
+    .radar-container { height: 320px; display: flex; justify-content: center; margin-bottom: 10px; }
+    .pill { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 2px;}
+    .pill-green { background: #dcfce7; color: #166534; }
+    .pill-orange { background: #ffedd5; color: #9a3412; }
+    .pill-red { background: #fee2e2; color: #991b1b; }
+    .pill-blue { background: #dbeafe; color: #1e40af; }
+    
+    .results-table { width:100%; border-collapse:collapse; min-width:600px; }
+    .results-table thead { background:#f1f5f9; color:#475569; }
+    .results-table th, .results-table td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; }
+    .results-table tr:hover { background:#f8fafc; }
+
+    /* Planning & Agenda styles */
     .planning-list{list-style:none; margin:0; padding:0; overflow-y:auto;}
     .course-item{
       padding:12px; border-bottom:1px solid #f8fafc;
@@ -251,7 +268,7 @@
     <div class="nav-category">Mes dossiers</div>
     <div class="nav-item" data-theme="pedago" onclick="showView('view-pedago', this)">🟦 1. Pédagogie & cours</div>
     <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 2. Évaluation & suivi</div>
-    <div class="nav-item" data-theme="eval" onclick="window.open('PageProf_Exercices.html', '_blank')">🟨 2b. Scores exercices</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 2b. Scores exercices</div>
     <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 3. Classes & groupes</div>
     <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 4. Projets & transversal</div>
     <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 5. Temps & admin</div>
@@ -427,6 +444,47 @@
           <a href="#" class="btn-yellow">📥 Exports JSON / CSV <span class="badge-soon">Bientôt</span></a>
         </div>
       </details>
+    </section>
+
+    <section id="view-scores" class="view-section">
+      <h2 style="color:var(--col-eval);">Suivi des Compétences & Notes</h2>
+      
+      <div class="dashboard-grid">
+          <div class="widget">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span>Dernières évaluations reçues (Firestore : <code>evaluations_competences</code>)</span>
+                <button onclick="chargerDonnees()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+            </div>
+            
+            <div style="overflow-x:auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Élève</th>
+                            <th>Classe</th>
+                            <th>Exercice</th>
+                            <th>Note</th>
+                            <th>Détail Compétences</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-eleves">
+                        <tr><td colspan="6" class="scores-empty">Cliquez sur "Actualiser" pour charger les copies.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+          </div>
+
+          <div class="widget">
+              <h3>📊 Radar Moyen de la Classe</h3>
+              <div class="radar-container">
+                  <canvas id="radarChart"></canvas>
+              </div>
+              <div style="text-align:center; margin-top:15px;">
+                  Moyenne Classe : <strong id="moyenne-globale" style="color:#3b82f6; font-size:1.3rem;">--</strong>
+              </div>
+          </div>
+      </div>
     </section>
 
     <section id="view-class" class="view-section">
@@ -693,6 +751,7 @@
         "dashboard":"Tableau de bord",
         "view-pedago":"Pédagogie & cours",
         "view-eval":"Évaluation & suivi",
+        "view-scores":"Scores exercices",
         "view-class":"Classes & groupes",
         "view-proj":"Projets & transversal",
         "view-admin":"Temps & institution",
@@ -714,6 +773,160 @@
     // INIT
     renderMemos();
     renderAgenda();
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+      authDomain: "devoirs-pse.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.appspot.com",
+      messagingSenderId: "614730413904",
+      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    let myRadarChart = null; // Pour stocker le graphique
+
+    // Fonction Globale pour charger les données (appelée par le bouton Actualiser)
+    window.chargerDonnees = async function() {
+        console.log("Chargement Firebase...");
+        const btn = document.querySelector("button[onclick='chargerDonnees()']");
+        if(btn) btn.innerText = "Chargement...";
+
+        // Connexion à la collection "evaluations_competences"
+        const q = query(collection(db, "evaluations_competences"), orderBy("date", "desc"));
+        
+        try {
+            const evalSnap = await getDocs(q);
+            
+            let totalNote = 0;
+            let countNote = 0;
+            let tbody = document.getElementById("tbody-eleves");
+            tbody.innerHTML = ""; // Vider le tableau
+
+            // Variables pour le Radar
+            let sumC1=0, sumC2=0, sumC3=0, sumC4=0, sumC5=0, sumC6=0;
+            let countC1=0, countC2=0, countC3=0, countC4=0, countC5=0, countC6=0;
+
+            if (evalSnap.empty) {
+                tbody.innerHTML = "<tr><td colspan='6' style='text-align:center'>Aucune copie reçue pour le moment.</td></tr>";
+                if(btn) btn.innerText = "🔄 Actualiser";
+                return;
+            }
+
+            evalSnap.forEach(doc => {
+                const data = doc.data();
+                
+                // Calcul moyenne
+                if(data.note_finale !== undefined) {
+                    totalNote += parseFloat(data.note_finale);
+                    countNote++;
+                }
+
+                // Calcul Radar (Agrégation)
+                if(data.competences) {
+                    if(data.competences.C1_Traiter_Info != null) { sumC1 += data.competences.C1_Traiter_Info; countC1++; }
+                    if(data.competences.C2_Analyse != null)      { sumC2 += data.competences.C2_Analyse; countC2++; }
+                    if(data.competences.C3_Expliquer != null)    { sumC3 += data.competences.C3_Expliquer; countC3++; }
+                    if(data.competences.C4_Solution != null)     { sumC4 += data.competences.C4_Solution; countC4++; }
+                    if(data.competences.C5_Argumenter != null)   { sumC5 += data.competences.C5_Argumenter; countC5++; }
+                    if(data.competences.C6_Communiquer != null)  { sumC6 += data.competences.C6_Communiquer; countC6++; }
+                }
+
+                // Remplir le tableau
+                let dateStr = "N/A";
+                if(data.date) dateStr = new Date(data.date.seconds * 1000).toLocaleDateString("fr-FR");
+
+                let badges = "";
+                if(data.competences) {
+                    badges += makeBadge("C1", data.competences.C1_Traiter_Info);
+                    badges += makeBadge("C2", data.competences.C2_Analyse);
+                    badges += makeBadge("C3", data.competences.C3_Expliquer);
+                    badges += makeBadge("C4", data.competences.C4_Solution);
+                    badges += makeBadge("C5", data.competences.C5_Argumenter);
+                    badges += makeBadge("C6", data.competences.C6_Communiquer);
+                }
+
+                let row = `<tr>
+                    <td>${dateStr}</td>
+                    <td><strong>${data.identifiant || "Anonyme"}</strong></td>
+                    <td>${data.classe || ""}</td>
+                    <td>${data.exercice_titre || "Exercice"}</td>
+                    <td style="font-weight:bold; color:#4f46e5;">${data.note_finale}/20</td>
+                    <td>${badges}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+            // Moyenne Globale
+            if(countNote > 0) {
+                document.getElementById("moyenne-globale").innerText = (totalNote / countNote).toFixed(1) + "/20";
+            }
+
+            // Dessiner le Radar
+            updateRadar(
+                countC1 ? sumC1/countC1 : 0,
+                countC2 ? sumC2/countC2 : 0,
+                countC3 ? sumC3/countC3 : 0,
+                countC4 ? sumC4/countC4 : 0,
+                countC5 ? sumC5/countC5 : 0,
+                countC6 ? sumC6/countC6 : 0
+            );
+
+            if(btn) btn.innerText = "🔄 Actualiser";
+
+        } catch (e) {
+            console.error("Erreur Firebase:", e);
+            alert("Erreur de connexion : " + e.message);
+            if(btn) btn.innerText = "Erreur";
+        }
+    }
+
+    // Fonctions Utilitaires
+    function makeBadge(name, level) {
+        if(level === undefined || level === null) return "";
+        let colorClass = "pill-red";
+        if(level >= 1) colorClass = "pill-orange";
+        if(level >= 2) colorClass = "pill-green";
+        if(level === 3) colorClass = "pill-blue";
+        return `<span class="pill ${colorClass}">${name}:${level}</span>`;
+    }
+
+    function updateRadar(c1, c2, c3, c4, c5, c6) {
+        const ctx = document.getElementById('radarChart');
+        if(!ctx) return;
+        
+        // Détruire l'ancien graphique s'il existe pour éviter les bugs
+        if(myRadarChart) myRadarChart.destroy();
+
+        myRadarChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['C1 Info', 'C2 Analyse', 'C3 Expliquer', 'C4 Solution', 'C5 Arg', 'C6 Com'],
+                datasets: [{
+                    label: 'Niveau Classe',
+                    data: [c1, c2, c3, c4, c5, c6],
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: '#3b82f6',
+                    pointBackgroundColor: '#3b82f6'
+                }]
+            },
+            options: {
+                scales: {
+                    r: { suggestedMin: 0, suggestedMax: 3 }
+                },
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    // Chargement automatique au démarrage
+    // setTimeout(chargerDonnees, 1000); // Optionnel : Décommentez pour charger direct
   </script>
 </body>
 </html>
