@@ -703,12 +703,13 @@
     function renderAgenda(){ const ul = document.getElementById("agenda-list"); ul.innerHTML=""; const now=new Date(); agenda.sort((a,b)=>new Date(a.when)-new Date(b.when)); agenda.forEach((ev,i)=>{ const d=new Date(ev.when), soon=(d-now)<7*24*3600*1000 && d>now; ul.innerHTML += `<li class="agenda-item${soon?" soon":""}"><div><strong>${ev.title}</strong><div class="agenda-meta">${d.toLocaleDateString("fr-FR")} • ${ev.type}</div></div><button type="button" onclick="deleteAgenda(${i})">✕</button></li>`; }); }
     function addAgenda(){ const type=document.getElementById("agenda-type").value, date=document.getElementById("agenda-date").value, title=document.getElementById("agenda-title").value.trim(); if(date&&title){ agenda.push({type,title,place:document.getElementById("agenda-place").value,when:new Date(date+"T"+(document.getElementById("agenda-time").value||"08:00"))}); save("cockpit_agenda",agenda); renderAgenda(); } }
     function deleteAgenda(i){ agenda.splice(i,1); save("cockpit_agenda",agenda); renderAgenda(); }
-    function showView(id,navEl){ document.querySelectorAll(".view-section").forEach(v=>v.classList.remove("active")); document.getElementById(id).classList.add("active"); if(navEl){ document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active")); navEl.classList.add("active"); } renderMemos(); }
+    
     function toggleMenu(){document.body.classList.toggle("menu-open");} function closeMenu(){document.body.classList.remove("menu-open");}
     renderMemos(); renderAgenda();
   </script>
 
   <script type="module">
+  
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy, where, limit, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
@@ -725,6 +726,46 @@
     const db = getFirestore(app);
     
     // VARIABLES GLOBALES
+    // --- VARIABLES GLOBALES ---
+let traficEstCharge = false;
+let traficEnCours = false;
+// --- NOUVELLE FONCTION NAVIGATION (Accessible globalement) ---
+    window.showView = function(viewId, navEl) {
+        
+        // 1. UI : Gestion des classes active (Cacher les autres, montrer la cible)
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        const target = document.getElementById(viewId);
+        if (target) target.classList.add('active');
+        if (navEl) navEl.classList.add('active');
+
+        // 2. LOGIQUE TRAFIC (Lazy Loading : On ne charge que si nécessaire)
+        if (viewId === 'view-trafic' && !traficEstCharge && !traficEnCours) {
+            console.log("🚦 Premier clic sur Trafic : Lancement du chargement...");
+            traficEnCours = true;
+
+            // Appel à la fonction de chargement Firebase (définie plus bas dans index_trafic.html)
+            if (typeof traficRefresh === 'function') {
+                traficRefresh()
+                    .then(() => {
+                        traficEstCharge = true;
+                        console.log("✅ Trafic chargé.");
+                    })
+                    .catch(e => console.error("Erreur Trafic:", e))
+                    .finally(() => traficEnCours = false);
+            }
+        }
+
+        // 3. Mobile : Fermer menu
+        if (window.innerWidth <= 980) {
+            document.body.classList.remove('menu-open');
+        }
+        
+        // 4. Mémos (Rafraîchissement contextuel)
+        if (typeof renderMemos === 'function') renderMemos();
+    };
+// ... tes autres variables (allEvalData, etc.) ...
     let allData = []; 
     let filteredData = [];
     let statsDetails = { 
