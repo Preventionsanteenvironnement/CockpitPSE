@@ -777,7 +777,7 @@ let traficEnCours = false;
     let globalChart = null;
     let detailsChart = null; // Pour le graphique dans la modale
 
-   // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V11 - FINALE) ---
+   // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V11 - FINALE CORRIGÉE) ---
     window.chargerDonnees = async function() {
         console.log("🚀 Démarrage chargement...");
         const btns = document.querySelectorAll("button");
@@ -803,7 +803,7 @@ let traficEnCours = false;
                         temps_secondes: d.temps_secondes || 0,
                         exercice_titre: d.titre || d.devoirId || "Devoir",
                         
-                        // ✅ C'EST ICI LA CORRECTION MAGIQUE (V11)
+                        // ✅ CORRECTION NOTE (V11)
                         note_finale: d.resultat_auto?.score ?? d.note_finale ?? d.meta?.score ?? "--",
                         
                         competences: d.competences || {} 
@@ -834,15 +834,13 @@ let traficEnCours = false;
 
         } catch(e) { console.error("Erreur Eval:", e); }
 
+        // Lancement des stats
         if(typeof chargerStatsCompletes === 'function') await chargerStatsCompletes();
         
+        // Remise à zéro des boutons
         btns.forEach(b => { if(b.innerText.includes("⏳")) b.innerText = "🔄 Tout actualiser"; });
     }
-        // B. CHARGER STATS & PRÉPARER LES DÉTAILS
-        if(typeof chargerStatsCompletes === 'function') await chargerStatsCompletes();
-        
-        btns.forEach(b => { if(b.innerText.includes("⏳")) b.innerText = "🔄 Tout actualiser"; });
-    }
+
     // --- 2. TRAITEMENT DES STATS (Pour le détail) ---
     async function chargerStatsCompletes() {
         try {
@@ -886,12 +884,17 @@ let traficEnCours = false;
             }).sort((a,b) => b.count - a.count);
 
             // Mise à jour Affichage "Carte" (Résumé)
-            document.getElementById("stat-total-views").innerText = totalViews;
+            const elTotal = document.getElementById("stat-total-views");
+            if(elTotal) elTotal.innerText = totalViews;
+
             let mobPct = totalViews>0 ? Math.round((statsDetails.devices.Mobile/totalViews)*100) : 0;
-            document.getElementById("stat-device").innerText = `${mobPct}% Mobile`;
+            const elDevice = document.getElementById("stat-device");
+            if(elDevice) elDevice.innerText = `${mobPct}% Mobile`;
+
             let topExo = statsDetails.pages.length > 0 ? statsDetails.pages[0].name : "--";
             if(topExo.length > 18) topExo = topExo.substring(0, 16) + "...";
-            document.getElementById("stat-top-page").innerText = topExo;
+            const elTop = document.getElementById("stat-top-page");
+            if(elTop) elTop.innerText = topExo;
 
         } catch(e) { console.error("Erreur Stats:", e); }
     }
