@@ -1030,38 +1030,74 @@ let traficEnCours = false;
 
     function renderTable() {
         const tbody = document.getElementById("tbody-eleves");
-        tbody.innerHTML = "";
-        if (filteredData.length === 0) { 
-            tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucun résultat ne correspond aux filtres.</td></tr>"; 
+        // Récupération sécurisée des filtres
+        const elClass = document.getElementById("filter-class");
+        const elExo = document.getElementById("filter-exercice");
+        const fCls = elClass ? elClass.value : "ALL";
+        const fExo = elExo ? elExo.value : "ALL";
+
+        tbody.innerHTML = ""; // ✅ Correction: innerHTML en majuscules
+
+        // Filtrage local
+        const filtered = allData.filter(d => {
+            if(fCls !== "ALL" && d.classe !== fCls) return false;
+            if(fExo !== "ALL" && d.exercice_titre !== fExo) return false;
+            return true;
+        });
+
+        if (filtered.length === 0) { 
+            tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucun résultat.</td></tr>"; 
             return;
         }
-        filteredData.forEach(d => {
-            let dateStr = d.date ? new Date(d.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
-            let timeStr = "-";
-            if(d.temps_secondes) { let m=Math.floor(d.temps_secondes/60), s=d.temps_secondes%60; timeStr=`${m}m ${s}s`; }
-            let badges = "";
-            if(d.competences) { for(let [k,v] of Object.entries(d.competences)) { if(v!==null) badges += makeBadge(k.substring(0,2), v); } }
 
-            tbody.innerHtml += `<tr>
-            <td>${dateStr}</td>
-            <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
-            <td>${d.classe || ""}</td>
-            <td>${timeStr}</td>
-            <td>${d.exercice_titre || ""}</td>
-            <td style="font-weight:bold; color:#4f46e5;">${d.note_finale}/20</td>
+        filtered.forEach(d => {
+            // Gestion Date (Compatible V10)
+            let dateStr = "-";
+            if(d.date instanceof Date) dateStr = d.date.toLocaleDateString("fr-FR");
             
-            <td style="display:flex; gap:5px;">
-                <button onclick="ouvrirCorrection('${d.id}')" 
-                   style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Noter">
-                   ✍️ Grille
-                </button>
+            // Gestion du temps
+            let timeStr = "-";
+            if(d.temps_secondes) { 
+                let m = Math.floor(d.temps_secondes/60);
+                timeStr = m + " min"; 
+            }
+
+            // Gestion Note et Couleur
+            let scoreClass = "color:#4b5563"; // Gris par défaut
+            let scoreTxt = d.note_finale;
+            
+            if(scoreTxt !== "--") {
+                scoreTxt += "/20";
+                // Couleur rouge/vert
+                let val = parseFloat(d.note_finale);
+                if(val < 10) scoreClass = "color:#dc2626;font-weight:bold";
+                else if(val >= 14) scoreClass = "color:#16a34a;font-weight:bold";
+            }
+
+            // URL du devoir (Mode Miroir)
+            const urlDevoir = "https://preventionsanteenvironnement.github.io/PSE/devoirs/PSE_devoirs_CAP_A3_sedentarite_v1.html";
+
+            // Insertion Ligne avec les DEUX BOUTONS
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
+                <td><span class="pill pill-blue">${d.classe}</span></td>
+                <td>${timeStr}</td>
+                <td>${d.exercice_titre}</td>
+                <td style="font-weight:bold; ${scoreClass}">${scoreTxt}</td>
                 
-                <button onclick="window.open('https://preventionsanteenvironnement.github.io/PSE/devoirs/PSE_devoirs_CAP_A3_sedentarite_v1.html?docId=${d.id}', '_blank')" 
-                   style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Voir la copie élève">
-                   👁️ Copie
-                </button>
-            </td>
-        </tr>`;
+                <td style="display:flex; gap:5px;">
+                    <button onclick="ouvrirCorrection('${d.id}')" 
+                       style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Ouvrir la grille">
+                       ✍️ Grille
+                    </button>
+                    
+                    <button onclick="window.open('${urlDevoir}?docId=${d.id}', '_blank')" 
+                       style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Voir copie originale">
+                       👁️ Copie
+                    </button>
+                </td>
+            </tr>`;
         });
     }
 
