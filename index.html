@@ -1102,20 +1102,38 @@ let traficEnCours = false;
     }
 
     function updateGlobalRadar() {
-        let sums={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0}, counts={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
+        let sums ={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0}, counts={C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
         let totalNote=0, count=0;
+        
         filteredData.forEach(d => {
-            if(d.note_finale !== undefined) { totalNote += parseFloat(d.note_finale); count++; }
+            // 1. Calcul de la Note Moyenne (Sécurisé)
+            // On ne compte que si c'est un vrai chiffre
+            if(d.note_finale && d.note_finale !== "--") {
+                let val = parseFloat(d.note_finale);
+                if(!isNaN(val)) {
+                    totalNote += val;
+                    count++;
+                }
+            }
+
+            // 2. Calcul des Compétences
             if(d.competences) {
                 for(let k in d.competences) {
                     let key = k.substring(0,2);
-                    if(d.competences[k] !== null && sums[key] !== undefined) { sums[key] += d.competences[k]; counts[key]++; }
+                    if(sums[key] !== undefined && d.competences[k] !== null) {
+                        sums[key] += d.competences[k];
+                        counts[key]++;
+                    }
                 }
             }
         });
-        if(count>0) document.getElementById("moyenne-globale").innerText = (totalNote/count).toFixed(1) + "/20";
+
+        // Mise à jour de l'affichage texte
+        if(count > 0) document.getElementById("moyenne-globale").innerText = (totalNote/count).toFixed(1) + " / 20";
         else document.getElementById("moyenne-globale").innerText = "--";
-        updateChart("radarChart", globalChart, sums, counts, "Moyenne Sélection", 'rgba(59, 130, 246, 0.2)', '#3b82f6');
+
+        // Mise à jour du graphique
+        updateChart(radarChart, globalChart, sums, counts, "Moyenne Sélection", 'rgba(59, 130, 246, 0.2)', '#3b82f6');
     }
 
     window.makeBadge = function(name, level) {
