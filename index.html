@@ -777,15 +777,13 @@ let traficEnCours = false;
     let globalChart = null;
     let detailsChart = null; // Pour le graphique dans la modale
 
-    // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V10) ---
+   // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V11 - FINALE) ---
     window.chargerDonnees = async function() {
         console.log("🚀 Démarrage chargement...");
         const btns = document.querySelectorAll("button");
         btns.forEach(b => { if(b.innerText.includes("Actualiser")) b.innerText = "⏳..."; });
         
-        // A. CHARGER DEVOIRS RENDUS (Source Élèves)
         try {
-            // On lit 'devoirs_rendus' au lieu de 'evaluations_competences'
             const qEval = query(collection(db, "devoirs_rendus"), orderBy("createdAtISO", "desc"), limit(100));
             const snapEval = await getDocs(qEval);
             
@@ -797,17 +795,17 @@ let traficEnCours = false;
                 snapEval.forEach(doc => {
                     const d = doc.data();
                     
-                    // On normalise les données pour le tableau
                     const item = {
-                        id: doc.id, // ✅ TRES IMPORTANT : L'ID DU DOCUMENT
+                        id: doc.id,
                         date: d.createdAtISO ? new Date(d.createdAtISO) : (d.date ? new Date(d.date) : new Date()),
-                        // On cherche le nom partout où il peut être
                         identifiant: (d.eleve?.prenom || "") + " " + (d.eleve?.nom || "") || d.identifiant || "Anonyme",
                         classe: d.eleve?.classe || d.classe || "?",
                         temps_secondes: d.temps_secondes || 0,
                         exercice_titre: d.titre || d.devoirId || "Devoir",
-                        // On prend le score auto s'il existe
-                        note_finale: d.resultat_auto?.score ?? d.note_finale ?? "--",
+                        
+                        // ✅ C'EST ICI LA CORRECTION MAGIQUE (V11)
+                        note_finale: d.resultat_auto?.score ?? d.note_finale ?? d.meta?.score ?? "--",
+                        
                         competences: d.competences || {} 
                     };
 
@@ -818,7 +816,7 @@ let traficEnCours = false;
                 });
             }
             
-            // Mise à jour des filtres (Code inchangé)
+            // Mise à jour des filtres
             const selClass = document.getElementById("filter-class");
             const selExo = document.getElementById("filter-exercice");
             const oldClass = selClass.value; 
@@ -836,6 +834,10 @@ let traficEnCours = false;
 
         } catch(e) { console.error("Erreur Eval:", e); }
 
+        if(typeof chargerStatsCompletes === 'function') await chargerStatsCompletes();
+        
+        btns.forEach(b => { if(b.innerText.includes("⏳")) b.innerText = "🔄 Tout actualiser"; });
+    }
         // B. CHARGER STATS & PRÉPARER LES DÉTAILS
         if(typeof chargerStatsCompletes === 'function') await chargerStatsCompletes();
         
