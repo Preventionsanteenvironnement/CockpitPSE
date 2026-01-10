@@ -2871,6 +2871,36 @@ document.addEventListener("DOMContentLoaded", () => {
   render();
   renderTrash();
 })();
+  // --- 4. CODE DE RÉCEPTION DU COCKPIT (À COLLER À LA FIN DE GRILLE.HTML) ---
+  window.addEventListener("load", function(){
+      // On regarde si le Cockpit nous a envoyé quelque chose
+      const payload = localStorage.getItem("cockpit_transfert");
+      
+      if(payload){
+          try {
+              const data = JSON.parse(payload);
+              console.log("Données reçues du Cockpit :", data);
+              
+              // Nettoyage pour ne pas recharger ça la prochaine fois par erreur
+              localStorage.removeItem("cockpit_transfert");
+              
+              // On utilise la fonction d'importation de ta grille
+              // (On vérifie d'abord que la fonction existe)
+              if(typeof importStudentJSON === "function") {
+                  importStudentJSON(data);
+                  
+                  // Petit message vert pour dire que ça a marché
+                  const msg = document.createElement("div");
+                  msg.style.cssText = "position:fixed;top:10px;right:10px;background:#10b981;color:white;padding:15px;border-radius:8px;z-index:9999;font-weight:bold;box-shadow:0 4px 6px rgba(0,0,0,0.1);";
+                  msg.innerText = "✅ Données de " + (data.eleve?.prenom || "l'élève") + " chargées !";
+                  document.body.appendChild(msg);
+                  setTimeout(() => msg.remove(), 4000);
+              }
+          } catch(e) { 
+              console.error("Erreur import cockpit", e); 
+          }
+      }
+  });
 </script>
 
 </body></html>
