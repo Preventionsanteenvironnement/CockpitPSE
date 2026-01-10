@@ -777,11 +777,38 @@ let traficEnCours = false;
     let globalChart = null;
     let detailsChart = null; // Pour le graphique dans la modale
 
-   // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V11 - FINALE CORRIGÉE) ---
+   // --- 1. FONCTION DE CHARGEMENT PRINCIPALE (VERSION V12 - AVEC DÉTECTIVE DE NOTE) ---
     window.chargerDonnees = async function() {
         console.log("🚀 Démarrage chargement...");
         const btns = document.querySelectorAll("button");
         btns.forEach(b => { if(b.innerText.includes("Actualiser")) b.innerText = "⏳..."; });
+
+        // --- LA FONCTION DÉTECTIVE (Proposée par l'IA) ---
+        function extractNote20(d){
+            const candidates = [
+                d?.resultat_auto?.score,
+                d?.note_finale,
+                d?.meta?.score,              
+                d?.score,
+                d?.note,
+                d?.raw?.meta?.score,         // Souvent ici pour les vieux formats
+                d?.raw?.score,
+                d?.raw?.note_finale,
+                d?.raw?.note,
+            ];
+
+            for (const c of candidates){
+                if (c === 0) return 0;
+                if (c === null || c === undefined) continue;
+                if (typeof c === "number" && !isNaN(c)) return c;
+                if (typeof c === "string"){
+                    const m = c.match(/(\d+(?:[.,]\d+)?)/);
+                    if (m) return parseFloat(m[1].replace(",", "."));
+                }
+            }
+            return null;
+        }
+        // --------------------------------------------------
         
         try {
             const qEval = query(collection(db, "devoirs_rendus"), orderBy("createdAtISO", "desc"), limit(100));
@@ -803,8 +830,8 @@ let traficEnCours = false;
                         temps_secondes: d.temps_secondes || 0,
                         exercice_titre: d.titre || d.devoirId || "Devoir",
                         
-                        // ✅ CORRECTION NOTE (V11)
-                        note_finale: d.resultat_auto?.score ?? d.note_finale ?? d.meta?.score ?? "--",
+                        // ✅ ON UTILISE LE DÉTECTIVE ICI
+                        note_finale: extractNote20(d) ?? "--",
                         
                         competences: d.competences || {} 
                     };
