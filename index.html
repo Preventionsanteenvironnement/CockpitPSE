@@ -1174,33 +1174,67 @@ let traficEnCours = false;
     }
     
     window.openStudentDetail = function(studentId) {
+        // On récupère tout l'historique de cet élève
         const studentHistory = allData.filter(d => d.identifiant === studentId);
         if(studentHistory.length === 0) return;
+        
         const last = studentHistory[0];
         document.getElementById("modal-name").innerText = last.identifiant;
         document.getElementById("modal-class").innerText = last.classe;
-        let totalTime = 0, totalScore = 0;
+        
+        let totalTime = 0, totalScore = 0, nbNotes = 0;
         let sums = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0}, counts = {C1:0,C2:0,C3:0,C4:0,C5:0,C6:0};
         let histHtml = "";
+        
         studentHistory.forEach(h => {
             if(h.temps_secondes) totalTime += h.temps_secondes;
-            if(h.note_finale) totalScore += parseFloat(h.note_finale);
+            
+            // Calcul note sécurisé
+            if(h.note_finale && h.note_finale !== "--"){
+                let v = parseFloat(h.note_finale);
+                if(!isNaN(v)) { totalScore += v; nbNotes++; }
+            }
+
             if(h.competences) {
                 for(let k in h.competences) {
                     let key = k.substring(0,2);
-                    if(h.competences[k] !== null && sums[key] !== undefined) { sums[key] += h.competences[k]; counts[key]++; }
+                    if(h.competences[k] !== null && sums[key] !== undefined) { 
+                        sums[key] += h.competences[k]; 
+                        counts[key]++; 
+                    }
                 }
             }
-            let d = h.date ? new Date(h.date.seconds*1000).toLocaleDateString("fr-FR") : "-";
-            histHtml += `<tr><td>${d}</td><td>${h.exercice_titre}</td><td><strong>${h.note_finale}/20</strong></td></tr>`;
+            
+            // ✅ CORRECTION DATE (Gestion universelle)
+            let dateAff = "-";
+            if(h.date instanceof Date) {
+                dateAff = h.date.toLocaleDateString("fr-FR");
+            } else if (h.date && h.date.seconds) {
+                dateAff = new Date(h.date.seconds * 1000).toLocaleDateString("fr-FR");
+            } else if (typeof h.date === "string") {
+                 dateAff = new Date(h.date).toLocaleDateString("fr-FR");
+            }
+            
+            histHtml += `<tr><td>${dateAff}</td><td>${h.exercice_titre}</td><td><strong>${h.note_finale}/20</strong></td></tr>`;
         });
-        let avgScore = (totalScore / studentHistory.length).toFixed(1);
-        let avgTime = Math.floor((totalTime / studentHistory.length) / 60) + "m " + Math.floor((totalTime / studentHistory.length) % 60) + "s";
-        document.getElementById("modal-avg").innerText = avgScore + "/20";
-        document.getElementById("modal-time").innerText = avgTime;
+        
+        // Moyennes affichées
+        let avgScore = nbNotes > 0 ? (totalScore / nbNotes).toFixed(1) : "--";
+        let avgTimeStr = "--";
+        if(studentHistory.length > 0 && totalTime > 0) {
+             let avgT = totalTime / studentHistory.length;
+             avgTimeStr = Math.floor(avgT / 60) + "m " + Math.floor(avgT % 60);
+        }
+        
+        document.getElementById("modal-avg").innerText = avgScore + " / 20";
+        document.getElementById("modal-time").innerText = avgTimeStr;
         document.getElementById("modal-history").innerHTML = histHtml;
+        
         document.getElementById("modalStudent").classList.add("open");
-        setTimeout(() => { updateChart("studentRadar", null, sums, counts, "Niveau de l'élève", 'rgba(16, 185, 129, 0.2)', '#10b981'); }, 100);
+        
+        setTimeout(() => { 
+            updateChart("studentRadar", null, sums, counts, "Niveau de l'élève", 'rgba(16, 185, 129, 0.2)', '#10b981'); 
+        }, 100);
     }
     window.closeModal = function() { document.getElementById("modalStudent").classList.remove("open"); }
 
