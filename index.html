@@ -799,7 +799,7 @@ let traficEnCours = false;
 // --- NOUVELLE FONCTION NAVIGATION (Accessible globalement) ---
     window.showView = function(viewId, navEl) {
         
-        // 1. UI : Gestion des classes active (Cacher les autres, montrer la cible)
+        // 1. UI : Gestion des classes active
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         
@@ -807,12 +807,10 @@ let traficEnCours = false;
         if (target) target.classList.add('active');
         if (navEl) navEl.classList.add('active');
 
-        // 2. LOGIQUE TRAFIC (Lazy Loading : On ne charge que si nécessaire)
+        // 2. LOGIQUE TRAFIC (On ne change rien)
         if (viewId === 'view-trafic' && !traficEstCharge && !traficEnCours) {
             console.log("🚦 Premier clic sur Trafic : Lancement du chargement...");
             traficEnCours = true;
-
-            // Appel à la fonction de chargement Firebase (définie plus bas dans index_trafic.html)
             if (typeof traficRefresh === 'function') {
                 traficRefresh()
                     .then(() => {
@@ -824,14 +822,21 @@ let traficEnCours = false;
             }
         }
 
-        // 3. Mobile : Fermer menu
+        // 3. LOGIQUE SESSIONS (LA SEULE NOUVEAUTÉ ICI 👇)
+        if (viewId === 'view-sessions') {
+            console.log("📡 Chargement du module Session...");
+            if (typeof loadHistory === 'function') loadHistory(); 
+        }
+
+        // 4. Mobile : Fermer menu
         if (window.innerWidth <= 980) {
             document.body.classList.remove('menu-open');
         }
         
-        // 4. Mémos (Rafraîchissement contextuel)
+        // 5. Mémos
         if (typeof renderMemos === 'function') renderMemos();
     };
+        
 // ... tes autres variables (allEvalData, etc.) ...
     let allData = []; 
     let filteredData = [];
