@@ -778,18 +778,22 @@
   <script type="module">
   
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit, Timestamp, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    const firebaseConfig = {
-      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-      authDomain: "devoirs-pse.firebaseapp.com",
-      projectId: "devoirs-pse",
-      storageBucket: "devoirs-pse.appspot.com",
-      messagingSenderId: "614730413904",
-      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
-    };
+import {
+  getFirestore, collection, getDocs, addDoc, setDoc, updateDoc, deleteDoc, doc,
+  onSnapshot, query, orderBy, where, limit, Timestamp, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+const firebaseConfig = {
+  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+  authDomain: "devoirs-pse.firebaseapp.com",
+  projectId: "devoirs-pse",
+  storageBucket: "devoirs-pse.appspot.com",
+  messagingSenderId: "614730413904",
+  appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
     
     // VARIABLES GLOBALES
     // --- VARIABLES GLOBALES ---
@@ -1773,21 +1777,22 @@ window.createNewSession = async function() {
     try {
         // A. Créer le document dans la collection 'sessions'
         const sessionRef = await addDoc(collection(db, "sessions"), {
-            title: title,
-            createdAt: new Date(),
-            isActive: true,       // Session active
-            currentStep: 'attente' // Écran par défaut
-        });
+  title: title,
+  createdAt: new Date(),
+  isActive: true,
+  currentStep: 'attente'
+});
 
         currentSessionId = sessionRef.id;
 
         // B. Mettre à jour la CONFIG GLOBALE pour que les téléphones sachent où aller
         // Les téléphones écoutent le doc 'config/live'
-        await updateDoc(doc(db, "config", "live"), {
-            activeSessionId: currentSessionId,
-            sessionTitle: title,
-            currentStep: 'attente'
-        });
+       await setDoc(doc(db, "config", "live"), {
+  activeSessionId: currentSessionId,
+  sessionTitle: title,
+  currentStep: "attente",
+  updatedAt: serverTimestamp()
+}, { merge: true });
 
         // C. UI : Passer en mode Live
         activateLivePanel(title, 0);
@@ -1812,8 +1817,8 @@ window.switchStep = async function(stepName) {
     
     // Mise à jour Firebase (Config globale + Session)
     try {
-        await updateDoc(doc(db, "config", "live"), { currentStep: stepName });
-        await updateDoc(doc(db, "sessions", currentSessionId), { currentStep: stepName });
+        await setDoc(doc(db, "config", "live"), { currentStep: stepName, updatedAt: serverTimestamp() }, { merge:true });
+await updateDoc(doc(db, "sessions", currentSessionId), { currentStep: stepName });
     } catch(e) { console.error(e); }
 }
 
@@ -1869,7 +1874,12 @@ window.stopSession = async function() {
     if(currentSessionId) {
         // Désactiver dans Firebase
         await updateDoc(doc(db, "sessions", currentSessionId), { isActive: false });
-        await updateDoc(doc(db, "config", "live"), { activeSessionId: null });
+
+await setDoc(doc(db, "config", "live"), {
+  activeSessionId: null,
+  currentStep: "attente",
+  updatedAt: serverTimestamp()
+}, { merge: true });
         
         // UI : Retour à l'accueil
         document.getElementById("live-panel").style.display = "none";
@@ -1900,7 +1910,9 @@ async function loadHistory() {
         list.innerHTML = "";
         snap.forEach(docSnap => {
             const d = docSnap.data();
-            const dateStr = d.createdAt ? new Date(d.createdAt.seconds*1000).toLocaleDateString() : "?";
+            let dateStr = "?";
+if (d.createdAt?.toDate) dateStr = d.createdAt.toDate().toLocaleDateString("fr-FR");
+else if (d.createdAt instanceof Date) dateStr = d.createdAt.toLocaleDateString("fr-FR");
             const statusBadge = d.isActive ? '<span style="background:#fecaca; color:#be185d; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">EN COURS</span>' : '<span style="background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px; font-size:0.7rem;">TERMINE</span>';
 
             list.innerHTML += `
