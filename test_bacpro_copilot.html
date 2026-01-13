@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Bac Pro - QQOQCP & ITAMAMI</title>
+    <style>
+        :root {
+            --primary: #0f766e; /* Un vert canard pour changer */
+            --bg: #f0fdfa; --text: #134e4a; --card-bg: #ffffff;
+            --accent: #f59e0b; --correct: #16a34a; --live: #7c3aed;
+            --font-main: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main); background-color: var(--bg); color: var(--text);
+            margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* --- TOOLBAR --- */
+        .toolbar {
+            background: var(--card-bg); padding: 5px 15px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 500; border-bottom: 3px solid var(--primary); height: 60px;
+        }
+        .btn {
+            background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px;
+            cursor: pointer; font-weight: 700; color: #334155;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-live { background: #f3e8ff; border-color: #d8b4fe; color: #6b21a8; } /* Bouton Copilot */
+        
+        /* --- STAGE --- */
+        #stage {
+            flex: 1; position: relative; background: #ccfbf1;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .slide {
+            position: absolute; width: 1100px; height: 700px; background: var(--card-bg); 
+            border-radius: 15px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); padding: 40px;
+            display: none; flex-direction: column; overflow-y: auto;
+        }
+        .slide.active { display: flex; animation: fadeUp 0.3s forwards; }
+        @keyframes fadeUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        /* --- ÉLÉMENTS INTERACTIFS --- */
+        .split { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; height: 100%; }
+        .panel { padding: 20px; background: #f0fdfa; border-radius: 12px; border: 1px solid #99f6e4; overflow-y: auto; }
+
+        /* QQOQCP & ITAMAMI Boxes */
+        .box-item {
+            margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; background: white;
+        }
+        .box-header {
+            padding: 10px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between;
+            background: #f8fafc; border-radius: 8px;
+        }
+        .box-header:hover { background: #e2e8f0; }
+        .box-content {
+            display: none; padding: 10px; border-top: 1px solid #eee; color: var(--primary);
+        }
+        .box-content.visible { display: block; background: #dcfce7; }
+
+        /* LIVE FRAME (Fenêtre Copilot) */
+        #live-frame {
+            position: fixed; inset: 40px; z-index: 8000; background: white; 
+            border-radius: 15px; box-shadow: 0 0 100px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; border: 4px solid var(--live);
+        }
+        
+        [contenteditable="true"] { border: 2px dashed orange; background: #fff7ed; padding: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div>
+            <button class="btn" onclick="prevSlide()">◀</button>
+            <span id="slide-num" style="font-weight:bold; margin:0 10px;">1/2</span>
+            <button class="btn" onclick="nextSlide()">▶</button>
+        </div>
+        <div>
+            <button class="btn" onclick="toggleEdit()">✎ Éditer Texte</button>
+            <button class="btn btn-live" onclick="openCopilot('dashboard')">🚀 Mon Tableau de Bord</button>
+        </div>
+    </div>
+
+    <div id="live-frame">
+        <div style="background:var(--live); color:white; padding:10px; display:flex; justify-content:space-between; font-weight:bold;">
+            <span id="live-title">Activité Connectée</span>
+            <button onclick="closeCopilot()" style="background:none; border:none; color:white; cursor:pointer;">❌ Fermer</button>
+        </div>
+        <iframe id="live-iframe" src="" style="flex:1; border:none;"></iframe>
+    </div>
+
+    <div id="stage">
+
+        <section class="slide active">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>1. Analyse de la situation (QQOQCP)</h2>
+                <button class="btn btn-live" onclick="openCopilot('qqoqcp')">🔴 Lancer l'activité QQOQCP (Live)</button>
+            </div>
+
+            <div class="split">
+                <div class="panel">
+                    <h3>Situation :</h3>
+                    <p contenteditable="true" style="font-size:1.2rem; line-height:1.6;">
+                        Karim, opérateur en logistique, déplace des cartons lourds sans utiliser le diable mis à disposition.
+                        Au bout de 2 heures, il ressent une vive douleur dans le bas du dos.
+                    </p>
+                </div>
+                <div class="panel">
+                    <h3>Correction Interactif :</h3>
+                    
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">QUI ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Karim, opérateur logistique.</div>
+                    </div>
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">QUOI ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Douleur vive dans le bas du dos (Lombalgie).</div>
+                    </div>
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">OÙ ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Dans l'entrepôt.</div>
+                    </div>
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">QUAND ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Après 2 heures de manutention.</div>
+                    </div>
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">COMMENT ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Port de charges lourdes sans matériel adapté.</div>
+                    </div>
+                    <div class="box-item">
+                        <div class="box-header" onclick="toggleBox(this)">POURQUOI ? <span>▼</span></div>
+                        <div class="box-content" contenteditable="true">Non-utilisation du diable.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>2. Analyse ITAMAMI (Système de Travail)</h2>
+                <button class="btn btn-live" onclick="openCopilot('itamami')">🔴 Lancer ITAMAMI (Live)</button>
+            </div>
+
+            <p style="text-align:center; font-style:italic;">Cliquez sur les zones pour afficher la correction.</p>
+
+            <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:30px;">
+                
+                <div class="box-item" style="border-top: 4px solid #3b82f6;">
+                    <div class="box-header" style="justify-content:center; text-align:center;" onclick="toggleBox(this)">
+                        <div style="font-size:2rem;">👤</div>
+                        <div>INDIVIDU</div>
+                    </div>
+                    <div class="box-content" contenteditable="true">
+                        Karim<br>Opérateur<br>Formation ?
+                    </div>
+                </div>
+
+                <div class="box-item" style="border-top: 4px solid #ef4444;">
+                    <div class="box-header" style="justify-content:center; text-align:center;" onclick="toggleBox(this)">
+                        <div style="font-size:2rem;">📋</div>
+                        <div>TÂCHE</div>
+                    </div>
+                    <div class="box-content" contenteditable="true">
+                        Déplacer des cartons<br>(Manutention)
+                    </div>
+                </div>
+
+                <div class="box-item" style="border-top: 4px solid #f59e0b;">
+                    <div class="box-header" style="justify-content:center; text-align:center;" onclick="toggleBox(this)">
+                        <div style="font-size:2rem;">⚙️</div>
+                        <div>ACTIVITÉ</div>
+                    </div>
+                    <div class="box-content" contenteditable="true">
+                        Porte à la main<br>Ne prend pas le diable
+                    </div>
+                </div>
+
+                <div class="box-item" style="border-top: 4px solid #10b981;">
+                    <div class="box-header" style="justify-content:center; text-align:center;" onclick="toggleBox(this)">
+                        <div style="font-size:2rem;">🔨</div>
+                        <div>MATÉRIEL</div>
+                    </div>
+                    <div class="box-content" contenteditable="true">
+                        Cartons lourds<br>Diable (dispo mais non utilisé)
+                    </div>
+                </div>
+
+                <div class="box-item" style="border-top: 4px solid #6366f1;">
+                    <div class="box-header" style="justify-content:center; text-align:center;" onclick="toggleBox(this)">
+                        <div style="font-size:2rem;">🏭</div>
+                        <div>MILIEU</div>
+                    </div>
+                    <div class="box-content" contenteditable="true">
+                        Entrepôt<br>Espace de circulation ?
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        /* === CONFIGURATION COPILOT (A REMPLACER AVEC TON LIEN) === */
+        // C'est ici que la magie opère. Remplace par ton URL GitHub Page.
+        const COPILOT_BASE_URL = "https://ton-pseudo.github.io/ton-app"; 
+
+        /* Navigation */
+        let curr = 0; const slides = document.querySelectorAll('.slide');
+        function up() { slides.forEach((s,i) => s.classList.toggle('active', i===curr)); document.getElementById('slide-num').innerText = `${curr+1}/${slides.length}`; }
+        function nextSlide() { curr = (curr+1)%slides.length; up(); }
+        function prevSlide() { curr = (curr-1+slides.length)%slides.length; up(); }
+        
+        /* Interaction Boites */
+        function toggleBox(el) { el.nextElementSibling.classList.toggle('visible'); }
+        
+        let ed = false;
+        function toggleEdit() { 
+            ed = !ed; 
+            document.querySelectorAll('[contenteditable]').forEach(e => e.contentEditable = ed);
+            alert(ed ? "Mode Édition : Tu peux modifier le texte." : "Mode Lecture");
+        }
+
+        /* COPILOT LOGIC */
+        function openCopilot(activityType) {
+            const frame = document.getElementById('live-frame');
+            const iframe = document.getElementById('live-iframe');
+            const title = document.getElementById('live-title');
+            
+            // Construction de l'URL intelligente
+            // Si tu as structuré ton GitHub avec des dossiers /qqoqcp /itamami, ça marchera direct
+            let url = COPILOT_BASE_URL;
+
+            if (activityType === 'dashboard') {
+                title.innerText = "Mon Tableau de Bord Professeur";
+                // url += "/admin"; 
+            } else if (activityType === 'qqoqcp') {
+                title.innerText = "Activité Élève : QQOQCP";
+                url += "/qqoqcp"; // ou ?exo=qqoqcp
+            } else if (activityType === 'itamami') {
+                title.innerText = "Activité Élève : ITAMAMI";
+                url += "/itamami"; // ou ?exo=itamami
+            }
+
+            iframe.src = url;
+            frame.style.display = 'flex';
+        }
+
+        function closeCopilot() {
+            document.getElementById('live-frame').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
