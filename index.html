@@ -1968,6 +1968,54 @@ function activateLivePanel(title, count) {
     // Animation scroll vers le panneau
     panel.scrollIntoView({behavior: "smooth"});
 }
+    // --- NOUVEAU : GESTION DES CONFIGURATIONS ---
+
+    // Modifier switchStep pour afficher les bons réglages
+    const originalSwitchStep = window.switchStep; // On garde l'ancienne
+    window.switchStep = async function(stepName) {
+        // 1. Appeler l'ancienne logique (change l'écran des parents)
+        await originalSwitchStep(stepName); 
+
+        // 2. Afficher la zone de réglage correspondante dans le Cockpit
+        const configNuage = document.getElementById('config-nuage');
+        const configSondage = document.getElementById('config-sondage');
+        
+        if(configNuage) configNuage.style.display = (stepName === 'nuage') ? 'block' : 'none';
+        if(configSondage) configSondage.style.display = (stepName === 'sondage') ? 'block' : 'none';
+    }
+
+    // Envoyer la Banque de Mots (Nuage à choix)
+    window.updateWordBank = async function() {
+        const text = document.getElementById('word-bank-input').value;
+        const words = text.split(',').map(w => w.trim()).filter(w => w); 
+        
+        await setDoc(doc(db, "config", "live"), { 
+            wordBank: words,
+            updatedAt: serverTimestamp() 
+        }, { merge: true });
+        
+        alert("Boutons envoyés aux parents !");
+    }
+
+    // Envoyer le Sondage Perso
+    window.updatePollDetails = async function() {
+        const question = document.getElementById('poll-question').value;
+        const optionsRaw = document.getElementById('poll-options').value;
+        const options = optionsRaw.split('/').map(o => o.trim()).filter(o => o);
+
+        if(!question || options.length < 2) {
+            alert("Il faut une question et au moins 2 choix (séparés par /)");
+            return;
+        }
+
+        await setDoc(doc(db, "config", "live"), { 
+            pollQuestion: question,
+            pollOptions: options,
+            updatedAt: serverTimestamp() 
+        }, { merge: true });
+
+        alert("Sondage lancé !");
+    }
   </script>
 </body>
 </html>
