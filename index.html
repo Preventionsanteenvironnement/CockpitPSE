@@ -1808,131 +1808,6 @@ window.initSessionModule = function() {
     loadHistory();
 }
 
-// 2. CRÉER UNE NOUVELLE SESSION
-window.createNewSession = async function() {
-    const titleInput = document.getElementById("session-title-input");
-    const title = titleInput.value.trim();
-    
-    if(!title) { alert("Merci de donner un titre !"); return; }
-
-    try {
-        // A. Créer le document dans la collection 'sessions'
-        const sessionRef = await addDoc(collection(db, "sessions"), {
-  title: title,
-  createdAt: new Date(),
-  isActive: true,
-  currentStep: 'attente'
-});
-
-        currentSessionId = sessionRef.id;
-
-        // B. Mettre à jour la CONFIG GLOBALE pour que les téléphones sachent où aller
-        // Les téléphones écoutent le doc 'config/live'
-       await setDoc(doc(db, "config", "live"), {
-  activeSessionId: currentSessionId,
-  sessionTitle: title,
-  currentStep: "attente",
-  updatedAt: serverTimestamp()
-}, { merge: true });
-
-        // C. UI : Passer en mode Live
-        activateLivePanel(title, 0);
-        titleInput.value = ""; // Vider le champ
-
-        // D. Lancer l'écoute des mots (pour modération)
-        listenToLiveWords(currentSessionId);
-
-        console.log("✅ Session lancée : " + currentSessionId);
-    } catch(e) {
-        console.error("Erreur création session", e);
-        alert("Erreur technique Firebase (voir console)");
-    }
-}
-
-// 3. CHANGER L'ÉTAPE (Météo, Nuage...)
-window.switchStep = async function(stepName) {
-    if(!currentSessionId) return;
-    
-    // Mise à jour locale (visuel bouton)
-    // (Optionnel : ajouter une classe 'active' sur le bouton cliqué)
-    
-    // Mise à jour Firebase (Config globale + Session)
-    try {
-        await setDoc(doc(db, "config", "live"), { currentStep: stepName, updatedAt: serverTimestamp() }, { merge:true });
-await updateDoc(doc(db, "sessions", currentSessionId), { currentStep: stepName });
-    } catch(e) { console.error(e); }
-}
-
-// 4. ÉCOUTER LES MOTS EN DIRECT (Modération)
-function listenToLiveWords(sessId) {
-    if(wordsUnsubscribe) wordsUnsubscribe(); // Stop ancienne écoute
-
-    // On écoute la sous-collection 'inputs' de cette session
-    const q = query(collection(db, `sessions/${sessId}/inputs`), orderBy("timestamp", "desc"), limit(100));
-
-    wordsUnsubscribe = onSnapshot(q, (snapshot) => {
-        const feed = document.getElementById("live-word-feed");
-        const counter = document.getElementById("live-counter");
-        
-        // Compteur de participants (approximatif basé sur les réponses)
-        if(counter) counter.innerText = snapshot.size;
-
-        if(snapshot.empty) {
-            feed.innerHTML = '<span style="color:#94a3b8; width:100%; text-align:center; margin-top:20px;">En attente...</span>';
-            return;
-        }
-
-        feed.innerHTML = "";
-        
-        snapshot.forEach(docSnap => {
-            const d = docSnap.data();
-            
-            // On n'affiche que les mots (pas les votes sondage) et ceux non bannis
-            if(d.type === 'word' && !d.banned) {
-                const tag = document.createElement("div");
-                tag.style.cssText = "display:inline-flex; align-items:center; gap:5px; padding:6px 10px; background:#fff; border:1px solid #cbd5e1; border-radius:20px; font-weight:bold; font-size:0.9rem; box-shadow:0 2px 5px rgba(0,0,0,0.05);";
-                tag.innerHTML = `
-                    ${d.content} 
-                    <button onclick="banWord('${sessId}', '${docSnap.id}')" style="background:none; border:none; cursor:pointer; font-size:0.8rem;">❌</button>
-                `;
-                feed.appendChild(tag);
-            }
-        });
-    });
-}
-
-// 5. BANNIR UN MOT
-window.banWord = async function(sessId, wordId) {
-    if(confirm("Masquer ce mot de l'écran géant ?")) {
-        await updateDoc(doc(db, `sessions/${sessId}/inputs/${wordId}`), { banned: true });
-    }
-}
-
-// 6. STOPPER LA SESSION
-window.stopSession = async function() {
-    if(!confirm("Terminer et archiver cette session ? Les participants seront déconnectés.")) return;
-
-    if(currentSessionId) {
-        // Désactiver dans Firebase
-        await updateDoc(doc(db, "sessions", currentSessionId), { isActive: false });
-
-await setDoc(doc(db, "config", "live"), {
-  activeSessionId: null,
-  currentStep: "attente",
-  updatedAt: serverTimestamp()
-}, { merge: true });
-        
-        // UI : Retour à l'accueil
-        document.getElementById("live-panel").style.display = "none";
-        
-        // Arrêter les écoutes
-        if(wordsUnsubscribe) wordsUnsubscribe();
-        currentSessionId = null;
-        
-        // Recharger l'historique
-        loadHistory();
-    }
-}
 
 // 7. CHARGER L'HISTORIQUE (Archives)
 async function loadHistory() {
@@ -1971,94 +1846,104 @@ else if (d.createdAt instanceof Date) dateStr = d.createdAt.toLocaleDateString("
         list.innerHTML = "Erreur chargement.";
     }
 }
+// ============================================================
+// 🚀 MOTEUR V4 : SESSIONS, BIBLIOTHÈQUE & QUIZ
+// ============================================================
 
-// Helpers UI
-function activateLivePanel(title, count) {
-    const panel = document.getElementById("live-panel");
-    const titleSpan = document.getElementById("live-title-display");
-    const countSpan = document.getElementById("live-counter");
+let currentSessionId = null;
+
+// --- 1. GESTION SESSION (Lancement / Stop) ---
+window.createNewSession = async function() {
+    const titleInput = document.getElementById("session-title-input");
+    const title = titleInput.value.trim();
+    if(!title) { alert("Mettez un titre !"); return; }
+
+    // Créer la session
+    const ref = await addDoc(collection(db, "sessions"), {
+        title: title, createdAt: serverTimestamp(), isActive: true
+    });
+    currentSessionId = ref.id;
+
+    // Mettre à jour la Config Globale (Mobile & Wall écoutent ça)
+    await setDoc(doc(db, "config", "live"), {
+        activeSessionId: currentSessionId,
+        sessionTitle: title,
+        currentStep: "wait",
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // UI
+    document.getElementById("live-panel").style.display = "block";
+    document.getElementById("session-info").style.display = "block";
+    document.getElementById("current-session-name").innerText = title;
+    document.getElementById("live-title-display").innerText = title;
+    titleInput.value = "";
     
-    panel.style.display = "block";
-    titleSpan.innerText = title;
-    countSpan.innerText = count;
-    
-    // Animation scroll vers le panneau
-    panel.scrollIntoView({behavior: "smooth"});
+    // Lancer écoute modération
+    listenToLiveWords(currentSessionId);
 }
-    // --- GESTION DES CONFIGURATIONS & BIBLIOTHÈQUE ---
 
-    // 1. LES DONNÉES PRÉPARÉES (C'est ici que tu prépares tes dossiers !)
-    const PRESETS_CLOUD = {
-        "cafe_parents": "Harcèlement, Écrans, Sommeil, Cantine, Discipline, Orientation",
-        "absenteisme": "Maladie, Transport, Motivation, Problèmes familiaux, Retards",
-        "orientation": "Seconde générale, Bac Pro, CAP, Apprentissage, Stage",
-        "reunion_prof": "Budget, Planning, Conseil de classe, Projets, Voyage"
-    };
-
-    const PRESETS_POLL = {
-        "satisfaction": { q: "Êtes-vous satisfait de cet échange ?", o: ["Oui, très", "Moyennement", "Pas du tout"] },
-        "compr_cours": { q: "Avez-vous compris ce point ?", o: ["Vert (Compris)", "Orange (Moyen)", "Rouge (Perdu)"] },
-        "date_reunion": { q: "Quelle dispo pour la prochaine ?", o: ["Lundi Soir", "Mardi Soir", "Samedi Matin"] },
-        "climat": { q: "Comment jugez-vous le climat de la classe ?", o: ["Serein", "Agité", "Tendu"] }
-    };
-
-    // 2. FONCTIONS DE CHARGEMENT
-    window.loadCloudPreset = function() {
-        const key = document.getElementById('preset-cloud').value;
-        if(PRESETS_CLOUD[key]) {
-            document.getElementById('word-bank-input').value = PRESETS_CLOUD[key];
-        }
-    }
-
-    window.loadPollPreset = function() {
-        const key = document.getElementById('preset-poll').value;
-        if(PRESETS_POLL[key]) {
-            const p = PRESETS_POLL[key];
-            document.getElementById('poll-question').value = p.q;
-            document.getElementById('poll-opt1').value = p.o[0] || "";
-            document.getElementById('poll-opt2').value = p.o[1] || "";
-            document.getElementById('poll-opt3').value = p.o[2] || "";
-        }
-    }
-
-    // 3. FONCTIONS D'AFFICHAGE ET D'ENVOI (Déjà existantes mais rappelées)
+window.stopSession = async function() {
+    if(!confirm("Arrêter la session et déconnecter tout le monde ?")) return;
     
-    // Modifier switchStep pour afficher les bons réglages
-    const originalSwitchStep = window.switchStep;
-    window.switchStep = async function(stepName) {
-        await originalSwitchStep(stepName); 
-        const configNuage = document.getElementById('config-nuage');
-        const configSondage = document.getElementById('config-sondage');
-        if(configNuage) configNuage.style.display = (stepName === 'nuage') ? 'block' : 'none';
-        if(configSondage) configSondage.style.display = (stepName === 'sondage') ? 'block' : 'none';
+    if(currentSessionId) {
+        await updateDoc(doc(db, "sessions", currentSessionId), { isActive: false });
+    }
+    // Reset Config
+    await setDoc(doc(db, "config", "live"), { activeSessionId: null, currentStep: "wait" }, { merge: true });
+
+    document.getElementById("live-panel").style.display = "none";
+    document.getElementById("session-info").style.display = "none";
+    currentSessionId = null;
+    
+    // On recharge l'historique si la fonction existe
+    if(typeof loadHistory === 'function') loadHistory();
+}
+
+// --- 2. PILOTAGE LIVE (Clic sur les boutons Météo, Nuage...) ---
+window.setMode = async function(mode) {
+    // Visuel boutons
+    document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('active'));
+    if(event && event.target) event.target.classList.add('active');
+
+    const zone = document.getElementById('config-zone');
+    document.getElementById('quiz-controls').style.display = 'none';
+
+    // Affichage contextuel
+    if(mode === 'meteo') {
+        zone.innerHTML = `<button onclick="sendLiveConfig('meteo')" style="background:#0369a1; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer la Météo 🚀</button>`;
+    } else if(mode === 'nuage') {
+        zone.innerHTML = `
+            <div style="width:100%; display:flex; gap:10px;">
+                <input type="text" id="live-cloud-words" placeholder="Mots suggérés (séparés par virgules)..." style="flex:1; padding:10px; border-radius:6px; border:1px solid #15803d;">
+                <button onclick="sendLiveConfig('nuage')" style="background:#15803d; color:white; border:none; padding:0 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer</button>
+            </div>
+            <div style="font-size:0.8rem; color:#64748b; margin-top:5px;">Ou choisissez un thème dans la bibliothèque à droite 👉</div>
+        `;
+    } else {
+        // Pour Sondage et Quiz, on attend un clic dans la bibliothèque
+        zone.innerHTML = `<p style="color:#64748b; margin:0;">👈 Cliquez sur un élément de la <strong>Bibliothèque</strong> (à droite) pour le charger.</p>`;
+    }
+}
+
+// Envoi de la commande à Firebase
+window.sendLiveConfig = async function(type, payload = {}) {
+    if(type === 'nuage') {
+        const txt = document.getElementById('live-cloud-words')?.value || "";
+        const words = txt.split(',').map(w => w.trim()).filter(w => w);
+        payload.wordBank = words;
     }
 
-    window.updateWordBank = async function() {
-        const text = document.getElementById('word-bank-input').value;
-        const words = text.split(',').map(w => w.trim()).filter(w => w); 
-        await setDoc(doc(db, "config", "live"), { wordBank: words, updatedAt: serverTimestamp() }, { merge: true });
-        alert("Boutons envoyés aux parents !");
-    }
+    const data = {
+        currentStep: type,
+        updatedAt: serverTimestamp(),
+        ...payload
+    };
 
-    window.updatePollDetails = async function() {
-        const question = document.getElementById('poll-question').value.trim();
-        const opt1 = document.getElementById('poll-opt1').value.trim();
-        const opt2 = document.getElementById('poll-opt2').value.trim();
-        const opt3 = document.getElementById('poll-opt3').value.trim();
-
-        let options = [];
-        if(opt1) options.push(opt1);
-        if(opt2) options.push(opt2);
-        if(opt3) options.push(opt3);
-
-        if(!question || options.length < 2) {
-            alert("⚠️ Il faut une question et au moins 2 choix !");
-            return;
-        }
-
-        await setDoc(doc(db, "config", "live"), { pollQuestion: question, pollOptions: options, updatedAt: serverTimestamp() }, { merge: true });
-        alert("✅ Sondage lancé !");
-    }
+    // Gestion état Quiz
+    if(type === 'quiz') {
+        data.quizState = 'voting'; // Au début, on vote
+        document.getElementById('quiz-
   </script>
 </body>
 </html>
