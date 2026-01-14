@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cockpit Enseignant ULTIMATE v11</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f8fafc; --sidebar:#1e293b; --text-light:#cbd5e1;
+      --white:#ffffff; --text:#334155; --border:#e2e8f0; 
+      --primary:#3b82f6; --accent:#8b5cf6; --danger:#ef4444; 
+      --radius:8px;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0; background:var(--bg); color:var(--text); height:100vh; overflow:hidden; font-family: 'Inter', sans-serif;}
+    
+    .app{display:flex; height:100vh; width:100vw; flex-direction: column;}
+    
+    /* --- BARRE DE WIDGETS (HAUT) - MODIFIÉE POUR VISIBILITÉ --- */
+    .top-widget-bar {
+      height: 50px; /* Un peu plus haut */
+      background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; 
+      font-size: 15px; /* Texte plus gros */
+      color: #1e293b; /* Couleur plus foncée */
+      z-index: 20;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .widget-group { display: flex; gap: 20px; align-items: center; }
+    
+    /* Styles spécifiques pour la visibilité */
+    .widget-item { display: flex; gap: 8px; align-items: center; cursor: default; font-weight: 600; }
+    #clock { font-weight: 800; color: #3b82f6; letter-spacing: 0.5px; }
+    #weather { font-weight: 700; color: #f59e0b; }
+    #topChrono { 
+      font-family: monospace; font-size: 16px; background: #e0f2fe; color: #0369a1; 
+      padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd; cursor: pointer;
+    }
+    #topChrono.running { background: #fee2e2; color: #ef4444; border-color: #fecaca; }
+    #dailyQuote { 
+      color: #334155; font-style: italic; font-weight: 500; font-family: 'Georgia', serif; 
+      text-align: center; flex: 1; margin: 0 20px;
+    }
+
+    .widget-btn { cursor: pointer; padding: 6px 10px; border-radius: 6px; transition: 0.2s; background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b; }
+    .widget-btn:hover { background: #e2e8f0; color: #0f172a; transform: scale(1.05); }
+    
+    .zen-mode .sidebar, .zen-mode .list-panel, .zen-mode .top-widget-bar { display: none !important; }
+    .zen-mode .editor-panel { width: 100vw; }
+    .zen-exit { position: fixed; top: 20px; right: 20px; z-index: 999; background: rgba(0,0,0,0.5); color: white; padding: 10px; border-radius: 50px; cursor: pointer; display: none; }
+    .zen-mode .zen-exit { display: block; }
+
+    /* LAYOUT PRINCIPAL */
+    .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar{width:280px; background:var(--sidebar); color:var(--text-light); display:flex; flex-direction:column; border-right:1px solid #000;}
+    .brand{padding:15px 20px; font-weight:700; color:var(--white); font-size:15px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;}
+    
+    .folders-section{flex:1; overflow-y:auto; padding:10px 0;}
+    .section-title{padding:10px 20px 5px; font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b; display:flex; justify-content:space-between; align-items:center;}
+    
+    .folder-item{padding:8px 20px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:13px; transition:0.2s; border-left:3px solid transparent;}
+    .folder-item:hover{background:rgba(255,255,255,0.05); color:white;}
+    .folder-item.active{background:rgba(255,255,255,0.1); color:white; border-left-color:var(--folder-color);}
+    .folder-dot{width:8px; height:8px; border-radius:50%; background:var(--folder-color);}
+    
+    .shortcuts-section{padding:10px 0; border-top:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); max-height:200px; overflow-y:auto;}
+    .shortcut-btn{display:flex; align-items:center; gap:10px; padding:8px 20px; color:#94a3b8; text-decoration:none; font-size:13px; transition:0.2s; cursor:pointer;}
+    .shortcut-btn:hover{color:white; background:rgba(255,255,255,0.05);}
+
+    .sidebar-footer{padding:15px; border-top:1px solid rgba(255,255,255,0.1);}
+    .btn-backup{width:100%; display:flex; gap:5px; background:#334155; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-size:12px; justify-content:center; align-items:center; margin-bottom:5px;}
+    .btn-backup.primary { background: var(--primary); font-weight: bold; }
+    .btn-backup.flash { background: #f59e0b; color: #fff; font-weight: bold; }
+
+    /* LISTE */
+    .list-panel{width:320px; background:var(--white); border-right:1px solid var(--border); display:flex; flex-direction:column;}
+    .list-header{padding:15px; border-bottom:1px solid var(--border); background:#f8fafc;}
+    .search-input{width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px;}
+    .note-list{flex:1; overflow-y:auto;}
+    .note-card{padding:15px; border-bottom:1px solid var(--border); cursor:pointer;}
+    .note-card.active{background:#eff6ff; border-left:3px solid var(--primary);}
+    .card-title{font-weight:600; font-size:14px; color:#1e293b; margin-bottom:5px; display:flex; justify-content:space-between;}
+
+    /* EDITEUR */
+    .editor-panel{flex:1; display:flex; flex-direction:column; background:var(--white); position:relative;}
+    .editor-header{padding:10px 20px; border-bottom:1px solid var(--border); display:flex; gap:15px; align-items:center;}
+    .input-title{font-size:18px; font-weight:700; border:none; width:100%; outline:none;}
+    
+    /* TOOLBAR */
+    .toolbar{padding:8px 20px; border-bottom:1px solid var(--border); background:#f1f5f9; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+    .tool-btn{height:30px; min-width:30px; padding:0 8px; border:1px solid var(--border); background:white; border-radius:4px; cursor:pointer; color:#475569; display:flex; align-items:center; justify-content:center; gap:5px; font-size:12px;}
+    .tool-btn:hover{background:#e2e8f0; color:#0f172a;}
+    .sep{width:1px; height:20px; background:#cbd5e1; margin:0 5px;}
+    
+    /* Couleurs */
+    .color-picker-wrapper { position: relative; display: inline-flex; align-items: center; }
+    .color-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); display: inline-block; }
+
+    .editor-content{flex:1; padding:40px; overflow-y:auto; outline:none; font-size:16px; line-height:1.7; color:#334155; max-width:900px; margin:0 auto; width:100%;}
+
+    /* ELEMENTS INTELLIGENTS */
+    .note-sticky { background: #fef3c7; color: #78350f; padding: 15px; width: 250px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); font-family: 'Kalam', cursive; font-size: 14px; margin: 10px; float: right; border:1px solid #fcd34d; resize: both; overflow: auto;}
+    .note-frame { border: 2px solid #ef4444; padding: 15px; border-radius: 8px; background: #fef2f2; margin: 10px 0; }
+    .note-accordion details { background: #f1f5f9; border-radius: 6px; margin: 5px 0; padding: 10px; }
+    
+    /* Tableaux & Menu Flottant */
+    .custom-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .custom-table td, .custom-table th { border: 1px solid #cbd5e1; padding: 8px; min-width: 50px; position: relative; }
+    .custom-table th { background: #f1f5f9; }
+    
+    #tableTools { position: absolute; background: #334155; color: white; padding: 5px; border-radius: 4px; display: none; gap: 5px; z-index: 100; font-size: 12px; }
+    #tableTools button { background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
+    #tableTools button:hover { background: rgba(255,255,255,0.4); }
+
+    /* Side Panels */
+    .side-panel { position:absolute; inset:0; background:#f8fafc; z-index:50; padding:30px; display:none; overflow-y:auto; flex-direction: column; }
+    .side-panel.open { display: flex; }
+    .side-panel h2 { margin-top: 0; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    
+    /* Actions Classes */
+    .class-select { padding: 10px; width: 100%; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 16px; margin-bottom: 20px; font-weight: bold; }
+    .check-item { background: white; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; }
+    .check-item:hover { border-color: var(--primary); }
+    .check-item.checked { opacity: 0.6; text-decoration: line-through; background: #f1f5f9; }
+    .check-item input { width: 18px; height: 18px; cursor: pointer; }
+
+    /* Bouton Fichier */
+    .file-shortcut {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #eff6ff; color: #1d4ed8; padding: 4px 10px;
+      border-radius: 20px; text-decoration: none; font-weight: 600; font-size: 13px;
+      border: 1px solid #bfdbfe; transition: 0.2s; margin: 2px; cursor: pointer;
+    }
+    .file-shortcut:hover { background: #dbeafe; transform: translateY(-1px); }
+
+    /* Firebase Status */
+    #dbStatus { font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; }
+    #dbStatus.ok { color:#10b981; }
+    #dbStatus.err { color:#ef4444; }
+
+    /* Modales */
+    .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; display:none; justify-content:center; align-items:center;}
+    .modal{background:white; padding:20px; border-radius:8px; width:300px; box-shadow:0 10px 25px rgba(0,0,0,0.2);}
+    .modal canvas { border: 1px solid #ccc; background: #fff; cursor: crosshair; }
+
+    /* Bulle Respiration */
+    #breathModal { display: none; position: fixed; inset: 0; background: #fff; z-index: 2000; align-items: center; justify-content: center; flex-direction: column; }
+    .breath-circle { width: 100px; height: 100px; background: #a5b4fc; border-radius: 50%; transition: all 4s ease-in-out; }
+    .breath-anim { transform: scale(3); background: #6366f1; }
+
+    @media print { .top-widget-bar, .sidebar, .list-panel, .toolbar, .editor-header button, .side-panel { display: none !important; } .editor-content { border: none; padding: 0; } }
+  </style>
+</head>
+<body>
+
+<div class="top-widget-bar">
+  <div class="widget-group">
+    <div class="widget-item" title="Heure Actuelle"><i class="fa-regular fa-clock"></i> <span id="clock">--:--</span></div>
+    <div class="widget-item" title="Météo"><i class="fa-solid fa-cloud-sun"></i> <span id="weather">--°C</span></div>
+    <div class="widget-item" id="topChrono" onclick="toggleTopChrono()" title="Cliquer pour démarrer/arrêter">⏱️ 00:00</div>
+  </div>
+  
+  <div class="widget-item" id="dailyQuote">"Enseigner, c'est apprendre deux fois."</div>
+
+  <div class="widget-group">
+    <button class="widget-btn" onclick="openCalc()" title="Calculatrice"><i class="fa-solid fa-calculator"></i></button>
+    <button class="widget-btn" onclick="startBreath()" title="Respiration Zen"><i class="fa-solid fa-lungs"></i></button>
+    <button class="widget-btn" onclick="toggleZen()" title="Mode Focus"><i class="fa-solid fa-eye"></i></button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="main-layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span><i class="fa-solid fa-plane-up"></i> COCKPIT</span>
+        <button id="btnAddFolder" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-folder-plus"></i></button>
+      </div>
+      <div class="section-title">MES CLASSEURS</div>
+      <div class="folders-section" id="folderList"></div>
+      <div class="section-title">LIENS COCKPIT <button id="btnAddShortcut" style="background:none; border:none; color:#64748b; cursor:pointer;"><i class="fa-solid fa-plus"></i></button></div>
+      <div class="shortcuts-section" id="shortcutList"></div>
+      
+      <div class="sidebar-footer">
+        <button class="btn-backup flash" onclick="openClassPanel()" title="Gérer mes classes">
+          <i class="fa-solid fa-bolt"></i> ACTIONS CLASSES
+        </button>
+        <button class="btn-backup" onclick="openPilotage()">
+          <i class="fa-solid fa-check-double"></i> PILOTAGE
+        </button>
+        <button class="btn-backup primary" id="btnBackup" title="Sauvegarde locale">
+          <i class="fa-solid fa-floppy-disk"></i> SAUVEGARDE (JSON)
+        </button>
+        <div style="font-size:10px; color:#64748b; text-align:center; margin-top:5px;" id="dbStatus">Connexion...</div>
+      </div>
+    </aside>
+
+    <aside class="list-panel">
+      <div class="list-header">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 id="currentFolderName" style="margin:0; font-size:15px; font-weight:700;">Dossier</h3>
+          <button id="btnNewNote" style="background:var(--primary); color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">+ Note</button>
+        </div>
+        <div class="search-box"><input class="search-input" id="search" placeholder="Rechercher..." /></div>
+      </div>
+      <div class="note-list" id="noteList"></div>
+    </aside>
+
+    <main class="editor-panel">
+      <div id="tableTools">
+        <span>Tableau :</span>
+        <button onmousedown="modifyTable('row')">+ Ligne</button>
+        <button onmousedown="modifyTable('col')">+ Colonne</button>
+        <button onmousedown="modifyTable('delRow')" style="color:#ef4444;">Suppr. Ligne</button>
+        <button onmousedown="modifyTable('delCol')" style="color:#ef4444;">Suppr. Col</button>
+      </div>
+
+      <div id="pilotagePanel" class="side-panel">
+        <h2><i class="fa-solid fa-list-check"></i> Pilotage des Tâches <button onclick="closePanels()" style="font-size:12px; padding:5px 10px;">Fermer</button></h2>
+        <div id="taskList"></div>
+      </div>
+
+      <div id="classPanel" class="side-panel">
+        <h2><i class="fa-solid fa-bolt"></i> Actions Rapides <button onclick="closePanels()" style="font-size:12px; padding:5px 10px;">Fermer</button></h2>
+        <select id="classSelector" class="class-select" onchange="renderClassActions()">
+          <option value="">-- Choisir une classe --</option>
+        </select>
+        <div id="classActionsList" style="flex:1; overflow-y:auto;"></div>
+        <div style="margin-top:10px; display:flex; gap:10px;">
+          <input id="newActionInput" placeholder="Ajouter un mémo rapide..." style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+          <button onclick="addClassAction()" style="background:var(--primary); color:white; border:none; padding:0 20px; border-radius:6px;">+</button>
+        </div>
+      </div>
+
+      <div class="editor-header">
+        <input id="noteTitle" class="input-title" placeholder="Titre de la note..." />
+        <button id="btnPin" title="Épingler" style="background:none; border:none; cursor:pointer; font-size:18px;"><i class="fa-regular fa-star" style="color:#f59e0b;"></i></button>
+        <button onclick="window.print()" title="Imprimer PDF" style="background:var(--primary); color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px; margin-left:10px;"><i class="fa-solid fa-print"></i> PDF</button>
+        <span id="saveState" style="font-size:11px; color:#10b981; margin-left:10px;">Sauvegardé</span>
+      </div>
+
+      <div class="toolbar">
+        <select id="fontName" style="border:1px solid #e2e8f0; border-radius:4px;"><option value="Inter">Police</option><option value="Arial">Arial</option><option value="Courier New">Courier</option></select>
+        <select id="fontSize" style="border:1px solid #e2e8f0; border-radius:4px;"><option value="3">Taille</option><option value="1">Petit</option><option value="5">Grand</option><option value="7">XXL</option></select>
+        <div class="sep"></div>
+        <button class="tool-btn" data-cmd="bold"><i class="fa-solid fa-bold"></i></button>
+        <button class="tool-btn" data-cmd="italic"><i class="fa-solid fa-italic"></i></button>
+        <button class="tool-btn" data-cmd="underline"><i class="fa-solid fa-underline"></i></button>
+        
+        <div style="display:flex; gap:2px; margin:0 5px; align-items:center;">
+          <span class="color-dot" style="background:#000;" onclick="execColor('foreColor', '#000000')"></span>
+          <span class="color-dot" style="background:#ef4444;" onclick="execColor('foreColor', '#ef4444')"></span>
+          <span class="color-dot" style="background:#3b82f6;" onclick="execColor('foreColor', '#3b82f6')"></span>
+          <span class="color-dot" style="background:#10b981;" onclick="execColor('foreColor', '#10b981')"></span>
+          <i class="fa-solid fa-highlighter" style="margin-left:5px; color:#f59e0b; cursor:pointer;" onclick="execColor('hiliteColor', '#fde047')" title="Surligner"></i>
+        </div>
+
+        <div class="sep"></div>
+        <button class="tool-btn" data-action="check" title="Case à cocher"><i class="fa-regular fa-square-check"></i></button>
+        <button class="tool-btn" data-action="postit" title="Post-it"><i class="fa-solid fa-note-sticky" style="color:#d97706;"></i></button>
+        <button class="tool-btn" data-action="frame" title="Encadrer"><i class="fa-regular fa-square" style="color:#ef4444;"></i></button>
+        <button class="tool-btn" data-action="table" title="Tableau"><i class="fa-solid fa-table"></i></button>
+        <button class="tool-btn" data-action="accordion" title="Texte caché"><i class="fa-solid fa-caret-right"></i></button>
+        <button class="tool-btn" onclick="insertFileLink()" title="Insérer un lien fichier"><i class="fa-solid fa-folder-open" style="color:#3b82f6;"></i></button>
+        <button class="tool-btn" onclick="openDrawModal()" title="Dessin"><i class="fa-solid fa-pen-nib"></i></button>
+        
+        <button class="tool-btn" id="btnDelete" style="color:#ef4444; margin-left:auto;"><i class="fa-solid fa-trash"></i></button>
+      </div>
+
+      <div id="editor" class="editor-content" contenteditable="true"></div>
+    </main>
+  </div>
+</div>
+
+<div id="modalFolder" class="modal-overlay">
+  <div class="modal"><h3>Nouveau Dossier</h3><input id="newFolderName" placeholder="Nom"><input type="color" id="newFolderColor" value="#3b82f6" style="height:40px;"><button id="btnCreateFolder" style="width:100%; padding:10px; background:var(--primary); color:white; border:none;">Créer</button><button onclick="closeModals()" style="width:100%; margin-top:5px; background:none; border:none;">Annuler</button></div>
+</div>
+
+<div id="modalShortcut" class="modal-overlay">
+  <div class="modal"><h3>Nouveau Raccourci</h3><input id="newLinkName" placeholder="Nom"><input id="newLinkUrl" placeholder="Fichier (ex: ./planning.html)"><button id="btnAddLink" style="width:100%; padding:10px; background:var(--accent); color:white; border:none;">Ajouter</button><button onclick="closeModals()" style="width:100%; margin-top:5px; background:none; border:none;">Annuler</button></div>
+</div>
+
+<div id="modalDraw" class="modal-overlay">
+  <div class="modal" style="width:500px;">
+    <h3>Zone de Dessin</h3><canvas id="drawCanvas" width="460" height="300"></canvas>
+    <div style="display:flex; gap:5px;"><button onclick="clearCanvas()" style="padding:5px;">Effacer</button><button onclick="saveDrawing()" style="flex:1; padding:10px; background:var(--primary); color:white; border:none;">Insérer</button></div><button onclick="closeModals()" style="width:100%; margin-top:5px; background:none; border:none;">Annuler</button>
+  </div>
+</div>
+
+<div id="modalCalc" class="modal-overlay">
+  <div class="modal" style="text-align:center;">
+    <h3>Calculatrice</h3><input id="calcInput" style="font-size:20px; text-align:right; margin-bottom:10px;" readonly>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:5px;">
+      <button onclick="c('7')">7</button><button onclick="c('8')">8</button><button onclick="c('9')">9</button><button onclick="c('/')">/</button>
+      <button onclick="c('4')">4</button><button onclick="c('5')">5</button><button onclick="c('6')">6</button><button onclick="c('*')">*</button>
+      <button onclick="c('1')">1</button><button onclick="c('2')">2</button><button onclick="c('3')">3</button><button onclick="c('-')">-</button>
+      <button onclick="c('0')">0</button><button onclick="c('.')">.</button><button onclick="ce()">C</button><button onclick="c('+')">+</button>
+    </div>
+    <button onclick="ceval()" style="width:100%; margin-top:5px; padding:10px; background:var(--primary); color:white;">=</button>
+    <button onclick="closeModals()" style="width:100%; margin-top:5px;">Fermer</button>
+  </div>
+</div>
+
+<div id="breathModal">
+  <div class="breath-circle"></div>
+  <p style="margin-top:20px; color:#475569;">Inspirez... Expirez...</p>
+  <button onclick="stopBreath()" style="margin-top:20px; padding:10px 20px; border:1px solid #ccc; background:white; border-radius:20px;">Arrêter</button>
+</div>
+
+<div class="zen-exit" onclick="toggleZen()">Quitter le mode Zen ✕</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+  // --- CONFIG ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+    authDomain: "devoirs-pse.firebaseapp.com",
+    projectId: "devoirs-pse",
+    storageBucket: "devoirs-pse.firebasestorage.app",
+    messagingSenderId: "614730413904",
+    appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+  };
+  const CLASSES = ['B1AGO1-2', 'BTAGO1-2', 'B2GATL1-2', 'B1MELEC', 'B2MELEC', 'BTMELEC', 'C1CAN', 'C2CAN', 'C1HORT', 'C2HORT', 'C1JP', 'C2JP', 'C1PSR', 'C2PSR', 'C1-2VAN'];
+  
+  // --- CONFIGURATION LIENS PAR DEFAUT (MODIFIER ICI) ---
+  const DEFAULT_SHORTCUTS = [
+    { name: "Glossaire PSE", url: "https://preventionsanteenvironnement.github.io/PSE/glossairegemini.html" },
+    { name: "Lien Local (Exemple)", url: "./ma_page.html" },
+    { name: "Lien Externe (Exemple)", url: "https://google.com" }
+  ];
+
+  const QUOTES = [
+    "L'éducation est l'arme la plus puissante pour changer le monde.",
+    "Enseigner, c'est apprendre deux fois.",
+    "La patience est la clé de la réussite pédagogique.",
+    "Chaque élève est une promesse.",
+    "Le meilleur professeur est celui qui suggère plutôt qu'il n'impose."
+  ];
+
+  // Init
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const statusEl = document.getElementById('dbStatus');
+
+  let state = { folders: [{id: 'f1', name: 'Général', color: '#64748b'}], activeFolder: 'f1', activeNote: null, notes: [], shortcuts: [] };
+  let classActions = {};
+
+  // --- STARTUP ---
+  async function startup() {
+    // Clock & Weather
+    setInterval(() => {
+      const d = new Date();
+      document.getElementById('clock').innerText = d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    }, 1000);
+    document.getElementById('weather').innerText = "⛅ 19°C"; // Placeholder API free
+    document.getElementById('dailyQuote').innerText = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+
+    // Classes Init
+    const sel = document.getElementById('classSelector');
+    CLASSES.forEach(c => { const o = document.createElement('option'); o.value = c; o.innerText = c; sel.appendChild(o); });
+
+    // Load Data
+    statusEl.textContent = "Sync Cloud...";
+    try {
+      // Notes
+      const q = query(collection(db, "notes"));
+      const snap = await getDocs(q);
+      const notes = []; snap.forEach(d => notes.push(d.data()));
+      if(notes.length) state.notes = notes;
+      renderNotes();
+
+      // Class Actions
+      onSnapshot(collection(db, "classActions"), (snap) => {
+        snap.forEach(d => classActions[d.id] = d.data().items || []);
+        if(document.getElementById('classPanel').style.display === 'flex') window.renderClassActions();
+      });
+
+      statusEl.innerHTML = '<i class="fa-solid fa-cloud"></i> Connecté';
+      statusEl.style.color = '#10b981';
+    } catch(e) {
+      statusEl.textContent = "Mode Local (Offline)";
+      const local = localStorage.getItem('cockpit_v10');
+      if(local) state = JSON.parse(local);
+      const localAct = localStorage.getItem('cockpit_actions');
+      if(localAct) classActions = JSON.parse(localAct);
+      renderNotes();
+    }
+    
+    // Charger les raccourcis (défaut ou sauvegardés)
+    if(!state.shortcuts || state.shortcuts.length === 0) {
+        state.shortcuts = DEFAULT_SHORTCUTS;
+    }
+    renderFolders();
+    renderShortcuts();
+  }
+
+  // --- ACTIONS CLASSES ---
+  window.openClassPanel = () => { document.getElementById('classPanel').classList.add('open'); document.getElementById('pilotagePanel').classList.remove('open'); };
+  window.openPilotage = () => { document.getElementById('pilotagePanel').classList.add('open'); document.getElementById('classPanel').classList.remove('open'); loadTasks(); };
+  window.closePanels = () => document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('open'));
+
+  window.renderClassActions = () => {
+    const cls = document.getElementById('classSelector').value;
+    const list = document.getElementById('classActionsList');
+    list.innerHTML = '';
+    if(!cls) return;
+
+    // Default Items if empty
+    if(!classActions[cls]) classActions[cls] = [
+      {text: "Correction Évaluation", checked: false},
+      {text: "Remettre Évaluation", checked: false},
+      {text: "Conseil de Classe", checked: false},
+      {text: "Réunion Institutionnelle", checked: false},
+      {text: "Prévoir Copies S1/S2", checked: false}
+    ];
+
+    classActions[cls].forEach((item, i) => {
+      const div = document.createElement('div');
+      div.className = `check-item ${item.checked ? 'checked' : ''}`;
+      div.innerHTML = `<input type="checkbox" ${item.checked ? 'checked' : ''}> <span>${item.text}</span> <i class="fa-solid fa-trash" style="margin-left:auto; color:#cbd5e1; font-size:10px;" onclick="delAction('${cls}', ${i})"></i>`;
+      div.querySelector('input').onclick = (e) => { e.stopPropagation(); toggleAction(cls, i); };
+      div.onclick = () => toggleAction(cls, i);
+      list.appendChild(div);
+    });
+  };
+
+  window.toggleAction = (cls, i) => {
+    classActions[cls][i].checked = !classActions[cls][i].checked;
+    saveActions(cls);
+    renderClassActions();
+  };
+  window.addClassAction = () => {
+    const cls = document.getElementById('classSelector').value;
+    const txt = document.getElementById('newActionInput').value;
+    if(cls && txt) {
+      classActions[cls].push({text: txt, checked: false});
+      document.getElementById('newActionInput').value = '';
+      saveActions(cls);
+      renderClassActions();
+    }
+  };
+  window.delAction = (cls, i) => {
+    if(confirm('Supprimer ?')) { classActions[cls].splice(i, 1); saveActions(cls); renderClassActions(); }
+  };
+
+  async function saveActions(cls) {
+    try { await setDoc(doc(db, "classActions", cls), { items: classActions[cls] }); } catch(e){}
+    localStorage.setItem('cockpit_actions', JSON.stringify(classActions));
+  }
+
+  // --- EDITEUR & CORE ---
+  const editor = document.getElementById('editor');
+  const noteTitle = document.getElementById('noteTitle');
+
+  function renderFolders() {
+    document.getElementById('folderList').innerHTML = state.folders.map(f => `
+      <div class="folder-item ${f.id === state.activeFolder ? 'active' : ''}" style="--folder-color:${f.color}" onclick="selectFolder('${f.id}')">
+        <div class="folder-dot"></div> ${f.name}
+      </div>`).join('');
+  }
+  window.selectFolder = (id) => {
+    state.activeFolder = id;
+    const f = state.folders.find(x => x.id === id);
+    document.getElementById('currentFolderName').textContent = f.name;
+    document.getElementById('currentFolderName').style.color = f.color;
+    renderFolders(); renderNotes();
+    state.activeNote = null; editor.innerHTML=''; noteTitle.value='';
+  };
+
+  // Raccourcis
+  function renderShortcuts(){
+    document.getElementById('shortcutList').innerHTML = state.shortcuts.map((s, i) => `
+      <div class="shortcut-btn">
+        <a href="${s.url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; gap:10px; align-items:center; flex:1;">
+          <i class="fa-solid fa-link"></i> ${s.name}
+        </a>
+        <div class="shortcut-actions"><i class="fa-solid fa-trash" style="font-size:10px;" onclick="deleteShortcut(${i})"></i></div>
+      </div>`).join('');
+  }
+  window.addShortcut = () => {
+      const name = document.getElementById('newLinkName').value;
+      const url = document.getElementById('newLinkUrl').value;
+      if(name && url){
+          state.shortcuts.push({ name, url });
+          saveStateLocally();
+          renderShortcuts();
+          window.closeModals();
+      }
+  };
+  window.deleteShortcut = (i) => {
+      if(confirm('Supprimer ce raccourci ?')){
+          state.shortcuts.splice(i, 1);
+          saveStateLocally();
+          renderShortcuts();
+      }
+  };
+
+  function saveStateLocally() {
+      localStorage.setItem('cockpit_v10', JSON.stringify(state));
+  }
+
+  function renderNotes() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const filtered = state.notes.filter(n => n.folderId === state.activeFolder && (n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)))
+      .sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0) || b.updatedAt-a.updatedAt);
+    document.getElementById('noteList').innerHTML = filtered.map(n => `
+      <div class="note-card ${n.id === state.activeNote ? 'active' : ''}" onclick="loadNote('${n.id}')">
+        <div class="card-title">${n.title||'Sans titre'} ${n.pinned?'⭐':''}</div>
+      </div>`).join('');
+  }
+  window.loadNote = (id) => {
+    state.activeNote = id;
+    const n = state.notes.find(x => x.id === id);
+    noteTitle.value = n.title; editor.innerHTML = n.content;
+    renderNotes();
+  };
+
+  // Save
+  let timer;
+  const triggerSave = () => {
+    const n = state.notes.find(x => x.id === state.activeNote);
+    if(n) {
+      n.title = noteTitle.value; n.content = editor.innerHTML; n.updatedAt = Date.now();
+      clearTimeout(timer); timer = setTimeout(async () => {
+        try { await setDoc(doc(db, "notes", n.id), n); document.getElementById('saveState').innerText = "Sauvegardé"; } catch(e){}
+        saveStateLocally();
+      }, 1000);
+      renderNotes();
+    }
+  };
+  editor.addEventListener('input', triggerSave);
+  noteTitle.addEventListener('input', triggerSave);
+
+  window.createNewNote = () => {
+    const id = "n"+Date.now();
+    const n = {id, folderId: state.activeFolder, title: '', content: '', updatedAt: Date.now(), pinned: false};
+    state.notes.unshift(n);
+    window.loadNote(id);
+    triggerSave();
+  };
+
+  // --- OUTILS EDITEUR ---
+  window.execColor = (cmd, val) => { document.execCommand(cmd, false, val); editor.focus(); };
+  document.querySelectorAll('.tool-btn[data-cmd]').forEach(b => b.onclick = (e) => { e.preventDefault(); document.execCommand(b.dataset.cmd); });
+  document.querySelectorAll('.tool-btn[data-action]').forEach(b => b.onclick = (e) => {
+    e.preventDefault();
+    if(b.dataset.action === 'check') insertHtml('<input type="checkbox">&nbsp;');
+    if(b.dataset.action === 'postit') insertHtml('<div class="note-sticky" contenteditable="true">Note...</div><br>');
+    if(b.dataset.action === 'frame') insertHtml('<div class="note-frame">Important...</div><br>');
+    if(b.dataset.action === 'table') insertHtml('<table class="custom-table"><tr><th>T1</th><th>T2</th></tr><tr><td>.</td><td>.</td></tr></table><br>');
+    if(b.dataset.action === 'accordion') insertHtml('<div class="note-accordion"><details><summary>▶ Titre</summary><p>Caché...</p></details></div><br>');
+  });
+  function insertHtml(h){ editor.focus(); document.execCommand('insertHTML', false, h); triggerSave(); }
+  
+  // Fichier Local
+  window.insertFileLink = () => {
+    const path = prompt("Chemin du fichier (ex: ./docs/planning.pdf) :");
+    const name = prompt("Nom du bouton (ex: Voir le Planning) :") || "Fichier";
+    if(path){ insertHtml(`<a href="${path}" target="_blank" class="file-shortcut" contenteditable="false"><i class="fa-solid fa-file"></i> ${name}</a>&nbsp;`); }
+  };
+
+  // Tableaux
+  let lastTable = null;
+  editor.addEventListener('click', (e) => {
+    if(e.target.closest('table')) {
+      lastTable = e.target.closest('table');
+      const t = document.getElementById('tableTools');
+      t.style.display = 'flex'; t.style.top = (lastTable.offsetTop+editor.offsetTop-30)+'px'; t.style.left = lastTable.offsetLeft+'px';
+    } else document.getElementById('tableTools').style.display = 'none';
+  });
+  window.modifyTable = (act) => {
+    if(!lastTable) return;
+    if(act==='row') { const r=lastTable.insertRow(); for(let i=0;i<lastTable.rows[0].cells.length;i++) {const c=r.insertCell(); c.style.border="1px solid #cbd5e1"; c.innerHTML=".";} }
+    if(act==='col') { for(let i=0;i<lastTable.rows.length;i++) {const c=lastTable.rows[i].insertCell(); c.style.border="1px solid #cbd5e1"; c.innerHTML=".";} }
+    if(act==='delRow' && lastTable.rows.length>1) lastTable.deleteRow(-1);
+    if(act==='delCol' && lastTable.rows[0].cells.length>1) { for(let i=0;i<lastTable.rows.length;i++) lastTable.rows[i].deleteCell(-1); }
+    triggerSave();
+  };
+
+  // WIDGETS
+  let chronoInt;
+  window.toggleTopChrono = () => {
+    const el = document.getElementById('topChrono');
+    if(el.classList.contains('running')) { el.classList.remove('running'); clearInterval(chronoInt); }
+    else {
+      el.classList.add('running'); let s=0;
+      chronoInt = setInterval(() => { s++; el.innerText = `⏱️ ${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }, 1000);
+    }
+  };
+  
+  // Calc
+  window.openCalc = () => document.getElementById('modalCalc').style.display='block';
+  window.c = (v) => document.getElementById('calcInput').value += v;
+  window.ce = () => document.getElementById('calcInput').value = '';
+  window.ceval = () => { try { document.getElementById('calcInput').value = eval(document.getElementById('calcInput').value); } catch(e){} };
+
+  // Zen / Breath
+  window.toggleZen = () => document.body.classList.toggle('zen-mode');
+  window.startBreath = () => { document.getElementById('breathModal').style.display='flex'; setInterval(() => { document.querySelector('.breath-circle').classList.toggle('breath-anim'); }, 4000); };
+  window.stopBreath = () => window.location.reload(); // Simple reset
+
+  // Canvas
+  const canvas = document.getElementById('drawCanvas'), ctx = canvas.getContext('2d');
+  let drawing=false;
+  window.openDrawModal = () => { document.getElementById('modalDraw').style.display='flex'; ctx.clearRect(0,0,460,300); };
+  canvas.onmousedown = (e) => { drawing=true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); };
+  canvas.onmousemove = (e) => { if(drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } };
+  canvas.onmouseup = () => drawing=false;
+  window.saveDrawing = () => { insertHtml(`<img src="${canvas.toDataURL()}" style="border:1px solid #ccc; max-width:300px;">`); window.closeModals(); };
+
+  // Modals & Utils
+  window.closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m => m.style.display='none');
+  window.exportJSON = () => { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state)); a.download = "backup.json"; a.click(); };
+  
+  // Pilotage Tasks
+  window.loadTasks = () => {
+    const l = document.getElementById('taskList'); l.innerHTML='';
+    state.notes.forEach(n => {
+      if(n.content.includes('type="checkbox"')) l.innerHTML += `<div style="background:white; padding:10px; margin-bottom:5px; border-radius:6px; border:1px solid #eee;"><strong>${n.title}</strong> <button onclick="loadNote('${n.id}'); closePanels();" style="float:right;">Voir</button></div>`;
+    });
+  };
+
+  // Folders creation
+  document.getElementById('btnAddFolder').onclick = () => document.getElementById('modalFolder').style.display='flex';
+  document.getElementById('btnCreateFolder').onclick = () => {
+    const name = document.getElementById('newFolderName').value; const col = document.getElementById('newFolderColor').value;
+    if(name) { state.folders.push({id:'f'+Date.now(), name, color: col}); renderFolders(); window.closeModals(); }
+  };
+  
+  // Shortcuts creation
+  document.getElementById('btnAddShortcut').onclick = () => document.getElementById('modalShortcut').style.display='flex';
+  document.getElementById('btnAddLink').onclick = window.addShortcut;
+
+  startup();
+</script>
+</body>
+</html>
