@@ -1994,7 +1994,14 @@ window.resetQuiz = async function() {
 function listenToLiveWords(sessionId) {
     if(!sessionId) return;
     
-    const q = query(collection(db, "sessions", sessionId, "words"), orderBy("timestamp", "desc"), limit(30));
+    // ✅ CORRECTION : On écoute "inputs" (là où le mobile écrit)
+    // et on filtre pour n'avoir que les mots du nuage (type == 'word')
+    const q = query(
+        collection(db, "sessions", sessionId, "inputs"), 
+        where("type", "==", "word"),
+        orderBy("timestamp", "desc"), 
+        limit(30)
+    );
     
     if(wordsUnsubscribe) wordsUnsubscribe();
     
@@ -2007,20 +2014,23 @@ function listenToLiveWords(sessionId) {
             const d = doc.data();
             const id = doc.id;
             
+            // Le mobile envoie le texte dans le champ "content"
+            const txt = d.content || d.word || "???";
+
             feed.innerHTML += `
-                <span onclick="censorWord('${id}')" style="background:#f1f5f9; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; border:1px solid #cbd5e1;">
-                    ${d.word || d.text} <span style="color:#dc2626;">❌</span>
+                <span onclick="censorWord('${id}')" style="background:#f1f5f9; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; border:1px solid #cbd5e1; display:inline-block; margin:2px;">
+                    ${txt} <span style="color:#dc2626;">❌</span>
                 </span>
             `;
         });
     });
 }
-
 window.censorWord = async function(wordId) {
     if(!currentSessionId) return;
     if(!confirm("Supprimer ce mot ?")) return;
     
-    await deleteDoc(doc(db, "sessions", currentSessionId, "words", wordId));
+    // ✅ CORRECTION : On supprime dans "inputs"
+    await deleteDoc(doc(db, "sessions", currentSessionId, "inputs", wordId));
 }
 
 // --- 5. BIBLIOTHÈQUE (CRUD) ---
