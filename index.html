@@ -780,7 +780,8 @@
         </div>
 
         <div id="creator-panel" style="display:none; background:#f0f9ff; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #bae6fd;">
-            <label style="font-size:0.75rem; font-weight:bold; color:#0369a1;">TYPE :</label>
+            <input type="hidden" id="edit-id">
+          <label style="font-size:0.75rem; font-weight:bold; color:#0369a1;">TYPE :</label>
             <select id="create-type" onchange="updateCreatorForm()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; margin-bottom:10px;">
                 <option value="poll">📊 Créer un Sondage</option>
                 <option value="quiz">🏆 Créer un Quiz (avec réponse)</option>
@@ -2061,44 +2062,94 @@ window.addOptionInput = function() {
     container.appendChild(div);
 }
 
-// 👇 CETTE FONCTION ENREGISTRE LA RÉPONSE COCHÉE
+/// 🔥 SAUVEGARDER (CRÉATION OU MODIFICATION)
 window.saveToLibrary = async function() {
+    const id = document.getElementById("edit-id").value;
     const type = document.getElementById("create-type").value;
     const title = document.getElementById("create-title").value.trim();
-    if(!title) return alert("Titre manquant");
+    const question = document.getElementById("create-question").value || "";
     
-    const data = { type, title, createdAt: serverTimestamp() };
-    
+    if(!title) return alert("Titre obligatoire");
+
+    const data = { type, title, question, createdAt: serverTimestamp() };
+
     if(type === "cloud") {
         data.wordBank = (document.getElementById("create-words")?.value || "").split(',').map(w=>w.trim()).filter(w=>w);
     } else {
-        data.question = document.getElementById("create-question").value;
-        
-        // On récupère toutes les lignes d'options
         const rows = document.querySelectorAll("#options-container .option-row");
         const options = [];
-        let correctIndex = -1; // -1 veut dire "pas de bonne réponse définie"
-
-        rows.forEach((row, index) => {
+        let correctIndex = -1;
+        rows.forEach((row, idx) => {
             const input = row.querySelector("input[type='text']");
-            const checkbox = row.querySelector("input[type='checkbox']");
-            
+            const cb = row.querySelector("input[type='checkbox']");
             if(input.value.trim()) {
                 options.push(input.value.trim());
-                // Si la case est cochée, on retient ce numéro comme la bonne réponse
-                if(checkbox && checkbox.checked) correctIndex = index;
+                if(cb && cb.checked) correctIndex = idx;
             }
         });
-        
         data.options = options;
         if(type === 'quiz') data.correctAnswer = correctIndex;
     }
+
+    if(id) {
+        await updateDoc(doc(db, "library", id), data);
+        alert("✅ Modifié !");
+    } else {
+        await addDoc(collection(db, "library"), data);
+        alert("✅ Créé !");
+    }
     
-    await addDoc(collection(db, "library"), data);
-    alert("✅ Enregistré");
     toggleCreator();
     loadLibrary();
 }
+
+// 🔥 CHARGER POUR MODIFIER (CRAYON)
+window.editLibraryItem = async function(id) {
+    const docSnap = await getDoc(doc(db, "library", id));
+    if(!docSnap.exists()) return;
+    const d = docSnap.data();
+
+    const panel = document.getElementById("creator-panel");
+    panel.style.display = "block";
+    document.getElementById("edit-id").value = id; 
+    
+    const btn = document.querySelector("#creator-panel button[onclick='saveToLibrary()']");
+    if(btn) { btn.innerText = "Modifier"; btn.style.background = "#f59e0b"; }
+
+    document.getElementById("create-type").value = d.type;
+    document.getElementById("create-title").value = d.title;
+    document.getElementById("create-question").value = d.question || "";
+
+    const container = document.getElementById("options-container");
+    container.innerHTML = "";
+
+    if(d.type === 'cloud') {
+        updateCreatorForm();
+        setTimeout(() => document.getElementById("create-words").value = d.wordBank.join(', '), 100);
+    } else {
+        if(d.options) {
+            d.options.forEach((opt, i) => {
+                addOptionInput(); 
+                const inputs = container.querySelectorAll("input[type='text']");
+                inputs[inputs.length-1].value = opt;
+                if(i === d.correctAnswer) {
+                    const checks = container.querySelectorAll("input[type='checkbox']");
+                    if(checks[checks.length-1]) checks[checks.length-1].checked = true;
+                }
+            });
+        }
+    }
+}
+
+// 🔥 SUPPRIMER (POUBELLE)
+window.deleteLibraryItem = async function(id) {
+    if(confirm("Supprimer ?")) {
+        await deleteDoc(doc(db, "library", id));
+        loadLibrary();
+    }
+}
+
+// 🔥 AFFICHER LA LISTE (AVEC ACTIONS)
 async function loadLibrary() {
     const list = document.getElementById("library-list");
     list.innerHTML = "Chargement...";
@@ -2106,17 +2157,57 @@ async function loadLibrary() {
     list.innerHTML = "";
     snap.forEach(d => {
         const data = d.data();
+        const icon = data.type === 'quiz' ? '🏆' : (data.type === 'poll' ? '📊' : '☁️');
         const li = document.createElement("li");
         li.className = "lib-item";
-        li.innerHTML = `<div><strong>${data.title}</strong></div><button onclick="loadItemToLive('${d.id}')" style="background:#f0f9ff; padding:5px; border-radius:6px;">📡</button>`;
+        li.innerHTML = `<div><span style="margin-right:10px;">${icon}</span><strong>${data.title}</strong></div>
+            <div class="lib-actions" style="display:flex; gap:10px;">
+                <button onclick="loadItemToLive('${d.id}')" title="Charger" style="cursor:pointer; background:#f0f9ff; border:1px solid #bae6fd; padding:5px;">📡</button>
+                <button onclick="editLibraryItem('${d.id}')" title="Modifier" style="cursor:pointer; background:#fffbeb; border:1px solid #fcd34d; padding:5px;">✏️</button>
+                <button onclick="deleteLibraryItem('${d.id}')" title="Supprimer" style="cursor:pointer; background:#fef2f2; border:1px solid #fca5a5; padding:5px; color:red;">🗑️</button>
+            </div>`;
         list.appendChild(li);
     });
+}
+
+// 🔥 BOUTON VIDER L'ÉCRAN
+window.resetCurrentActivity = async function(mode) {
+    if(!currentSessionId) return alert("Pas de session active");
+    if(!confirm("⚠️ Vider l'écran ?")) return;
+
+    let targetType = 'word'; 
+    if(mode === 'quiz') targetType = 'quiz';
+    if(mode === 'sondage' || mode === 'poll') targetType = 'poll';
+    if(mode === 'meteo') targetType = 'meteo_full';
+
+    if(mode === 'meteo') {
+        const q1 = query(collection(db, `sessions/${currentSessionId}/inputs`), where("type", "==", "mood"));
+        const s1 = await getDocs(q1);
+        s1.forEach(async d => await deleteDoc(d.ref));
+    }
+
+    const q = query(collection(db, `sessions/${currentSessionId}/inputs`), where("type", "==", targetType));
+    const snap = await getDocs(q);
+    
+    let count = 0;
+    snap.forEach(async (d) => {
+        await deleteDoc(d.ref);
+        count++;
+    });
+    
+    if(targetType === 'poll') {
+         const q2 = query(collection(db, `sessions/${currentSessionId}/inputs`), where("type", "==", "quiz"));
+         const s2 = await getDocs(q2);
+         s2.forEach(async d => await deleteDoc(d.ref));
+    }
+    
+    alert(`♻️ Nettoyage terminé (${count} éléments effacés).`);
 }
 
 // INITIALISATION
 updateCreatorForm();
 loadLibrary();
 
-  </script>
+</script>
 </body>
 </html>
