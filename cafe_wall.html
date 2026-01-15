@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Écran Géant</title>
+    <title>Écran Géant - FINAL SONDAGE</title>
     <style>
         body { margin: 0; background: #0f172a; color: white; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 80%); }
         .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
@@ -15,29 +15,31 @@
 
         /* SONDAGE (BARRES) */
         #poll-results { width: 80%; max-width: 1000px; display: flex; flex-direction: column; gap: 15px; }
-        .poll-row { display: flex; align-items: center; width: 100%; }
+        .poll-row { display: flex; align-items: center; width: 100%; animation: slideIn 0.5s ease-out; }
         .poll-label { width: 35%; text-align: right; padding-right: 20px; font-size: 1.3rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .poll-bar-bg { flex: 1; height: 35px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; position: relative; }
-        .poll-bar-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 1s; display: flex; align-items: center; padding-left: 10px; font-weight: bold; }
-        .poll-row.winner .poll-bar-fill { background: #eab308; box-shadow: 0 0 15px rgba(234, 179, 8, 0.5); }
-        .poll-row.winner .poll-label { color: #facc15; font-weight: 800; }
+        .poll-bar-bg { flex: 1; height: 40px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; position: relative; }
+        .poll-bar-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); display: flex; align-items: center; padding-left: 15px; font-weight: bold; font-size: 1.2rem; }
+        
+        /* LE GAGNANT EN OR */
+        .poll-row.winner .poll-bar-fill { background: linear-gradient(90deg, #eab308, #facc15); box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); color: #0f172a; }
+        .poll-row.winner .poll-label { color: #facc15; font-weight: 800; transform: scale(1.05); transition: 0.3s; }
 
         /* HEADER & QR */
         .header { position: absolute; top: 30px; left: 40px; font-size: 1.5rem; font-weight: 800; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; }
         .qr-box { position: absolute; top: 30px; right: 40px; background: white; padding: 10px; border-radius: 12px; text-align: center; }
         .qr-text { color: #0f172a; font-weight: 800; font-size: 0.7rem; margin-top: 5px; }
 
-        /* OTHER STYLES (Keep existing ones) */
+        /* OTHER STYLES */
         #cloud-container { width: 100%; height: 60vh; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 15px; }
         .bubble { padding: 12px 30px; border-radius: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-weight: bold; font-size: 2rem; }
         #options-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; }
         .option-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; font-size: 1.5rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
         .reveal-mode .option-card.correct { background: #16a34a; color: white; transform: scale(1.05); }
         .reveal-mode .option-card.wrong { opacity: 0.3; }
-        /* Meteo */
         #meteo-system { display: flex; align-items: center; justify-content: center; height: 400px; font-size: 8rem; }
         .battery-container { width: 50%; height: 30px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 20px; overflow: hidden; }
         .battery-level { height: 100%; background: linear-gradient(90deg, #ef4444, #eab308, #22c55e); width: 0%; transition: width 1s; text-align: right; padding-right: 10px; font-weight: bold; font-size: 0.9rem; line-height: 30px; }
+        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -100,14 +102,23 @@
     function handleNavigation(data) {
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         
+        // --- ROUTAGE DES ÉCRANS ---
         if(data.currentStep === 'meteo') {
             document.getElementById('view-meteo').classList.add('active');
         } 
-        else if(data.currentStep === 'sondage') {
+        // 🔧 RÉPARATION SONDAGE : Accepte 'sondage' ET 'poll'
+        else if(data.currentStep === 'sondage' || data.currentStep === 'poll') {
             document.getElementById('view-sondage').classList.add('active');
-            document.getElementById('poll-question').innerText = data.pollQuestion || "Sondage";
-            currentPollOptions = data.pollOptions || [];
-            renderPollBars({}, 0); // Force l'affichage vide au début
+            
+            // On récupère la question et les options
+            const q = data.pollQuestion || data.quizQuestion || "Sondage";
+            document.getElementById('poll-question').innerText = q;
+            
+            // On stocke les options pour le calcul
+            currentPollOptions = data.pollOptions || data.quizOptions || [];
+            
+            // On force un premier affichage vide (pour voir les barres tout de suite)
+            if(currentPollOptions.length > 0) renderPollBars({}, 0);
         } 
         else if(data.currentStep === 'quiz') {
             document.getElementById('view-quiz').classList.add('active');
@@ -127,15 +138,21 @@
             
             // Init Poll Counts
             currentPollOptions.forEach(opt => votes.poll[opt] = 0);
+            let totalPoll = 0;
 
             snap.forEach(d => {
                 const data = d.data();
                 if(data.type === 'word' && !data.banned) votes.word.push(data.content);
-                if(data.type === 'poll') {
-                    // Nettoyage guillemets
-                    let val = data.content.replace(/^"|"$/g, '');
-                    if(votes.poll[val] !== undefined) votes.poll[val]++;
+                
+                // On écoute tout ce qui ressemble à un sondage (poll ou quiz)
+                if((data.type === 'poll' || data.type === 'quiz') && data.content) {
+                    let val = data.content.replace(/^"|"$/g, ''); // Nettoyage
+                    if(votes.poll[val] !== undefined) {
+                        votes.poll[val]++;
+                        totalPoll++;
+                    }
                 }
+                
                 if(data.type === 'meteo_full') {
                     try { const p = JSON.parse(data.content); if(p.mood) votes.meteo.mood[p.mood] = (votes.meteo.mood[p.mood]||0)+1; if(p.energy) votes.meteo.energy.push(p.energy); } catch(e){}
                 }
@@ -143,22 +160,28 @@
 
             // UPDATE UI
             if(document.getElementById('view-nuage').classList.contains('active')) renderCloud(votes.word);
-            if(document.getElementById('view-sondage').classList.contains('active')) renderPollBars(votes.poll);
+            // On met à jour les barres avec les vrais votes
+            if(document.getElementById('view-sondage').classList.contains('active')) renderPollBars(votes.poll, totalPoll);
             if(document.getElementById('view-meteo').classList.contains('active')) renderMeteo(votes.meteo);
         });
     }
 
-    function renderPollBars(counts) {
+    function renderPollBars(counts, total) {
         const container = document.getElementById('poll-results');
         container.innerHTML = "";
         
-        // Convert to Array & Sort
-        const sorted = currentPollOptions.map(opt => ({ label: opt, count: counts[opt] || 0 }))
-                                         .sort((a,b) => b.count - a.count);
+        // 1. Transformer en tableau
+        let items = currentPollOptions.map(opt => ({ label: opt, count: counts[opt] || 0 }));
         
-        const max = sorted.length > 0 ? sorted[0].count : 0;
+        // 2. TRIER (La demande : celui qui domine le plus en haut)
+        items.sort((a,b) => b.count - a.count);
+        
+        // 3. Trouver le max pour l'échelle
+        const max = items.length > 0 ? items[0].count : 0;
 
-        sorted.forEach((item, idx) => {
+        items.forEach((item, idx) => {
+            // Calcul du pourcentage de la barre
+            // Si pas de vote, on met 0%. Si vote, on compare au max.
             const pct = max > 0 ? (item.count / max) * 100 : 0;
             const isWinner = (idx === 0 && item.count > 0);
             
@@ -166,11 +189,15 @@
                 <div class="poll-row ${isWinner ? 'winner' : ''}">
                     <div class="poll-label">${item.label}</div>
                     <div class="poll-bar-bg">
-                        <div class="poll-bar-fill" style="width:${pct}%">${item.count > 0 ? item.count : ''}</div>
+                        <div class="poll-bar-fill" style="width:${pct}%">
+                            ${item.count > 0 ? item.count : ''}
+                        </div>
                     </div>
                 </div>
             `;
         });
+        
+        if(items.length === 0) container.innerHTML = "<div style='text-align:center'>Pas d'options...</div>";
     }
 
     function renderCloud(words) {
@@ -185,11 +212,9 @@
     }
 
     function renderMeteo(data) {
-        // Battery
         const avg = data.energy.length ? Math.round(data.energy.reduce((a,b)=>a+b,0)/data.energy.length) : 0;
         document.getElementById('energy-bar').style.width = avg + "%";
         document.getElementById('energy-bar').innerText = avg + "%";
-        // Sun (Basic logic)
         let maxMood = '☀️', maxC = 0; const map = {'super':'🤩','bien':'🙂','bof':'🤔','mauvais':'😰'};
         for(let m in data.mood) if(data.mood[m] > maxC) { maxC = data.mood[m]; maxMood = map[m]; }
         document.getElementById('meteo-system').innerText = maxC > 0 ? maxMood : "En attente...";
