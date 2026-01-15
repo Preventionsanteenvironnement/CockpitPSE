@@ -758,10 +758,7 @@
                 </div>
             </div>
             
-            <div style="margin-top:15px;">
-                <div style="font-size:0.7rem; font-weight:bold; color:#475569; margin-bottom:5px;">DERNIERS MOTS (Cliquer pour censurer ❌)</div>
-                <div id="live-word-feed" style="display:flex; flex-wrap:wrap; gap:5px;"></div>
-            </div>
+            
         </div>
         
         <div class="widget">
@@ -1860,9 +1857,8 @@ else if (d.createdAt instanceof Date) dateStr = d.createdAt.toLocaleDateString("
     }
 }
 // ============================================================
-// 🚀 MOTEUR V4 : SESSIONS, BIBLIOTHÈQUE & QUIZ
+// 🚀 MOTEUR V4 : SESSIONS, BIBLIOTHÈQUE & QUIZ (VERSION CLEAN)
 // ============================================================
-
 
 // --- 1. GESTION SESSION (Lancement / Stop) ---
 window.createNewSession = async function() {
@@ -1876,7 +1872,7 @@ window.createNewSession = async function() {
     });
     currentSessionId = ref.id;
 
-    // Mettre à jour la Config Globale (Mobile & Wall écoutent ça)
+    // Config Globale
     await setDoc(doc(db, "config", "live"), {
         activeSessionId: currentSessionId,
         sessionTitle: title,
@@ -1888,36 +1884,32 @@ window.createNewSession = async function() {
     document.getElementById("live-panel").style.display = "block";
     document.getElementById("session-info").style.display = "block";
     document.getElementById("current-session-name").innerText = title;
-    document.getElementById("live-title-display").innerText = title;
-    titleInput.value = "";
     
-    // Lancer écoute modération
-    listenToLiveWords(currentSessionId);
+    // On cache les commandes de quiz par défaut
+    const qc = document.getElementById("quiz-controls");
+    if(qc) qc.style.display = "none";
+    
+    titleInput.value = "";
 }
 
 window.stopSession = async function() {
-    if(!confirm("Arrêter la session et déconnecter tout le monde ?")) return;
+    if(!confirm("Arrêter la session ?")) return;
     
     if(currentSessionId) {
         await updateDoc(doc(db, "sessions", currentSessionId), { isActive: false });
     }
-    // Reset Config
     await setDoc(doc(db, "config", "live"), { activeSessionId: null, currentStep: "wait" }, { merge: true });
 
     document.getElementById("live-panel").style.display = "none";
     document.getElementById("session-info").style.display = "none";
     currentSessionId = null;
     
-    // On recharge l'historique si la fonction existe
     if(typeof loadHistory === 'function') loadHistory();
 }
 
-// --- 2. PILOTAGE LIVE (Clic sur les boutons Météo, Nuage...) ---
+// --- 2. PILOTAGE LIVE ---
 window.setMode = async function(mode) {
-    // Visuel boutons
     document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('active'));
-    
-    // Correction : On utilise window.event pour que ça marche partout
     const ev = window.event;
     if(ev && ev.target) ev.target.classList.add('active');
 
@@ -1925,285 +1917,145 @@ window.setMode = async function(mode) {
     const qc = document.getElementById('quiz-controls');
     if(qc) qc.style.display = 'none';
 
-    // Affichage contextuel
     if(mode === 'meteo') {
         zone.innerHTML = `<button onclick="sendLiveConfig('meteo')" style="background:#0369a1; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer la Météo 🚀</button>`;
     } else if(mode === 'nuage') {
         zone.innerHTML = `
             <div style="width:100%; display:flex; gap:10px;">
-                <input type="text" id="live-cloud-words" placeholder="Mots suggérés (séparés par virgules)..." style="flex:1; padding:10px; border-radius:6px; border:1px solid #15803d;">
+                <input type="text" id="live-cloud-words" placeholder="Mots suggérés..." style="flex:1; padding:10px; border-radius:6px; border:1px solid #15803d;">
                 <button onclick="sendLiveConfig('nuage')" style="background:#15803d; color:white; border:none; padding:0 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer</button>
             </div>
-            <div style="font-size:0.8rem; color:#64748b; margin-top:5px;">Ou choisissez un thème dans la bibliothèque à droite 👉</div>
         `;
     } else {
-        // Pour Sondage et Quiz
         zone.innerHTML = `<p style="color:#64748b; margin:0;">👈 Cliquez sur un élément de la <strong>Bibliothèque</strong> (à droite) pour le charger.</p>`;
     }
 }
 
-// Envoi de la commande à Firebase
 window.sendLiveConfig = async function(type, payload = {}) {
     if(type === 'nuage') {
         const txt = document.getElementById('live-cloud-words')?.value || "";
         const words = txt.split(',').map(w => w.trim()).filter(w => w);
-        payload.wordBank = words;
+        if(words.length > 0) payload.wordBank = words;
     }
 
-    const data = {
-        currentStep: type,
-        updatedAt: serverTimestamp(),
-        ...payload
-    };
+    const data = { currentStep: type, updatedAt: serverTimestamp(), ...payload };
 
-    // Gestion état Quiz
     if(type === 'quiz') {
-  
-   data.quizState = 'voting'; // Au début, on vote
-        document.getElementById('quiz-controls').style.display = 'block';
+        data.quizState = 'voting';
+        const qc = document.getElementById('quiz-controls');
+        if(qc) qc.style.display = 'block';
     }
 
     try {
         await setDoc(doc(db, "config", "live"), data, { merge: true });
-        console.log("✅ Config envoyée :", type);
-    } catch(e) {
-        console.error("Erreur envoi config:", e);
-    }
+    } catch(e) { console.error(e); }
 }
 
-// --- 3. CONTRÔLES QUIZ (Révéler / Reset) ---
+// --- 3. CONTRÔLES QUIZ ---
 window.revealQuiz = async function() {
     await setDoc(doc(db, "config", "live"), { quizState: 'revealed' }, { merge: true });
-    alert("✅ Réponse révélée aux élèves !");
 }
-
 window.resetQuiz = async function() {
-    if(!currentSessionId) return;
-    
-    // Supprimer tous les votes existants
-    const qVotes = query(collection(db, "sessions", currentSessionId, "votes"));
-    const snap = await getDocs(qVotes);
-    snap.forEach(async (d) => await deleteDoc(d.ref));
-    
-    // Reset l'état
     await setDoc(doc(db, "config", "live"), { quizState: 'voting' }, { merge: true });
-    alert("🔄 Quiz réinitialisé !");
 }
 
-// --- 4. MODÉRATION MOTS (Feed Live) ---
-function listenToLiveWords(sessionId) {
-    if(!sessionId) return;
-    
-    // ✅ CORRECTION : On écoute "inputs" (là où le mobile écrit)
-    // et on filtre pour n'avoir que les mots du nuage (type == 'word')
-    const q = query(
-        collection(db, "sessions", sessionId, "inputs"), 
-        where("type", "==", "word"),
-        orderBy("timestamp", "desc"), 
-        limit(30)
-    );
-    
-    if(wordsUnsubscribe) wordsUnsubscribe();
-    
-    wordsUnsubscribe = onSnapshot(q, (snap) => {
-        const feed = document.getElementById("live-word-feed");
-        if(!feed) return;
-        
-        feed.innerHTML = "";
-        snap.forEach(doc => {
-            const d = doc.data();
-            const id = doc.id;
-            
-            // Le mobile envoie le texte dans le champ "content"
-            const txt = d.content || d.word || "???";
-
-            feed.innerHTML += `
-                <span onclick="censorWord('${id}')" style="background:#f1f5f9; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem; border:1px solid #cbd5e1; display:inline-block; margin:2px;">
-                    ${txt} <span style="color:#dc2626;">❌</span>
-                </span>
-            `;
-        });
-    });
-}
-window.censorWord = async function(wordId) {
-    if(!currentSessionId) return;
-    if(!confirm("Supprimer ce mot ?")) return;
-    
-    // ✅ CORRECTION : On supprime dans "inputs"
-    await deleteDoc(doc(db, "sessions", currentSessionId, "inputs", wordId));
-}
-
-// --- 5. BIBLIOTHÈQUE (CRUD) ---
-window.toggleCreator = function() {
-    const panel = document.getElementById("creator-panel");
-    panel.style.display = panel.style.display === "none" ? "block" : "none";
-}
-
-window.updateCreatorForm = function() {
-    const type = document.getElementById("create-type").value;
-    const container = document.getElementById("options-container");
-    
-    if(type === "cloud") {
-        container.innerHTML = '<textarea id="create-words" placeholder="Liste de mots séparés par des virgules..." style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1; box-sizing:border-box; min-height:80px;"></textarea>';
-    } else {
-        // Pour Sondage et Quiz, options identiques (avec ou sans correctAnswer)
-        container.innerHTML = '<div style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">Options de réponse :</div>';
-        addOptionInput();
-        addOptionInput();
-    }
-}
-
-window.addOptionInput = function() {
-    const container = document.getElementById("options-container");
-    const type = document.getElementById("create-type").value;
-    
-    const isQuiz = (type === "quiz");
-    
-    const div = document.createElement("div");
-    div.className = "option-row";
-    div.innerHTML = `
-        <input type="text" placeholder="Option..." style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
-        ${isQuiz ? '<input type="checkbox" title="Réponse correcte ?" style="width:20px; height:20px;">' : ''}
-        <button onclick="this.parentElement.remove()" style="background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer;">✕</button>
-    `;
-    container.appendChild(div);
-}
-
-window.saveToLibrary = async function() {
-    const type = document.getElementById("create-type").value;
-    const title = document.getElementById("create-title").value.trim();
-    const question = document.getElementById("create-question").value.trim();
-    
-    if(!title) { alert("Il faut un titre !"); return; }
-    
-    const data = { type, title, question, createdAt: serverTimestamp() };
-    
-    if(type === "cloud") {
-        const words = document.getElementById("create-words")?.value || "";
-        data.wordBank = words.split(',').map(w => w.trim()).filter(w => w);
-    } else {
-        const rows = document.querySelectorAll("#options-container .option-row");
-        const options = [];
-        let correctAnswer = null;
-        
-        rows.forEach((row, i) => {
-            const input = row.querySelector("input[type='text']");
-            const checkbox = row.querySelector("input[type='checkbox']");
-            const text = input?.value.trim();
-            
-            if(text) {
-                options.push(text);
-                if(checkbox?.checked) correctAnswer = i;
-            }
-        });
-        
-        data.options = options;
-        if(type === "quiz") data.correctAnswer = correctAnswer;
-    }
-    
-    try {
-        await addDoc(collection(db, "library"), data);
-        alert("✅ Enregistré dans la bibliothèque !");
-        toggleCreator();
-        loadLibrary();
-    } catch(e) {
-        console.error("Erreur save:", e);
-        alert("Erreur.");
-    }
-}
-
-// Charger Bibliothèque
-async function loadLibrary() {
-    const list = document.getElementById("library-list");
-    list.innerHTML = '<li style="text-align:center; color:#94a3b8; padding:20px;">Chargement...</li>';
-    
-    try {
-        const q = query(collection(db, "library"), orderBy("createdAt", "desc"));
-        const snap = await getDocs(q);
-        
-        if(snap.empty) {
-            list.innerHTML = '<li style="text-align:center; color:#94a3b8; padding:20px;">Bibliothèque vide.</li>';
-            return;
-        }
-        
-        list.innerHTML = "";
-        snap.forEach(docSnap => {
-            const d = docSnap.data();
-            const id = docSnap.id;
-            
-            let tag = '<span class="tag tag-poll">📊 Sondage</span>';
-            if(d.type === "quiz") tag = '<span class="tag tag-quiz">🏆 Quiz</span>';
-            if(d.type === "cloud") tag = '<span class="tag tag-cloud">☁️ Nuage</span>';
-            
-            const li = document.createElement("li");
-            li.className = "lib-item";
-            li.innerHTML = `
-                <div>
-                    ${tag}
-                    <strong>${d.title}</strong>
-                    <div style="font-size:0.75rem; color:#64748b;">${d.question || 'Thème nuage'}</div>
-                </div>
-                <button onclick="loadItemToLive('${id}')" style="background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">📡 Charger</button>
-            `;
-            list.appendChild(li);
-        });
-    } catch(e) {
-        console.error("Erreur load lib:", e);
-        list.innerHTML = "Erreur.";
-    }
-}
-
-// Charger un item dans le panneau Live
+// --- 4. CHARGEUR AVEC SÉCURITÉ APOSTROPHE (CRUCIAL) ---
 window.loadItemToLive = async function(itemId) {
     try {
         const docRef = doc(db, "library", itemId);
         const docSnap = await getDoc(docRef);
-        
-        if(!docSnap.exists()) { alert("Item introuvable"); return; }
+        if(!docSnap.exists()) return;
         
         const d = docSnap.data();
-        const type = d.type;
-        
         const zone = document.getElementById('config-zone');
         
-        if(type === "cloud") {
-            // 👇 ICI : La sécurité qui protège les apostrophes (d'écran -> d&apos;écran)
-            const safeWordBank = JSON.stringify({ wordBank: d.wordBank }).replace(/'/g, "&apos;");
+        if(d.type === "cloud") {
+            // SÉCURITÉ : On protège les apostrophes pour ne pas casser le HTML
+            const safeBank = JSON.stringify({ wordBank: d.wordBank }).replace(/'/g, "&apos;");
             
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
                 <div style="font-size:0.8rem; color:#64748b;">Mots : ${d.wordBank.join(', ')}</div>
-                <button onclick='sendLiveConfig("nuage", ${safeWordBank})' style="margin-top:10px; background:#15803d; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                <button onclick='sendLiveConfig("nuage", ${safeBank})' style="margin-top:10px; width:100%; background:#15803d; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
             `;
         } else {
-            // Sondage ou Quiz
             const opts = d.options.map((opt, i) => `<div>${String.fromCharCode(65 + i)}. ${opt}</div>`).join('');
             
-            // 👇 ICI : La sécurité aussi pour les questions
+            // SÉCURITÉ : On protège aussi ici
             const payload = { question: d.question, options: d.options };
-            if(type === 'quiz') payload.correctAnswer = d.correctAnswer;
+            if(d.type === 'quiz') payload.correctAnswer = d.correctAnswer;
             const safePayload = JSON.stringify(payload).replace(/'/g, "&apos;");
             
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
                 <div style="font-size:0.9rem; margin:10px 0;">${d.question}</div>
                 <div style="font-size:0.85rem; color:#64748b;">${opts}</div>
-                <button onclick='sendLiveConfig("${type === 'quiz' ? 'quiz' : 'sondage'}", ${safePayload})' style="margin-top:10px; background:#db2777; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                <button onclick='sendLiveConfig("${d.type}", ${safePayload})' style="margin-top:10px; width:100%; background:#db2777; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
             `;
             
-            if(type === 'quiz') document.getElementById('quiz-controls').style.display = 'block';
+            if(d.type === 'quiz') {
+                const qc = document.getElementById('quiz-controls');
+                if(qc) qc.style.display = 'block';
+            }
         }
-        
-        // Activer le bouton visuellement
-        document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('active'));
-        const btn = [...document.querySelectorAll('.act-btn')].find(b => b.textContent.includes(type === 'cloud' ? 'Nuage' : (type === 'quiz' ? 'Quiz' : 'Sondage')));
-        if(btn) btn.classList.add('active');
-        
-    } catch(e) {
-        console.error("Erreur load item:", e);
+    } catch(e) { console.error(e); }
+}
+
+// --- 5. BIBLIOTHÈQUE ---
+window.toggleCreator = function() {
+    const panel = document.getElementById("creator-panel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+window.updateCreatorForm = function() {
+    const type = document.getElementById("create-type").value;
+    const container = document.getElementById("options-container");
+    if(type === "cloud") {
+        container.innerHTML = '<textarea id="create-words" placeholder="Mots séparés par virgules..." style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1;"></textarea>';
+    } else {
+        container.innerHTML = '';
+        addOptionInput(); addOptionInput();
     }
 }
-// --- 6. INITIALISATION ---
+window.addOptionInput = function() {
+    const container = document.getElementById("options-container");
+    const div = document.createElement("div");
+    div.className = "option-row";
+    div.innerHTML = `<input type="text" style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1;"><button onclick="this.parentElement.remove()">✕</button>`;
+    container.appendChild(div);
+}
+window.saveToLibrary = async function() {
+    const type = document.getElementById("create-type").value;
+    const title = document.getElementById("create-title").value.trim();
+    if(!title) return alert("Titre manquant");
+    
+    const data = { type, title, createdAt: serverTimestamp() };
+    if(type === "cloud") {
+        data.wordBank = (document.getElementById("create-words")?.value || "").split(',').map(w=>w.trim()).filter(w=>w);
+    } else {
+        data.question = document.getElementById("create-question").value;
+        const rows = document.querySelectorAll("#options-container input[type='text']");
+        data.options = Array.from(rows).map(r => r.value.trim()).filter(r=>r);
+    }
+    await addDoc(collection(db, "library"), data);
+    alert("✅ Enregistré");
+    toggleCreator();
+    loadLibrary();
+}
+async function loadLibrary() {
+    const list = document.getElementById("library-list");
+    list.innerHTML = "Chargement...";
+    const snap = await getDocs(query(collection(db, "library"), orderBy("createdAt", "desc")));
+    list.innerHTML = "";
+    snap.forEach(d => {
+        const data = d.data();
+        const li = document.createElement("li");
+        li.className = "lib-item";
+        li.innerHTML = `<div><strong>${data.title}</strong></div><button onclick="loadItemToLive('${d.id}')" style="background:#f0f9ff; padding:5px; border-radius:6px;">📡</button>`;
+        list.appendChild(li);
+    });
+}
+
+// INITIALISATION
 updateCreatorForm();
 loadLibrary();
 
