@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Écran Géant - FINAL SONDAGE</title>
+    <title>Écran Géant</title>
     <style>
         body { margin: 0; background: #0f172a; color: white; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 80%); }
         .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
@@ -19,8 +19,6 @@
         .poll-label { width: 35%; text-align: right; padding-right: 20px; font-size: 1.3rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .poll-bar-bg { flex: 1; height: 40px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; position: relative; }
         .poll-bar-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); display: flex; align-items: center; padding-left: 15px; font-weight: bold; font-size: 1.2rem; }
-        
-        /* LE GAGNANT EN OR */
         .poll-row.winner .poll-bar-fill { background: linear-gradient(90deg, #eab308, #facc15); box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); color: #0f172a; }
         .poll-row.winner .poll-label { color: #facc15; font-weight: 800; transform: scale(1.05); transition: 0.3s; }
 
@@ -29,9 +27,11 @@
         .qr-box { position: absolute; top: 30px; right: 40px; background: white; padding: 10px; border-radius: 12px; text-align: center; }
         .qr-text { color: #0f172a; font-weight: 800; font-size: 0.7rem; margin-top: 5px; }
 
-        /* OTHER STYLES */
+        /* NUAGE */
         #cloud-container { width: 100%; height: 60vh; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 15px; }
-        .bubble { padding: 12px 30px; border-radius: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-weight: bold; font-size: 2rem; }
+        .bubble { padding: 12px 30px; border-radius: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-weight: bold; font-size: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.2); animation: popIn 0.5s forwards; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        
+        /* OTHER STYLES */
         #options-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; }
         .option-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; font-size: 1.5rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
         .reveal-mode .option-card.correct { background: #16a34a; color: white; transform: scale(1.05); }
@@ -40,6 +40,7 @@
         .battery-container { width: 50%; height: 30px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 20px; overflow: hidden; }
         .battery-level { height: 100%; background: linear-gradient(90deg, #ef4444, #eab308, #22c55e); width: 0%; transition: width 1s; text-align: right; padding-right: 10px; font-weight: bold; font-size: 0.9rem; line-height: 30px; }
         @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -102,22 +103,15 @@
     function handleNavigation(data) {
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         
-        // --- ROUTAGE DES ÉCRANS ---
         if(data.currentStep === 'meteo') {
             document.getElementById('view-meteo').classList.add('active');
         } 
-        // 🔧 RÉPARATION SONDAGE : Accepte 'sondage' ET 'poll'
+        // 🔧 Accepte 'sondage' ET 'poll'
         else if(data.currentStep === 'sondage' || data.currentStep === 'poll') {
             document.getElementById('view-sondage').classList.add('active');
-            
-            // On récupère la question et les options
             const q = data.pollQuestion || data.quizQuestion || "Sondage";
             document.getElementById('poll-question').innerText = q;
-            
-            // On stocke les options pour le calcul
             currentPollOptions = data.pollOptions || data.quizOptions || [];
-            
-            // On force un premier affichage vide (pour voir les barres tout de suite)
             if(currentPollOptions.length > 0) renderPollBars({}, 0);
         } 
         else if(data.currentStep === 'quiz') {
@@ -135,8 +129,6 @@
     function listenToAll(sessId) {
         onSnapshot(query(collection(db, `sessions/${sessId}/inputs`)), (snap) => {
             const votes = { word:[], poll:{}, quiz:{}, meteo:{mood:{}, energy:[]} };
-            
-            // Init Poll Counts
             currentPollOptions.forEach(opt => votes.poll[opt] = 0);
             let totalPoll = 0;
 
@@ -144,9 +136,9 @@
                 const data = d.data();
                 if(data.type === 'word' && !data.banned) votes.word.push(data.content);
                 
-                // On écoute tout ce qui ressemble à un sondage (poll ou quiz)
-                if((data.type === 'poll' || data.type === 'quiz') && data.content) {
-                    let val = data.content.replace(/^"|"$/g, ''); // Nettoyage
+                // On écoute tout ce qui ressemble à un sondage (poll ou quiz ou sondage)
+                if((data.type === 'poll' || data.type === 'quiz' || data.type === 'sondage') && data.content) {
+                    let val = data.content.replace(/^"|"$/g, ''); 
                     if(votes.poll[val] !== undefined) {
                         votes.poll[val]++;
                         totalPoll++;
@@ -158,9 +150,7 @@
                 }
             });
 
-            // UPDATE UI
             if(document.getElementById('view-nuage').classList.contains('active')) renderCloud(votes.word);
-            // On met à jour les barres avec les vrais votes
             if(document.getElementById('view-sondage').classList.contains('active')) renderPollBars(votes.poll, totalPoll);
             if(document.getElementById('view-meteo').classList.contains('active')) renderMeteo(votes.meteo);
         });
@@ -169,22 +159,13 @@
     function renderPollBars(counts, total) {
         const container = document.getElementById('poll-results');
         container.innerHTML = "";
-        
-        // 1. Transformer en tableau
         let items = currentPollOptions.map(opt => ({ label: opt, count: counts[opt] || 0 }));
-        
-        // 2. TRIER (La demande : celui qui domine le plus en haut)
         items.sort((a,b) => b.count - a.count);
-        
-        // 3. Trouver le max pour l'échelle
         const max = items.length > 0 ? items[0].count : 0;
 
         items.forEach((item, idx) => {
-            // Calcul du pourcentage de la barre
-            // Si pas de vote, on met 0%. Si vote, on compare au max.
             const pct = max > 0 ? (item.count / max) * 100 : 0;
             const isWinner = (idx === 0 && item.count > 0);
-            
             container.innerHTML += `
                 <div class="poll-row ${isWinner ? 'winner' : ''}">
                     <div class="poll-label">${item.label}</div>
@@ -193,20 +174,23 @@
                             ${item.count > 0 ? item.count : ''}
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
-        
-        if(items.length === 0) container.innerHTML = "<div style='text-align:center'>Pas d'options...</div>";
     }
 
     function renderCloud(words) {
         const container = document.getElementById('cloud-container');
         container.innerHTML = "";
         const counts = {}; words.forEach(w => counts[w] = (counts[w] || 0)+1);
-        Object.keys(counts).forEach(w => {
+        Object.keys(counts).forEach((w, i) => {
             const div = document.createElement('div'); div.className = 'bubble'; div.innerText = w;
             div.style.fontSize = Math.min(2 + counts[w], 6) + "rem";
+            
+            // 🎨 LES COULEURS SONT ICI
+            const colors = ['#ec4899', '#22c55e', '#3b82f6', '#eab308', '#8b5cf6'];
+            div.style.backgroundColor = colors[i % colors.length] + "dd"; 
+            div.style.borderColor = colors[i % colors.length];
+            
             container.appendChild(div);
         });
     }
