@@ -1923,17 +1923,24 @@ window.setMode = async function(mode) {
     const qc = document.getElementById('quiz-controls');
     if(qc) qc.style.display = 'none';
 
+    // Bouton Vider (Commun)
+    const btnVider = `<button onclick="resetCurrentActivity('${mode}')" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:0 15px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left:10px;" title="Effacer les votes précédents">🗑️ Vider</button>`;
+
     if(mode === 'meteo') {
-        zone.innerHTML = `<button onclick="sendLiveConfig('meteo')" style="background:#0369a1; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer la Météo 🚀</button>`;
+        zone.innerHTML = `
+            <button onclick="sendLiveConfig('meteo')" style="background:#0369a1; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer la Météo 🚀</button>
+            ${btnVider}
+        `;
     } else if(mode === 'nuage') {
         zone.innerHTML = `
             <div style="width:100%; display:flex; gap:10px;">
                 <input type="text" id="live-cloud-words" placeholder="Mots suggérés..." style="flex:1; padding:10px; border-radius:6px; border:1px solid #15803d;">
                 <button onclick="sendLiveConfig('nuage')" style="background:#15803d; color:white; border:none; padding:0 20px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer</button>
+                ${btnVider}
             </div>
         `;
     } else {
-        zone.innerHTML = `<p style="color:#64748b; margin:0;">👈 Cliquez sur un élément de la <strong>Bibliothèque</strong> (à droite) pour le charger.</p>`;
+        zone.innerHTML = `<p style="color:#64748b; margin:0;">👈 Cliquez sur un élément de la <strong>Bibliothèque</strong>.</p>`;
     }
 }
 
@@ -1975,51 +1982,44 @@ window.loadItemToLive = async function(itemId) {
         const d = docSnap.data();
         const zone = document.getElementById('config-zone');
         
+        // Bouton Vider (Adapté au type)
+        // Pour un nuage, on efface 'word'. Pour un sondage/quiz, on efface 'poll' ou 'quiz'.
+        const typeToClear = d.type === 'cloud' ? 'nuage' : d.type; 
+        const btnVider = `<button onclick="resetCurrentActivity('${typeToClear}')" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left:5px;" title="Effacer les résultats précédents">🗑️ Vider</button>`;
+
         if(d.type === "cloud") {
-            // Cas du NUAGE
             const safeBank = JSON.stringify({ wordBank: d.wordBank }).replace(/'/g, "&apos;");
-            
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
                 <div style="font-size:0.8rem; color:#64748b;">Mots : ${d.wordBank.join(', ')}</div>
-                <button onclick='sendLiveConfig("nuage", ${safeBank})' style="margin-top:10px; width:100%; background:#15803d; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                <div style="display:flex; margin-top:10px;">
+                    <button onclick='sendLiveConfig("nuage", ${safeBank})' style="flex:1; background:#15803d; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                    ${btnVider}
+                </div>
             `;
         } else {
-            // Cas du SONDAGE ou QUIZ
             const opts = d.options.map((opt, i) => `<div>${String.fromCharCode(65 + i)}. ${opt}</div>`).join('');
             
-            // 👇 LA CORRECTION EST ICI : On crée le bon objet selon le type
+            // Correction payload Quiz/Sondage
             let payloadObj = {};
-            
             if (d.type === 'quiz') {
-                // Si c'est un QUIZ, on utilise les noms "quiz..."
-                payloadObj = { 
-                    quizQuestion: d.question, 
-                    quizOptions: d.options, 
-                    quizCorrect: d.correctAnswer 
-                };
+                payloadObj = { quizQuestion: d.question, quizOptions: d.options, quizCorrect: d.correctAnswer };
             } else {
-                // Sinon (Sondage), on utilise les noms "poll..."
-                payloadObj = { 
-                    pollQuestion: d.question, 
-                    pollOptions: d.options 
-                };
+                payloadObj = { pollQuestion: d.question, pollOptions: d.options };
             }
-
-            // On sécurise pour les apostrophes
             const safePayload = JSON.stringify(payloadObj).replace(/'/g, "&apos;");
             
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
                 <div style="font-size:0.9rem; margin:10px 0;">${d.question}</div>
                 <div style="font-size:0.85rem; color:#64748b;">${opts}</div>
-                <button onclick='sendLiveConfig("${d.type}", ${safePayload})' style="margin-top:10px; width:100%; background:#db2777; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                <div style="display:flex; margin-top:10px;">
+                    <button onclick='sendLiveConfig("${d.type}", ${safePayload})' style="flex:1; background:#db2777; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                    ${btnVider}
+                </div>
             `;
             
-            if(d.type === 'quiz') {
-                const qc = document.getElementById('quiz-controls');
-                if(qc) qc.style.display = 'block';
-            }
+            if(d.type === 'quiz') document.getElementById('quiz-controls').style.display = 'block';
         }
     } catch(e) { console.error(e); }
 }
