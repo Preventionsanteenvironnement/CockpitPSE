@@ -2001,11 +2001,12 @@ window.loadItemToLive = async function(itemId) {
     } catch(e) { console.error(e); }
 }
 
-// --- 5. BIBLIOTHÈQUE ---
+// --- 5. BIBLIOTHÈQUE (CORRIGÉE AVEC CASES À COCHER) ---
 window.toggleCreator = function() {
     const panel = document.getElementById("creator-panel");
     panel.style.display = panel.style.display === "none" ? "block" : "none";
 }
+
 window.updateCreatorForm = function() {
     const type = document.getElementById("create-type").value;
     const container = document.getElementById("options-container");
@@ -2016,26 +2017,60 @@ window.updateCreatorForm = function() {
         addOptionInput(); addOptionInput();
     }
 }
+
+// 👇 CETTE FONCTION AJOUTE LA CASE À COCHER
 window.addOptionInput = function() {
     const container = document.getElementById("options-container");
+    const type = document.getElementById("create-type").value;
     const div = document.createElement("div");
     div.className = "option-row";
-    div.innerHTML = `<input type="text" style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1;"><button onclick="this.parentElement.remove()">✕</button>`;
+    
+    // Si c'est un QUIZ, on ajoute une case à cocher (checkbox)
+    const checkboxHtml = (type === 'quiz') 
+        ? '<input type="checkbox" title="Cocher si c\'est la bonne réponse" style="width:20px; height:20px; margin:0 10px; cursor:pointer;">' 
+        : '';
+
+    div.innerHTML = `
+        <input type="text" placeholder="Réponse..." style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+        ${checkboxHtml}
+        <button onclick="this.parentElement.remove()" style="margin-left:5px; background:#fee2e2; border:1px solid #fca5a5; color:#b91c1c; border-radius:4px; cursor:pointer;">✕</button>
+    `;
     container.appendChild(div);
 }
+
+// 👇 CETTE FONCTION ENREGISTRE LA RÉPONSE COCHÉE
 window.saveToLibrary = async function() {
     const type = document.getElementById("create-type").value;
     const title = document.getElementById("create-title").value.trim();
     if(!title) return alert("Titre manquant");
     
     const data = { type, title, createdAt: serverTimestamp() };
+    
     if(type === "cloud") {
         data.wordBank = (document.getElementById("create-words")?.value || "").split(',').map(w=>w.trim()).filter(w=>w);
     } else {
         data.question = document.getElementById("create-question").value;
-        const rows = document.querySelectorAll("#options-container input[type='text']");
-        data.options = Array.from(rows).map(r => r.value.trim()).filter(r=>r);
+        
+        // On récupère toutes les lignes d'options
+        const rows = document.querySelectorAll("#options-container .option-row");
+        const options = [];
+        let correctIndex = -1; // -1 veut dire "pas de bonne réponse définie"
+
+        rows.forEach((row, index) => {
+            const input = row.querySelector("input[type='text']");
+            const checkbox = row.querySelector("input[type='checkbox']");
+            
+            if(input.value.trim()) {
+                options.push(input.value.trim());
+                // Si la case est cochée, on retient ce numéro comme la bonne réponse
+                if(checkbox && checkbox.checked) correctIndex = index;
+            }
+        });
+        
+        data.options = options;
+        if(type === 'quiz') data.correctAnswer = correctIndex;
     }
+    
     await addDoc(collection(db, "library"), data);
     alert("✅ Enregistré");
     toggleCreator();
