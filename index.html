@@ -1965,7 +1965,7 @@ window.resetQuiz = async function() {
     await setDoc(doc(db, "config", "live"), { quizState: 'voting' }, { merge: true });
 }
 
-// --- 4. CHARGEUR AVEC SÉCURITÉ APOSTROPHE (CRUCIAL) ---
+// --- 4. CHARGEUR AVEC CORRECTION DES ÉTIQUETTES (QUIZ VS SONDAGE) ---
 window.loadItemToLive = async function(itemId) {
     try {
         const docRef = doc(db, "library", itemId);
@@ -1976,7 +1976,7 @@ window.loadItemToLive = async function(itemId) {
         const zone = document.getElementById('config-zone');
         
         if(d.type === "cloud") {
-            // SÉCURITÉ : On protège les apostrophes pour ne pas casser le HTML
+            // Cas du NUAGE
             const safeBank = JSON.stringify({ wordBank: d.wordBank }).replace(/'/g, "&apos;");
             
             zone.innerHTML = `
@@ -1985,12 +1985,29 @@ window.loadItemToLive = async function(itemId) {
                 <button onclick='sendLiveConfig("nuage", ${safeBank})' style="margin-top:10px; width:100%; background:#15803d; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
             `;
         } else {
+            // Cas du SONDAGE ou QUIZ
             const opts = d.options.map((opt, i) => `<div>${String.fromCharCode(65 + i)}. ${opt}</div>`).join('');
             
-            // SÉCURITÉ : On protège aussi ici
-            const payload = { question: d.question, options: d.options };
-            if(d.type === 'quiz') payload.correctAnswer = d.correctAnswer;
-            const safePayload = JSON.stringify(payload).replace(/'/g, "&apos;");
+            // 👇 LA CORRECTION EST ICI : On crée le bon objet selon le type
+            let payloadObj = {};
+            
+            if (d.type === 'quiz') {
+                // Si c'est un QUIZ, on utilise les noms "quiz..."
+                payloadObj = { 
+                    quizQuestion: d.question, 
+                    quizOptions: d.options, 
+                    quizCorrect: d.correctAnswer 
+                };
+            } else {
+                // Sinon (Sondage), on utilise les noms "poll..."
+                payloadObj = { 
+                    pollQuestion: d.question, 
+                    pollOptions: d.options 
+                };
+            }
+
+            // On sécurise pour les apostrophes
+            const safePayload = JSON.stringify(payloadObj).replace(/'/g, "&apos;");
             
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
