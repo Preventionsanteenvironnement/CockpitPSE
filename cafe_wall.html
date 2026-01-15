@@ -3,113 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Écran Géant - Final</title>
+    <title>Écran Géant</title>
     <style>
-        /* === DESIGN GLOBAL === */
-        body { margin: 0; background: #0f172a; color: white; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 80%); }
-        
-        .header { position: absolute; top: 30px; left: 40px; display: flex; align-items: center; gap: 15px; opacity: 0.9; }
-        .title-main { font-size: 1.8rem; font-weight: 800; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px;}
-        
-        .qr-box { position: absolute; top: 30px; right: 40px; background: white; padding: 10px; border-radius: 16px; box-shadow: 0 15px 40px -5px rgba(0,0,0,0.5); text-align: center; z-index: 50; }
-        .qr-text { color: #0f172a; font-weight: 800; font-size: 0.7rem; margin-top: 5px; text-transform: uppercase; }
+        body { margin: 0; background: #0f172a; color: white; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 80%); }
+        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        .active { display: flex; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
-        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.5s ease; padding: 0 5%; box-sizing: border-box; }
-        .active { display: flex; opacity: 1; }
+        /* TEXTE ADAPTATIF */
+        .question-huge { font-weight: 800; text-align: center; margin-bottom: 40px; width: 90%; line-height: 1.2; font-size: clamp(2rem, 4vw, 4rem); }
 
-        /* === 1. CORRECTION TEXTE (Adaptatif) === */
-        .question-huge { 
-            font-weight: 800; 
-            text-align: center; 
-            line-height: 1.2; 
-            margin: 20px 0 40px 0; 
-            width: 100%;
-            /* La taille s'adapte : minimum 1.5rem, idéal 3.5vw, max 4rem */
-            font-size: clamp(1.8rem, 3.5vw, 4rem); 
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
+        /* SONDAGE (BARRES) */
+        #poll-results { width: 80%; max-width: 1000px; display: flex; flex-direction: column; gap: 15px; }
+        .poll-row { display: flex; align-items: center; width: 100%; }
+        .poll-label { width: 35%; text-align: right; padding-right: 20px; font-size: 1.3rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .poll-bar-bg { flex: 1; height: 35px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; position: relative; }
+        .poll-bar-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 1s; display: flex; align-items: center; padding-left: 10px; font-weight: bold; }
+        .poll-row.winner .poll-bar-fill { background: #eab308; box-shadow: 0 0 15px rgba(234, 179, 8, 0.5); }
+        .poll-row.winner .poll-label { color: #facc15; font-weight: 800; }
 
-        /* NUAGE */
-        #cloud-container { width: 100%; height: 60vh; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; align-items: center; gap: 15px; }
-        .bubble { padding: 12px 30px; border-radius: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: 700; box-shadow: 0 4px 15px rgba(0,0,0,0.2); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; white-space: nowrap; }
+        /* HEADER & QR */
+        .header { position: absolute; top: 30px; left: 40px; font-size: 1.5rem; font-weight: 800; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; }
+        .qr-box { position: absolute; top: 30px; right: 40px; background: white; padding: 10px; border-radius: 12px; text-align: center; }
+        .qr-text { color: #0f172a; font-weight: 800; font-size: 0.7rem; margin-top: 5px; }
 
-        /* QUIZ (Cartes) */
-        #options-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1200px; }
-        .option-card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px; font-size: 1.4rem; border: 1px solid rgba(255,255,255,0.1); color: white; display: flex; align-items: center; transition: all 0.3s; }
-        .opt-letter { font-weight: 800; color: #94a3b8; margin-right: 15px; font-size: 1.2rem; background: rgba(255,255,255,0.1); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; flex-shrink: 0; }
-        .reveal-mode .option-card.correct { background: #16a34a; border-color: #4ade80; color: white; transform: scale(1.03); box-shadow: 0 10px 30px rgba(22, 163, 74, 0.4); }
-        .reveal-mode .option-card.correct .opt-letter { background: white; color: #16a34a; }
-        .reveal-mode .option-card.wrong { opacity: 0.3; filter: grayscale(1); transform: scale(0.95); }
-
-        /* === 2. NOUVEAU SONDAGE (Barres Classées) === */
-        #poll-results { width: 100%; max-width: 1000px; display: flex; flex-direction: column; gap: 15px; }
-        .poll-bar-container { display: flex; align-items: center; width: 100%; animation: slideIn 0.5s ease-out; }
-        .poll-label { width: 30%; text-align: right; padding-right: 20px; font-size: 1.2rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .poll-track { flex: 1; height: 40px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; position: relative; }
-        .poll-fill { height: 100%; background: #3b82f6; width: 0%; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); border-radius: 8px; display: flex; align-items: center; padding-left: 10px; }
-        .poll-count { position: absolute; right: 10px; top: 0; bottom: 0; display: flex; align-items: center; font-weight: bold; font-size: 1.1rem; }
-        
-        /* Le gagnant en Or/Vert */
-        .poll-bar-container.winner .poll-fill { background: linear-gradient(90deg, #eab308, #facc15); box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); }
-        .poll-bar-container.winner .poll-label { color: #facc15; font-size: 1.3rem; }
-
-        /* METEO */
-        #meteo-system { width: 100%; height: 500px; display: flex; align-items: center; justify-content: center; position: relative; }
-        .sun-emoji { font-size: 10rem; z-index: 10; animation: pulse 3s infinite; filter: drop-shadow(0 0 40px rgba(255, 200, 0, 0.4)); }
-        .orbit-ring { position: absolute; border: 2px dashed rgba(255,255,255,0.1); border-radius: 50%; animation: rotate 40s linear infinite; }
-        .planet-emoji { position: absolute; font-size: 3.5rem; filter: grayscale(0.5); }
-        .battery-container { width: 50%; height: 30px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 10px; position: relative; overflow: hidden; }
-        .battery-level { height: 100%; background: linear-gradient(90deg, #ef4444, #eab308, #22c55e); width: 0%; transition: width 1s; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; font-weight: bold; font-size: 0.9rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 0.5; } }
-        .zen-circle { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%); border-radius: 50%; animation: breathe 6s infinite ease-in-out; z-index: -1; }
+        /* OTHER STYLES (Keep existing ones) */
+        #cloud-container { width: 100%; height: 60vh; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 15px; }
+        .bubble { padding: 12px 30px; border-radius: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-weight: bold; font-size: 2rem; }
+        #options-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 80%; }
+        .option-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; font-size: 1.5rem; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; }
+        .reveal-mode .option-card.correct { background: #16a34a; color: white; transform: scale(1.05); }
+        .reveal-mode .option-card.wrong { opacity: 0.3; }
+        /* Meteo */
+        #meteo-system { display: flex; align-items: center; justify-content: center; height: 400px; font-size: 8rem; }
+        .battery-container { width: 50%; height: 30px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 20px; overflow: hidden; }
+        .battery-level { height: 100%; background: linear-gradient(90deg, #ef4444, #eab308, #22c55e); width: 0%; transition: width 1s; text-align: right; padding-right: 10px; font-weight: bold; font-size: 0.9rem; line-height: 30px; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <span style="font-size: 2rem;">☕</span>
-        <div class="title-main" id="session-title-display">Bienvenue</div>
-    </div>
+    <div class="header" id="session-title-display">BIENVENUE</div>
     <div class="qr-box">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=https://preventionsanteenvironnement.github.io/PSE/cafe_mobile.html" alt="QR" width="120" height="120">
-        <div class="qr-text">Scannez</div>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=https://preventionsanteenvironnement.github.io/PSE/cafe_mobile.html" alt="QR" width="100" height="100">
+        <div class="qr-text">SCANNEZ</div>
     </div>
 
     <div id="view-wait" class="screen active">
-        <div class="zen-circle"></div>
-        <div style="font-size: 6rem; animation: float 4s infinite ease-in-out;">👋</div>
-        <h1 style="margin-top:20px; font-size:3rem; font-weight:800;">Installez-vous</h1>
-        <h2 style="color:#94a3b8; font-weight:400;">La session va bientôt commencer.</h2>
+        <div style="font-size: 6rem; animation: float 3s infinite;">👋</div>
+        <h1 style="font-size: 3rem; margin-top: 20px;">Installez-vous</h1>
     </div>
 
     <div id="view-nuage" class="screen">
-        <h1 style="font-size:3rem; margin-bottom:20px;">☁️ Vos idées en direct</h1>
+        <h1 class="question-huge">Vos idées en direct</h1>
         <div id="cloud-container"></div>
     </div>
 
-    <div id="view-quiz" class="screen">
-        <div id="quiz-question-display" class="question-huge">Question...</div>
-        <div id="options-container" class="voting-mode"></div>
+    <div id="view-sondage" class="screen">
+        <div id="poll-question" class="question-huge">Sondage</div>
+        <div id="poll-results"></div>
     </div>
 
-    <div id="view-sondage" class="screen">
-        <div id="poll-question-display" class="question-huge">Sondage</div>
-        <div id="poll-results"></div>
+    <div id="view-quiz" class="screen">
+        <div id="quiz-question" class="question-huge">Question ?</div>
+        <div id="options-container"></div>
     </div>
 
     <div id="view-meteo" class="screen">
         <h1>Météo du groupe</h1>
-        <div id="meteo-system"><div style="font-size:2rem; color:#64748b;">En attente de votes...</div></div>
-        <div class="battery-container">
-            <div class="battery-level" id="group-energy-bar">0%</div>
-        </div>
-        <div style="font-size:0.8rem; color:#64748b; margin-top:5px; text-transform:uppercase;">Énergie Moyenne</div>
+        <div id="meteo-system">☀️</div>
+        <div class="battery-container"><div id="energy-bar" class="battery-level">0%</div></div>
     </div>
 
 <script type="module">
@@ -121,8 +83,7 @@
     const db = getFirestore(app);
 
     let activeSessionId = null;
-    let currentQuizCorrectIndex = -1;
-    let currentPollOptions = []; // Pour stocker les labels du sondage
+    let currentPollOptions = [];
 
     onSnapshot(doc(db, "config", "live"), (snap) => {
         if(!snap.exists()) return;
@@ -131,187 +92,121 @@
         
         if(data.activeSessionId !== activeSessionId) {
             activeSessionId = data.activeSessionId;
-            if(activeSessionId) { 
-                listenToVotes(activeSessionId); // Nuage
-                listenToMeteo(activeSessionId); // Météo
-                listenToPoll(activeSessionId);  // Sondage
-            } else showScreen('wait');
+            if(activeSessionId) { listenToAll(activeSessionId); }
         }
         handleNavigation(data);
     });
 
     function handleNavigation(data) {
-        const step = data.currentStep || 'wait';
-        const quizState = data.quizState || 'voting';
-        const optsContainer = document.getElementById('options-container');
-        optsContainer.classList.remove('voting-mode', 'reveal-mode');
-
-        if(step === 'meteo') showScreen('meteo');
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         
-        else if (step === 'sondage') {
-            // Configuration SONDAGE
-            document.getElementById('poll-question-display').innerText = data.pollQuestion || data.quizQuestion || "Sondage";
-            currentPollOptions = data.pollOptions || data.quizOptions || [];
-            showScreen('sondage');
-            // Le rendu des barres se fera via listenToPoll
-        }
-        else if (step === 'quiz') {
-            // Configuration QUIZ
-            currentQuizCorrectIndex = data.quizCorrect;
-            setupQuizDisplay(data.quizQuestion || data.pollQuestion, data.quizOptions || data.pollOptions);
-            if(quizState === 'revealed') { optsContainer.classList.add('reveal-mode'); revealAnswer(); }
-            showScreen('quiz');
+        if(data.currentStep === 'meteo') {
+            document.getElementById('view-meteo').classList.add('active');
         } 
-        else if (step === 'nuage') showScreen('nuage');
-        else showScreen('wait');
+        else if(data.currentStep === 'sondage') {
+            document.getElementById('view-sondage').classList.add('active');
+            document.getElementById('poll-question').innerText = data.pollQuestion || "Sondage";
+            currentPollOptions = data.pollOptions || [];
+            renderPollBars({}, 0); // Force l'affichage vide au début
+        } 
+        else if(data.currentStep === 'quiz') {
+            document.getElementById('view-quiz').classList.add('active');
+            setupQuiz(data.quizQuestion, data.quizOptions, data.quizState, data.quizCorrect);
+        } 
+        else if(data.currentStep === 'nuage') {
+            document.getElementById('view-nuage').classList.add('active');
+        } 
+        else {
+            document.getElementById('view-wait').classList.add('active');
+        }
     }
 
-    function showScreen(name) {
-        document.querySelectorAll('.screen').forEach(el => { el.style.opacity = 0; setTimeout(() => el.classList.remove('active'), 400); });
-        const target = document.getElementById('view-' + name);
-        if(target) { setTimeout(() => { target.classList.add('active'); setTimeout(() => target.style.opacity = 1, 50); }, 400); }
-    }
-
-    // --- QUIZ (Cartes) ---
-    function setupQuizDisplay(question, options) {
-        document.getElementById('quiz-question-display').innerText = question || "Question ?";
-        const container = document.getElementById('options-container');
-        container.innerHTML = '';
-        if(!options) return;
-        
-        options.forEach((optText, index) => {
-            const letter = String.fromCharCode(65 + index);
-            const card = document.createElement('div'); card.className = 'option-card'; card.id = 'opt-card-' + index;
-            card.innerHTML = `<span class="opt-letter">${letter}</span> ${optText}`;
-            container.appendChild(card);
-        });
-    }
-    
-    function revealAnswer() {
-        if(currentQuizCorrectIndex === undefined || currentQuizCorrectIndex < 0) return;
-        const cards = document.querySelectorAll('.option-card');
-        cards.forEach((card, index) => {
-            if(index === currentQuizCorrectIndex) card.classList.add('correct'); else card.classList.add('wrong');
-        });
-    }
-
-    // --- SONDAGE (Barres Classées) ---
-    function listenToPoll(sessId) {
+    function listenToAll(sessId) {
         onSnapshot(query(collection(db, `sessions/${sessId}/inputs`)), (snap) => {
-            // Ne traiter que si on est sur l'écran sondage
-            if(!document.getElementById('view-sondage').classList.contains('active')) return;
+            const votes = { word:[], poll:{}, quiz:{}, meteo:{mood:{}, energy:[]} };
+            
+            // Init Poll Counts
+            currentPollOptions.forEach(opt => votes.poll[opt] = 0);
 
-            let counts = {};
-            // Init à 0 pour toutes les options connues
-            currentPollOptions.forEach(opt => counts[opt] = 0);
-
-            let totalVotes = 0;
             snap.forEach(d => {
                 const data = d.data();
-                // On accepte 'poll' ou 'quiz' comme type de réponse pour être large
-                if((data.type === 'poll' || data.type === 'quiz') && data.content) {
-                    // Nettoyage des guillemets éventuels
-                    let val = data.content.replace ? data.content.replace(/^"|"$/g, '') : data.content; 
-                    if(counts[val] !== undefined) {
-                        counts[val]++;
-                        totalVotes++;
-                    }
+                if(data.type === 'word' && !data.banned) votes.word.push(data.content);
+                if(data.type === 'poll') {
+                    // Nettoyage guillemets
+                    let val = data.content.replace(/^"|"$/g, '');
+                    if(votes.poll[val] !== undefined) votes.poll[val]++;
+                }
+                if(data.type === 'meteo_full') {
+                    try { const p = JSON.parse(data.content); if(p.mood) votes.meteo.mood[p.mood] = (votes.meteo.mood[p.mood]||0)+1; if(p.energy) votes.meteo.energy.push(p.energy); } catch(e){}
                 }
             });
 
-            renderPollBars(counts, totalVotes);
+            // UPDATE UI
+            if(document.getElementById('view-nuage').classList.contains('active')) renderCloud(votes.word);
+            if(document.getElementById('view-sondage').classList.contains('active')) renderPollBars(votes.poll);
+            if(document.getElementById('view-meteo').classList.contains('active')) renderMeteo(votes.meteo);
         });
     }
 
-    function renderPollBars(counts, total) {
+    function renderPollBars(counts) {
         const container = document.getElementById('poll-results');
         container.innerHTML = "";
+        
+        // Convert to Array & Sort
+        const sorted = currentPollOptions.map(opt => ({ label: opt, count: counts[opt] || 0 }))
+                                         .sort((a,b) => b.count - a.count);
+        
+        const max = sorted.length > 0 ? sorted[0].count : 0;
 
-        if(total === 0) {
-            container.innerHTML = "<div style='text-align:center; color:#64748b; font-size:1.5rem;'>En attente de votes...</div>";
-            return;
-        }
-
-        // TRIER : Du plus grand au plus petit
-        const sorted = Object.keys(counts).map(key => {
-            return { label: key, count: counts[key] };
-        }).sort((a,b) => b.count - a.count);
-
-        const max = sorted[0].count; // Le score du premier
-
-        sorted.forEach((item, index) => {
-            const pct = max > 0 ? (item.count / max) * 100 : 0; // Largeur relative au premier
-            const isWinner = (index === 0 && item.count > 0);
+        sorted.forEach((item, idx) => {
+            const pct = max > 0 ? (item.count / max) * 100 : 0;
+            const isWinner = (idx === 0 && item.count > 0);
             
-            const div = document.createElement('div');
-            div.className = `poll-bar-container ${isWinner ? 'winner' : ''}`;
-            
-            div.innerHTML = `
-                <div class="poll-label">${item.label}</div>
-                <div class="poll-track">
-                    <div class="poll-fill" style="width:${pct}%"></div>
-                    <div class="poll-count">${item.count}</div>
+            container.innerHTML += `
+                <div class="poll-row ${isWinner ? 'winner' : ''}">
+                    <div class="poll-label">${item.label}</div>
+                    <div class="poll-bar-bg">
+                        <div class="poll-bar-fill" style="width:${pct}%">${item.count > 0 ? item.count : ''}</div>
+                    </div>
                 </div>
             `;
+        });
+    }
+
+    function renderCloud(words) {
+        const container = document.getElementById('cloud-container');
+        container.innerHTML = "";
+        const counts = {}; words.forEach(w => counts[w] = (counts[w] || 0)+1);
+        Object.keys(counts).forEach(w => {
+            const div = document.createElement('div'); div.className = 'bubble'; div.innerText = w;
+            div.style.fontSize = Math.min(2 + counts[w], 6) + "rem";
             container.appendChild(div);
         });
     }
 
-    // --- NUAGE & METEO (Déjà OK) ---
-    function listenToVotes(sessId) {
-        onSnapshot(query(collection(db, `sessions/${sessId}/inputs`)), (snap) => {
-            const words = [];
-            snap.forEach(d => { 
-                const data = d.data();
-                if(data.type === 'word' && !data.banned) words.push(data.content);
-            });
-            if(document.getElementById('view-nuage').classList.contains('active')) renderCloud(words);
-        });
+    function renderMeteo(data) {
+        // Battery
+        const avg = data.energy.length ? Math.round(data.energy.reduce((a,b)=>a+b,0)/data.energy.length) : 0;
+        document.getElementById('energy-bar').style.width = avg + "%";
+        document.getElementById('energy-bar').innerText = avg + "%";
+        // Sun (Basic logic)
+        let maxMood = '☀️', maxC = 0; const map = {'super':'🤩','bien':'🙂','bof':'🤔','mauvais':'😰'};
+        for(let m in data.mood) if(data.mood[m] > maxC) { maxC = data.mood[m]; maxMood = map[m]; }
+        document.getElementById('meteo-system').innerText = maxC > 0 ? maxMood : "En attente...";
     }
-    function renderCloud(words) {
-        const container = document.getElementById('cloud-container');
-        container.innerHTML = "";
-        if(words.length === 0) { container.innerHTML = "<div style='color:#64748b; font-size:1.5rem;'>En attente de mots...</div>"; return; }
-        const counts = {}; words.forEach(w => counts[w] = (counts[w] || 0) + 1);
-        Object.keys(counts).forEach((word, i) => {
-            const el = document.createElement('div'); el.className = 'bubble'; el.innerText = word;
-            let size = 2 + (counts[word] - 1) * 1.5; el.style.fontSize = Math.min(size, 8) + "rem"; 
-            const cols = ['rgba(244, 114, 182, 0.9)', 'rgba(74, 222, 128, 0.9)', 'rgba(96, 165, 250, 0.9)', 'rgba(250, 204, 21, 0.9)'];
-            el.style.backgroundColor = cols[i % cols.length]; el.style.borderColor = el.style.backgroundColor.replace('0.9', '1');
-            el.style.zIndex = Math.floor(size * 10);
-            container.appendChild(el);
+
+    function setupQuiz(q, opts, state, correct) {
+        document.getElementById('quiz-question').innerText = q;
+        const cont = document.getElementById('options-container');
+        cont.innerHTML = "";
+        if(!opts) return;
+        opts.forEach((o, i) => {
+            const letter = String.fromCharCode(65+i);
+            let cls = 'option-card';
+            if(state === 'revealed') cls += (i === correct ? ' correct' : ' wrong');
+            cont.innerHTML += `<div class="${cls}"><span class="opt-letter">${letter}</span> ${o}</div>`;
         });
-    }
-    function listenToMeteo(sessId) {
-        onSnapshot(query(collection(db, `sessions/${sessId}/inputs`)), (snap) => {
-            let counts = { 'super':0, 'bien':0, 'bof':0, 'mauvais':0 }; let totalE=0, nbE=0;
-            snap.forEach(d => {
-                const data = d.data();
-                if(data.type === 'meteo_full') { try { const p = JSON.parse(data.content); counts[p.mood]++; if(p.energy){totalE+=p.energy; nbE++;} } catch(e){} } 
-                else if(data.type === 'mood') counts[data.content]++;
-            });
-            const avg = nbE > 0 ? Math.round(totalE/nbE) : 0;
-            document.getElementById('group-energy-bar').style.width = avg+"%"; document.getElementById('group-energy-bar').innerText = avg+"%";
-            renderSolarSystem(counts);
-        });
-    }
-    function renderSolarSystem(counts) {
-        const container = document.getElementById('meteo-system');
-        let winner='super', max=-1, total=0;
-        Object.keys(counts).forEach(k => { total+=counts[k]; if(counts[k]>max){max=counts[k]; winner=k;} });
-        if(total === 0) { container.innerHTML = "<div style='font-size:2rem; color:#64748b;'>En attente de votes...</div>"; return; }
-        const emojis = { 'super':'🤩', 'bien':'🙂', 'bof':'🤔', 'mauvais':'😰' };
-        let html = `<div class="sun-emoji">${emojis[winner]}</div>`;
-        const others = Object.keys(counts).filter(k => k !== winner && counts[k] > 0);
-        if(others.length > 0) {
-            html += `<div class="orbit-ring" style="width:350px; height:350px;">`;
-            others.forEach((k, i) => {
-                const angle = (360/others.length)*i;
-                html += `<div class="planet-emoji" style="top:0; left:50%; margin:-2rem; transform:rotate(${angle}deg) translateY(-175px) rotate(-${angle}deg);">${emojis[k]}</div>`;
-            });
-            html += `</div>`;
-        }
-        container.innerHTML = html;
+        if(state === 'revealed') document.getElementById('options-container').classList.add('reveal-mode');
     }
 </script>
 </body>
