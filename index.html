@@ -1983,10 +1983,12 @@ window.loadItemToLive = async function(itemId) {
         const d = docSnap.data();
         const zone = document.getElementById('config-zone');
         
-        // Bouton Vider (Adapté au type)
-        // Pour un nuage, on efface 'word'. Pour un sondage/quiz, on efface 'poll' ou 'quiz'.
-        const typeToClear = d.type === 'cloud' ? 'nuage' : d.type; 
-        const btnVider = `<button onclick="resetCurrentActivity('${typeToClear}')" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left:5px;" title="Effacer les résultats précédents">🗑️ Vider</button>`;
+        // 🚨 CORRECTIF CRUCIAL : C'est ici que ça bloquait !
+        // On force le mot 'sondage' pour que l'écran comprenne, même si c'est enregistré 'poll'
+        const typeForLive = (d.type === 'poll') ? 'sondage' : d.type;
+
+        // Bouton Vider adapté
+        const btnVider = `<button onclick="resetCurrentActivity('${typeForLive}')" style="background:#fff; color:#dc2626; border:1px solid #dc2626; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left:5px;" title="Effacer">🗑️ Vider</button>`;
 
         if(d.type === "cloud") {
             const safeBank = JSON.stringify({ wordBank: d.wordBank }).replace(/'/g, "&apos;");
@@ -1996,33 +1998,36 @@ window.loadItemToLive = async function(itemId) {
                 <div style="display:flex; margin-top:10px;">
                     <button onclick='sendLiveConfig("nuage", ${safeBank})' style="flex:1; background:#15803d; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
                     ${btnVider}
-                </div>
-            `;
+                </div>`;
         } else {
-            const opts = d.options.map((opt, i) => `<div>${String.fromCharCode(65 + i)}. ${opt}</div>`).join('');
+            const opts = d.options ? d.options.map((opt, i) => `<div>${String.fromCharCode(65 + i)}. ${opt}</div>`).join('') : 'Aucune option';
             
-            // Correction payload Quiz/Sondage
+            // Préparation des données pour l'écran
             let payloadObj = {};
             if (d.type === 'quiz') {
                 payloadObj = { quizQuestion: d.question, quizOptions: d.options, quizCorrect: d.correctAnswer };
             } else {
+                // IMPORTANT : On envoie bien les données du sondage
                 payloadObj = { pollQuestion: d.question, pollOptions: d.options };
             }
+
             const safePayload = JSON.stringify(payloadObj).replace(/'/g, "&apos;");
+            const btnColor = d.type === 'poll' ? '#f59e0b' : '#db2777';
             
             zone.innerHTML = `
                 <div><strong>${d.title}</strong></div>
                 <div style="font-size:0.9rem; margin:10px 0;">${d.question}</div>
                 <div style="font-size:0.85rem; color:#64748b;">${opts}</div>
                 <div style="display:flex; margin-top:10px;">
-                    <button onclick='sendLiveConfig("${d.type}", ${safePayload})' style="flex:1; background:#db2777; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
+                    <button onclick='sendLiveConfig("${typeForLive}", ${safePayload})' style="flex:1; background:${btnColor}; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Lancer 🚀</button>
                     ${btnVider}
-                </div>
-            `;
+                </div>`;
             
+            // Afficher ou masquer les contrôles Quiz
             if(d.type === 'quiz') document.getElementById('quiz-controls').style.display = 'block';
+            else document.getElementById('quiz-controls').style.display = 'none';
         }
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert("Erreur chargement: " + e.message); }
 }
 
 // --- 5. BIBLIOTHÈQUE (CORRIGÉE AVEC CASES À COCHER) ---
