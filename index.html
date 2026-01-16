@@ -469,16 +469,17 @@
           <h3>👥 Présence (micro)</h3>
           <div style="overflow-x:auto;">
             <table class="results-table" style="min-width:720px;">
-              <thead>
+             <thead>
                 <tr>
                   <th>Élève</th>
                   <th>Classe</th>
-                  <th>Assiduité (période)</th>
+                  <th>Visites</th>
+                  <th>Temps Cumulé ⏱️</th>
                   <th>Dernière activité</th>
                 </tr>
               </thead>
               <tbody id="trafic-presence-body">
-                <tr><td colspan="4" class="scores-empty">Chargement…</td></tr>
+                <tr><td colspan="5" class="scores-empty">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -495,15 +496,15 @@
         <div style="overflow:auto; max-height:420px;">
           <table class="results-table" style="min-width:880px;">
             <thead>
-              <tr>
-                <th>Date/Heure</th>
-                <th>Élève</th>
-                <th>Classe</th>
-                <th>Action</th>
-                <th>Page / Contenu</th>
-                <th>Type</th>
-              </tr>
-            </thead>
+                <tr>
+                  <th>Date/Heure</th>
+                  <th>Élève</th>
+                  <th>Classe</th>
+                  <th>Temps ⏱️</th>
+                  <th>Page / Contenu</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
             <tbody id="trafic-logs-body">
               <tr><td colspan="6" class="scores-empty">Chargement…</td></tr>
             </tbody>
@@ -1582,23 +1583,32 @@ let traficEnCours = false;
       }
     }
 
+  // --- NOUVEAU MOTEUR TRAFIC (TEMPS & DURÉE & COULEURS) ---
+
+    // 1. TOP CONTENUS (Avec temps moyen)
     function traficRenderTopPages(logs) {
       const box = document.getElementById("trafic-top-pages");
       if (!box) return;
 
       const counts = {};
-      const anonCounts = {};
+      const totalTime = {}; // Stocke la durée totale
+      
       logs.forEach(d => {
-        const page = String(d.page || d.nomPage || d.contenu || "Inconnu");
-        counts[page] = (counts[page] || 0) + 1;
-        if (traficIsAnonymous(d)) anonCounts[page] = (anonCounts[page] || 0) + 1;
+        const p = String(d.page || d.nomPage || d.contenu || "Inconnu");
+        counts[p] = (counts[p] || 0) + 1;
+        totalTime[p] = (totalTime[p] || 0) + (d.duree || 0);
       });
 
       const ranked = Object.keys(counts).map(name => {
         const total = counts[name];
-        const anon = anonCounts[name] || 0;
-        const anonPct = total ? Math.round((anon / total) * 100) : 0;
-        return { name, total, anonPct };
+        const avg = total ? Math.floor(totalTime[name] / total) : 0;
+        
+        // Formatage minutes/secondes
+        const m = Math.floor(avg / 60);
+        const s = avg % 60;
+        const timeStr = `${m}m${s}s`;
+
+        return { name, total, timeStr };
       }).sort((a, b) => b.total - a.total).slice(0, 15);
 
       let html = "";
@@ -1607,18 +1617,21 @@ let traficEnCours = false;
           <div class="rank-item">
             <span class="rank-pos">${i + 1}.</span>
             <span class="rank-name">${p.name}</span>
-            <span class="rank-val">${p.total} vues • ${p.anonPct}% anon.</span>
+            <div style="text-align:right;">
+                <div class="rank-val">${p.total} vues</div>
+                <div style="font-size:0.75rem; color:#64748b;">Moy. ⏱️ <strong>${p.timeStr}</strong></div>
+            </div>
           </div>`;
       });
 
-      box.innerHTML = html || `<div style="color:#64748b;">Aucune donnée sur la période.</div>`;
+      box.innerHTML = html || `<div style="color:#64748b;">Aucune donnée.</div>`;
     }
 
+    // 2. PRÉSENCE MICRO (Avec temps cumulé vert)
     function traficRenderPresence(logs, classFilter, eleveFilter) {
       const tbody = document.getElementById("trafic-presence-body");
       if (!tbody) return;
 
-      // Agrégation par élève
       const map = new Map();
       logs.forEach(d => {
         const code = traficNormalizeCode(d.userCode || d.code || d.eleve || d.identifiant);
@@ -1629,37 +1642,45 @@ let traficEnCours = false;
         if (eleveFilter !== "ALL" && code !== eleveFilter) return;
 
         const key = `${code}__${classe}`;
-        const item = map.get(key) || { code, classe, count: 0, lastDt: null, lastPage: "" };
+        const item = map.get(key) || { code, classe, count: 0, lastDt: null, totalDuree: 0 };
+        
         item.count += 1;
+        item.totalDuree += (d.duree || 0);
 
-        if (!item.lastDt || dt > item.lastDt) {
-          item.lastDt = dt;
-          item.lastPage = String(d.page || d.nomPage || d.contenu || "Inconnu");
-        }
+        if (!item.lastDt || dt > item.lastDt) item.lastDt = dt;
         map.set(key, item);
       });
 
-      const rows = [...map.values()].sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return (b.lastDt?.getTime() || 0) - (a.lastDt?.getTime() || 0);
-      }).slice(0, 60);
+      const rows = [...map.values()].sort((a, b) => b.totalDuree - a.totalDuree).slice(0, 60);
 
       if (rows.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='4' class='scores-empty'>Aucune activité sur la période.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' class='scores-empty'>Aucune activité.</td></tr>";
         return;
       }
 
       tbody.innerHTML = rows.map(r => {
-        const last = r.lastDt ? `${traficFmtDateTime(r.lastDt)} • ${r.lastPage}` : "-";
+        const last = r.lastDt ? traficFmtDateTime(r.lastDt) : "-";
+        
+        // Calcul temps total (Heures / Minutes)
+        let tempsStr = "0s";
+        if(r.totalDuree > 0) {
+            const h = Math.floor(r.totalDuree / 3600);
+            const m = Math.floor((r.totalDuree % 3600) / 60);
+            if(h > 0) tempsStr = `<strong>${h}h ${m}m</strong>`;
+            else tempsStr = `<strong>${m} min</strong>`;
+        }
+
         return `<tr>
-          <td style="font-weight:800;">${r.code}</td>
+          <td style="font-weight:800; color:#1e293b;">${r.code}</td>
           <td>${r.classe}</td>
-          <td>${r.count}</td>
-          <td>${last}</td>
+          <td style="text-align:center;">${r.count}</td>
+          <td style="color:#059669; background:#ecfdf5; text-align:center; border-radius:4px;">${tempsStr}</td>
+          <td style="font-size:0.85rem; color:#64748b;">${last}</td>
         </tr>`;
       }).join("");
     }
 
+    // 3. JOURNAL DE BORD (Avec points rouges/verts 🔴🟢)
     function traficRenderLogs(logs, classFilter, eleveFilter, typeFilter) {
       const tbody = document.getElementById("trafic-logs-body");
       if (!tbody) return;
@@ -1677,7 +1698,7 @@ let traficEnCours = false;
       }).slice(0, 120);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='6' class='scores-empty'>Aucune ligne sur la période.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='6' class='scores-empty'>Aucune ligne.</td></tr>";
         return;
       }
 
@@ -1685,21 +1706,40 @@ let traficEnCours = false;
         const dt = d.__dt;
         const code = traficNormalizeCode(d.userCode || d.code || d.eleve || d.identifiant);
         const classe = traficClassLabel(d);
-        const action = String(d.action || "Consultation");
         const page = String(d.page || d.nomPage || d.contenu || "Inconnu");
         const anon = traficIsAnonymous(d);
-        const type = anon ? "Anonyme" : "Identifié";
+        
+        // CALCUL TEMPS & COULEUR
+        let dureeAff = "-";
+        let styleDuree = "color:#94a3b8";
+        
+        if (d.duree !== undefined) {
+            const min = Math.floor(d.duree / 60);
+            const sec = d.duree % 60;
+            const txt = `${min}m ${sec}s`;
+            
+            if(d.duree < 30) {
+                dureeAff = `🔴 ${txt}`; 
+                styleDuree = "color:#ef4444; font-weight:800;";
+            } else if(d.duree > 120) {
+                dureeAff = `🟢 ${txt}`;
+                styleDuree = "color:#16a34a; font-weight:800;";
+            } else {
+                dureeAff = `🟠 ${txt}`;
+                styleDuree = "color:#f59e0b; font-weight:800;";
+            }
+        }
+
         return `<tr>
           <td>${traficFmtDateTime(dt)}</td>
           <td style="font-weight:800;">${code}</td>
           <td>${classe}</td>
-          <td>${action}</td>
+          <td style="${styleDuree}">${dureeAff}</td>
           <td>${page}</td>
-          <td>${type}</td>
+          <td>${anon ? "Anonyme" : "Identifié"}</td>
         </tr>`;
       }).join("");
     }
-
     async function traficRefresh() {
       const period = document.getElementById("trafic-period")?.value || "7d";
       const classSel = document.getElementById("trafic-class");
