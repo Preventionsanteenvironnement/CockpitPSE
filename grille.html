@@ -19,7 +19,7 @@
         .status-ok { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .status-ko { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .loading { text-align: center; padding: 50px; color: #64748b; font-size: 1.2em; }
-        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; }
+        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -53,25 +53,26 @@
             const copy = JSON.parse(rawData);
             console.log("Copie chargée :", copy);
 
-            // --- VERSION LOCALE SIMPLE ---
-            // On cherche le fichier dans le dossier 'devoirs' du Cockpit lui-même.
-            // Plus de problème de lien entre sites différents.
-            const blueprintUrl = `devoirs/${copy.devoirId}_blueprint.json`;
+            // --- VERSION LOCALE RACINE ---
+            // On cherche le fichier JSON juste à côté (pas de dossier)
+            // On nettoie l'ID pour éviter les espaces invisibles
+            const cleanId = (copy.devoirId || "").trim();
+            const blueprintUrl = `${cleanId}_blueprint.json`;
             
             console.log("Chargement local :", blueprintUrl);
             const resp = await fetch(blueprintUrl);
             
             if (!resp.ok) { 
-                throw new Error(`Fichier corrigé introuvable dans le dossier 'devoirs' du Cockpit.\n(Nom cherché : ${copy.devoirId}_blueprint.json)`); 
+                throw new Error(`Fichier corrigé introuvable à la racine du Cockpit.\n(Nom cherché : ${blueprintUrl})`); 
             }
             
             const blueprint = await resp.json();
             renderCorrection(copy, blueprint);
 
         } catch (e) { 
-            // Si on a encore "Unexpected token <", c'est que le fichier n'est pas dans le dossier devoirs du Cockpit
-            if(e.message.includes("<")) {
-                showError("Le fichier JSON n'est pas encore dans le dossier 'devoirs' du Cockpit.");
+            // Si erreur <, c'est que le fichier n'est pas là (page 404 HTML)
+            if(e.message.includes("<") || e.name === "SyntaxError") {
+                showError("Le fichier JSON n'est pas encore trouvé à la racine du site Cockpit. Vérifiez son nom exact.");
             } else {
                 showError("Erreur : " + e.message); 
             }
