@@ -19,8 +19,8 @@
         .status-ok { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .status-ko { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .loading { text-align: center; padding: 50px; color: #64748b; font-size: 1.2em; }
-        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; word-wrap: break-word;}
-        .debug-url { font-family: monospace; font-size: 0.85em; background: #f1f5f9; padding: 10px; margin-top: 10px; border-radius: 6px; display:block; color: #334155; }
+        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; word-break: break-all; }
+        .link-debug { font-size: 0.8em; margin-top: 10px; display: block; color: #475569; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -54,31 +54,38 @@
             const copy = JSON.parse(rawData);
             console.log("Copie chargée :", copy);
 
-            // 1. NETTOYAGE DE L'ID (Supprime les espaces et caractères invisibles)
-            let cleanId = copy.devoirId ? copy.devoirId.trim() : "";
+            // --- CHANGEMENT STRATEGIQUE : LIEN RAW (BRUT) ---
+            // On utilise l'adresse directe du fichier sur les serveurs de stockage GitHub
+            // Structure : https://raw.githubusercontent.com/[USER]/[REPO]/main/[DOSSIER]/[FICHIER]
+            const user = "preventionsanteenvironnement";
+            const repo = "PSE";
+            const branch = "main"; // C'est généralement 'main' ou 'master'
             
-            if (!cleanId) {
-                throw new Error("L'identifiant du devoir est manquant dans la copie.");
-            }
-
-            // 2. CONSTRUCTION DE L'ADRESSE (Vers le site PSE)
-            const baseUrl = "https://preventionsanteenvironnement.github.io/PSE/devoirs/";
-            const fileName = cleanId + "_blueprint.json";
+            const fileName = (copy.devoirId || "").trim() + "_blueprint.json";
             
-            // On s'assure que l'URL est valide
-            const blueprintUrl = new URL(fileName, baseUrl).href;
+            // URL BRUTE (Plus fiable pour les données)
+            const blueprintUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/devoirs/${fileName}`;
             
-            console.log("Tentative chargement :", blueprintUrl);
-
-            // 3. RECUPERATION DU FICHIER
+            console.log("Tentative chargement RAW :", blueprintUrl);
+            
             const resp = await fetch(blueprintUrl);
             
             if (!resp.ok) { 
-                // Affiche le lien cliquable pour tester
-                throw new Error(`Fichier introuvable sur le site PSE.<br><a href="${blueprintUrl}" target="_blank" class="debug-url">${blueprintUrl}</a>`); 
+                // Si ça échoue, on donne le lien pour vérifier manuellement
+                throw new Error(`Fichier introuvable (404).<br>L'ordinateur a cherché ici :<br><a href="${blueprintUrl}" target="_blank" class="link-debug">${blueprintUrl}</a>`); 
             }
             
-            const blueprint = await resp.json();
+            // On vérifie que c'est bien du JSON
+            const contentType = resp.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") === -1 && contentType.indexOf("text/plain") === -1) {
+                 // Parfois le raw renvoie du text/plain, c'est ok pour nous, mais si c'est html c'est non.
+                 const text = await resp.text();
+                 if(text.trim().startsWith("<")) throw new Error("Le fichier reçu n'est pas du JSON (c'est une page HTML d'erreur).");
+                 var blueprint = JSON.parse(text); // On parse manuellement
+            } else {
+                 var blueprint = await resp.json();
+            }
+
             renderCorrection(copy, blueprint);
 
         } catch (e) { 
@@ -126,7 +133,7 @@
         document.getElementById("loader").style.display = "none";
         const box = document.getElementById("error-msg");
         box.style.display = "block";
-        box.innerHTML = msg; 
+        box.innerHTML = msg;
     }
 
     init();
