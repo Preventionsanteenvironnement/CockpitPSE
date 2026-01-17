@@ -19,8 +19,8 @@
         .status-ok { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .status-ko { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .loading { text-align: center; padding: 50px; color: #64748b; font-size: 1.2em; }
-        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; }
-        .debug-info { font-size: 0.8em; color: #64748b; margin-top: 10px; font-family: monospace; word-break: break-all; }
+        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; word-wrap: break-word;}
+        .debug-url { font-family: monospace; font-size: 0.85em; background: #f1f5f9; padding: 10px; margin-top: 10px; border-radius: 6px; display:block; color: #334155; }
     </style>
 </head>
 <body>
@@ -54,30 +54,35 @@
             const copy = JSON.parse(rawData);
             console.log("Copie chargée :", copy);
 
-            // --- C'EST ICI LA CLÉ DE L'ARCHITECTURE ---
-            // On vise le Site A (PSE) depuis le Site B (Cockpit)
-            // L'URL de base est fixe : c'est votre dossier devoirs sur le site PSE
+            // 1. NETTOYAGE DE L'ID (Supprime les espaces et caractères invisibles)
+            let cleanId = copy.devoirId ? copy.devoirId.trim() : "";
+            
+            if (!cleanId) {
+                throw new Error("L'identifiant du devoir est manquant dans la copie.");
+            }
+
+            // 2. CONSTRUCTION DE L'ADRESSE (Vers le site PSE)
             const baseUrl = "https://preventionsanteenvironnement.github.io/PSE/devoirs/";
+            const fileName = cleanId + "_blueprint.json";
             
-            // On construit le nom du fichier
-            const fileName = copy.devoirId + "_blueprint.json";
-            const blueprintUrl = baseUrl + fileName;
+            // On s'assure que l'URL est valide
+            const blueprintUrl = new URL(fileName, baseUrl).href;
             
-            console.log("Tentative de chargement :", blueprintUrl);
-            
+            console.log("Tentative chargement :", blueprintUrl);
+
+            // 3. RECUPERATION DU FICHIER
             const resp = await fetch(blueprintUrl);
             
             if (!resp.ok) { 
-                // Si ça échoue, on affiche le lien exact pour vérifier
-                throw new Error(`Fichier introuvable sur le site PSE.<br><div class="debug-info">Lien testé : <a href="${blueprintUrl}" target="_blank">${blueprintUrl}</a></div>`); 
+                // Affiche le lien cliquable pour tester
+                throw new Error(`Fichier introuvable sur le site PSE.<br><a href="${blueprintUrl}" target="_blank" class="debug-url">${blueprintUrl}</a>`); 
             }
             
             const blueprint = await resp.json();
             renderCorrection(copy, blueprint);
 
         } catch (e) { 
-            // On affiche l'erreur brute pour comprendre "String did not match" si ça revient
-            showError("Erreur technique : " + e.message); 
+            showError("Erreur : " + e.message); 
             console.error(e);
         }
     }
@@ -121,7 +126,7 @@
         document.getElementById("loader").style.display = "none";
         const box = document.getElementById("error-msg");
         box.style.display = "block";
-        box.innerHTML = msg; // innerHTML pour autoriser les liens
+        box.innerHTML = msg; 
     }
 
     init();
