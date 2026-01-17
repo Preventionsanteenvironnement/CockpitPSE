@@ -9,19 +9,15 @@
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         h1 { text-align: center; color: #0f172a; margin-bottom: 30px; }
-        
         .score-box { background: #f8fafc; border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
         .score-val { font-size: 2.5em; font-weight: 900; color: #2563eb; }
-        
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
         th { background: #f1f5f9; font-weight: 800; }
-        
         .rep-eleve { color: #1e293b; font-weight: 600; }
         .rep-corrige { color: #16a34a; font-size: 0.9em; margin-top: 5px; font-style: italic; }
         .status-ok { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .status-ko { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-        
         .loading { text-align: center; padding: 50px; color: #64748b; font-size: 1.2em; }
         .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; }
     </style>
@@ -32,21 +28,14 @@
     <div id="loader" class="loading">Chargement de la copie...</div>
     <div id="content" style="display:none;">
         <h1 id="titre-devoir">Correction</h1>
-        
         <div class="score-box">
             <div>Note Finale</div>
             <div class="score-val"><span id="note-finale">--</span> / 20</div>
             <div id="eleve-info" style="margin-top:10px; color:#64748b;"></div>
         </div>
-
         <table id="grille-table">
             <thead>
-                <tr>
-                    <th>Question</th>
-                    <th>Réponse Élève / Corrigé</th>
-                    <th>Barème</th>
-                    <th>Résultat</th>
-                </tr>
+                <tr><th>Question</th><th>Réponse Élève / Corrigé</th><th>Barème</th><th>Résultat</th></tr>
             </thead>
             <tbody id="grille-body"></tbody>
         </table>
@@ -55,37 +44,30 @@
 </div>
 
 <script>
-    // Récupération des données depuis le localStorage (déposées par le Cockpit)
     const rawData = localStorage.getItem("cockpit_transfert");
     
     async function init() {
-        if (!rawData) {
-            showError("Aucune donnée reçue. Passez par le Cockpit.");
-            return;
-        }
+        if (!rawData) { showError("Aucune donnée reçue. Passez par le Cockpit."); return; }
 
         try {
             const copy = JSON.parse(rawData);
             console.log("Copie chargée :", copy);
 
-            // 1. Charger le JSON du corrigé (Blueprint)
-            // L'ID du devoir est dans copy.devoirId (ex: "devoir_17686...")
-            // On cherche le fichier dans le dossier 'devoirs/'
-            const blueprintUrl = `devoirs/${copy.devoirId}_blueprint.json`;
+            // C'EST ICI QUE SE FAIT LA MAGIE : 
+            // On va chercher le fichier sur le site PSE (Site A) depuis le Cockpit (Site B)
+            const blueprintUrl = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${copy.devoirId}_blueprint.json`;
             
-            console.log("Chargement blueprint :", blueprintUrl);
+            console.log("Chargement blueprint depuis PSE :", blueprintUrl);
             const resp = await fetch(blueprintUrl);
             
-            if (!resp.ok) {
-                throw new Error(`Fichier corrigé introuvable (${blueprintUrl}). Vérifiez que le fichier .json est bien dans le dossier 'devoirs' sur GitHub.`);
+            if (!resp.ok) { 
+                throw new Error(`Fichier corrigé introuvable sur le site PSE.\nAdresse testée : ${blueprintUrl}\n\nVérifiez que le fichier .json est bien sur le site PSE dans le dossier 'devoirs'.`); 
             }
             
             const blueprint = await resp.json();
             renderCorrection(copy, blueprint);
 
-        } catch (e) {
-            showError("Erreur : " + e.message);
-        }
+        } catch (e) { showError("Erreur : " + e.message); }
     }
 
     function renderCorrection(copy, blueprint) {
@@ -95,50 +77,30 @@
         document.getElementById("eleve-info").innerText = `${copy.eleve?.prenom || ''} ${copy.eleve?.nom || ''} (${copy.eleve?.classe || '?'})`;
 
         const tbody = document.getElementById("grille-body");
-        let totalScore = 0;
-        let totalMax = 0;
+        let totalScore = 0; let totalMax = 0;
 
         blueprint.questions.forEach(q => {
             const qid = q.qid;
-            // On cherche la réponse de l'élève
             let repEleve = copy.reponses[qid];
             if(repEleve === undefined) repEleve = "Non répondu";
             
-            // Calcul automatique simple (QCM / Exactitude)
             let points = 0;
+            if (q.reponseAttendue && repEleve === q.reponseAttendue) { points = q.bareme; }
             
-            // Logique de correction basique
-            if (q.reponseAttendue && repEleve === q.reponseAttendue) {
-                points = q.bareme;
-            } else if (repEleve !== "Non répondu" && !q.reponseAttendue) {
-                // Question ouverte sans réponse type stricte = A corriger manuellement
-                // On met 0 par défaut pour l'instant
-                points = 0; 
-            }
-
-            totalScore += points;
-            totalMax += q.bareme;
+            totalScore += points; totalMax += q.bareme;
 
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td><strong>${q.label}</strong><br><small>${q.competence}</small></td>
-                <td>
-                    <div class="rep-eleve">${repEleve}</div>
-                    ${q.reponseAttendue ? `<div class="rep-corrige">Attendu : ${q.reponseAttendue}</div>` : ''}
-                </td>
+                <td><div class="rep-eleve">${repEleve}</div>${q.reponseAttendue ? `<div class="rep-corrige">Attendu : ${q.reponseAttendue}</div>` : ''}</td>
                 <td style="text-align:center;">${q.bareme}</td>
-                <td style="text-align:center;">
-                    <span class="${points > 0 ? 'status-ok' : 'status-ko'}">${points}</span>
-                </td>
+                <td style="text-align:center;"><span class="${points > 0 ? 'status-ok' : 'status-ko'}">${points}</span></td>
             `;
             tbody.appendChild(row);
         });
 
-        // Mise à jour de la note finale sur 20
         let note20 = 0;
-        if(totalMax > 0) {
-            note20 = (totalScore / totalMax) * 20;
-        }
+        if(totalMax > 0) { note20 = (totalScore / totalMax) * 20; }
         document.getElementById("note-finale").innerText = Math.round(note20 * 10) / 10;
     }
 
@@ -151,6 +113,5 @@
 
     init();
 </script>
-
 </body>
 </html>
