@@ -122,6 +122,7 @@
     <div class="tools-container no-print">
         <button class="action-btn btn-reset" onclick="resetNewStudent()" title="Nouvel Élève">♻️ Nouvel Élève</button>
         <button class="action-btn btn-print" onclick="window.print()" title="Imprimer">🖨️ Imprimer</button>
+        <span id="modeIndicator" style="background: rgba(255, 255, 255, 0.95); padding: 5px 12px; border-radius: 5px; font-size: 0.85em; font-weight: bold; color: #666; border: 1px solid #ddd;"></span>
     </div>
     
     <div id="saveMessage">Sauvegardé</div>
@@ -236,9 +237,16 @@
 
         // VÉRIFICATION : Arrive-t-on du Cockpit ?
         const paquet = localStorage.getItem("cockpit_transfert");
+        const modeIndicator = document.getElementById('modeIndicator');
         
         if (paquet) {
             console.log("🚀 Mode Connecté : Copie reçue !");
+            if(modeIndicator) {
+                modeIndicator.innerText = "🚀 Mode Cockpit";
+                modeIndicator.style.background = "#e0f2fe";
+                modeIndicator.style.color = "#0369a1";
+                modeIndicator.style.borderColor = "#0369a1";
+            }
             try {
                 const copie = JSON.parse(paquet);
                 localStorage.removeItem("cockpit_transfert"); // Nettoyage de la valise
@@ -286,6 +294,12 @@
         } else {
             // Mode Manuel (Ouverture directe)
             console.log("✍️ Mode Manuel");
+            if(modeIndicator) {
+                modeIndicator.innerText = "✍️ Mode Manuel";
+                modeIndicator.style.background = "#fff7ed";
+                modeIndicator.style.color = "#c2410c";
+                modeIndicator.style.borderColor = "#c2410c";
+            }
             loadState();
             if(document.getElementById('correctionTable').querySelector('tbody').children.length === 0) {
                 addCorrectionRow();
@@ -302,16 +316,28 @@
     async function chargerBlueprintEtConstruire(idDevoir, reponsesEleve) {
         // Nettoyage de l'ID pour trouver le fichier JSON
         const idClean = idDevoir.replace('.html', '').replace('_eleve', '');
-        const urlJSON = URL_SITE_ELEVE + idClean + "_blueprint.json";
         
-        console.log("🔍 Téléchargement Blueprint : " + urlJSON);
+        // ESSAI 1 : Chercher sur GitHub (production)
+        let urlJSON = URL_SITE_ELEVE + idClean + "_blueprint.json";
+        console.log("🔍 Tentative 1 - GitHub : " + urlJSON);
 
         try {
-            const response = await fetch(urlJSON);
-            if (!response.ok) throw new Error("Fichier JSON introuvable sur GitHub");
+            let response = await fetch(urlJSON);
+            
+            // Si GitHub ne répond pas, essayer en LOCAL
+            if (!response.ok) {
+                urlJSON = idClean + "_blueprint.json";
+                console.log("🔍 Tentative 2 - Local : " + urlJSON);
+                response = await fetch(urlJSON);
+                
+                if (!response.ok) {
+                    throw new Error("Blueprint introuvable (ni sur GitHub, ni en local)");
+                }
+            }
             
             const blueprint = await response.json();
             CURRENT_BLUEPRINT = blueprint;
+            console.log("✅ Blueprint chargé avec succès !");
 
             document.getElementById('docTitle').innerText = "Correction : " + (blueprint.titre || idClean);
 
@@ -378,8 +404,24 @@
             majEntete(blueprint.questions);
 
         } catch (error) {
-            console.error(error);
-            alert("⚠️ Impossible de charger le corrigé automatique.\n\nAssurez-vous que le fichier '" + idClean + "_blueprint.json' est bien dans le dossier 'devoirs' sur GitHub.\n\nJe passe en mode manuel.");
+            console.error("❌ Erreur:", error);
+            
+            // Message d'erreur détaillé
+            const errorMsg = `⚠️ Impossible de charger le Blueprint automatiquement.
+
+📍 Fichier recherché :
+  • Sur GitHub : ${URL_SITE_ELEVE}${idClean}_blueprint.json
+  • En local : ${idClean}_blueprint.json
+
+✅ SOLUTIONS :
+1. Vérifiez que le fichier Blueprint existe sur GitHub
+2. Vérifiez qu'il est dans le dossier /devoirs/
+3. Testez l'URL dans votre navigateur
+4. Ou placez le fichier dans le même dossier que cette grille
+
+Je passe en mode manuel.`;
+            
+            alert(errorMsg);
             addCorrectionRow();
         }
     }
