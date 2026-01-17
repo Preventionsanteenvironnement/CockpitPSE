@@ -1,329 +1,432 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Grille de Correction - CoqPilot</title>
-    
-    <script src="data_eleves.js"></script>
-    <script src="data_commentaires_competences.js"></script>
-    <script src="data_appreciation.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grille de Correction - CoqPilot</title>
 
-    <style>
-        /* CONFIGURATION A4 */
-        @page { size: A4; margin: 10mm; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 210mm; margin: 0 auto; padding: 10px 20px; background-color: #fff; color: #333; }
+  <script src="data_eleves.js"></script>
+  <script src="data_commentaires_competences.js"></script>
+  <script src="data_appreciation.js"></script>
 
-        /* BOUTONS OUTILS */
-        .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; }
-        .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.2em; cursor: pointer; opacity: 0.8; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }
-        .action-btn:hover { opacity: 1; transform: scale(1.05); background: white; }
-        #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.8em; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+  <style>
+    /* CONFIGURATION A4 */
+    @page { size: A4; margin: 10mm; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 10px 20px;
+      background-color: #fff;
+      color: #333;
+    }
 
-        h1 { text-align: center; color: #d9534f; margin: 0 0 10px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.5em; }
-        
-        .header-row { display: flex; gap: 15px; margin-bottom: 10px; align-items: flex-end; background-color: #f8f9fa; padding: 8px 15px; border-radius: 6px; border: 1px solid #ddd; }
-        .input-group { display: flex; flex-direction: column; position: relative; }
-        .input-group.grow { flex-grow: 1; }
-        .input-group label { font-size: 0.8em; color: #666; font-weight: bold; margin-bottom: 2px; }
-        .input-group input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; width: 100%; box-sizing: border-box; }
+    /* BOUTONS OUTILS */
+    .tools-container {
+      position: fixed; top: 10px; right: 10px; z-index: 1000;
+      display: flex; gap: 10px;
+    }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #ccc;
+      font-size: 1.2em;
+      cursor: pointer;
+      opacity: 0.8;
+      padding: 5px 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+    .action-btn:hover { opacity: 1; transform: scale(1.05); background: white; }
 
-        .appreciation-box { margin-bottom: 10px; position: relative; }
-        .appreciation-box textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; font-family: inherit; resize: vertical; background-color: #f0f8ff; box-sizing: border-box; }
+    #saveMessage {
+      position: fixed; bottom: 10px; right: 10px;
+      background: #333; color: white;
+      padding: 5px 10px; border-radius: 4px;
+      font-size: 0.8em; opacity: 0;
+      transition: opacity 0.5s; pointer-events: none;
+    }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-        th, td { border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle; }
-        .thead-dark { background-color: #333; color: white; }
-        .thead-light { background-color: #f4f4f4; color: #333; font-size: 0.85em; font-weight: bold; }
-        .correction-th { background-color: #d9534f; color: white; text-align: left; }
-        
-        .badge { display: inline-block; color: white; padding: 3px 0; width: 30px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
-        .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
+    h1 {
+      text-align: center;
+      color: #d9534f;
+      margin: 0 0 10px 0;
+      border-bottom: 2px solid #d9534f;
+      padding-bottom: 5px;
+      font-size: 1.5em;
+    }
 
-        /* Styles spécifiques correction */
-        .q-display { width: 100%; border: none; background: #f9f9f9; text-align: center; font-style: italic; color: #555; font-weight: bold; }
-        
-        .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.75em; padding: 2px 5px; cursor: pointer; border-radius: 3px; margin: 0 1px; font-weight: bold; color: #aaa; transition: all 0.2s; }
-        .level-btn:hover { background-color: #eee; color: #333; }
-        .level-btn.active { border: 2px solid #555; transform: scale(1.05); }
-        .level-btn.active.nt { background: #ffebeb; color: #c00; border-color: #c00; }
-        .level-btn.active.i { background: #fff5e6; color: #d9534f; border-color: #d9534f; }
-        .level-btn.active.a { background: #e6f7ff; color: #2e7bb6; border-color: #2e7bb6; }
-        .level-btn.active.m { background: #e6fffa; color: #5cb85c; border-color: #5cb85c; }
+    .header-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 10px;
+      align-items: flex-end;
+      background-color: #f8f9fa;
+      padding: 8px 15px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      flex-wrap: wrap;
+    }
+    .input-group { display: flex; flex-direction: column; position: relative; }
+    .input-group.grow { flex-grow: 1; min-width: 180px; }
+    .input-group label { font-size: 0.8em; color: #666; font-weight: bold; margin-bottom: 2px; }
+    .input-group input {
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+      width: 100%;
+      box-sizing: border-box;
+    }
 
-        .editable-div { min-height: 20px; text-align: left; outline: none; padding: 4px; font-size: 0.95em; cursor: text; white-space: pre-wrap; }
-        .editable-div:empty::before { content: attr(placeholder); color: #aaa; font-style: italic;}
-        .editable-div:focus { background-color: #e8f0fe; }
+    .appreciation-box { margin-bottom: 10px; position: relative; }
+    .appreciation-box textarea {
+      width: 100%;
+      height: 60px;
+      padding: 8px;
+      border: 2px solid #2e7bb6;
+      border-radius: 4px;
+      font-family: inherit;
+      resize: vertical;
+      background-color: #f0f8ff;
+      box-sizing: border-box;
+    }
 
-        .final-grade-cell { background-color: #fffef0; color: #d9534f; font-weight: bold; vertical-align: middle; }
-        .final-grade-text { font-size: 1.8em; display: block; line-height: 1; margin-bottom: 2px;}
+    table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle; }
+    .thead-dark { background-color: #333; color: white; }
+    .thead-light { background-color: #f4f4f4; color: #333; font-size: 0.85em; font-weight: bold; }
+    .correction-th { background-color: #d9534f; color: white; text-align: left; }
 
-        @media print {
-            .no-print { display: none !important; }
-            .rep-prof-box { display: none; } 
-        }
-    </style>
+    .badge {
+      display: inline-block; color: white; padding: 3px 0; width: 30px;
+      text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.85em;
+    }
+    .c1 { background-color: #7f8c8d; }
+    .c2 { background-color: #66a5ad; }
+    .c3 { background-color: #b03052; }
+    .c4 { background-color: #2e7bb6; }
+    .c5 { background-color: #5cb85c; }
+    .c6 { background-color: #f0c05a; }
+
+    /* Styles spécifiques correction */
+    .q-display {
+      width: 100%;
+      border: none;
+      background: #f9f9f9;
+      text-align: center;
+      font-style: italic;
+      color: #555;
+      font-weight: bold;
+      box-sizing: border-box;
+    }
+
+    .level-btn {
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      font-size: 0.75em;
+      padding: 2px 5px;
+      cursor: pointer;
+      border-radius: 3px;
+      margin: 0 1px;
+      font-weight: bold;
+      color: #aaa;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .level-btn:hover { background-color: #eee; color: #333; }
+    .level-btn.active { border: 2px solid #555; transform: scale(1.05); }
+    .level-btn.active.nt { background: #ffebeb; color: #c00; border-color: #c00; }
+    .level-btn.active.i  { background: #fff5e6; color: #d9534f; border-color: #d9534f; }
+    .level-btn.active.a  { background: #e6f7ff; color: #2e7bb6; border-color: #2e7bb6; }
+    .level-btn.active.m  { background: #e6fffa; color: #5cb85c; border-color: #5cb85c; }
+
+    .editable-div {
+      min-height: 20px;
+      text-align: left;
+      outline: none;
+      padding: 4px;
+      font-size: 0.95em;
+      cursor: text;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .editable-div:empty::before { content: attr(placeholder); color: #aaa; font-style: italic; }
+    .editable-div:focus { background-color: #e8f0fe; }
+
+    .final-grade-cell { background-color: #fffef0; color: #d9534f; font-weight: bold; vertical-align: middle; }
+    .final-grade-text { font-size: 1.8em; display: block; line-height: 1; margin-bottom: 2px; }
+
+    @media print {
+      .no-print { display: none !important; }
+      .rep-prof-box { display: none; }
+    }
+
+    @media (max-width: 680px) {
+      body { padding: 10px 10px; }
+      .tools-container { right: 8px; top: 8px; }
+      th, td { padding: 3px; }
+      .final-grade-text { font-size: 1.5em; }
+    }
+  </style>
 </head>
+
 <body>
+  <div class="tools-container no-print">
+    <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
+  </div>
 
-    <div class="tools-container no-print">
-        <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
-    </div>
-    
-    <div id="saveMessage">Sauvegardé</div>
+  <div id="saveMessage">Sauvegardé</div>
 
-    <h1 id="docTitle">Correction</h1>
+  <h1 id="docTitle">Correction</h1>
 
-    <div class="header-row">
-        <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
-        <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
-        <div class="input-group"><label>Classe :</label><input type="text" id="inputClasse"></div>
-        <div class="input-group" style="width: 100px;"><label>Date :</label><input type="date" id="inputDate"></div>
-    </div>
+  <div class="header-row">
+    <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
+    <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
+    <div class="input-group" style="width: 140px; min-width: 140px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
+    <div class="input-group" style="width: 140px; min-width: 140px;"><label>Date :</label><input type="date" id="inputDate"></div>
+  </div>
 
-    <div class="appreciation-box">
-        <label>Appréciation générale :</label>
-        <textarea id="appreciationArea" placeholder=""></textarea>
-    </div>
+  <div class="appreciation-box">
+    <label>Appréciation générale :</label>
+    <textarea id="appreciationArea" placeholder=""></textarea>
+  </div>
 
-    <table>
-        <thead>
-            <tr class="thead-dark">
-                <th rowspan="2" style="width: 40px;">C</th>
-                <th rowspan="2">Questions</th>
-                <th colspan="4" class="thead-light">Maîtrise</th>
-                <th rowspan="2" style="width: 60px; background:#fff; color:#333;">Pts</th>
-                <th rowspan="2" style="width: 80px; background:#fff; color:#333;">Note</th>
-            </tr>
-            <tr class="thead-light">
-                <th style="width: 30px;">NT</th><th style="width: 30px;">I</th><th style="width: 30px;">A</th><th style="width: 30px;">M</th>
-            </tr>
-        </thead>
-        <tbody id="gradingBody"></tbody>
-    </table>
+  <table>
+    <thead>
+      <tr class="thead-dark">
+        <th rowspan="2" style="width: 40px;">C</th>
+        <th rowspan="2">Questions</th>
+        <th colspan="4" class="thead-light">Maîtrise</th>
+        <th rowspan="2" style="width: 90px; background:#fff; color:#333;">Pts</th>
+        <th rowspan="2" style="width: 95px; background:#fff; color:#333;">Note</th>
+      </tr>
+      <tr class="thead-light">
+        <th style="width: 30px;">NT</th>
+        <th style="width: 30px;">I</th>
+        <th style="width: 30px;">A</th>
+        <th style="width: 30px;">M</th>
+      </tr>
+    </thead>
+    <tbody id="gradingBody"></tbody>
+  </table>
 
-    <h3 style="margin-top:20px; color:#555;">Détail de la correction</h3>
+  <h3 style="margin-top:20px; color:#555;">Détail de la correction</h3>
 
-    <table id="correctionTable">
-        <thead>
-            <tr>
-                <th class="correction-th" style="width: 50px;">Q°</th>
-                <th class="correction-th" style="width: 40px;">C</th>
-                <th class="correction-th" style="width: 120px;">Niveau</th>
-                <th class="correction-th">Réponse Élève / Corrigé</th>
-                <th class="correction-th" style="width: 30%;">Commentaires</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+  <table id="correctionTable">
+    <thead>
+      <tr>
+        <th class="correction-th" style="width: 50px;">Q°</th>
+        <th class="correction-th" style="width: 40px;">C</th>
+        <th class="correction-th" style="width: 120px;">Niveau</th>
+        <th class="correction-th">Réponse Élève / Corrigé</th>
+        <th class="correction-th" style="width: 30%;">Commentaires</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-<script>
-    // --- CONFIGURATION ---
+  <script>
     const comps = [
-        { id: 'c1', name: 'C1', color: 'c1' }, { id: 'c2', name: 'C2', color: 'c2' },
-        { id: 'c3', name: 'C3', color: 'c3' }, { id: 'c4', name: 'C4', color: 'c4' },
-        { id: 'c5', name: 'C5', color: 'c5' }, { id: 'c6', name: 'C6', color: 'c6' }
+      { id: 'c1', name: 'C1', color: 'c1' },
+      { id: 'c2', name: 'C2', color: 'c2' },
+      { id: 'c3', name: 'C3', color: 'c3' },
+      { id: 'c4', name: 'C4', color: 'c4' },
+      { id: 'c5', name: 'C5', color: 'c5' },
+      { id: 'c6', name: 'C6', color: 'c6' }
     ];
 
-    // --- DÉMARRAGE ---
+    function escapeHtml(v){
+      return String(v ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function nl2brSafe(v){
+      return escapeHtml(v).replace(/\n/g,"<br>");
+    }
+
     window.addEventListener('load', async function() {
-        initGradingTable();
-        
-        // Récupération des données du Cockpit
-        const rawData = localStorage.getItem("cockpit_transfert");
-        
-        if (!rawData) {
-            // Mode déconnecté (pour test ou saisie manuelle)
-            addCorrectionRow(); // Ajoute une ligne vide
-            return;
+      initGradingTable();
+
+      const rawData = localStorage.getItem("cockpit_transfert");
+
+      if (!rawData) {
+        addCorrectionRow();
+        return;
+      }
+
+      try {
+        const copie = JSON.parse(rawData);
+
+        if (copie.eleve) {
+          document.getElementById('inputNom').value = copie.eleve.nom || copie.eleve.code || "";
+          document.getElementById('inputPrenom').value = copie.eleve.prenom || "";
+          document.getElementById('inputClasse').value = copie.eleve.classe || "";
         }
 
-        try {
-            const copie = JSON.parse(rawData);
-            console.log("Copie reçue :", copie);
-
-            // Remplissage infos élève
-            if(copie.eleve) {
-                document.getElementById('inputNom').value = copie.eleve.nom || copie.eleve.code || "";
-                document.getElementById('inputPrenom').value = copie.eleve.prenom || "";
-                document.getElementById('inputClasse').value = copie.eleve.classe || "";
-            }
-            // Date
-            if(copie.date) {
-                let d = new Date(copie.date.seconds ? copie.date.seconds * 1000 : copie.date);
-                if(!isNaN(d.getTime())) document.getElementById('inputDate').value = d.toISOString().split('T')[0];
-            }
-
-            // CHARGEMENT DU JSON (BLUEPRINT)
-            // Correction : On cherche le fichier à la RACINE du Cockpit (pas de dossier)
-            const idClean = (copie.idExercice || copie.devoirId || "").replace('.html', '').replace('_eleve', '');
-            const urlJSON = idClean + "_blueprint.json";
-            
-            console.log("Tentative de chargement LOCAL : " + urlJSON);
-
-            const resp = await fetch(urlJSON);
-            
-            if (!resp.ok) throw new Error("Fichier JSON introuvable à la racine du Cockpit : " + urlJSON);
-            
-            const blueprint = await resp.json();
-            document.getElementById('docTitle').innerText = "Correction : " + (blueprint.titre || idClean);
-            
-            construireGrille(blueprint, copie.reponses);
-
-        } catch (e) {
-            alert("Erreur : " + e.message);
-            console.error(e);
-            // On ajoute une ligne vide si ça plante, pour ne pas bloquer le prof
-            addCorrectionRow();
+        if (copie.date) {
+          const d = new Date(copie.date.seconds ? copie.date.seconds * 1000 : copie.date);
+          if (!isNaN(d.getTime())) document.getElementById('inputDate').value = d.toISOString().split('T')[0];
         }
+
+        const idClean = (copie.idExercice || copie.devoirId || "")
+          .replace('.html', '')
+          .replace('_eleve', '');
+
+        const urlJSON = idClean + "_blueprint.json";
+
+        const resp = await fetch(urlJSON, { cache: "no-store" });
+        if (!resp.ok) throw new Error("Fichier JSON introuvable à la racine du Cockpit : " + urlJSON);
+
+        const blueprint = await resp.json();
+
+        document.getElementById('docTitle').innerText = "Correction : " + (blueprint.titre || idClean);
+
+        construireGrille(blueprint, copie.reponses);
+
+      } catch (e) {
+        alert("Erreur : " + e.message);
+        addCorrectionRow();
+      }
     });
 
-    // --- INITIALISATION TABLEAU RÉCAP ---
     function initGradingTable() {
-        const tbody = document.getElementById('gradingBody');
-        tbody.innerHTML = "";
-        comps.forEach((c, idx) => {
-            const tr = document.createElement('tr');
-            let html = `
-                <td><span class="badge ${c.color}">${c.name}</span></td>
-                <td><input type="text" id="q_list_${c.id}" class="q-display" readonly></td>
-                <td><input type="radio" name="rad_${c.id}" disabled></td>
-                <td><input type="radio" name="rad_${c.id}" disabled></td>
-                <td><input type="radio" name="rad_${c.id}" disabled></td>
-                <td><input type="radio" name="rad_${c.id}" disabled></td>
-                <td><span id="pts_${c.id}">0</span> / <span id="max_${c.id}">0</span></td>
-            `;
-            if(idx === 0) {
-                html += `<td rowspan="6" class="final-grade-cell"><span id="finalNoteDisplay" class="final-grade-text">--</span></td>`;
-            }
-            tr.innerHTML = html;
-            tbody.appendChild(tr);
-        });
-    }
-
-    // --- CONSTRUCTION DE LA GRILLE DÉTAILLÉE ---
-    function construireGrille(blueprint, reponsesEleve) {
-        const tbody = document.getElementById('correctionTable').querySelector('tbody');
-        tbody.innerHTML = "";
-
-        // Structures pour le calcul des totaux par compétence
-        let compMap = {}; 
-        comps.forEach(c => compMap[c.name] = { pts: 0, max: 0, qList: [] });
-
-        blueprint.questions.forEach((q) => {
-            const row = document.createElement('tr');
-            
-            // Réponse de l'élève
-            const repEleve = (reponsesEleve && reponsesEleve[q.qid]) ? reponsesEleve[q.qid] : "<i>(Non répondu)</i>";
-            const repProf = q.reponseAttendue || "<i>(Pas de corrigé type défini)</i>";
-
-            // Mise à jour des compteurs par compétence (Max points)
-            let cKey = q.competence.toUpperCase();
-            if(compMap[cKey]) {
-                compMap[cKey].max += (q.bareme || 0);
-                compMap[cKey].qList.push(q.label);
-            }
-
-            row.innerHTML = `
-                <td style="text-align:center; font-weight:bold;">${q.label}</td>
-                <td><span class="badge ${q.competence.toLowerCase()}">${q.competence}</span></td>
-                <td>
-                    <div style="display:flex; gap:2px; justify-content:center;">
-                        <span class="level-btn" onclick="setNote(this, 0, ${q.bareme}, '${cKey}')">NT</span>
-                        <span class="level-btn" onclick="setNote(this, ${q.bareme * 0.25}, ${q.bareme}, '${cKey}')">I</span>
-                        <span class="level-btn" onclick="setNote(this, ${q.bareme * 0.5}, ${q.bareme}, '${cKey}')">A</span>
-                        <span class="level-btn" onclick="setNote(this, ${q.bareme}, ${q.bareme}, '${cKey}')">M</span>
-                    </div>
-                    <input type="hidden" class="score-val" value="0">
-                </td>
-                <td style="text-align:left;">
-                    <div style="background:#f0f9ff; padding:8px; border-radius:6px; border-left:4px solid #3498db; margin-bottom:6px; color:#0f172a;">
-                        <strong>Élève :</strong> ${repEleve}
-                    </div>
-                    <div style="color:#64748b; font-size:0.9em; padding:4px; border-top:1px dashed #cbd5e1; font-style:italic;">
-                        🎯 <strong>Corrigé :</strong> ${repProf}
-                    </div>
-                </td>
-                <td>
-                    <div class="editable-div" contenteditable="true" placeholder="Votre commentaire..."></div>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        // Mise à jour du tableau récapitulatif (Liste des Q° et Points Max)
-        for(const [name, data] of Object.entries(compMap)) {
-            let id = name.toLowerCase();
-            const qInput = document.getElementById(`q_list_${id}`);
-            const maxSpan = document.getElementById(`max_${id}`);
-            if(qInput) qInput.value = data.qList.join(", ");
-            if(maxSpan) maxSpan.innerText = data.max;
+      const tbody = document.getElementById('gradingBody');
+      tbody.innerHTML = "";
+      comps.forEach((c, idx) => {
+        const tr = document.createElement('tr');
+        let html = `
+          <td><span class="badge ${c.color}">${c.name}</span></td>
+          <td><input type="text" id="q_list_${c.id}" class="q-display" readonly></td>
+          <td><input type="radio" name="rad_${c.id}" disabled></td>
+          <td><input type="radio" name="rad_${c.id}" disabled></td>
+          <td><input type="radio" name="rad_${c.id}" disabled></td>
+          <td><input type="radio" name="rad_${c.id}" disabled></td>
+          <td><span id="pts_${c.id}">0</span> / <span id="max_${c.id}">0</span></td>
+        `;
+        if (idx === 0) {
+          html += `<td rowspan="6" class="final-grade-cell"><span id="finalNoteDisplay" class="final-grade-text">--</span></td>`;
         }
-        
-        recalculerTout();
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+      });
     }
 
-    // --- GESTION DES NOTES (Calcul Automatique) ---
+    function construireGrille(blueprint, reponsesEleve) {
+      const tbody = document.getElementById('correctionTable').querySelector('tbody');
+      tbody.innerHTML = "";
+
+      const compMap = {};
+      comps.forEach(c => compMap[c.name] = { pts: 0, max: 0, qList: [] });
+
+      (blueprint.questions || []).forEach((q) => {
+        const row = document.createElement('tr');
+
+        const rawEleve = (reponsesEleve && (q.qid in reponsesEleve)) ? reponsesEleve[q.qid] : null;
+        const repEleve = rawEleve ? nl2brSafe(rawEleve) : "<i>(Non répondu)</i>";
+
+        const rawProf = q.reponseAttendue ?? "";
+        const repProf = rawProf ? nl2brSafe(rawProf) : "<i>(Pas de corrigé type défini)</i>";
+
+        const cKey = String(q.competence || "").toUpperCase();
+
+        if (compMap[cKey]) {
+          compMap[cKey].max += (q.bareme || 0);
+          compMap[cKey].qList.push(q.label);
+        }
+
+        const bareme = Number(q.bareme || 0);
+
+        row.innerHTML = `
+          <td style="text-align:center; font-weight:bold;">${escapeHtml(q.label)}</td>
+          <td><span class="badge ${escapeHtml(String(q.competence || "").toLowerCase())}">${escapeHtml(String(q.competence || ""))}</span></td>
+          <td>
+            <div style="display:flex; gap:2px; justify-content:center; flex-wrap:wrap;">
+              <span class="level-btn" onclick="setNote(this, 0, ${bareme}, '${escapeHtml(cKey)}')">NT</span>
+              <span class="level-btn" onclick="setNote(this, ${(bareme * 0.25)}, ${bareme}, '${escapeHtml(cKey)}')">I</span>
+              <span class="level-btn" onclick="setNote(this, ${(bareme * 0.5)}, ${bareme}, '${escapeHtml(cKey)}')">A</span>
+              <span class="level-btn" onclick="setNote(this, ${bareme}, ${bareme}, '${escapeHtml(cKey)}')">M</span>
+            </div>
+            <input type="hidden" class="score-val" value="0" data-comp="${escapeHtml(cKey)}">
+          </td>
+          <td style="text-align:left;">
+            <div style="background:#f0f9ff; padding:8px; border-radius:6px; border-left:4px solid #3498db; margin-bottom:6px; color:#0f172a;">
+              <strong>Élève :</strong> ${repEleve}
+            </div>
+            <div style="color:#64748b; font-size:0.9em; padding:4px; border-top:1px dashed #cbd5e1; font-style:italic;">
+              🎯 <strong>Corrigé :</strong> ${repProf}
+            </div>
+          </td>
+          <td>
+            <div class="editable-div" contenteditable="true" placeholder="Votre commentaire..."></div>
+          </td>
+        `;
+
+        tbody.appendChild(row);
+      });
+
+      for (const [name, data] of Object.entries(compMap)) {
+        const id = name.toLowerCase();
+        const qInput = document.getElementById(`q_list_${id}`);
+        const maxSpan = document.getElementById(`max_${id}`);
+        if (qInput) qInput.value = data.qList.join(", ");
+        if (maxSpan) maxSpan.innerText = String(data.max);
+      }
+
+      recalculerTout();
+    }
+
     function setNote(btn, points, max, compName) {
-        // Gestion visuelle des boutons
-        const parent = btn.parentNode;
-        Array.from(parent.children).forEach(c => c.classList.remove('active'));
-        btn.classList.add('active'); // Colore le bouton cliqué
+      const parent = btn.parentNode;
+      Array.from(parent.children).forEach(c => c.classList.remove('active','nt','i','a','m'));
 
-        // Ajoute la classe spécifique pour la couleur (nt, i, a, m)
-        const classeNiveau = btn.innerText.toLowerCase();
-        btn.classList.add(classeNiveau);
+      const classeNiveau = btn.innerText.toLowerCase();
+      btn.classList.add('active', classeNiveau);
 
-        // Stockage de la note
-        const hiddenInput = parent.parentNode.querySelector('.score-val');
-        hiddenInput.value = points;
-        hiddenInput.setAttribute('data-comp', compName); 
+      const hiddenInput = parent.parentNode.querySelector('.score-val');
+      hiddenInput.value = String(points);
+      hiddenInput.setAttribute('data-comp', compName);
 
-        recalculerTout();
+      recalculerTout();
     }
 
     function recalculerTout() {
-        // Réinitialise les compteurs de points obtenus
-        let scores = {};
-        comps.forEach(c => scores[c.name] = 0);
-        let totalGeneral = 0;
-        let totalMaxGeneral = 0;
+      const scores = {};
+      comps.forEach(c => scores[c.name] = 0);
 
-        // Parcourt toutes les questions notées pour additionner les points
-        document.querySelectorAll('.score-val').forEach(input => {
-            const val = parseFloat(input.value) || 0;
-            const comp = input.getAttribute('data-comp'); // ex: "C4"
-            if(scores[comp] !== undefined) {
-                scores[comp] += val;
-            }
-            totalGeneral += val;
-        });
+      let totalGeneral = 0;
+      let totalMaxGeneral = 0;
 
-        // Mise à jour de l'affichage Récapitulatif
-        comps.forEach(c => {
-            const spanPts = document.getElementById(`pts_${c.id}`);
-            const spanMax = document.getElementById(`max_${c.id}`);
-            
-            if(spanPts) spanPts.innerText = scores[c.name]; // Affiche les points obtenus
-            
-            // On récupère le max pour le total général
-            const max = parseFloat(spanMax ? spanMax.innerText : 0) || 0;
-            totalMaxGeneral += max;
-        });
+      document.querySelectorAll('.score-val').forEach(input => {
+        const val = parseFloat(input.value) || 0;
+        const comp = input.getAttribute('data-comp');
+        if (scores[comp] !== undefined) scores[comp] += val;
+        totalGeneral += val;
+      });
 
-        // Note Finale sur 20
-        let note20 = 0;
-        if(totalMaxGeneral > 0) {
-            note20 = (totalGeneral / totalMaxGeneral) * 20;
-        }
-        document.getElementById('finalNoteDisplay').innerText = note20.toFixed(1) + " / 20";
+      comps.forEach(c => {
+        const spanPts = document.getElementById(`pts_${c.id}`);
+        const spanMax = document.getElementById(`max_${c.id}`);
+
+        const pts = scores[c.name] || 0;
+        if (spanPts) spanPts.innerText = (Math.round(pts * 100) / 100).toString();
+
+        const max = parseFloat(spanMax ? spanMax.innerText : 0) || 0;
+        totalMaxGeneral += max;
+      });
+
+      let note20 = 0;
+      if (totalMaxGeneral > 0) note20 = (totalGeneral / totalMaxGeneral) * 20;
+
+      document.getElementById('finalNoteDisplay').innerText = note20.toFixed(1) + " / 20";
     }
 
-    // Fonction de secours pour ajouter une ligne manuelle si besoin
     function addCorrectionRow() {
-        // Code simplifié pour ajout manuel (non prioritaire si le JSON marche)
-        console.log("Ajout ligne manuelle (fonctionnalité réduite en mode connecté)");
+      console.log("Ajout ligne manuelle (fonctionnalité réduite en mode connecté)");
     }
-
-</script>
+  </script>
 </body>
 </html>
