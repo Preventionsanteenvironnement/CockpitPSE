@@ -2,602 +2,155 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille de Correction - CoqPilot</title>
-    
-    <script src="data_eleves.js"></script>
-    <script src="data_commentaires_competences.js"></script>
-    <script src="data_appreciation.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grille de Correction - Cockpit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        /* CONFIGURATION A4 */
-        @page { size: A4; margin: 10mm; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 210mm; margin: 0 auto; padding: 10px 20px; background-color: #fff; color: #333; }
-
-        /* BOUTONS OUTILS (Invisibles à l'impression) */
-        .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; }
-        .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.2em; cursor: pointer; opacity: 0.8; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }
-        .action-btn:hover { opacity: 1; transform: scale(1.05); background: white; }
-        .btn-reset { color: #d9534f; border-color: #d9534f; }
-        .btn-print { color: #2e7bb6; border-color: #2e7bb6; }
-        #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.8em; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
-
-        h1 { text-align: center; color: #d9534f; margin: 0 0 10px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.5em; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #0f172a; margin-bottom: 30px; }
         
-        /* HEADER IDENTITÉ */
-        .header-row { display: flex; gap: 15px; margin-bottom: 10px; align-items: flex-end; background-color: #f8f9fa; padding: 8px 15px; border-radius: 6px; border: 1px solid #ddd; }
-        .input-group { display: flex; flex-direction: column; position: relative; }
-        .input-group.grow { flex-grow: 1; }
-        .input-group label { font-size: 0.8em; color: #666; font-weight: bold; margin-bottom: 2px; }
-        .input-group input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; width: 100%; box-sizing: border-box; }
-
-        /* APPRECIATION */
-        .appreciation-box { margin-bottom: 10px; position: relative; }
-        .appreciation-box label { font-weight: bold; color: #2e7bb6; display: block; margin-bottom: 5px; font-size: 0.9em; cursor: pointer; text-decoration: underline; }
-        .appreciation-box textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; font-family: inherit; resize: vertical; background-color: #f0f8ff; box-sizing: border-box; }
-
-        /* TABLEAUX */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-        tr { page-break-inside: avoid; }
-        table { page-break-inside: auto; }
-        th, td { border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle; }
-        .thead-dark { background-color: #333; color: white; }
-        .thead-light { background-color: #f4f4f4; color: #333; font-size: 0.85em; font-weight: bold; }
-        .correction-th { background-color: #d9534f; color: white; text-align: left; position: relative; }
-        .sortable { cursor: pointer; user-select: none; } .sortable:hover { background-color: #c9302c; } .sort-icon { font-size: 0.8em; opacity: 0.7; margin-left: 5px; }
-
-        /* BADGES */
-        .badge { display: inline-block; color: white; padding: 3px 0; width: 30px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
-        .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
-
-        /* CHAMPS */
-        .q-display { width: 100%; border: none; background: #f9f9f9; text-align: center; font-style: italic; color: #555; font-weight: bold; font-size: 0.9em; }
-        .points-container { display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 0.9em; }
-        input[type=number] { width: 35px; text-align: center; padding: 3px; border-radius: 3px; }
-        input.score-input { font-weight: bold; border: 1px solid #ddd; color: #333; }
-        input.max-input { font-weight: normal; border: 1px solid #eee; color: #666; }
-        input[type="radio"] { transform: scale(1.2); cursor: pointer; accent-color: #333; margin: 0; }
-
-        .final-grade-cell { background-color: #fffef0; color: #d9534f; font-weight: bold; vertical-align: middle; }
-        .final-grade-text { font-size: 1.8em; display: block; line-height: 1; margin-bottom: 2px;}
-        .final-grade-base { font-size: 0.9em; color: #d9534f; font-weight: bold; }
-
-        .bottom-grid-info { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 5px; margin-bottom: 15px; border-bottom: 2px dashed #ccc; padding-bottom: 10px; }
-        .legend-text { font-size: 0.75em; font-style: italic; color: #666; margin-top: 5px; }
-        .qr-box { display: flex; align-items: center; gap: 10px; background-color: #f9f9f9; padding: 5px 10px; border-radius: 8px; border: 1px solid #eee; }
-        .qr-text { font-size: 0.8em; color: #333; text-align: right; line-height: 1.3; }
-        .url-text { display: block; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #000; text-decoration: none; font-size: 0.9em; margin-top: 3px; }
-        .qr-img { width: 55px; height: 55px; }
-
-        .editable-div { min-height: 20px; text-align: left; outline: none; padding: 4px; font-size: 0.95em; cursor: text; white-space: pre-wrap; }
-        .editable-div:empty::before { content: attr(placeholder); color: #aaa; font-style: italic;}
-        .editable-div:focus { background-color: #e8f0fe; }
+        .score-box { background: #f8fafc; border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+        .score-val { font-size: 2.5em; font-weight: 900; color: #2563eb; }
         
-        select.smart-select { border: 1px solid #ccc; padding: 2px; border-radius: 4px; width: 100%; font-weight: bold; cursor: pointer; font-size: 0.9em; }
-        select.comp-select { color: white; border: none; text-align: center; appearance: none; -webkit-appearance: none; padding: 4px 0; width: 35px; font-weight: bold; font-size: 0.85em; }
-        select.comp-select option { color: #333; background-color: white; text-align: left; }
-
-        .btn-add { background-color: #2e7bb6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
-        .btn-del { background-color: #d9534f; padding: 1px 6px; color: white; border: none; border-radius: 3px; cursor: pointer; }
-
-        .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.75em; padding: 2px 5px; cursor: pointer; border-radius: 3px; margin: 0 1px; font-weight: bold; color: #aaa; transition: all 0.2s; }
-        .level-btn:hover { background-color: #eee; color: #333; }
-        .level-btn.active { border: 2px solid #555; transform: scale(1.05); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-        .level-btn.active.nt { background: #ffebeb; color: #c00; border-color: #c00; }
-        .level-btn.active.i { background: #fff5e6; color: #d9534f; border-color: #d9534f; }
-        .level-btn.active.a { background: #e6f7ff; color: #2e7bb6; border-color: #2e7bb6; }
-        .level-btn.active.m { background: #e6fffa; color: #5cb85c; border-color: #5cb85c; }
-
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-box { background: white; width: 700px; max-width: 95%; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; max-height: 80vh; }
-        .modal-header { padding: 10px 15px; border-bottom: 1px solid #eee; background: #f8f9fa; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; }
-        .modal-title { font-weight: bold; color: #333; }
-        .modal-close { cursor: pointer; font-size: 1.5em; border: none; background: none; color: #999; }
-        .modal-body { padding: 0; overflow-y: auto; }
-        .modal-section-title { background: #eee; padding: 5px 15px; font-weight: bold; font-size: 0.9em; color: #555; border-bottom: 1px solid #ddd; margin-top: 0; }
-        .comment-item { padding: 8px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.95em; display: block; }
-        .comment-item:hover { background-color: #f0f8ff; color: #2e7bb6; }
-
-        .suggestions-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-radius: 0 0 4px 4px; max-height: 150px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .suggestion-item { padding: 8px; cursor: pointer; font-size: 0.9em; }
-        .suggestion-item:hover { background-color: #eee; }
-
-        @media print {
-            .no-print { display: none !important; }
-            body { padding: 0; margin: 0; max-width: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            h1 { font-size: 1.4em; margin-bottom: 5px; }
-            .header-row { padding: 0; border: none; background: none; }
-            .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 2px; }
-            .appreciation-box textarea { border: 1px solid #333; height: auto; }
-            .c1, .c2, .c3, .c4, .c5, .c6, .correction-th, .thead-dark, .final-grade-cell { color: white !important; }
-            .final-grade-cell { color: #d9534f !important; background-color: #fffef0 !important; }
-            .qr-box { border: 1px solid #333; }
-            select { appearance: none; -webkit-appearance: none; border: none; background: transparent; padding: 0; font-weight: bold; color: #000; }
-            .level-btn { border: 1px solid #eee; color: #e0e0e0; background: transparent; }
-            .level-btn.active { border: 2px solid #000; color: #000; background: transparent; font-weight: bold; }
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
+        th { background: #f1f5f9; font-weight: 800; }
+        
+        .rep-eleve { color: #1e293b; font-weight: 600; }
+        .rep-corrige { color: #16a34a; font-size: 0.9em; margin-top: 5px; font-style: italic; }
+        .status-ok { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .status-ko { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        
+        .loading { text-align: center; padding: 50px; color: #64748b; font-size: 1.2em; }
+        .error { color: #dc2626; background: #fee2e2; padding: 20px; border-radius: 8px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="tools-container no-print">
-        <button class="action-btn btn-reset" onclick="resetNewStudent()" title="Nouvel Élève">♻️ Nouvel Élève</button>
-        <button class="action-btn btn-print" onclick="window.print()" title="Imprimer">🖨️ Imprimer</button>
-    </div>
-    
-    <div id="saveMessage">Sauvegardé</div>
-
-    <div id="commentModal" class="modal-overlay no-print">
-        <div class="modal-box">
-            <div class="modal-header">
-                <span id="modalTitle" class="modal-title">Banque</span>
-                <button class="modal-close" onclick="closeModal()">×</button>
-            </div>
-            <div id="modalList" class="modal-body"></div>
+<div class="container">
+    <div id="loader" class="loading">Chargement de la copie...</div>
+    <div id="content" style="display:none;">
+        <h1 id="titre-devoir">Correction</h1>
+        
+        <div class="score-box">
+            <div>Note Finale</div>
+            <div class="score-val"><span id="note-finale">--</span> / 20</div>
+            <div id="eleve-info" style="margin-top:10px; color:#64748b;"></div>
         </div>
+
+        <table id="grille-table">
+            <thead>
+                <tr>
+                    <th>Question</th>
+                    <th>Réponse Élève / Corrigé</th>
+                    <th>Barème</th>
+                    <th>Résultat</th>
+                </tr>
+            </thead>
+            <tbody id="grille-body"></tbody>
+        </table>
     </div>
-
-    <h1 contenteditable="true" id="docTitle">Titre du Devoir / Module</h1>
-
-    <div class="header-row">
-        <div class="input-group grow" style="position: relative;">
-            <label>Nom :</label>
-            <input type="text" id="inputNom" oninput="searchStudent()" autocomplete="off">
-            <div id="suggestions" class="suggestions-list no-print"></div>
-        </div>
-        <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
-        <div class="input-group"><label>Classe :</label><input type="text" id="inputClasse"></div>
-        <div class="input-group" style="width: 100px;"><label>Date :</label><input type="date" id="inputDate"></div>
-    </div>
-
-    <div class="appreciation-box">
-        <label onclick="openAppreciationBank()" title="Cliquez pour la banque">Appréciation générale <span class="no-print" style="font-weight:normal; font-size:0.8em; color:#777;">(Clic pour banque)</span> :</label>
-        <textarea id="appreciationArea" placeholder=""></textarea>
-    </div>
-
-    <table>
-        <thead>
-            <tr class="thead-dark">
-                <th rowspan="2" style="width: 40px;">C</th>
-                <th rowspan="2" style="width: 25%;">Questions</th>
-                <th colspan="4" class="thead-light">Niveau de maîtrise*</th>
-                <th rowspan="2" style="width: 15%; background-color:#fff; color: #333;">Points</th>
-                <th rowspan="2" style="width: 15%; background-color:#fff; color: #333;">Note</th>
-            </tr>
-            <tr class="thead-light">
-                <th style="width: 35px;">NT</th>
-                <th style="width: 35px;">I</th>
-                <th style="width: 35px;">A</th>
-                <th style="width: 35px;">M</th>
-            </tr>
-        </thead>
-        <tbody id="gradingBody"></tbody>
-    </table>
-    
-    <div class="bottom-grid-info">
-        <div class="legend-text">
-            * NT : Non Traité &nbsp;-&nbsp; I : Insuffisant<br>
-            * A : Acceptable &nbsp;-&nbsp; M : Maîtrisé
-        </div>
-        <div class="qr-box">
-            <div class="qr-text">
-                Scanne le code ou tape l'adresse<br>
-                pour réviser sur le site :<br>
-                <span class="url-text">preventionsanteenvironnement.github.io/PSE/</span>
-            </div>
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR Code" class="qr-img">
-        </div>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-        <h3 style="margin:0; color: #555; font-size: 1.1em;">Correction</h3>
-        <button class="btn-add no-print" onclick="addCorrectionRow()">+ Question</button>
-    </div>
-
-    <table id="correctionTable">
-        <thead>
-            <tr>
-                <th class="correction-th sortable" style="width: 9%;" onclick="sortTable(0)" title="Trier par numéro">Q° <span class="sort-icon">⇅</span></th>
-                <th class="correction-th sortable" style="width: 6%;" onclick="sortTable(1)" title="Trier par compétence">C <span class="sort-icon">⇅</span></th>
-                <th class="correction-th sortable" style="width: 12%;" onclick="sortTable(2)" title="Trier par niveau">Niveau <span class="sort-icon">⇅</span></th>
-                <th class="correction-th" style="width: 36%;">Réponse Élève / Corrigé</th>
-                <th class="correction-th" style="width: 36%;">Commentaires</th>
-                <th class="correction-th no-print" style="width: 1%;"></th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+    <div id="error-msg" class="error" style="display:none;"></div>
+</div>
 
 <script>
-    // ============================================================
-    // 🧠 CERVEAU DE LA GRILLE (Connexion Cockpit + Blueprint + RGPD)
-    // ============================================================
-
-    // 1. CONFIGURATION
-    const URL_SITE_ELEVE = "https://preventionsanteenvironnement.github.io/PSE/devoirs/";
+    // Récupération des données depuis le localStorage (déposées par le Cockpit)
+    const rawData = localStorage.getItem("cockpit_transfert");
     
-    // Données par défaut si les fichiers externes manquent
-    let STUDENTS_DB = window.BDD_ELEVES || [];
-    let COMMENTS_COMP = window.DATA_COMMENTAIRES_COMPETENCES || {};
-    let COMMENTS_APPR = window.DATA_APPRECIATION || { "Global": [], "Remédiations": {} };
-    let CURRENT_BLUEPRINT = null;
-
-    const comps = [
-        { id: 'c1', name: 'C1', color: 'c1' }, { id: 'c2', name: 'C2', color: 'c2' },
-        { id: 'c3', name: 'C3', color: 'c3' }, { id: 'c4', name: 'C4', color: 'c4' },
-        { id: 'c5', name: 'C5', color: 'c5' }, { id: 'c6', name: 'C6', color: 'c6' }
-    ];
-
-    // --- 2. DÉMARRAGE ET CONNEXION ---
-    window.addEventListener('load', async function() {
-        initGradingTable();
-        const today = new Date().toISOString().split('T')[0];
-        const dateInput = document.getElementById('inputDate');
-        if(dateInput && !dateInput.value) dateInput.value = today;
-
-        // VÉRIFICATION : Arrive-t-on du Cockpit ?
-        const paquet = localStorage.getItem("cockpit_transfert");
-        
-        if (paquet) {
-            console.log("🚀 Mode Connecté : Copie reçue !");
-            try {
-                const copie = JSON.parse(paquet);
-                localStorage.removeItem("cockpit_transfert"); // Nettoyage de la valise
-
-                // --- GESTION IDENTITÉ RGPD ---
-                if(copie.eleve) {
-                    // On cherche le code (ex: KA47) ou le nom
-                    const code = copie.eleve.code || copie.eleve.userCode; 
-                    
-                    // Si on a un code et que le fichier data_eleves.js est chargé
-                    if (code && typeof ANNUAIRE_DECRYPT !== 'undefined' && ANNUAIRE_DECRYPT[code]) {
-                        // BINGO ! On traduit le code en Vrai Nom
-                        const info = ANNUAIRE_DECRYPT[code];
-                        if(document.getElementById('inputNom')) document.getElementById('inputNom').value = info.nom;
-                        if(document.getElementById('inputPrenom')) document.getElementById('inputPrenom').value = info.prenom;
-                        if(document.getElementById('inputClasse')) document.getElementById('inputClasse').value = info.classe;
-                    } 
-                    else {
-                        // SINON : On affiche ce qu'on a (ex: Anonyme ou le code brut)
-                        if(document.getElementById('inputNom')) document.getElementById('inputNom').value = copie.eleve.nom || code || "Anonyme";
-                        if(document.getElementById('inputPrenom')) document.getElementById('inputPrenom').value = copie.eleve.prenom || "";
-                        if(document.getElementById('inputClasse')) document.getElementById('inputClasse').value = copie.eleve.classe || "";
-                    }
-                }
-                
-                // Remplir date
-                if(copie.date) {
-                    let d = new Date(copie.date.seconds ? copie.date.seconds * 1000 : copie.date);
-                    if(!isNaN(d.getTime())) dateInput.value = d.toISOString().split('T')[0];
-                }
-
-                // CHARGER LE CORRIGÉ ET LES RÉPONSES
-                const idDevoir = copie.idExercice || copie.idDevoir || copie.titre; 
-                if(idDevoir) {
-                    await chargerBlueprintEtConstruire(idDevoir, copie.reponses);
-                } else {
-                    alert("⚠️ Cette copie n'a pas d'ID de devoir. Je passe en mode manuel.");
-                    addCorrectionRow();
-                }
-
-            } catch(e) {
-                console.error("Erreur lecture paquet:", e);
-                addCorrectionRow();
-            }
-        } else {
-            // Mode Manuel (Ouverture directe)
-            console.log("✍️ Mode Manuel");
-            loadState();
-            if(document.getElementById('correctionTable').querySelector('tbody').children.length === 0) {
-                addCorrectionRow();
-            }
+    async function init() {
+        if (!rawData) {
+            showError("Aucune donnée reçue. Passez par le Cockpit.");
+            return;
         }
-
-        // Auto-save local
-        document.body.addEventListener('input', saveState);
-        document.body.addEventListener('click', () => setTimeout(saveState, 100));
-        document.addEventListener('click', function(e) { if (e.target.id !== 'inputNom') document.getElementById('suggestions').style.display = 'none'; });
-    });
-
-    // --- 3. MOTEUR DE CONSTRUCTION (FUSION ÉLÈVE + PROF) ---
-    async function chargerBlueprintEtConstruire(idDevoir, reponsesEleve) {
-        // Nettoyage de l'ID pour trouver le fichier JSON
-        const idClean = idDevoir.replace('.html', '').replace('_eleve', '');
-        const urlJSON = URL_SITE_ELEVE + idClean + "_blueprint.json";
-        
-        console.log("🔍 Téléchargement Blueprint : " + urlJSON);
 
         try {
-            const response = await fetch(urlJSON);
-            if (!response.ok) throw new Error("Fichier JSON introuvable sur GitHub");
+            const copy = JSON.parse(rawData);
+            console.log("Copie chargée :", copy);
+
+            // 1. Charger le JSON du corrigé (Blueprint)
+            // L'ID du devoir est dans copy.devoirId (ex: "devoir_17686...")
+            // On cherche le fichier dans le dossier 'devoirs/'
+            const blueprintUrl = `devoirs/${copy.devoirId}_blueprint.json`;
             
-            const blueprint = await response.json();
-            CURRENT_BLUEPRINT = blueprint;
-
-            document.getElementById('docTitle').innerText = "Correction : " + (blueprint.titre || idClean);
-
-            const tbody = document.getElementById('correctionTable').querySelector('tbody');
-            tbody.innerHTML = "";
-
-            // --- CRÉATION DES LIGNES (Avec Réponse Élève) ---
-            blueprint.questions.forEach((q) => {
-                const row = tbody.insertRow();
-                
-                // Q°
-                row.insertCell(0).innerHTML = `<input type="text" class="q-display" value="${q.label}" readonly style="font-weight:bold; border:none; width:100%; text-align:center; background:transparent;">`;
-                
-                // Compétence
-                const cellComp = row.insertCell(1);
-                cellComp.innerHTML = `<span class="badge ${q.competence.toLowerCase()}">${q.competence}</span>`;
-                
-                // Niveaux
-                const cellLvl = row.insertCell(2);
-                ['NT', 'I', 'A', 'M'].forEach(lvl => {
-                    const btn = document.createElement('span');
-                    btn.innerText = lvl;
-                    btn.className = `level-btn ${lvl.toLowerCase()}`;
-                    btn.onclick = function() {
-                        Array.from(cellLvl.children).forEach(child => child.classList.remove('active'));
-                        this.classList.add('active');
-                    };
-                    cellLvl.appendChild(btn);
-                });
-
-                // C'EST ICI QUE TOUT SE JOUE : FUSION DES RÉPONSES
-                const repEleve = reponsesEleve ? (reponsesEleve[q.qid] || "∅") : "";
-                const repProf = q.reponseAttendue || "Pas de corrigé défini.";
-                
-                const cellRep = row.insertCell(3);
-                cellRep.style.textAlign = "left";
-                cellRep.style.verticalAlign = "top";
-                cellRep.innerHTML = `
-                    <div style="background:#f0f9ff; padding:8px; border-radius:6px; border-left:4px solid #3498db; margin-bottom:6px; color:#0f172a;">
-                        <strong>Élève :</strong> ${repEleve}
-                    </div>
-                    <div style="color:#64748b; font-size:0.9em; padding:4px; border-top:1px dashed #cbd5e1; font-style:italic;">
-                        🎯 <strong>Attendu :</strong> ${repProf}
-                    </div>
-                `;
-
-                // Commentaires
-                const cellCom = row.insertCell(4);
-                cellCom.innerHTML = '<div class="editable-div" contenteditable="true" placeholder="Commentaire..."></div>';
-                
-                // Bouton Banque
-                const btnBank = document.createElement('button');
-                btnBank.innerText = "💬";
-                btnBank.className = "no-print";
-                btnBank.style.float = "right"; btnBank.style.border="none"; btnBank.style.cursor="pointer"; btnBank.style.background="transparent";
-                btnBank.onclick = () => openCommentBank(q.competence, 'I', cellCom.querySelector('.editable-div'));
-                cellCom.appendChild(btnBank);
-
-                // Pas de suppression en mode auto
-                row.insertCell(5).innerHTML = ""; 
-            });
-
-            // Mise à jour du Barème en haut
-            majEntete(blueprint.questions);
-
-        } catch (error) {
-            console.error(error);
-            alert("⚠️ Impossible de charger le corrigé automatique.\n\nAssurez-vous que le fichier '" + idClean + "_blueprint.json' est bien dans le dossier 'devoirs' sur GitHub.\n\nJe passe en mode manuel.");
-            addCorrectionRow();
-        }
-    }
-
-    function majEntete(questions) {
-        comps.forEach(c => {
-            const elQ = document.getElementById(`q_display_${c.id}`);
-            const elM = document.getElementById(`max_${c.id}`);
-            if(elQ) elQ.value = "";
-            if(elM) elM.value = "";
-        });
-
-        let mapQ = {}; let mapPts = {};
-        comps.forEach(c => { mapQ[c.name] = []; mapPts[c.name] = 0; });
-
-        questions.forEach(q => {
-            let cKey = q.competence.toUpperCase();
-            if(mapQ[cKey]) {
-                mapQ[cKey].push(q.label);
-                mapPts[cKey] += (q.bareme || 0);
+            console.log("Chargement blueprint :", blueprintUrl);
+            const resp = await fetch(blueprintUrl);
+            
+            if (!resp.ok) {
+                throw new Error(`Fichier corrigé introuvable (${blueprintUrl}). Vérifiez que le fichier .json est bien dans le dossier 'devoirs' sur GitHub.`);
             }
-        });
+            
+            const blueprint = await resp.json();
+            renderCorrection(copy, blueprint);
 
-        for (const [comp, list] of Object.entries(mapQ)) {
-            if(list.length > 0) {
-                let id = comp.toLowerCase();
-                const elQ = document.getElementById(`q_display_${id}`);
-                const elM = document.getElementById(`max_${id}`);
-                if(elQ) elQ.value = list.join(", ");
-                if(elM) elM.value = mapPts[comp];
+        } catch (e) {
+            showError("Erreur : " + e.message);
+        }
+    }
+
+    function renderCorrection(copy, blueprint) {
+        document.getElementById("loader").style.display = "none";
+        document.getElementById("content").style.display = "block";
+        document.getElementById("titre-devoir").innerText = blueprint.titre || "Devoir";
+        document.getElementById("eleve-info").innerText = `${copy.eleve?.prenom || ''} ${copy.eleve?.nom || ''} (${copy.eleve?.classe || '?'})`;
+
+        const tbody = document.getElementById("grille-body");
+        let totalScore = 0;
+        let totalMax = 0;
+
+        blueprint.questions.forEach(q => {
+            const qid = q.qid;
+            // On cherche la réponse de l'élève
+            let repEleve = copy.reponses[qid];
+            if(repEleve === undefined) repEleve = "Non répondu";
+            
+            // Calcul automatique simple (QCM / Exactitude)
+            let points = 0;
+            
+            // Logique de correction basique
+            if (q.reponseAttendue && repEleve === q.reponseAttendue) {
+                points = q.bareme;
+            } else if (repEleve !== "Non répondu" && !q.reponseAttendue) {
+                // Question ouverte sans réponse type stricte = A corriger manuellement
+                // On met 0 par défaut pour l'instant
+                points = 0; 
             }
+
+            totalScore += points;
+            totalMax += q.bareme;
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td><strong>${q.label}</strong><br><small>${q.competence}</small></td>
+                <td>
+                    <div class="rep-eleve">${repEleve}</div>
+                    ${q.reponseAttendue ? `<div class="rep-corrige">Attendu : ${q.reponseAttendue}</div>` : ''}
+                </td>
+                <td style="text-align:center;">${q.bareme}</td>
+                <td style="text-align:center;">
+                    <span class="${points > 0 ? 'status-ok' : 'status-ko'}">${points}</span>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        // Mise à jour de la note finale sur 20
+        let note20 = 0;
+        if(totalMax > 0) {
+            note20 = (totalScore / totalMax) * 20;
         }
-        updateTotal();
+        document.getElementById("note-finale").innerText = Math.round(note20 * 10) / 10;
     }
 
-    // --- 4. FONCTIONS MANUELLES & UI ---
-    function initGradingTable() {
-        const gradingBody = document.getElementById('gradingBody');
-        if(gradingBody.children.length > 0) return;
-        comps.forEach((c, index) => {
-            const tr = document.createElement('tr');
-            let html = `<td><span class="badge ${c.color}">${c.name}</span></td><td><input type="text" id="q_display_${c.id}" class="q-display" readonly></td><td><input type="radio" name="rad_${c.id}"></td><td><input type="radio" name="rad_${c.id}"></td><td><input type="radio" name="rad_${c.id}"></td><td><input type="radio" name="rad_${c.id}"></td><td><div class="points-container"><input type="number" id="score_${c.id}" class="score-input" min="0" step="0.25" placeholder="0" oninput="updateTotal()"> / <input type="number" id="max_${c.id}" class="max-input" min="0" step="0.5" placeholder="?" oninput="updateTotal()"></div></td>`;
-            if (index === 0) html += `<td rowspan="6" class="final-grade-cell"><span id="finalNoteDisplay" class="final-grade-text">--</span><span id="finalNoteBase" class="final-grade-base">/ --</span></td>`;
-            tr.innerHTML = html;
-            gradingBody.appendChild(tr);
-        });
+    function showError(msg) {
+        document.getElementById("loader").style.display = "none";
+        const box = document.getElementById("error-msg");
+        box.style.display = "block";
+        box.innerText = msg;
     }
 
-    function updateTotal() {
-        let totalPoints = 0; let totalMax = 0; let hasScore = false;
-        comps.forEach(c => {
-            const s = parseFloat(document.getElementById(`score_${c.id}`).value);
-            const m = parseFloat(document.getElementById(`max_${c.id}`).value);
-            if (!isNaN(s)) { totalPoints += s; hasScore = true; }
-            if (!isNaN(m)) { totalMax += m; }
-        });
-        const d = document.getElementById('finalNoteDisplay');
-        const b = document.getElementById('finalNoteBase');
-        if (hasScore) { d.innerText = parseFloat(totalPoints.toFixed(2)); if (totalMax > 0) b.innerText = "/ " + parseFloat(totalMax.toFixed(2)); else b.innerText = "/ --"; } 
-        else { d.innerText = "--"; b.innerText = "/ --"; }
-    }
-
-    function addCorrectionRow() {
-        const tbody = document.getElementById('correctionTable').querySelector('tbody');
-        let nextNum = 1;
-        const rows = tbody.querySelectorAll('tr');
-        if (rows.length > 0) {
-            const lastSelect = rows[rows.length - 1].querySelector('.q-select');
-            if (lastSelect && lastSelect.value) nextNum = Math.floor(parseFloat(lastSelect.value)) + 1;
-        }
-        if(nextNum>30) nextNum=30;
-        const row = tbody.insertRow();
-        let qOpts = '<option value="" disabled>N°</option>';
-        for(let i=1; i<=30; i++) { let isSelected = (i === nextNum) ? 'selected' : ''; qOpts += `<option value="${i}" ${isSelected}>${i}</option>`; for(let j=1; j<=5; j++) { qOpts += `<option value="${i}.${j}">${i}.${j}</option>`; } }
-        row.insertCell(0).innerHTML = `<select class="smart-select q-select" onchange="syncQuestions()">${qOpts}</select>`;
-        row.insertCell(1).innerHTML = `<select class="comp-select c1" onchange="changeCompColor(this); syncQuestions()"><option value="c1">C1</option><option value="c2">C2</option><option value="c3">C3</option><option value="c4">C4</option><option value="c5">C5</option><option value="c6">C6</option></select>`;
-        changeCompColor(row.cells[1].querySelector('select'));
-        const cellLvl = row.insertCell(2);
-        ['NT', 'I', 'A', 'M'].forEach(lvl => {
-            const btn = document.createElement('span'); btn.innerText = lvl; btn.className = `level-btn ${lvl.toLowerCase()}`;
-            btn.onclick = function() { Array.from(cellLvl.children).forEach(child => child.classList.remove('active')); this.classList.add('active'); const compKey = row.querySelector('.comp-select').value.toUpperCase(); const commentDiv = row.cells[4].querySelector('.editable-div'); openCommentBank(compKey, lvl, commentDiv); };
-            cellLvl.appendChild(btn);
-        });
-        row.insertCell(3).innerHTML = '<div class="editable-div" contenteditable="true" placeholder="Réponse attendue..."></div>';
-        row.insertCell(4).innerHTML = '<div class="editable-div" contenteditable="true" placeholder="Commentaire..."></div>';
-        row.insertCell(5).className = "no-print";
-        row.cells[5].innerHTML = '<button class="btn-del" onclick="removeRow(this)">X</button>';
-        syncQuestions();
-    }
-
-    function removeRow(btn) { btn.closest('tr').remove(); syncQuestions(); }
-    function changeCompColor(s) { comps.forEach(c => s.classList.remove(c.color)); s.classList.add(s.value); }
-    function syncQuestions() {
-        let map = { c1: [], c2: [], c3: [], c4: [], c5: [], c6: [] };
-        document.getElementById('correctionTable').querySelectorAll('tbody tr').forEach(row => {
-            const q = row.querySelector('.q-select')?.value;
-            const c = row.querySelector('.comp-select')?.value;
-            if (q && c && map[c]) map[c].push(q);
-        });
-        for (const [key, val] of Object.entries(map)) { document.getElementById(`q_display_${key}`).value = val.join(', '); }
-    }
-
-    let sortDirection = {};
-    function sortTable(colIndex) {
-        const tbody = document.getElementById("correctionTable").querySelector("tbody");
-        const rows = Array.from(tbody.querySelectorAll("tr"));
-        const dir = sortDirection[colIndex] === 'asc' ? 'desc' : 'asc';
-        sortDirection[colIndex] = dir;
-        rows.sort((a, b) => {
-            let valA = a.cells[colIndex].innerText, valB = b.cells[colIndex].innerText;
-            if(colIndex===0) { valA=parseFloat(valA)||0; valB=parseFloat(valB)||0; }
-            return (valA < valB ? -1 : 1) * (dir === 'asc' ? 1 : -1);
-        });
-        rows.forEach(row => tbody.appendChild(row));
-    }
-
-    let currentTargetInput = null;
-    function openCommentBank(compKey, level, targetDiv) {
-        currentTargetInput = targetDiv;
-        const compData = COMMENTS_COMP[compKey] || {};
-        const container = document.getElementById('modalList'); container.innerHTML = '';
-        document.getElementById('modalTitle').innerText = `${compKey} - Banques`;
-        let found = false;
-        for (const [outil, niveaux] of Object.entries(compData)) {
-             const comments = niveaux[level] || [];
-             if(comments.length > 0) {
-                 found = true;
-                 const t = document.createElement('div'); t.className='modal-section-title'; t.innerText=outil; container.appendChild(t);
-                 comments.forEach(txt => {
-                     const d = document.createElement('div'); d.className='comment-item'; d.innerText=txt; 
-                     d.onclick=()=>{ insertText(txt); }; container.appendChild(d);
-                 });
-             }
-        }
-        if(!found) container.innerHTML = '<div style="padding:15px;color:#777;">Aucun commentaire spécifique.</div>';
-        document.getElementById('commentModal').style.display = 'flex';
-    }
-
-    function openAppreciationBank() { currentTargetInput = document.getElementById('appreciationArea'); showModalAppreciation(); }
-    function showModalAppreciation() {
-        const container = document.getElementById('modalList'); container.innerHTML = '';
-        document.getElementById('modalTitle').innerText = "Appréciations";
-        const t1 = document.createElement('div'); t1.className='modal-section-title'; t1.innerText="Globales"; container.appendChild(t1);
-        (COMMENTS_APPR["Global"] || []).forEach(txt => {
-            const d = document.createElement('div'); d.className='comment-item'; d.innerText=txt; d.onclick=()=>{ insertText(txt, true); }; container.appendChild(d);
-        });
-        document.getElementById('commentModal').style.display = 'flex';
-    }
-
-    function insertText(text, newLine = false) {
-        if(currentTargetInput) {
-            if(currentTargetInput.tagName === 'TEXTAREA') {
-                const sep = (currentTargetInput.value.length > 0) ? (newLine ? "\n" : " ") : "";
-                currentTargetInput.value += sep + text;
-            } else { currentTargetInput.innerText += (currentTargetInput.innerText ? " " : "") + text; }
-        }
-        closeModal();
-    }
-    function closeModal() { document.getElementById('commentModal').style.display = 'none'; }
-
-    function saveState() {
-        const state = {
-            title: document.getElementById('docTitle').innerText,
-            nom: document.getElementById('inputNom').value,
-            prenom: document.getElementById('inputPrenom').value,
-            classe: document.getElementById('inputClasse').value,
-            appr: document.getElementById('appreciationArea').value
-        };
-        localStorage.setItem('pse_eval_state', JSON.stringify(state));
-        const msg = document.getElementById('saveMessage');
-        msg.style.opacity = 1; setTimeout(() => msg.style.opacity = 0, 1000);
-    }
-    function loadState() {
-        const saved = localStorage.getItem('pse_eval_state');
-        if(saved) {
-            const s = JSON.parse(saved);
-            if(s.title) document.getElementById('docTitle').innerText = s.title;
-            if(s.nom) document.getElementById('inputNom').value = s.nom;
-            if(s.prenom) document.getElementById('inputPrenom').value = s.prenom;
-            if(s.classe) document.getElementById('inputClasse').value = s.classe;
-            if(s.appr) document.getElementById('appreciationArea').value = s.appr;
-        }
-    }
-    function resetNewStudent() {
-        if(confirm("Nouvel élève ?")) {
-            document.getElementById('inputNom').value = "";
-            document.getElementById('inputPrenom').value = "";
-            document.getElementById('appreciationArea').value = "";
-            document.querySelectorAll('.score-input').forEach(i => i.value="");
-            document.querySelectorAll('input[type=radio]').forEach(r => r.checked=false);
-            document.querySelectorAll('.level-btn.active').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('#correctionTable .editable-div').forEach(d => {
-                if(d.parentElement.cellIndex === 4) d.innerText = "";
-            });
-            updateTotal();
-            saveState();
-        }
-    }
-    function searchStudent() {
-        const input = document.getElementById('inputNom');
-        const val = input.value.toUpperCase();
-        const list = document.getElementById('suggestions'); list.innerHTML = '';
-        if (!val || STUDENTS_DB.length === 0) { list.style.display = 'none'; return; }
-        const matches = STUDENTS_DB.filter(s => s.nom.toUpperCase().startsWith(val));
-        if (matches.length === 0) { list.style.display = 'none'; return; }
-        matches.forEach(s => {
-            const div = document.createElement('div'); div.className = 'suggestion-item';
-            div.innerText = `${s.nom} ${s.prenom} (${s.classe})`;
-            div.onclick = () => {
-                input.value = s.nom;
-                document.getElementById('inputPrenom').value = s.prenom;
-                document.getElementById('inputClasse').value = s.classe;
-                list.style.display = 'none';
-            };
-            list.appendChild(div);
-        });
-        list.style.display = 'block';
-    }
+    init();
 </script>
+
 </body>
 </html>
