@@ -1652,7 +1652,715 @@ window.traficInit = function() {
     // Note: Les fonctions traficRefresh() et autres fonctions Firestore 
     // sont déjà définies dans le code original et fonctionnent correctement
     // Elles sont conservées telles quelles car elles sont fonctionnelles
+// ============================================================================
+// CORRECTIF - Traffic Monitoring & Sessions Sondage
+// À insérer dans la section <script type="module"> de index.html
+// ============================================================================
 
+// CORRECTION 1 : Renommer la fonction trafficInit → traficInit
+window.traficInit = function() {
+  if (traficInitDone) return;
+  traficInitDone = true;
+  console.log("✅ Initialisation du module Trafic");
+  
+  const period = document.getElementById("trafic-period");
+  const cls = document.getElementById("trafic-class");
+  const eleve = document.getElementById("trafic-eleve");
+  const type = document.getElementById("trafic-type");
+  const btn = document.getElementById("trafic-refresh");
+  
+  if (period) period.addEventListener("change", () => traficRefresh());
+  if (cls) cls.addEventListener("change", () => traficRefresh());
+  if (eleve) eleve.addEventListener("change", () => traficRefresh());
+  if (type) type.addEventListener("change", () => traficRefresh());
+  if (btn) btn.addEventListener("click", () => traficRefresh());
+};
+
+// CORRECTION 2 : Implémenter traficRefresh()
+window.traficRefresh = async function() {
+  console.log("🔄 Actualisation du trafic...");
+  
+  try {
+    // Récupérer les paramètres de filtre
+    const period = document.getElementById("trafic-period")?.value || "7d";
+    const filterClass = document.getElementById("trafic-class")?.value || "ALL";
+    const filterEleve = document.getElementById("trafic-eleve")?.value || "ALL";
+    const filterType = document.getElementById("trafic-type")?.value || "ALL";
+    
+    // Calculer la date de début selon la période
+    let startDate = new Date();
+    switch(period) {
+      case "today":
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "7d":
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case "year":
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+    }
+    
+    // Requête Firebase
+    const qStats = query(
+      collection(db, "statistiques_usage"),
+      where("timestamp", ">=", Timestamp.fromDate(startDate)),
+      orderBy("timestamp", "desc")
+    );
+    
+    const snapshot = await getDocs(qStats);
+    
+    // Initialiser les données
+    let weekData = [0, 0, 0, 0, 0, 0, 0]; // Lun-Dim
+    let splitData = { matin: 0, apresMidi: 0, soir: 0, nuit: 0 };
+    let presenceMap = new Map();
+    let pagesMap = new Map();
+    let logsData = [];
+    
+    // Mise à jour des filtres de classe et élève
+    let classesSet = new Set();
+    let elevesSet = new Set();
+    
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      
+      // Filtrage
+      if (filterClass !== "ALL" && d.classe !== filterClass) return;
+      if (filterEleve !== "ALL" && d.userCode !== filterEleve) return;
+      if (filterType === "IDENT" && !d.userCode) return;
+      if (filterType === "ANON" && d.userCode) return;
+      
+      // Collecter classes et élèves pour les filtres
+      if (d.classe) classesSet.add(d.classe);
+      if (d.userCode && d.identifiant) {
+        elevesSet.add(JSON.stringify({ code: d.userCode, nom: d.identifiant }));
+      }
+      
+      // Traitement de la date
+      let date = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp || d.date);
+      let dayOfWeek = (date.getDay() + 6) % 7; // 0=Lun, 6=Dim
+      let hour = date.getHours();
+      
+      // Graphique semaine
+      weekData[dayOfWeek]++;
+      
+      // Répartition temporelle
+      if (hour >= 5 && hour < 12) splitData.matin++;
+      else if (hour >= 12 && hour < 18) splitData.apresMidi++;
+      else if (hour >= 18 && hour < 22) splitData.soir++;
+      else splitData.nuit++;
+      
+      // Présence par élève
+      if (d.userCode) {
+        const key = d.userCode;
+        if (!presenceMap.has(key)) {
+          presenceMap.set(key, {
+            identifiant: d.identifiant || "Anonyme",
+            classe: d.classe || "?",
+            visites: 0,
+            tempsTotal: 0,
+            derniere: date
+          });
+        }
+        let p = presenceMap.get(key);
+        p.visites++;
+        p.tempsTotal += (d.temps_secondes || 0);
+        if (date > p.derniere) p.derniere = date;
+      }
+      
+      // Top pages
+      let page = d.page || d.exercice_titre || "Inconnu";
+      pagesMap.set(page, (pagesMap.get(page) || 0) + 1);
+      
+      // Logs bruts
+      logsData.push({
+        date: date,
+        identifiant: d.identifiant || "Anonyme",
+        classe: d.classe || "?",
+        temps: d.temps_secondes || 0,
+        page: page,
+        type: d.userCode ? "Identifié" : "Anonyme"
+      });
+    });
+    
+    // Mise à jour des sélecteurs
+    updateTraficFilters(classesSet, elevesSet);
+    
+    // Mise à jour des graphiques
+    updateTraficCharts(weekData, splitData);
+    
+    // Mise à jour des tableaux
+    updatePresenceTable(presenceMap);
+    updateTopPages(pagesMap);
+    updateLogsTable(logsData);
+    
+    console.log("✅ Trafic actualisé");
+    
+  } catch(e) {
+    console.error("❌ Erreur traficRefresh:", e);
+    alert("Erreur lors du chargement du trafic : " + e.message);
+  }
+};
+
+// Fonction auxiliaire : Mise à jour des filtres
+function updateTraficFilters(classesSet, elevesSet) {
+  const selClass = document.getElementById("trafic-class");
+  const selEleve = document.getElementById("trafic-eleve");
+  
+  if (selClass) {
+    const oldVal = selClass.value;
+    selClass.innerHTML = '<option value="ALL">Toutes les classes</option>';
+    [...classesSet].sort().forEach(c => {
+      selClass.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+    selClass.value = oldVal;
+  }
+  
+  if (selEleve) {
+    const oldVal = selEleve.value;
+    selEleve.innerHTML = '<option value="ALL">Tous les élèves</option>';
+    [...elevesSet].map(s => JSON.parse(s)).sort((a, b) => a.nom.localeCompare(b.nom)).forEach(e => {
+      selEleve.innerHTML += `<option value="${e.code}">${e.nom}</option>`;
+    });
+    selEleve.value = oldVal;
+  }
+}
+
+// Fonction auxiliaire : Mise à jour des graphiques
+function updateTraficCharts(weekData, splitData) {
+  // Graphique semaine
+  const ctxWeek = document.getElementById("traficChartWeek");
+  if (ctxWeek) {
+    if (Chart.getChart("traficChartWeek")) {
+      Chart.getChart("traficChartWeek").destroy();
+    }
+    new Chart(ctxWeek, {
+      type: 'bar',
+      data: {
+        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+        datasets: [{
+          label: 'Activité',
+          data: weekData,
+          backgroundColor: '#3b82f6',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+  
+  // Graphique répartition
+  const ctxSplit = document.getElementById("traficChartSplit");
+  if (ctxSplit) {
+    if (Chart.getChart("traficChartSplit")) {
+      Chart.getChart("traficChartSplit").destroy();
+    }
+    new Chart(ctxSplit, {
+      type: 'doughnut',
+      data: {
+        labels: ['Matin (5h-12h)', 'Après-midi (12h-18h)', 'Soirée (18h-22h)', 'Nuit (22h-5h)'],
+        datasets: [{
+          data: [splitData.matin, splitData.apresMidi, splitData.soir, splitData.nuit],
+          backgroundColor: ['#fbbf24', '#3b82f6', '#8b5cf6', '#1e293b']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+}
+
+// Fonction auxiliaire : Mise à jour du tableau présence
+function updatePresenceTable(presenceMap) {
+  const tbody = document.getElementById("trafic-presence-body");
+  if (!tbody) return;
+  
+  let html = "";
+  const sorted = [...presenceMap.values()].sort((a, b) => b.visites - a.visites);
+  
+  sorted.forEach(p => {
+    const tempsAff = p.tempsTotal > 0 
+      ? Math.floor(p.tempsTotal / 60) + "m" 
+      : "-";
+    const derniereAff = p.derniere.toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    
+    html += `<tr>
+      <td><strong>${p.identifiant}</strong></td>
+      <td><span class="pill pill-blue">${p.classe}</span></td>
+      <td><span class="pill pill-green">${p.visites}</span></td>
+      <td>${tempsAff}</td>
+      <td style="font-size:0.85rem; color:#64748b;">${derniereAff}</td>
+    </tr>`;
+  });
+  
+  tbody.innerHTML = html || '<tr><td colspan="5" class="scores-empty">Aucune donnée</td></tr>';
+}
+
+// Fonction auxiliaire : Mise à jour top pages
+function updateTopPages(pagesMap) {
+  const div = document.getElementById("trafic-top-pages");
+  if (!div) return;
+  
+  const sorted = [...pagesMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  
+  let html = "";
+  sorted.forEach(([page, count], i) => {
+    let medal = "";
+    if (i === 0) medal = "🥇";
+    else if (i === 1) medal = "🥈";
+    else if (i === 2) medal = "🥉";
+    
+    html += `
+    <div class="rank-item">
+      <span class="rank-pos">${medal || (i + 1) + '.'}</span>
+      <span class="rank-name">${page}</span>
+      <span class="rank-val">${count}</span>
+    </div>`;
+  });
+  
+  div.innerHTML = html || '<p style="text-align:center; color:#94a3b8;">Aucune donnée</p>';
+}
+
+// Fonction auxiliaire : Mise à jour logs
+function updateLogsTable(logsData) {
+  const tbody = document.getElementById("trafic-logs-body");
+  if (!tbody) return;
+  
+  // Trier par date décroissante
+  logsData.sort((a, b) => b.date - a.date);
+  
+  let html = "";
+  logsData.slice(0, 50).forEach(log => {
+    const dateAff = log.date.toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const tempsAff = log.temps > 0 ? Math.floor(log.temps / 60) + "m" : "-";
+    const typePill = log.type === "Identifié" 
+      ? '<span class="pill pill-green">Identifié</span>'
+      : '<span class="pill pill-orange">Anonyme</span>';
+    
+    html += `<tr>
+      <td style="font-size:0.85rem;">${dateAff}</td>
+      <td><strong>${log.identifiant}</strong></td>
+      <td><span class="pill pill-blue">${log.classe}</span></td>
+      <td>${tempsAff}</td>
+      <td style="font-size:0.85rem;">${log.page}</td>
+      <td>${typePill}</td>
+    </tr>`;
+  });
+  
+  tbody.innerHTML = html || '<tr><td colspan="6" class="scores-empty">Aucune donnée</td></tr>';
+}
+
+// ============================================================================
+// CORRECTION 3 : Fonctions pour le module Sessions & Sondages
+// ============================================================================
+
+// Variables globales pour les sessions
+let libraryData = [];
+let currentMode = null;
+let currentConfig = null;
+
+// Fonction loadHistory
+window.loadHistory = async function() {
+  console.log("📚 Chargement de l'historique des sessions...");
+  
+  try {
+    const qSessions = query(
+      collection(db, "sessions"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
+    
+    const snapshot = await getDocs(qSessions);
+    const histDiv = document.getElementById("history-list");
+    
+    if (!histDiv) return;
+    
+    let html = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const date = data.createdAt?.toDate 
+        ? data.createdAt.toDate().toLocaleString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        : "-";
+      
+      const status = data.isActive 
+        ? '<span class="pill pill-green">Active</span>'
+        : '<span class="pill pill-orange">Terminée</span>';
+      
+      html += `
+      <div style="padding:8px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong>${data.title}</strong><br>
+          <small style="color:#64748b;">${date}</small>
+        </div>
+        ${status}
+      </div>`;
+    });
+    
+    histDiv.innerHTML = html || '<p style="text-align:center; color:#94a3b8;">Aucun historique</p>';
+    
+  } catch(e) {
+    console.error("❌ Erreur loadHistory:", e);
+  }
+};
+
+// Fonction toggleCreator
+window.toggleCreator = function() {
+  const panel = document.getElementById("creator-panel");
+  if (!panel) return;
+  
+  if (panel.style.display === "none" || !panel.style.display) {
+    panel.style.display = "block";
+    updateCreatorForm();
+  } else {
+    panel.style.display = "none";
+    // Réinitialiser le formulaire
+    document.getElementById("edit-id").value = "";
+    document.getElementById("create-title").value = "";
+    document.getElementById("create-question").value = "";
+    document.getElementById("options-container").innerHTML = "";
+  }
+};
+
+// Fonction updateCreatorForm
+window.updateCreatorForm = function() {
+  const type = document.getElementById("create-type").value;
+  const container = document.getElementById("options-container");
+  
+  if (!container) return;
+  
+  if (type === "cloud") {
+    container.innerHTML = '<p style="color:#64748b; font-size:0.85rem; margin:10px 0;">Pour un nuage de mots, seul le thème est nécessaire.</p>';
+  } else {
+    // Quiz ou Sondage : afficher 2 options par défaut
+    container.innerHTML = `
+      <div class="option-row">
+        <input type="text" placeholder="Option A" class="filter-input" style="flex:1;">
+        <input type="number" placeholder="Points (quiz)" class="filter-input" style="width:80px;" min="0" max="10">
+        <button onclick="this.parentElement.remove()" style="background:#fee2e2; color:#991b1b; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✕</button>
+      </div>
+      <div class="option-row">
+        <input type="text" placeholder="Option B" class="filter-input" style="flex:1;">
+        <input type="number" placeholder="Points (quiz)" class="filter-input" style="width:80px;" min="0" max="10">
+        <button onclick="this.parentElement.remove()" style="background:#fee2e2; color:#991b1b; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✕</button>
+      </div>
+    `;
+  }
+};
+
+// Fonction addOptionInput
+window.addOptionInput = function() {
+  const container = document.getElementById("options-container");
+  if (!container) return;
+  
+  const div = document.createElement("div");
+  div.className = "option-row";
+  div.innerHTML = `
+    <input type="text" placeholder="Option..." class="filter-input" style="flex:1;">
+    <input type="number" placeholder="Points" class="filter-input" style="width:80px;" min="0" max="10">
+    <button onclick="this.parentElement.remove()" style="background:#fee2e2; color:#991b1b; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✕</button>
+  `;
+  container.appendChild(div);
+};
+
+// Fonction saveToLibrary
+window.saveToLibrary = async function() {
+  const type = document.getElementById("create-type").value;
+  const title = document.getElementById("create-title").value.trim();
+  const question = document.getElementById("create-question").value.trim();
+  const editId = document.getElementById("edit-id").value;
+  
+  if (!title) {
+    alert("Le titre est obligatoire !");
+    return;
+  }
+  
+  // Préparer les données selon le type
+  let data = {
+    type: type === "poll" ? "poll" : type === "quiz" ? "quiz" : "cloud",
+    title: title,
+    question: question || title,
+    createdAt: serverTimestamp()
+  };
+  
+  // Récupérer les options si ce n'est pas un nuage
+  if (type !== "cloud") {
+    const rows = document.querySelectorAll("#options-container .option-row");
+    data.options = [];
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll("input");
+      if (inputs[0].value.trim()) {
+        data.options.push({
+          text: inputs[0].value.trim(),
+          points: type === "quiz" ? (parseInt(inputs[1].value) || 0) : 0
+        });
+      }
+    });
+    
+    if (data.options.length === 0) {
+      alert("Ajoutez au moins une option !");
+      return;
+    }
+  }
+  
+  try {
+    if (editId) {
+      // Mise à jour
+      await updateDoc(doc(db, "library", editId), data);
+      console.log("✅ Item mis à jour");
+    } else {
+      // Création
+      await addDoc(collection(db, "library"), data);
+      console.log("✅ Item créé");
+    }
+    
+    // Réinitialiser et recharger
+    toggleCreator();
+    loadLibrary();
+    
+  } catch(e) {
+    console.error("❌ Erreur saveToLibrary:", e);
+    alert("Erreur lors de l'enregistrement : " + e.message);
+  }
+};
+
+// Fonction loadLibrary
+window.loadLibrary = async function() {
+  console.log("📚 Chargement de la bibliothèque...");
+  
+  try {
+    const qLib = query(collection(db, "library"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(qLib);
+    
+    libraryData = [];
+    const ul = document.getElementById("library-list");
+    if (!ul) return;
+    
+    let html = "";
+    snapshot.forEach(doc => {
+      const data = { id: doc.id, ...doc.data() };
+      libraryData.push(data);
+      
+      const tag = data.type === "poll" 
+        ? '<span class="tag tag-poll">Sondage</span>'
+        : data.type === "quiz"
+        ? '<span class="tag tag-quiz">Quiz</span>'
+        : '<span class="tag tag-cloud">Nuage</span>';
+      
+      html += `
+      <li class="lib-item" onclick="loadFromLibrary('${data.id}')">
+        <div>
+          ${tag}
+          <strong>${data.title}</strong>
+        </div>
+        <div style="display:flex; gap:5px;">
+          <button onclick="event.stopPropagation(); editLibraryItem('${data.id}')" style="background:#f1f5f9; border:1px solid #cbd5e1; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">✏️</button>
+          <button onclick="event.stopPropagation(); deleteLibraryItem('${data.id}')" style="background:#fee2e2; border:1px solid #fecaca; color:#991b1b; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">🗑️</button>
+        </div>
+      </li>`;
+    });
+    
+    ul.innerHTML = html || '<li style="text-align:center; color:#94a3b8; padding:20px;">Bibliothèque vide</li>';
+    
+  } catch(e) {
+    console.error("❌ Erreur loadLibrary:", e);
+  }
+};
+
+// Fonction loadFromLibrary
+window.loadFromLibrary = async function(itemId) {
+  if (!currentSessionId) {
+    alert("Aucune session active ! Créez-en une d'abord.");
+    return;
+  }
+  
+  const item = libraryData.find(i => i.id === itemId);
+  if (!item) return;
+  
+  console.log("📥 Chargement de l'item:", item.title);
+  
+  // Mettre à jour la config live
+  await setDoc(doc(db, "config", "live"), {
+    activeSessionId: currentSessionId,
+    currentStep: item.type === "cloud" ? "nuage" : item.type === "poll" ? "sondage" : "quiz",
+    config: item,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  
+  // Afficher l'interface de configuration
+  const configZone = document.getElementById("config-zone");
+  if (configZone) {
+    configZone.innerHTML = `
+      <div style="width:100%;">
+        <h4 style="margin:0 0 10px; color:#0f172a;">${item.title}</h4>
+        <p style="margin:0; color:#64748b; font-size:0.9rem;">${item.question}</p>
+        ${item.options ? `
+          <div style="margin-top:10px;">
+            ${item.options.map((opt, i) => 
+              `<div style="padding:5px; background:#fff; border:1px solid #e2e8f0; border-radius:4px; margin-bottom:3px;">
+                ${opt.text} ${item.type === "quiz" ? `(${opt.points} pts)` : ''}
+              </div>`
+            ).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  // Afficher les contrôles quiz si nécessaire
+  const quizControls = document.getElementById("quiz-controls");
+  if (quizControls) {
+    quizControls.style.display = item.type === "quiz" ? "block" : "none";
+  }
+  
+  // Activer le mode
+  setMode(item.type === "cloud" ? "nuage" : item.type);
+};
+
+// Fonction editLibraryItem
+window.editLibraryItem = function(itemId) {
+  const item = libraryData.find(i => i.id === itemId);
+  if (!item) return;
+  
+  // Remplir le formulaire
+  document.getElementById("edit-id").value = item.id;
+  document.getElementById("create-type").value = item.type;
+  document.getElementById("create-title").value = item.title;
+  document.getElementById("create-question").value = item.question;
+  
+  updateCreatorForm();
+  
+  // Remplir les options
+  if (item.options) {
+    const container = document.getElementById("options-container");
+    container.innerHTML = "";
+    item.options.forEach(opt => {
+      const div = document.createElement("div");
+      div.className = "option-row";
+      div.innerHTML = `
+        <input type="text" placeholder="Option..." class="filter-input" style="flex:1;" value="${opt.text}">
+        <input type="number" placeholder="Points" class="filter-input" style="width:80px;" min="0" max="10" value="${opt.points || 0}">
+        <button onclick="this.parentElement.remove()" style="background:#fee2e2; color:#991b1b; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✕</button>
+      `;
+      container.appendChild(div);
+    });
+  }
+  
+  // Afficher le panneau
+  document.getElementById("creator-panel").style.display = "block";
+};
+
+// Fonction deleteLibraryItem
+window.deleteLibraryItem = async function(itemId) {
+  if (!confirm("Supprimer cet élément de la bibliothèque ?")) return;
+  
+  try {
+    await deleteDoc(doc(db, "library", itemId));
+    console.log("✅ Item supprimé");
+    loadLibrary();
+  } catch(e) {
+    console.error("❌ Erreur deleteLibraryItem:", e);
+    alert("Erreur lors de la suppression : " + e.message);
+  }
+};
+
+// Fonction setMode
+window.setMode = function(mode) {
+  console.log("🎯 Mode:", mode);
+  currentMode = mode;
+  
+  // Activer visuellement le bouton
+  document.querySelectorAll(".act-btn").forEach(btn => btn.classList.remove("active"));
+  const buttons = {
+    meteo: 0,
+    nuage: 1,
+    sondage: 2,
+    quiz: 3
+  };
+  const btns = document.querySelectorAll(".act-btn");
+  if (btns[buttons[mode]]) {
+    btns[buttons[mode]].classList.add("active");
+  }
+};
+
+// Fonction revealQuiz
+window.revealQuiz = async function() {
+  if (!currentSessionId) return;
+  
+  try {
+    await updateDoc(doc(db, "config", "live"), {
+      revealed: true,
+      updatedAt: serverTimestamp()
+    });
+    console.log("✅ Réponse révélée");
+  } catch(e) {
+    console.error("❌ Erreur revealQuiz:", e);
+  }
+};
+
+// Fonction resetQuiz
+window.resetQuiz = async function() {
+  if (!currentSessionId) return;
+  if (!confirm("Réinitialiser les votes ?")) return;
+  
+  try {
+    // Supprimer tous les votes de la session
+    const qVotes = query(
+      collection(db, "votes"),
+      where("sessionId", "==", currentSessionId)
+    );
+    const snapshot = await getDocs(qVotes);
+    
+    const batch = [];
+    snapshot.forEach(doc => {
+      batch.push(deleteDoc(doc.ref));
+    });
+    
+    await Promise.all(batch);
+    
+    // Réinitialiser revealed
+    await updateDoc(doc(db, "config", "live"), {
+      revealed: false,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log("✅ Quiz réinitialisé");
+  } catch(e) {
+    console.error("❌ Erreur resetQuiz:", e);
+  }
+};
+
+// Auto-chargement de la bibliothèque au démarrage
+if (typeof db !== 'undefined') {
+  loadLibrary();
+}
+
+console.log("✅ Toutes les fonctions de correction sont chargées");
   </script>
 </body>
 </html>
