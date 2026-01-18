@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - Expert V12</title>
+    <title>Grille PSE - V13 (Sauvegarde Firebase)</title>
 
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -14,7 +14,16 @@
 
         .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; }
         .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.1em; cursor: pointer; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.7em; opacity: 0; transition: opacity 0.5s; }
+        .action-btn:hover { background: #f0f0f0; }
+        .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
+        .action-btn.save-btn:hover { background: #bbf7d0; }
+        
+        #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #16a34a; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.85em; opacity: 0; transition: opacity 0.5s; font-weight: bold; }
+
+        /* Bandeau de statut */
+        .status-banner { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; }
+        .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
+        .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
 
         h1 { text-align: center; color: #d9534f; margin: 0 0 5px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.4em; }
 
@@ -25,7 +34,7 @@
 
         .appreciation-box { margin-bottom: 10px; position: relative; }
         .appreciation-box label { font-weight: bold; color: #2e7bb6; cursor: pointer; text-decoration: underline; font-size: 0.85em; display:flex; align-items:center; gap:5px; margin-bottom: 3px;}
-        .appreciation-box textarea { width: 100%; min-height: 50px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; background-color: #f0f8ff; resize: none; font-family: inherit; font-size: 0.9em; overflow-y: hidden; }
+        .appreciation-box textarea { width: 100%; min-height: 50px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; background-color: #f0f8ff; resize: none; font-family: inherit; font-size: 0.9em; overflow-y: hidden; box-sizing: border-box; }
 
         table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
         th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; vertical-align: middle; }
@@ -44,8 +53,16 @@
 
         tfoot { border-top: 2px solid #333; background-color: #fffef0; }
         .total-label { text-align: right; font-weight: bold; font-size: 1.1em; padding-right: 15px; }
-        .total-points { font-weight: bold; font-size: 1.1em; text-align: center; width: 120px; }
-        .total-note { font-weight: 900; font-size: 2em; color: #d9534f; display: block; }
+        .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
+        
+        /* ✅ CSS CORRIGÉ POUR LA NOTE */
+        .total-note { 
+            font-weight: 900; 
+            font-size: 1.4em; 
+            color: #d9534f; 
+            display: block;
+            line-height: 1.2;
+        }
 
         .rep-eleve-box { background:#f0f9ff; padding:5px; border-radius:4px; border-left:3px solid #3498db; margin-bottom:3px; color:#0f172a; text-align: left; font-size: 0.9em; }
         .rep-prof-box { color:#166534; font-size:0.85em; padding:2px; font-style:italic; text-align: left; border-top: 1px dashed #ccc; margin-top:2px; }
@@ -80,6 +97,7 @@
         @media print {
             .no-print { display: none !important; }
             body { padding: 0; margin: 0; background: white; }
+            .status-banner { display: none !important; }
             .rep-prof-box { display: none; }
             .header-row, .revision-box { border: 1px solid #eee; }
             .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
@@ -93,11 +111,18 @@
 <body>
 
     <div class="tools-container no-print">
-        <button class="action-btn" onclick="resetNewStudent()">♻️ Nouveau</button>
+        <button class="action-btn save-btn" onclick="saveToFirebase()">💾 Enregistrer</button>
         <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
+        <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
     </div>
 
-    <div id="saveMessage">Enregistré</div>
+    <div id="saveMessage">✅ Correction enregistrée !</div>
+
+    <!-- Bandeau de statut -->
+    <div id="statusBanner" class="status-banner no-print">
+        <span id="statusText">⏳ Chargement...</span>
+        <span id="statusDate"></span>
+    </div>
 
     <div id="commentModal" class="modal-overlay no-print">
         <div class="modal-box">
@@ -117,7 +142,7 @@
 
     <div class="appreciation-box">
         <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
-        <textarea id="appreciationArea" oninput="autoResize(this)"></textarea>
+        <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved();"></textarea>
     </div>
 
     <table id="summaryTable">
@@ -164,15 +189,83 @@
         <tbody></tbody>
     </table>
 
-<script>
+<!-- ========== FIREBASE ========== -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.appspot.com",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Variables globales
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
+    let CURRENT_DOC_ID = null;
+    let CURRENT_COPY = null;
+    let IS_SAVED = true;
+    let QUESTIONS_MAP = {}; // Pour retrouver les qid
     const comps = ['C1','C2','C3','C4','C5','C6'];
-    let compHasQuestions = {C1:false, C2:false, C3:false, C4:false, C5:false, C6:false};
+
+    // Exposer les fonctions au scope global
+    window.autoResize = autoResize;
+    window.openAppreciationBank = openAppreciationBank;
+    window.closeModal = closeModal;
+    window.sortTable = sortTable;
+    window.markUnsaved = markUnsaved;
+    window.resetNewStudent = resetNewStudent;
+    window.setNoteVisual = setNoteVisual;
+    window.calculateTotal = calculateTotal;
+    window.saveToFirebase = saveToFirebase;
+
+    // ========== FONCTIONS UTILITAIRES ==========
 
     function autoResize(el) {
         el.style.height = 'auto';
         el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    function markUnsaved() {
+        IS_SAVED = false;
+        updateStatusBanner();
+    }
+
+    function updateStatusBanner() {
+        const banner = document.getElementById('statusBanner');
+        const text = document.getElementById('statusText');
+        const date = document.getElementById('statusDate');
+        
+        banner.classList.remove('saved', 'not-saved');
+        
+        if (IS_SAVED && CURRENT_COPY?.correction?.savedAt) {
+            banner.classList.add('saved');
+            text.innerHTML = '✅ Correction enregistrée';
+            const d = new Date(CURRENT_COPY.correction.savedAt);
+            date.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+        } else if (!IS_SAVED) {
+            banner.classList.add('not-saved');
+            text.innerHTML = '⚠️ Modifications non enregistrées';
+            date.textContent = '';
+        } else {
+            text.innerHTML = '📝 Nouvelle correction';
+            date.textContent = '';
+        }
+    }
+
+    function showSaveMessage(success = true) {
+        const msg = document.getElementById('saveMessage');
+        msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
+        msg.style.background = success ? '#16a34a' : '#dc2626';
+        msg.style.opacity = 1;
+        setTimeout(() => msg.style.opacity = 0, 2000);
     }
 
     function extractQuestionsFromBlueprint(blueprint) {
@@ -188,6 +281,122 @@
         walk(blueprint?.content);
         return questions;
     }
+
+    // ========== SAUVEGARDE FIREBASE ==========
+
+    async function saveToFirebase() {
+        if (!CURRENT_DOC_ID) {
+            alert("Erreur : Aucune copie chargée.");
+            return;
+        }
+
+        try {
+            // Collecter les données de correction
+            const correction = {
+                savedAt: new Date().toISOString(),
+                appreciation: document.getElementById('appreciationArea').value || "",
+                note_finale: parseFloat(document.getElementById('finalNote').textContent) || 0,
+                competences: {},
+                questions: {}
+            };
+
+            // Collecter les points par compétence
+            comps.forEach(c => {
+                const ptsEl = document.getElementById(`pts_${c}`);
+                const maxEl = document.getElementById(`max_${c}`);
+                if (ptsEl && maxEl) {
+                    correction.competences[c] = {
+                        pts: parseFloat(ptsEl.value) || 0,
+                        max: parseFloat(maxEl.value) || 0
+                    };
+                }
+            });
+
+            // Collecter les niveaux et commentaires par question
+            document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
+                const qid = row.dataset.qid || `q_${idx}`;
+                const level = row.dataset.level || "";
+                const commentDiv = row.querySelector('.editable-div');
+                const comment = commentDiv ? commentDiv.innerText.trim() : "";
+                
+                correction.questions[qid] = { level, comment };
+            });
+
+            console.log("💾 Sauvegarde:", correction);
+
+            // Mettre à jour Firestore
+            const docRef = doc(db, "devoirs_rendus", CURRENT_DOC_ID);
+            await updateDoc(docRef, { correction });
+
+            // Mettre à jour l'état local
+            CURRENT_COPY.correction = correction;
+            IS_SAVED = true;
+            updateStatusBanner();
+            showSaveMessage(true);
+
+            console.log("✅ Sauvegarde réussie !");
+
+        } catch (e) {
+            console.error("❌ Erreur sauvegarde:", e);
+            showSaveMessage(false);
+            alert("Erreur de sauvegarde:\n" + e.message);
+        }
+    }
+
+    // ========== CHARGEMENT D'UNE CORRECTION EXISTANTE ==========
+
+    function loadExistingCorrection(correction) {
+        if (!correction) return;
+
+        console.log("📂 Chargement correction existante:", correction);
+
+        // Appréciation
+        if (correction.appreciation) {
+            document.getElementById('appreciationArea').value = correction.appreciation;
+            autoResize(document.getElementById('appreciationArea'));
+        }
+
+        // Points par compétence
+        if (correction.competences) {
+            for (const c in correction.competences) {
+                const ptsEl = document.getElementById(`pts_${c}`);
+                if (ptsEl && correction.competences[c].pts !== undefined) {
+                    ptsEl.value = correction.competences[c].pts;
+                }
+            }
+        }
+
+        // Niveaux et commentaires par question
+        if (correction.questions) {
+            document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
+                const qid = row.dataset.qid || `q_${idx}`;
+                const qData = correction.questions[qid];
+                
+                if (qData) {
+                    // Niveau
+                    if (qData.level) {
+                        row.dataset.level = qData.level;
+                        const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
+                        if (btn) btn.classList.add('active');
+                    }
+                    
+                    // Commentaire
+                    if (qData.comment) {
+                        const commentDiv = row.querySelector('.editable-div');
+                        if (commentDiv) commentDiv.innerText = qData.comment;
+                    }
+                }
+            });
+        }
+
+        // Recalculer les compteurs
+        comps.forEach(c => updateCounters(c));
+        calculateTotal();
+
+        IS_SAVED = true;
+    }
+
+    // ========== RENDU DE LA GRILLE ==========
 
     function initSummary(activeComps, maxMap) {
         const tbody = document.getElementById('gradingBody');
@@ -207,8 +416,8 @@
                 <td><input type="radio" name="r_${c}" value="A"></td>
                 <td><input type="radio" name="r_${c}" value="M"></td>
                 <td style="white-space:nowrap;">
-                    <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); showSave();"> /
-                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); showSave();">
+                    <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); markUnsaved();"> /
+                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
                 </td>
             </tr>`;
         });
@@ -221,17 +430,18 @@
         let maxMap = {};
         let qMap = {};
         let activeComps = [];
-        comps.forEach(c => compHasQuestions[c] = false);
+        QUESTIONS_MAP = {};
 
         const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
         list.forEach((q, idx) => {
             const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
             const bareme = Number(q?.bareme) || 0;
             const label = q?.label || ("Q" + (idx + 1));
-            const qid = q?.qid || q?.id || q?.name || label;
+            const qid = q?.qid || q?.id || q?.name || `q_${idx}`;
+
+            QUESTIONS_MAP[qid] = q;
 
             if(!activeComps.includes(competence)) activeComps.push(competence);
-            compHasQuestions[competence] = true;
             maxMap[competence] = (maxMap[competence] || 0) + bareme;
             qMap[competence] = qMap[competence] || [];
             qMap[competence].push(label);
@@ -239,6 +449,7 @@
             const row = tbody.insertRow();
             row.dataset.comp = competence;
             row.dataset.level = "";
+            row.dataset.qid = qid;
 
             row.innerHTML = `
                 <td style="font-weight:bold">${label}</td>
@@ -257,7 +468,7 @@
                     </div>
                     <div class="rep-prof-box">🎯 ${q?.reponseAttendue || "N/A"}</div>
                 </td>
-                <td><div class="editable-div" contenteditable="true" placeholder="💡 Votre conseil / commentaire..." oninput="showSave()"></div></td>
+                <td><div class="editable-div" contenteditable="true" placeholder="💡 Votre conseil / commentaire..." oninput="markUnsaved()"></div></td>
             `;
         });
 
@@ -275,7 +486,7 @@
         btn.classList.add('active');
         row.dataset.level = level;
         updateCounters(row.dataset.comp);
-        showSave();
+        markUnsaved();
         openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
@@ -299,15 +510,18 @@
                 totalMax += m;
             }
         });
+        const elNote = document.getElementById('finalNote');
         if(totalMax > 0) {
             const note20 = (totalPts / totalMax) * 20;
-            const elNote = document.getElementById('finalNote');
             elNote.innerText = note20.toFixed(1) + " / 20";
             elNote.style.color = note20 < 10 ? "#d9534f" : "#16a34a";
         } else {
-            document.getElementById('finalNote').innerText = "-- / 20";
+            elNote.innerText = "-- / 20";
+            elNote.style.color = "#d9534f";
         }
     }
+
+    // ========== BANQUES DE COMMENTAIRES ==========
 
     function openCommentBank(comp, level, target) {
         CURRENT_TARGET_DIV = target;
@@ -333,7 +547,7 @@
                             let prev = CURRENT_TARGET_DIV.innerText;
                             if(prev && !prev.includes("Votre conseil")) CURRENT_TARGET_DIV.innerText += " " + txt;
                             else CURRENT_TARGET_DIV.innerText = txt;
-                            closeModal(); showSave();
+                            closeModal(); markUnsaved();
                         };
                         list.appendChild(d);
                     });
@@ -387,7 +601,7 @@
             autoResize(CURRENT_TARGET_DIV);
         }
         closeModal();
-        showSave();
+        markUnsaved();
     }
 
     function closeModal() { document.getElementById('commentModal').style.display = "none"; }
@@ -404,20 +618,18 @@
         rows.forEach(r => table.appendChild(r));
     }
 
-    function showSave() {
-        const msg = document.getElementById('saveMessage');
-        msg.style.opacity = 1; 
-        setTimeout(() => msg.style.opacity = 0, 1000);
-    }
-
     function resetNewStudent() { 
-        if(confirm("Nouveau ?")) location.reload(); 
+        if (!IS_SAVED) {
+            if (!confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) {
+                return;
+            }
+        }
+        window.close();
     }
 
-    // =============================================
-    // 🚀 CHARGEMENT AU DÉMARRAGE
-    // =============================================
-    window.addEventListener('load', async function() {
+    // ========== CHARGEMENT AU DÉMARRAGE ==========
+
+    async function init() {
         initSummary([], {});
 
         // Récupérer les données depuis localStorage
@@ -425,16 +637,21 @@
         
         if (!rawData) {
             document.getElementById('docTitle').innerText = "⚠️ Aucune copie sélectionnée";
+            document.getElementById('statusText').innerHTML = "❌ Aucune copie";
             alert("Aucune copie à corriger.\n\nUtilisez le bouton '✍️ Grille' depuis le Cockpit.");
             return;
         }
 
-        // Supprimer immédiatement pour éviter les confusions futures
+        // Supprimer immédiatement
         localStorage.removeItem("cockpit_transfert");
 
         try {
             const copy = JSON.parse(rawData);
+            CURRENT_DOC_ID = copy.id;
+            CURRENT_COPY = copy;
+            
             console.log("✅ Copie chargée:", copy);
+            console.log("📄 Document ID:", CURRENT_DOC_ID);
 
             // Remplir les infos élève
             document.getElementById('inputNom').value = copy.eleve?.nom || copy.eleve?.code || copy.identifiant || "";
@@ -457,13 +674,33 @@
             const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
             renderCorrection({ questions }, copy.reponses || {});
 
+            // Charger la correction existante si elle existe
+            if (copy.correction) {
+                loadExistingCorrection(copy.correction);
+            } else {
+                IS_SAVED = false;
+            }
+            
+            updateStatusBanner();
             console.log("✅ Grille prête !");
 
         } catch (e) {
+            document.getElementById('statusText').innerHTML = "❌ Erreur";
             alert("Erreur de chargement:\n\n" + e.message);
             console.error(e);
         }
+    }
+
+    // Avertir avant de fermer si non sauvegardé
+    window.addEventListener('beforeunload', (e) => {
+        if (!IS_SAVED) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
     });
+
+    // Démarrage
+    init();
 </script>
 </body>
 </html>
