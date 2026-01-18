@@ -1181,105 +1181,105 @@ let traficEnCours = false;
         sortData(currentSort.col, false);
     }
     
-    window.sortData = function(col, toggle=true) {
-        if(toggle) {
-            if(currentSort.col === col) currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
-            else { currentSort.col = col; currentSort.dir = 'asc'; } 
-            if((col === 'date' || col === 'note_finale') && toggle && currentSort.col !== col) currentSort.dir = 'desc';
+    window.sortData = function(col, toggle = true) {
+      // 1. Gestion du sens de tri (Ascendant / Descendant)
+      if (toggle) {
+        if (currentSort.col === col) currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+        else { currentSort.col = col; currentSort.dir = "asc"; }
+        // Par défaut, date et note se trient du plus grand au plus petit
+        if ((col === "date" || col === "note_finale") && toggle && currentSort.col !== col) currentSort.dir = "desc";
+      }
+
+      // 2. Fonction utilitaire pour lire n'importe quelle date (Firebase ou Javascript)
+      const getDateValue = (x) => {
+        if (!x) return 0;
+        if (x instanceof Date) return x.getTime();
+        if (typeof x === "string") {
+          const d = new Date(x);
+          return isNaN(d.getTime()) ? 0 : d.getTime();
         }
-        filteredData.sort((a,b) => {
-            let va = a[col], vb = b[col];
-            if(col === 'date') { va = a.date.seconds; vb = b.date.seconds; }
-            if(col === 'note_finale' || col === 'temps_secondes') { va = Number(va||0); vb = Number(vb||0); }
-            if(typeof va === 'string') va = va.toLowerCase();
-            if(typeof vb === 'string') vb = vb.toLowerCase();
-            if(va < vb) return currentSort.dir === 'asc' ? -1 : 1;
-            if(va > vb) return currentSort.dir === 'asc' ? 1 : -1;
-            return 0;
-        });
-        renderTable();
-        updateGlobalRadar();
-    }
+        if (x.seconds) return x.seconds * 1000;
+        return 0;
+      };
+
+      // 3. Le Tri réel
+      filteredData.sort((a, b) => {
+        let va = a[col], vb = b[col];
+
+        if (col === "date") { va = getDateValue(a.date); vb = getDateValue(b.date); }
+        if (col === "note_finale" || col === "temps_secondes") { va = Number(va ?? 0); vb = Number(vb ?? 0); }
+
+        if (typeof va === "string") va = va.toLowerCase();
+        if (typeof vb === "string") vb = vb.toLowerCase();
+
+        if (va < vb) return currentSort.dir === "asc" ? -1 : 1;
+        if (va > vb) return currentSort.dir === "asc" ? 1 : -1;
+        return 0;
+      });
+
+      // 4. On rafraîchit l'affichage
+      renderTable();
+      updateGlobalRadar();
+    };
 
     function renderTable() {
-        const tbody = document.getElementById("tbody-eleves");
-        // Récupération sécurisée des filtres
-        const elClass = document.getElementById("filter-class");
-        const elExo = document.getElementById("filter-exercice");
-        const fCls = elClass ? elClass.value : "ALL";
-        const fExo = elExo ? elExo.value : "ALL";
+      const tbody = document.getElementById("tbody-eleves");
+      tbody.innerHTML = "";
 
-        tbody.innerHTML = ""; 
+      // C'EST ICI LA CORRECTION : On utilise les données DÉJÀ filtrées
+      const filtered = filteredData;
 
-        // Filtrage local
-        const filtered = allData.filter(d => {
-            if(fCls !== "ALL" && d.classe !== fCls) return false;
-            if(fExo !== "ALL" && d.exercice_titre !== fExo) return false;
-            return true;
-        });
+      if (!filtered || filtered.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucun résultat trouvé.</td></tr>";
+        return;
+      }
 
-        if (filtered.length === 0) { 
-            tbody.innerHTML = "<tr><td colspan='7' class='scores-empty'>Aucun résultat.</td></tr>"; 
-            return;
+      filtered.forEach(d => {
+        // Gestion Date
+        let dateStr = "-";
+        if (d.date instanceof Date) dateStr = d.date.toLocaleDateString("fr-FR");
+        else if (d.date && d.date.seconds) dateStr = new Date(d.date.seconds * 1000).toLocaleDateString("fr-FR");
+
+        // Gestion Temps
+        let timeStr = "-";
+        if (d.temps_secondes) {
+          const m = Math.floor(d.temps_secondes / 60);
+          timeStr = m + " min";
         }
 
-        filtered.forEach(d => {
-            // Gestion Date (Compatible V10)
-            let dateStr = "-";
-            if(d.date instanceof Date) dateStr = d.date.toLocaleDateString("fr-FR");
-            
-            // Gestion du temps
-            let timeStr = "-";
-            if(d.temps_secondes) { 
-                let m = Math.floor(d.temps_secondes/60);
-                timeStr = m + " min"; 
-            }
+        // Gestion Note (Couleurs)
+        let scoreStyle = "color:#4b5563";
+        let scoreTxt = d.note_finale;
 
-            // Gestion Note et Couleur
-            let scoreClass = "color:#4b5563"; // Gris par défaut
-            let scoreTxt = d.note_finale;
-            
-            if(scoreTxt !== "--") {
-                scoreTxt += "/20";
-                // Couleur rouge/vert
-                let val = parseFloat(d.note_finale);
-                if(val < 10) scoreClass = "color:#dc2626;font-weight:bold";
-                else if(val >= 14) scoreClass = "color:#16a34a;font-weight:bold";
-            }
+        if (scoreTxt !== "--") {
+          scoreTxt = scoreTxt + "/20";
+          const val = parseFloat(d.note_finale);
+          if (!isNaN(val)) {
+            if (val < 10) scoreStyle = "color:#dc2626;font-weight:bold";
+            else if (val >= 14) scoreStyle = "color:#16a34a;font-weight:bold";
+          }
+        }
 
-            // --- CONSTRUCTION URL DYNAMIQUE POUR LA COPIE ---
-            let urlDevoir = "";
-            // Si le devoir a un ID enregistré et propre
-            if (d.devoirId && d.devoirId.startsWith("devoir_")) {
-                 urlDevoir = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${d.devoirId}_eleve.html`;
-            } else {
-                 // Fallback ancien système
-                 urlDevoir = "https://preventionsanteenvironnement.github.io/PSE/devoirs/PSE_devoirs_CAP_A3_sedentarite_v1.html";
-            }
-            
-
-            // Insertion Ligne avec les DEUX BOUTONS (Grille + Copie)
-            tbody.innerHTML += `<tr>
-                <td>${dateStr}</td>
-                <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
-                <td><span class="pill pill-blue">${d.classe}</span></td>
-                <td>${timeStr}</td>
-                <td>${d.exercice_titre}</td>
-                <td style="font-weight:bold; ${scoreClass}">${scoreTxt}</td>
-                
-                <td style="display:flex; gap:5px;">
-                    <button onclick='ouvrirCorrection("${d.id}")' 
-                       style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Ouvrir la grille">
-                       ✍️ Grille
-                    </button>
-                    
-                    <button onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})' 
-                       style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Voir copie originale">
-                       👁️ Copie
-                    </button>
-                </td>
-            </tr>`;
-        });
+        // Création de la ligne
+        tbody.innerHTML += `<tr>
+          <td>${dateStr}</td>
+          <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
+          <td><span class="pill pill-blue">${d.classe}</span></td>
+          <td>${timeStr}</td>
+          <td>${d.exercice_titre}</td>
+          <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}</td>
+          <td style="display:flex; gap:5px;">
+            <button onclick='ouvrirCorrection("${d.id}")'
+              style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Ouvrir la grille">
+              ✍️ Grille
+            </button>
+            <button onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})'
+              style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Voir copie originale">
+              👁️ Copie
+            </button>
+          </td>
+        </tr>`;
+      });
     }
 
     function updateGlobalRadar() {
