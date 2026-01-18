@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - Expert V7 (Assisté)</title>
+    <title>Grille PSE - Expert V8 (Finale)</title>
     
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -42,7 +42,7 @@
         .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } 
         .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
 
-        /* NOUVEAU : STYLE DES STATS VISUELLES */
+        /* COMPTEURS VISUELS */
         .stat-counters { font-size: 0.75em; color: #666; margin-top: 3px; display: flex; justify-content: center; gap: 8px; background: #f9f9f9; padding: 2px; border-radius: 4px; }
         .stat-counters span { font-weight: bold; }
 
@@ -66,20 +66,22 @@
 
         .editable-div { min-height: 25px; text-align: left; outline: none; padding: 4px; font-size: 0.9em; border: 1px dashed #ccc; cursor: text; background: #fff; border-radius: 4px; }
         .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
-        .editable-div:empty::before { content: "Commentaire..."; color: #ccc; font-style: italic; }
+        .editable-div:empty::before { content: attr(placeholder); color: #ccc; font-style: italic; }
 
         .final-grade-cell { background-color: #fffef0; color: #d9534f; font-weight: bold; vertical-align: middle; }
         .final-grade-text { font-size: 1.8em; display: block; line-height: 1; }
 
-        /* ZONE QR CODE RÉVISION */
+        /* ZONE QR CODE & LÉGENDE */
+        .bottom-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .legend-box { font-size: 0.75em; color: #555; font-style: italic; }
+        
         .revision-box {
-            display: flex; align-items: center; justify-content: space-between;
+            display: flex; align-items: center; gap: 10px;
             background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px;
-            padding: 8px 15px; margin-bottom: 15px;
+            padding: 5px 10px;
         }
-        .revision-text { font-size: 0.85em; color: #475569; font-style: italic; line-height: 1.3; }
-        .revision-link { font-weight: bold; color: #0f172a; text-decoration: none; display: block; margin-top: 3px; font-family: monospace; }
-        .qr-img { height: 50px; width: 50px; mix-blend-mode: multiply; }
+        .revision-text { font-size: 0.75em; color: #475569; text-align: right; line-height: 1.2; }
+        .qr-img { height: 40px; width: 40px; mix-blend-mode: multiply; }
 
         /* MODALE BANQUE */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
@@ -139,7 +141,7 @@
             <tr class="thead-dark">
                 <th rowspan="2" style="width:30px;">C</th>
                 <th rowspan="2">Compétences évaluées</th>
-                <th colspan="4" class="thead-light">Maîtrise (Choix Prof)</th>
+                <th colspan="4" class="thead-light">Niveau</th>
                 <th rowspan="2" style="width:80px; background:#fff; color:#333;">Pts / Max</th>
                 <th rowspan="2" style="width:80px; background:#fff; color:#333;">Note</th>
             </tr>
@@ -150,12 +152,17 @@
         <tbody id="gradingBody"></tbody>
     </table>
 
-    <div class="revision-box">
-        <div class="revision-text">
-            Pour progresser, scanne ce code ou va sur le site :<br>
-            <a href="https://preventionsanteenvironnement.github.io/PSE/" target="_blank" class="revision-link">preventionsanteenvironnement.github.io/PSE/</a>
+    <div class="bottom-container">
+        <div class="legend-box">
+            * NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé
         </div>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
+        <div class="revision-box">
+            <div class="revision-text">
+                Pour réviser :<br>
+                <b>preventionsanteenvironnement.github.io/PSE/</b>
+            </div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
+        </div>
     </div>
 
     <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
@@ -253,7 +260,7 @@
 
             const row = tbody.insertRow();
             row.dataset.comp = q.competence;
-            row.dataset.level = ""; // Stocke le niveau (NT, I...)
+            row.dataset.level = ""; 
 
             row.innerHTML = `
                 <td style="font-weight:bold">${q.label}</td>
@@ -267,10 +274,12 @@
                     </div>
                 </td>
                 <td style="text-align:left">
-                    <div class="rep-eleve-box">${reponses[q.qid] || "<i>Non répondu</i>"}</div>
+                    <div class="rep-eleve-box">
+                        <strong>👤 Élève :</strong> ${reponses[q.qid] || "<i>Non répondu</i>"}
+                    </div>
                     <div class="rep-prof-box">🎯 ${q.reponseAttendue || "N/A"}</div>
                 </td>
-                <td><div class="editable-div" contenteditable="true" oninput="showSave()"></div></td>
+                <td><div class="editable-div" contenteditable="true" placeholder="💡 Votre conseil / commentaire..." oninput="showSave()"></div></td>
             `;
         });
 
@@ -283,36 +292,31 @@
         }
     }
 
-    // --- 4. LOGIQUE VISUELLE + COMPTEURS ---
+    // --- 4. LOGIQUE VISUELLE ---
     function setNoteVisual(btn, level) {
         const row = btn.closest('tr');
         Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
-        row.dataset.level = level; // On mémorise le choix
-        updateCounters(row.dataset.comp); // Mise à jour du compteur pour cette compétence
-        
+        row.dataset.level = level; 
+        updateCounters(row.dataset.comp); 
         showSave();
         openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
     function updateCounters(comp) {
-        // On compte combien de NT/I/A/M pour cette compétence
         let counts = { NT:0, I:0, A:0, M:0 };
         document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
             if(r.dataset.comp === comp && r.dataset.level) {
                 counts[r.dataset.level]++;
             }
         });
-        
-        // Mise à jour de l'affichage
         const statBox = document.getElementById(`stats_${comp}`);
         if(statBox) {
             statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
         }
     }
 
-    // --- 5. CALCUL DE LA NOTE (Manuel uniquement) ---
+    // --- 5. CALCUL DE LA NOTE (Manuel) ---
     function calculateTotal() {
         let totalPts = 0;
         let totalMax = 0;
@@ -331,7 +335,6 @@
             const note20 = (totalPts / totalMax) * 20;
             const elNote = document.getElementById('finalNote');
             elNote.innerText = note20.toFixed(1);
-            
             if(note20 < 10) elNote.style.color = "#d9534f";
             else if(note20 >= 10) elNote.style.color = "#16a34a";
         } else {
@@ -339,7 +342,7 @@
         }
     }
 
-    // --- 6. BANQUES DE DONNÉES ---
+    // --- 6. BANQUES DE DONNÉES (CORRECTIF BUG) ---
     function openCommentBank(comp, level, target) {
         CURRENT_TARGET_DIV = target;
         const list = document.getElementById('modalList');
@@ -365,7 +368,8 @@
                         d.innerText = txt;
                         d.onclick = () => { 
                             let prev = CURRENT_TARGET_DIV.innerText;
-                            if(prev && prev !== "Commentaire...") CURRENT_TARGET_DIV.innerText += " " + txt;
+                            // Pour les commentaires Q°, on remplace souvent le "placeholder"
+                            if(prev && !prev.includes("Votre conseil")) CURRENT_TARGET_DIV.innerText += " " + txt;
                             else CURRENT_TARGET_DIV.innerText = txt;
                             closeModal(); showSave();
                         };
@@ -383,34 +387,53 @@
         list.innerHTML = "";
         document.getElementById('modalTitle').innerText = "Appréciations";
         
-        // Correction pour s'assurer que l'objet existe
         const apprData = window.DATA_APPRECIATION || {};
         
-        // On vérifie s'il y a des clés (Global, etc.)
         if(Object.keys(apprData).length === 0) {
              list.innerHTML = "<div style='padding:20px; text-align:center;'>Banque vide ou non chargée.</div>";
         }
 
-        for (const [catName, phrases] of Object.entries(apprData)) {
+        // CORRECTIF : Gère les Tableaux (Global) ET les Objets (Remédiations)
+        for (const [catName, data] of Object.entries(apprData)) {
             const h = document.createElement("div");
             h.className = "bank-title";
             h.innerText = catName;
             list.appendChild(h);
 
-            if(Array.isArray(phrases)) {
-                phrases.forEach(txt => {
+            // Cas 1 : C'est une liste simple (ex: Global)
+            if(Array.isArray(data)) {
+                data.forEach(txt => {
                     const d = document.createElement('div');
                     d.className = "comment-item";
                     d.innerText = txt;
-                    d.onclick = () => { 
-                        CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
-                        closeModal(); showSave();
-                    };
+                    d.onclick = () => { insertText(txt, true); };
                     list.appendChild(d);
                 });
+            } 
+            // Cas 2 : C'est un objet (ex: Remédiations par compétence)
+            else if (typeof data === 'object') {
+                for (const [comp, phrases] of Object.entries(data)) {
+                    phrases.forEach(txt => {
+                        const d = document.createElement('div');
+                        d.className = "comment-item";
+                        d.innerHTML = `<strong>(${comp})</strong> ${txt}`;
+                        // On ajoute le préfixe de la compétence
+                        d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
+                        list.appendChild(d);
+                    });
+                }
             }
         }
         document.getElementById('commentModal').style.display = "flex";
+    }
+
+    function insertText(text, newLine) {
+        if(CURRENT_TARGET_DIV) {
+            const sep = (CURRENT_TARGET_DIV.value.length > 0 && newLine) ? "\n" : " ";
+            CURRENT_TARGET_DIV.value += sep + text;
+        }
+        closeModal();
+        showSave();
     }
 
     function closeModal() { document.getElementById('commentModal').style.display = "none"; }
