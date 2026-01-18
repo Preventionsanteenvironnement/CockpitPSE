@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - Expert V6 (Manuel)</title>
+    <title>Grille PSE - Expert V7 (Assisté)</title>
     
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -42,10 +42,13 @@
         .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } 
         .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
 
+        /* NOUVEAU : STYLE DES STATS VISUELLES */
+        .stat-counters { font-size: 0.75em; color: #666; margin-top: 3px; display: flex; justify-content: center; gap: 8px; background: #f9f9f9; padding: 2px; border-radius: 4px; }
+        .stat-counters span { font-weight: bold; }
+
         /* INPUTS NOTES & BARÈME */
         .score-input { width: 40px; text-align: center; font-weight: bold; border: 1px solid #ccc; padding: 2px; border-radius: 3px; font-size: 1em; background: #fff; }
         .max-input { width: 35px; text-align: center; border: none; font-weight:bold; color: #666; font-size: 0.9em; background: transparent; }
-        .max-input:focus { background: #fff; border: 1px solid #2e7bb6; }
         
         input[type="radio"] { transform: scale(1.1); cursor: pointer; }
 
@@ -127,9 +130,7 @@
     </div>
 
     <div class="appreciation-box">
-        <label onclick="openAppreciationBank()" style="cursor:pointer;" title="Cliquez ici pour ouvrir la banque">
-            📝 Appréciation Générale (cliquer ici pour la banque)
-        </label>
+        <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
         <textarea id="appreciationArea"></textarea>
     </div>
 
@@ -138,7 +139,7 @@
             <tr class="thead-dark">
                 <th rowspan="2" style="width:30px;">C</th>
                 <th rowspan="2">Compétences évaluées</th>
-                <th colspan="4" class="thead-light">Maîtrise</th>
+                <th colspan="4" class="thead-light">Maîtrise (Choix Prof)</th>
                 <th rowspan="2" style="width:80px; background:#fff; color:#333;">Pts / Max</th>
                 <th rowspan="2" style="width:80px; background:#fff; color:#333;">Note</th>
             </tr>
@@ -176,6 +177,7 @@
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
     const comps = ['C1','C2','C3','C4','C5','C6'];
+    let compHasQuestions = {C1:false, C2:false, C3:false, C4:false, C5:false, C6:false};
 
     window.addEventListener('load', async function() {
         initSummary([], {}); 
@@ -201,7 +203,7 @@
         }
     });
 
-    // --- 2. TABLEAU RÉCAP (BARÈME FIXE) ---
+    // --- 2. TABLEAU RÉCAP (BARÈME FIXE + COMPTEURS) ---
     function initSummary(activeComps, maxMap) {
         const tbody = document.getElementById('gradingBody');
         tbody.innerHTML = "";
@@ -211,10 +213,12 @@
             const displayStyle = isVisible ? "" : "display:none;";
             const initialMax = maxMap[c] || 0;
             
-            // IMPORTANT : Inputs avec oninput="calculateTotal()" pour calcul manuel en direct
             let tr = `<tr id="row_${c}" style="${displayStyle}">
                 <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
-                <td><input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly></td>
+                <td>
+                    <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
+                    <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
+                </td>
                 <td><input type="radio" name="r_${c}" value="NT"></td>
                 <td><input type="radio" name="r_${c}" value="I"></td>
                 <td><input type="radio" name="r_${c}" value="A"></td>
@@ -228,28 +232,28 @@
             tr += `</tr>`;
             tbody.innerHTML += tr;
         });
-        // On ne lance PAS calculateTotal() tout de suite pour laisser "--" et attendre la saisie du prof
     }
 
-    // --- 3. RENDU DÉTAIL (SANS CALCUL AUTO) ---
+    // --- 3. RENDU DÉTAIL ---
     function renderCorrection(blueprint, reponses) {
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
         let maxMap = {}; 
         let qMap = {};
         let activeComps = [];
+        comps.forEach(c => compHasQuestions[c] = false);
 
         blueprint.questions.forEach(q => {
             if(!activeComps.includes(q.competence)) activeComps.push(q.competence);
+            compHasQuestions[q.competence] = true;
             
-            // On accumule le barème MAX défini par le Master pour l'affichage initial
             maxMap[q.competence] = (maxMap[q.competence] || 0) + q.bareme;
             qMap[q.competence] = qMap[q.competence] || [];
             qMap[q.competence].push(q.label);
 
             const row = tbody.insertRow();
-            // On ne stocke plus de ptsEleve pour le calcul auto
             row.dataset.comp = q.competence;
+            row.dataset.level = ""; // Stocke le niveau (NT, I...)
 
             row.innerHTML = `
                 <td style="font-weight:bold">${q.label}</td>
@@ -270,7 +274,7 @@
             `;
         });
 
-        if(!maxMap['C6']) maxMap['C6'] = 2; // Valeur par défaut modifiable
+        if(!maxMap['C6']) maxMap['C6'] = 2; // Défaut C6
 
         initSummary(activeComps, maxMap);
 
@@ -279,18 +283,36 @@
         }
     }
 
-    // --- 4. LOGIQUE VISUELLE UNIQUEMENT (Pas de calcul) ---
+    // --- 4. LOGIQUE VISUELLE + COMPTEURS ---
     function setNoteVisual(btn, level) {
         const row = btn.closest('tr');
         Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         
-        // Pas de updateSummaryFromDetails() ici ! C'est ce que tu ne voulais pas.
+        row.dataset.level = level; // On mémorise le choix
+        updateCounters(row.dataset.comp); // Mise à jour du compteur pour cette compétence
+        
         showSave();
         openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
-    // --- 5. CALCUL DE LA NOTE (Déclenché par la saisie manuelle dans le tableau du haut) ---
+    function updateCounters(comp) {
+        // On compte combien de NT/I/A/M pour cette compétence
+        let counts = { NT:0, I:0, A:0, M:0 };
+        document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+            if(r.dataset.comp === comp && r.dataset.level) {
+                counts[r.dataset.level]++;
+            }
+        });
+        
+        // Mise à jour de l'affichage
+        const statBox = document.getElementById(`stats_${comp}`);
+        if(statBox) {
+            statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
+        }
+    }
+
+    // --- 5. CALCUL DE LA NOTE (Manuel uniquement) ---
     function calculateTotal() {
         let totalPts = 0;
         let totalMax = 0;
@@ -298,7 +320,6 @@
         comps.forEach(c => {
             const row = document.getElementById(`row_${c}`);
             if(row && row.style.display !== 'none') {
-                // On lit ce que le prof a tapé
                 const p = parseFloat(document.getElementById(`pts_${c}`).value) || 0;
                 const m = parseFloat(document.getElementById(`max_${c}`).value) || 0;
                 totalPts += p;
@@ -311,7 +332,6 @@
             const elNote = document.getElementById('finalNote');
             elNote.innerText = note20.toFixed(1);
             
-            // Couleur dynamique
             if(note20 < 10) elNote.style.color = "#d9534f";
             else if(note20 >= 10) elNote.style.color = "#16a34a";
         } else {
@@ -363,31 +383,31 @@
         list.innerHTML = "";
         document.getElementById('modalTitle').innerText = "Appréciations";
         
-        // Correction : On s'assure que DATA_APPRECIATION existe
-        const apprData = window.DATA_APPRECIATION;
+        // Correction pour s'assurer que l'objet existe
+        const apprData = window.DATA_APPRECIATION || {};
         
-        if (!apprData) {
-             list.innerHTML = "<div style='padding:20px; text-align:center;'>Erreur : Fichier data_appreciation.js non chargé.</div>";
-        } else {
-            // Parcours des clés (Global, etc.)
-            for (const [catName, phrases] of Object.entries(apprData)) {
-                const h = document.createElement("div");
-                h.className = "bank-title";
-                h.innerText = catName;
-                list.appendChild(h);
+        // On vérifie s'il y a des clés (Global, etc.)
+        if(Object.keys(apprData).length === 0) {
+             list.innerHTML = "<div style='padding:20px; text-align:center;'>Banque vide ou non chargée.</div>";
+        }
 
-                if(Array.isArray(phrases)) {
-                    phrases.forEach(txt => {
-                        const d = document.createElement('div');
-                        d.className = "comment-item";
-                        d.innerText = txt;
-                        d.onclick = () => { 
-                            CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
-                            closeModal(); showSave();
-                        };
-                        list.appendChild(d);
-                    });
-                }
+        for (const [catName, phrases] of Object.entries(apprData)) {
+            const h = document.createElement("div");
+            h.className = "bank-title";
+            h.innerText = catName;
+            list.appendChild(h);
+
+            if(Array.isArray(phrases)) {
+                phrases.forEach(txt => {
+                    const d = document.createElement('div');
+                    d.className = "comment-item";
+                    d.innerText = txt;
+                    d.onclick = () => { 
+                        CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
+                        closeModal(); showSave();
+                    };
+                    list.appendChild(d);
+                });
             }
         }
         document.getElementById('commentModal').style.display = "flex";
