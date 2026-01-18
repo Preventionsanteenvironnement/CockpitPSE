@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - Expert V5</title>
+    <title>Grille PSE - Expert V6 (Manuel)</title>
     
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -45,6 +45,7 @@
         /* INPUTS NOTES & BARÈME */
         .score-input { width: 40px; text-align: center; font-weight: bold; border: 1px solid #ccc; padding: 2px; border-radius: 3px; font-size: 1em; background: #fff; }
         .max-input { width: 35px; text-align: center; border: none; font-weight:bold; color: #666; font-size: 0.9em; background: transparent; }
+        .max-input:focus { background: #fff; border: 1px solid #2e7bb6; }
         
         input[type="radio"] { transform: scale(1.1); cursor: pointer; }
 
@@ -126,7 +127,9 @@
     </div>
 
     <div class="appreciation-box">
-        <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
+        <label onclick="openAppreciationBank()" style="cursor:pointer;" title="Cliquez ici pour ouvrir la banque">
+            📝 Appréciation Générale (cliquer ici pour la banque)
+        </label>
         <textarea id="appreciationArea"></textarea>
     </div>
 
@@ -173,7 +176,6 @@
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
     const comps = ['C1','C2','C3','C4','C5','C6'];
-    let compHasQuestions = {C1:false, C2:false, C3:false, C4:false, C5:false, C6:false};
 
     window.addEventListener('load', async function() {
         initSummary([], {}); 
@@ -207,9 +209,9 @@
         comps.forEach((c, idx) => {
             const isVisible = activeComps.includes(c) || c === 'C6';
             const displayStyle = isVisible ? "" : "display:none;";
-            // Le barème MAX est chargé depuis le JSON ici et ne bougera pas tout seul
             const initialMax = maxMap[c] || 0;
             
+            // IMPORTANT : Inputs avec oninput="calculateTotal()" pour calcul manuel en direct
             let tr = `<tr id="row_${c}" style="${displayStyle}">
                 <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
                 <td><input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly></td>
@@ -218,39 +220,35 @@
                 <td><input type="radio" name="r_${c}" value="A"></td>
                 <td><input type="radio" name="r_${c}" value="M"></td>
                 <td style="white-space:nowrap;">
-                    <input type="number" id="pts_${c}" class="score-input" step="0.25" value="0" oninput="calculateTotal()"> / 
-                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal()">
+                    <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); showSave();"> / 
+                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); showSave();">
                 </td>`;
             
             if(idx === 0) tr += `<td rowspan="6" class="final-grade-cell"><span id="finalNote" class="final-grade-text">--</span><span style="font-size:0.5em; color:#999;">/20</span></td>`;
             tr += `</tr>`;
             tbody.innerHTML += tr;
         });
-        setTimeout(calculateTotal, 100);
+        // On ne lance PAS calculateTotal() tout de suite pour laisser "--" et attendre la saisie du prof
     }
 
-    // --- 3. RENDU DÉTAIL ---
+    // --- 3. RENDU DÉTAIL (SANS CALCUL AUTO) ---
     function renderCorrection(blueprint, reponses) {
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
         let maxMap = {}; 
         let qMap = {};
         let activeComps = [];
-        comps.forEach(c => compHasQuestions[c] = false);
 
         blueprint.questions.forEach(q => {
             if(!activeComps.includes(q.competence)) activeComps.push(q.competence);
-            compHasQuestions[q.competence] = true;
             
-            // On accumule le barème MAX défini par le Master
+            // On accumule le barème MAX défini par le Master pour l'affichage initial
             maxMap[q.competence] = (maxMap[q.competence] || 0) + q.bareme;
-            
             qMap[q.competence] = qMap[q.competence] || [];
             qMap[q.competence].push(q.label);
 
             const row = tbody.insertRow();
-            row.dataset.ptsEleve = 0;
-            row.dataset.max = q.bareme; // Le barème de la question pour le calcul %
+            // On ne stocke plus de ptsEleve pour le calcul auto
             row.dataset.comp = q.competence;
 
             row.innerHTML = `
@@ -258,10 +256,10 @@
                 <td><span class="badge ${q.competence.toLowerCase()}">${q.competence}</span></td>
                 <td>
                     <div style="display:flex; gap:2px; justify-content:center;">
-                        <span class="level-btn nt" onclick="setNote(this, 0, 'NT')">NT</span>
-                        <span class="level-btn i" onclick="setNote(this, ${q.bareme*0.33}, 'I')">I</span>
-                        <span class="level-btn a" onclick="setNote(this, ${q.bareme*0.66}, 'A')">A</span>
-                        <span class="level-btn m" onclick="setNote(this, ${q.bareme}, 'M')">M</span>
+                        <span class="level-btn nt" onclick="setNoteVisual(this, 'NT')">NT</span>
+                        <span class="level-btn i" onclick="setNoteVisual(this, 'I')">I</span>
+                        <span class="level-btn a" onclick="setNoteVisual(this, 'A')">A</span>
+                        <span class="level-btn m" onclick="setNoteVisual(this, 'M')">M</span>
                     </div>
                 </td>
                 <td style="text-align:left">
@@ -272,7 +270,6 @@
             `;
         });
 
-        // Gestion C6 (si pas de points définis, on peut mettre 2 par défaut)
         if(!maxMap['C6']) maxMap['C6'] = 2; // Valeur par défaut modifiable
 
         initSummary(activeComps, maxMap);
@@ -282,38 +279,18 @@
         }
     }
 
-    // --- 4. CALCUL ---
-    function setNote(btn, pts, level) {
+    // --- 4. LOGIQUE VISUELLE UNIQUEMENT (Pas de calcul) ---
+    function setNoteVisual(btn, level) {
         const row = btn.closest('tr');
         Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        row.dataset.ptsEleve = pts;
         
-        updateSummaryFromDetails(); 
+        // Pas de updateSummaryFromDetails() ici ! C'est ce que tu ne voulais pas.
         showSave();
         openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
-    function updateSummaryFromDetails() {
-        let scores = {};
-        comps.forEach(c => scores[c] = 0);
-
-        document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-            const p = parseFloat(r.dataset.ptsEleve) || 0;
-            const c = r.dataset.comp;
-            if(scores[c] !== undefined) scores[c] += p;
-        });
-
-        // On ne met à jour QUE les points acquis (pas le barème max)
-        for(let c in scores) { 
-            if(compHasQuestions[c]) {
-                const input = document.getElementById(`pts_${c}`);
-                if(input) input.value = parseFloat(scores[c].toFixed(2));
-            }
-        }
-        calculateTotal();
-    }
-
+    // --- 5. CALCUL DE LA NOTE (Déclenché par la saisie manuelle dans le tableau du haut) ---
     function calculateTotal() {
         let totalPts = 0;
         let totalMax = 0;
@@ -321,8 +298,8 @@
         comps.forEach(c => {
             const row = document.getElementById(`row_${c}`);
             if(row && row.style.display !== 'none') {
+                // On lit ce que le prof a tapé
                 const p = parseFloat(document.getElementById(`pts_${c}`).value) || 0;
-                // On utilise la valeur du champ MAX (qui vient du JSON ou modif manuelle)
                 const m = parseFloat(document.getElementById(`max_${c}`).value) || 0;
                 totalPts += p;
                 totalMax += m;
@@ -331,13 +308,18 @@
 
         if(totalMax > 0) {
             const note20 = (totalPts / totalMax) * 20;
-            document.getElementById('finalNote').innerText = note20.toFixed(1);
+            const elNote = document.getElementById('finalNote');
+            elNote.innerText = note20.toFixed(1);
+            
+            // Couleur dynamique
+            if(note20 < 10) elNote.style.color = "#d9534f";
+            else if(note20 >= 10) elNote.style.color = "#16a34a";
         } else {
             document.getElementById('finalNote').innerText = "--";
         }
     }
 
-    // --- 5. BANQUES ---
+    // --- 6. BANQUES DE DONNÉES ---
     function openCommentBank(comp, level, target) {
         CURRENT_TARGET_DIV = target;
         const list = document.getElementById('modalList');
@@ -347,9 +329,8 @@
         const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
         
         if (!compData) {
-            list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de commentaires.</div>";
+            list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données trouvées.</div>";
         } else {
-            // CORRECTION: On parcourt bien toutes les clés (Général, etc.)
             for (const [catName, levelsObj] of Object.entries(compData)) {
                 const phrases = levelsObj[level];
                 if (phrases && phrases.length > 0) {
@@ -382,23 +363,32 @@
         list.innerHTML = "";
         document.getElementById('modalTitle').innerText = "Appréciations";
         
-        const apprData = window.DATA_APPRECIATION || {};
-        for (const [catName, phrases] of Object.entries(apprData)) {
-            const h = document.createElement("div");
-            h.className = "bank-title";
-            h.innerText = catName;
-            list.appendChild(h);
+        // Correction : On s'assure que DATA_APPRECIATION existe
+        const apprData = window.DATA_APPRECIATION;
+        
+        if (!apprData) {
+             list.innerHTML = "<div style='padding:20px; text-align:center;'>Erreur : Fichier data_appreciation.js non chargé.</div>";
+        } else {
+            // Parcours des clés (Global, etc.)
+            for (const [catName, phrases] of Object.entries(apprData)) {
+                const h = document.createElement("div");
+                h.className = "bank-title";
+                h.innerText = catName;
+                list.appendChild(h);
 
-            phrases.forEach(txt => {
-                const d = document.createElement('div');
-                d.className = "comment-item";
-                d.innerText = txt;
-                d.onclick = () => { 
-                    CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
-                    closeModal(); showSave();
-                };
-                list.appendChild(d);
-            });
+                if(Array.isArray(phrases)) {
+                    phrases.forEach(txt => {
+                        const d = document.createElement('div');
+                        d.className = "comment-item";
+                        d.innerText = txt;
+                        d.onclick = () => { 
+                            CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
+                            closeModal(); showSave();
+                        };
+                        list.appendChild(d);
+                    });
+                }
+            }
         }
         document.getElementById('commentModal').style.display = "flex";
     }
