@@ -2,72 +2,95 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille Évaluation PSE - Expert Connecté</title>
+    <title>Grille Évaluation PSE - Expert V4 (Barème Flexible)</title>
     
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
     <script src="data_appreciation.js"></script>
 
     <style>
-        /* --- OPTIMISATION A4 ET IMPRESSION --- */
+        /* CONFIGURATION A4 */
         @page { size: A4; margin: 10mm; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 210mm; margin: 0 auto; padding: 10px 20px; background-color: #fff; color: #333; font-size: 0.9em; }
 
-        /* BOUTONS FLOTTANTS */
+        /* BOUTONS OUTILS */
         .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; }
         .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.1em; cursor: pointer; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.7em; opacity: 0; transition: opacity 0.5s; }
 
         h1 { text-align: center; color: #d9534f; margin: 0 0 10px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.5em; }
         
+        /* HEADER */
         .header-row { display: flex; gap: 10px; margin-bottom: 10px; background-color: #f8f9fa; padding: 8px 15px; border-radius: 6px; border: 1px solid #ddd; }
         .input-group { display: flex; flex-direction: column; flex-grow: 1; }
         .input-group label { font-size: 0.8em; color: #666; font-weight: bold; }
-        .input-group input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+        .input-group input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; font-weight: bold; color: #0f172a; }
 
-        .appreciation-box { margin-bottom: 10px; }
-        .appreciation-box label { font-weight: bold; color: #2e7bb6; cursor: pointer; text-decoration: underline; font-size: 0.9em; }
-        .appreciation-box textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; background-color: #f0f8ff; resize: none; font-family: inherit; }
+        /* APPRÉCIATION */
+        .appreciation-box { margin-bottom: 15px; }
+        .appreciation-box label { font-weight: bold; color: #2e7bb6; cursor: pointer; text-decoration: underline; font-size: 0.9em; display:flex; align-items:center; gap:5px;}
+        .appreciation-box textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; background-color: #f0f8ff; resize: vertical; font-family: inherit; }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+        /* TABLEAUX */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th, td { border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle; }
         .thead-dark { background-color: #333; color: white; }
-        .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.8em; }
-        .correction-th { background-color: #d9534f; color: white; cursor: pointer; }
+        .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.85em; }
+        .correction-th { background-color: #d9534f; color: white; cursor: pointer; user-select: none; }
+        .correction-th:hover { background-color: #c9302c; }
 
         .badge { display: inline-block; color: white; padding: 3px 0; width: 30px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
         .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } 
         .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
 
-        .rep-eleve-box { background:#f0f9ff; padding:8px; border-radius:6px; border-left:4px solid #3498db; margin-bottom:4px; color:#0f172a; text-align: left; }
-        .rep-prof-box { color:#64748b; font-size:0.85em; padding:2px; font-style:italic; text-align: left; }
+        /* INPUTS NOTES & BARÈME */
+        .score-input { width: 45px; text-align: center; font-weight: bold; border: 1px solid #ccc; padding: 2px; border-radius: 3px; font-size: 1em; }
+        .max-input { width: 40px; text-align: center; border: 1px dashed #999; padding: 2px; border-radius: 3px; color: #666; font-size: 0.9em; background: transparent; }
+        .max-input:focus { border: 1px solid #2e7bb6; color: #000; background: #fff; }
         
-        .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.75em; padding: 2px 5px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #aaa; }
-        .level-btn.active { border: 2px solid #333; color: #fff; }
-        .level-btn.active.nt { background: #7f8c8d; } .level-btn.active.i { background: #d9534f; }
-        .level-btn.active.a { background: #f0c05a; } .level-btn.active.m { background: #5cb85c; }
+        input[type="radio"] { transform: scale(1.2); cursor: pointer; }
 
-        .editable-div { min-height: 20px; text-align: left; outline: none; padding: 4px; font-size: 0.95em; border: 1px dashed transparent; cursor: text; }
-        .editable-div:focus { background-color: #fff; border-color: #2e7bb6; }
+        /* TABLEAU DÉTAILLÉ */
+        .rep-eleve-box { background:#f0f9ff; padding:8px; border-radius:6px; border-left:4px solid #3498db; margin-bottom:4px; color:#0f172a; text-align: left; font-size: 0.95em; }
+        .rep-prof-box { color:#166534; font-size:0.9em; padding:4px; font-style:italic; text-align: left; border-top: 1px dashed #ccc; margin-top:4px; }
+        
+        .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.75em; padding: 3px 6px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #aaa; transition:0.2s; }
+        .level-btn:hover { background: #eee; color:#333; }
+        .level-btn.active { border: 2px solid #333; color: #fff; transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .level-btn.active.nt { background: #7f8c8d; border-color: #7f8c8d; } 
+        .level-btn.active.i { background: #d9534f; border-color: #d9534f; }
+        .level-btn.active.a { background: #f0c05a; border-color: #f0c05a; } 
+        .level-btn.active.m { background: #5cb85c; border-color: #5cb85c; }
+
+        .editable-div { min-height: 30px; text-align: left; outline: none; padding: 5px; font-size: 0.95em; border: 1px dashed #ccc; cursor: text; background: #fff; border-radius: 4px; }
+        .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
+        .editable-div:empty::before { content: "Commentaire..."; color: #ccc; font-style: italic; }
 
         .final-grade-cell { background-color: #fffef0; color: #d9534f; font-weight: bold; vertical-align: middle; }
-        .final-grade-text { font-size: 1.8em; display: block; line-height: 1; }
+        .final-grade-text { font-size: 2em; display: block; line-height: 1; }
 
         /* MODALE BANQUE */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-box { background: white; width: 600px; max-width: 90%; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; max-height: 80vh; }
-        .modal-header { padding: 10px 15px; border-bottom: 1px solid #eee; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .modal-box { background: white; width: 650px; max-width: 95%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column; max-height: 85vh; }
+        .modal-header { padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #2e7bb6; }
         .modal-body { padding: 0; overflow-y: auto; }
-        .comment-item { padding: 10px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.95em; }
-        .comment-item:hover { background-color: #f0f8ff; color: #2e7bb6; }
+        
+        .bank-section { border-bottom: 1px solid #eee; }
+        .bank-title { background: #f1f5f9; padding: 8px 15px; font-size: 0.85em; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .comment-item { padding: 10px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.95em; transition: background 0.1s; }
+        .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
 
         @media print {
             .no-print { display: none !important; }
-            body { padding: 0; margin: 0; }
+            body { padding: 0; margin: 0; background: white; }
             .rep-prof-box { display: none; }
-            .header-row { background: none; border: none; padding: 0; }
-            .input-group input { border: none; border-bottom: 1px solid #000; }
-            textarea { border: 1px solid #000 !important; background: transparent !important; }
+            .header-row { border: none; padding: 0; background: none; }
+            .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
+            textarea { border: 1px solid #333 !important; background: transparent !important; }
+            .editable-div { border: none; }
+            .score-input, .max-input { border: none; text-align: right; width: auto; }
+            /* On garde les lignes, même cachées, si on veut imprimer le vide ? Non, on garde le comportement dynamique */
+            tr[style*="display: none"] { display: none !important; }
         }
     </style>
 </head>
@@ -82,49 +105,51 @@
 
     <div id="commentModal" class="modal-overlay no-print">
         <div class="modal-box">
-            <div class="modal-header"><span id="modalTitle">Banque</span><span style="cursor:pointer" onclick="closeModal()">✖</span></div>
+            <div class="modal-header"><span id="modalTitle">Banque</span><span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span></div>
             <div id="modalList" class="modal-body"></div>
         </div>
     </div>
 
-    <h1 id="docTitle">Correction Devoir</h1>
+    <h1 id="docTitle">Correction</h1>
 
     <div class="header-row">
-        <div class="input-group"><label>Nom :</label><input type="text" id="inputNom"></div>
-        <div class="input-group"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
+        <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
+        <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
         <div class="input-group" style="width:80px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
         <div class="input-group" style="width:110px;"><label>Date :</label><input type="date" id="inputDate"></div>
     </div>
 
     <div class="appreciation-box">
-        <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour la banque) :</label>
+        <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquer pour ouvrir la banque)</label>
         <textarea id="appreciationArea"></textarea>
     </div>
 
-    <table>
+    <table id="summaryTable">
         <thead>
             <tr class="thead-dark">
                 <th rowspan="2" style="width:40px;">C</th>
-                <th rowspan="2">Questions</th>
-                <th colspan="4" class="thead-light">Maîtrise</th>
-                <th rowspan="2" style="width:60px; background:#fff; color:#333;">Pts</th>
-                <th rowspan="2" style="width:80px; background:#fff; color:#333;">Note</th>
+                <th rowspan="2">Questions traitées</th>
+                <th colspan="4" class="thead-light">Maîtrise Globale</th>
+                <th rowspan="2" style="width:90px; background:#fff; color:#333;">Pts / Barème</th>
+                <th rowspan="2" style="width:90px; background:#fff; color:#333;">Note</th>
             </tr>
             <tr class="thead-light">
-                <th>NT</th><th>I</th><th>A</th><th>M</th>
+                <th style="width:30px;">NT</th><th style="width:30px;">I</th><th style="width:30px;">A</th><th style="width:30px;">M</th>
             </tr>
         </thead>
         <tbody id="gradingBody"></tbody>
     </table>
 
+    <h3 style="margin-top:20px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
+
     <table id="correctionTable">
         <thead>
             <tr>
-                <th class="correction-th" onclick="sortTable(0)">Q° ⇅</th>
-                <th class="correction-th" onclick="sortTable(1)">C ⇅</th>
-                <th class="correction-th" onclick="sortTable(2)">Niveau ⇅</th>
+                <th class="correction-th" onclick="sortTable(0)" style="width:50px;">Q° ⇅</th>
+                <th class="correction-th" onclick="sortTable(1)" style="width:50px;">C ⇅</th>
+                <th class="correction-th" onclick="sortTable(2)" style="width:110px;">Niveau ⇅</th>
                 <th class="correction-th">Réponse Élève / Corrigé</th>
-                <th class="correction-th" style="width:30%;">Commentaires</th>
+                <th class="correction-th" style="width:28%;">Commentaires</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -133,56 +158,80 @@
 <script>
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
+    const comps = ['C1','C2','C3','C4','C5','C6'];
+    // On garde en mémoire quelles compétences ont des questions pour gérer l'auto-calcul
+    let compHasQuestions = {C1:false, C2:false, C3:false, C4:false, C5:false, C6:false};
 
     // --- 1. INITIALISATION ---
     window.addEventListener('load', async function() {
-        initSummary();
-        const rawData = localStorage.getItem("cockpit_transfert");
+        initSummary([], {}); // Init vide
         
+        const rawData = localStorage.getItem("cockpit_transfert");
         if (rawData) {
             try {
                 const copy = JSON.parse(rawData);
-                // Remplir infos
                 document.getElementById('inputNom').value = copy.eleve?.nom || copy.eleve?.code || "";
                 document.getElementById('inputPrenom').value = copy.eleve?.prenom || "";
                 document.getElementById('inputClasse').value = copy.eleve?.classe || "";
                 document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
 
-                // Charger Blueprint local (Racine)
                 const idClean = (copy.devoirId || "").trim();
                 const resp = await fetch(`${idClean}_blueprint.json`);
-                if (!resp.ok) throw new Error("Fichier JSON non trouvé à la racine");
+                if (!resp.ok) throw new Error("Fichier JSON du corrigé non trouvé (" + idClean + ")");
                 
                 CURRENT_BLUEPRINT = await resp.json();
-                document.getElementById('docTitle').innerText = CURRENT_BLUEPRINT.titre || "Correction";
+                document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || idClean);
                 
                 renderCorrection(CURRENT_BLUEPRINT, copy.reponses);
             } catch (e) { alert("Erreur chargement : " + e.message); }
         }
     });
 
-    function initSummary() {
+    // --- 2. TABLEAU RÉCAP ---
+    function initSummary(activeComps, maxMap) {
         const tbody = document.getElementById('gradingBody');
         tbody.innerHTML = "";
-        ['C1','C2','C3','C4','C5','C6'].forEach((c, idx) => {
-            let tr = `<tr>
+        
+        comps.forEach((c, idx) => {
+            // RÈGLE : On affiche si la compétence est active OU si c'est C6 (toujours visible)
+            const isVisible = activeComps.includes(c) || c === 'C6';
+            const displayStyle = isVisible ? "" : "display:none;";
+            const initialMax = maxMap[c] || 0;
+            
+            let tr = `<tr id="row_${c}" style="${displayStyle}">
                 <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
-                <td id="q_list_${c}"></td>
-                <td><input type="radio" name="r_${c}" disabled></td><td><input type="radio" name="r_${c}" disabled></td>
-                <td><input type="radio" name="r_${c}" disabled></td><td><input type="radio" name="r_${c}" disabled></td>
-                <td><span id="pts_${c}">0</span> / <span id="max_${c}">0</span></td>`;
-            if(idx === 0) tr += `<td rowspan="6" class="final-grade-cell"><span id="finalNote" class="final-grade-text">--</span></td>`;
+                <td><input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly></td>
+                <td><input type="radio" name="r_${c}" value="NT" onclick="showSave()"></td>
+                <td><input type="radio" name="r_${c}" value="I" onclick="showSave()"></td>
+                <td><input type="radio" name="r_${c}" value="A" onclick="showSave()"></td>
+                <td><input type="radio" name="r_${c}" value="M" onclick="showSave()"></td>
+                <td>
+                    <input type="number" id="pts_${c}" class="score-input" step="0.25" oninput="calculateTotal(); showSave();"> / 
+                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); showSave();">
+                </td>`;
+            
+            if(idx === 0) tr += `<td rowspan="6" class="final-grade-cell"><span id="finalNote" class="final-grade-text">--</span><span style="font-size:0.5em; color:#999;">/20</span></td>`;
             tr += `</tr>`;
             tbody.innerHTML += tr;
         });
+        // Calcul initial au cas où
+        setTimeout(calculateTotal, 100);
     }
 
+    // --- 3. RENDU DU DÉTAIL ---
     function renderCorrection(blueprint, reponses) {
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
-        let maxMap = {}; let qMap = {};
+        let maxMap = {}; 
+        let qMap = {};
+        let activeComps = [];
+        // Reset flags
+        comps.forEach(c => compHasQuestions[c] = false);
 
         blueprint.questions.forEach(q => {
+            if(!activeComps.includes(q.competence)) activeComps.push(q.competence);
+            compHasQuestions[q.competence] = true; // Marque cette compétence comme ayant des questions
+            
             maxMap[q.competence] = (maxMap[q.competence] || 0) + q.bareme;
             qMap[q.competence] = qMap[q.competence] || [];
             qMap[q.competence].push(q.label);
@@ -198,73 +247,130 @@
                 <td>
                     <div style="display:flex; gap:2px; justify-content:center;">
                         <span class="level-btn nt" onclick="setNote(this, 0, 'NT')">NT</span>
-                        <span class="level-btn i" onclick="setNote(this, ${q.bareme*0.3}, 'I')">I</span>
-                        <span class="level-btn a" onclick="setNote(this, ${q.bareme*0.7}, 'A')">A</span>
+                        <span class="level-btn i" onclick="setNote(this, ${q.bareme*0.33}, 'I')">I</span>
+                        <span class="level-btn a" onclick="setNote(this, ${q.bareme*0.66}, 'A')">A</span>
                         <span class="level-btn m" onclick="setNote(this, ${q.bareme}, 'M')">M</span>
                     </div>
                 </td>
                 <td style="text-align:left">
                     <div class="rep-eleve-box">${reponses[q.qid] || "<i>Non répondu</i>"}</div>
-                    <div class="rep-prof-box">🎯 Corrigé : ${q.reponseAttendue || "N/A"}</div>
+                    <div class="rep-prof-box">🎯 ${q.reponseAttendue || "N/A"}</div>
                 </td>
                 <td><div class="editable-div" contenteditable="true" oninput="showSave()"></div></td>
             `;
         });
 
-        // Maj résumé
-        for(let c in maxMap) {
-            if(document.getElementById(`max_${c}`)) document.getElementById(`max_${c}`).innerText = maxMap[c];
-            if(document.getElementById(`q_list_${c}`)) document.getElementById(`q_list_${c}`).innerText = qMap[c].join(", ");
+        // Mise à jour du récapitulatif
+        // Si C6 n'a pas de max défini par le JSON, on peut le laisser à 0 ou mettre une valeur par défaut (ex: 2)
+        if(!maxMap['C6']) maxMap['C6'] = 0; 
+        
+        initSummary(activeComps, maxMap);
+
+        // Remplissage listes questions
+        for(let c in qMap) {
+            if(document.getElementById(`q_list_${c}`)) document.getElementById(`q_list_${c}`).value = qMap[c].join(", ");
         }
     }
 
-    // --- 2. LOGIQUE DE NOTATION & BANQUE ---
+    // --- 4. LOGIQUE DE NOTATION ---
     function setNote(btn, pts, level) {
         const row = btn.closest('tr');
         Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        
         row.dataset.ptsEleve = pts;
         row.dataset.level = level;
         
-        calculate();
+        updateSummaryFromDetails(); 
         showSave();
-
-        // Ouvrir banque auto
         openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
-    function calculate() {
-        let scores = {}; let gTotal = 0; let gMax = 0;
+    // Remonte les notes
+    function updateSummaryFromDetails() {
+        let scores = {};
+        comps.forEach(c => scores[c] = 0);
+
         document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
             const p = parseFloat(r.dataset.ptsEleve) || 0;
-            const m = parseFloat(r.dataset.max) || 0;
-            scores[r.dataset.comp] = (scores[r.dataset.comp] || 0) + p;
-            gTotal += p; gMax += m;
+            const c = r.dataset.comp;
+            if(scores[c] !== undefined) scores[c] += p;
         });
-        for(let c in scores) { if(document.getElementById(`pts_${c}`)) document.getElementById(`pts_${c}`).innerText = scores[c].toFixed(1); }
-        if(gMax > 0) document.getElementById('finalNote').innerText = ((gTotal/gMax)*20).toFixed(1) + "/20";
+
+        // Met à jour les inputs du haut UNIQUEMENT si la compétence a des questions dans le détail
+        // Cela évite d'écraser la note manuelle de C6 si elle est notée globalement
+        for(let c in scores) { 
+            if(compHasQuestions[c]) {
+                const input = document.getElementById(`pts_${c}`);
+                if(input) input.value = parseFloat(scores[c].toFixed(2));
+            }
+        }
+        calculateTotal();
     }
 
-    // --- 3. BANQUES DE TEXTES ---
+    // Calcule note finale
+    function calculateTotal() {
+        let totalPts = 0;
+        let totalMax = 0;
+
+        comps.forEach(c => {
+            const row = document.getElementById(`row_${c}`);
+            // On compte la ligne si elle est affichée
+            if(row && row.style.display !== 'none') {
+                const p = parseFloat(document.getElementById(`pts_${c}`).value) || 0;
+                // On prend la valeur du barème (qui est un input modifiable maintenant)
+                const m = parseFloat(document.getElementById(`max_${c}`).value) || 0;
+                totalPts += p;
+                totalMax += m;
+            }
+        });
+
+        if(totalMax > 0) {
+            const note20 = (totalPts / totalMax) * 20;
+            document.getElementById('finalNote').innerText = note20.toFixed(1);
+        } else {
+            document.getElementById('finalNote').innerText = "--";
+        }
+    }
+
+    // --- 5. BANQUES DE DONNÉES ---
     function openCommentBank(comp, level, target) {
         CURRENT_TARGET_DIV = target;
         const list = document.getElementById('modalList');
         list.innerHTML = "";
-        document.getElementById('modalTitle').innerText = `Commentaires ${comp} (${level})`;
+        document.getElementById('modalTitle').innerText = `Banque ${comp} - Niveau ${level}`;
         
-        // On cherche dans data_commentaires_competences.js
-        const phrases = window.DATA_COMMENTAIRES_COMPETENCES?.[comp]?.["Général"]?.[level] || [];
+        const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
         
-        if(phrases.length === 0) { phrases.push("Bon travail", "À approfondir", "Non traité"); }
+        if (!compData) {
+            list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
+        } else {
+            for (const [categoryName, levelsObj] of Object.entries(compData)) {
+                const phrases = levelsObj[level];
+                if (phrases && phrases.length > 0) {
+                    const header = document.createElement("div");
+                    header.className = "bank-title";
+                    header.innerText = categoryName;
+                    list.appendChild(header);
 
-        phrases.forEach(txt => {
-            const d = document.createElement('div'); d.className = "comment-item"; d.innerText = txt;
-            d.onclick = () => { 
-                CURRENT_TARGET_DIV.innerText = txt; 
-                closeModal(); 
-            };
-            list.appendChild(d);
-        });
+                    phrases.forEach(txt => {
+                        const d = document.createElement('div');
+                        d.className = "comment-item";
+                        d.innerText = txt;
+                        d.onclick = () => { 
+                            if(CURRENT_TARGET_DIV.innerText && CURRENT_TARGET_DIV.innerText !== "Commentaire...") {
+                                CURRENT_TARGET_DIV.innerText += " " + txt;
+                            } else {
+                                CURRENT_TARGET_DIV.innerText = txt;
+                            }
+                            closeModal(); 
+                            showSave();
+                        };
+                        list.appendChild(d);
+                    });
+                }
+            }
+        }
         document.getElementById('commentModal').style.display = "flex";
     }
 
@@ -274,27 +380,41 @@
         list.innerHTML = "";
         document.getElementById('modalTitle').innerText = "Appréciations Globales";
         
-        const phrases = window.DATA_APPRECIATION?.["Global"] || [];
-        phrases.forEach(txt => {
-            const d = document.createElement('div'); d.className = "comment-item"; d.innerText = txt;
-            d.onclick = () => { 
-                CURRENT_TARGET_DIV.value = txt; 
-                closeModal(); 
-            };
-            list.appendChild(d);
-        });
+        const apprData = window.DATA_APPRECIATION || {};
+        for (const [catName, phrases] of Object.entries(apprData)) {
+            const header = document.createElement("div");
+            header.className = "bank-title";
+            header.innerText = catName;
+            list.appendChild(header);
+
+            phrases.forEach(txt => {
+                const d = document.createElement('div');
+                d.className = "comment-item";
+                d.innerText = txt;
+                d.onclick = () => { 
+                    CURRENT_TARGET_DIV.value += (CURRENT_TARGET_DIV.value ? "\n" : "") + txt; 
+                    closeModal(); 
+                    showSave();
+                };
+                list.appendChild(d);
+            });
+        }
         document.getElementById('commentModal').style.display = "flex";
     }
 
     function closeModal() { document.getElementById('commentModal').style.display = "none"; }
 
-    // --- 4. TRI & OUTILS ---
+    // --- 6. UTILS ---
     function sortTable(n) {
         const table = document.getElementById("correctionTable");
         let rows = Array.from(table.rows).slice(1);
+        let dir = table.dataset.dir === 'asc' ? 'desc' : 'asc';
+        table.dataset.dir = dir;
         rows.sort((a, b) => {
-            let t1 = a.cells[n].innerText, t2 = b.cells[n].innerText;
-            return isNaN(t1) ? t1.localeCompare(t2) : t1 - t2;
+            let t1 = a.cells[n].innerText.toLowerCase();
+            let t2 = b.cells[n].innerText.toLowerCase();
+            if(n === 0) return (parseFloat(t1)||0) - (parseFloat(t2)||0) * (dir==='asc'?1:-1);
+            return t1.localeCompare(t2) * (dir==='asc'?1:-1);
         });
         rows.forEach(r => table.appendChild(r));
     }
