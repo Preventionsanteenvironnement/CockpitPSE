@@ -396,7 +396,7 @@
                             <th onclick="sortData('temps_secondes')">Temps ↕</th>
                             <th onclick="sortData('exercice_titre')">Exercice ↕</th>
                             <th onclick="sortData('note_finale')">Note ↕</th>
-                            <th>Détail Compétences</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-eleves">
@@ -963,10 +963,14 @@ let traficEnCours = false;
                         id: doc.id,
                         raw: d, // <--- C'EST ICI LA CLÉ (Sauvegarde la copie brute)
                         date: d.createdAtISO ? new Date(d.createdAtISO) : (d.date ? new Date(d.date) : new Date()),
-                        identifiant: (d.eleve?.prenom || "") + " " + (d.eleve?.nom || "") || d.identifiant || "Anonyme",
+                        // Modif ici pour récupérer le nom correctement
+                        identifiant: (d.eleve?.prenom ? (d.eleve.prenom + " " + d.eleve.nom) : (d.identifiant || "Anonyme")),
                         classe: d.eleve?.classe || d.classe || "?",
                         temps_secondes: d.temps_secondes || 0,
                         exercice_titre: d.titre || d.devoirId || "Devoir",
+                        devoirId: d.devoirId,
+                        reponses: d.reponses,
+                        eleve: d.eleve,
                         
                         // ✅ ON UTILISE LE DÉTECTIVE ICI
                         note_finale: extractNote20(d) ?? "--",
@@ -1205,7 +1209,7 @@ let traficEnCours = false;
         const fCls = elClass ? elClass.value : "ALL";
         const fExo = elExo ? elExo.value : "ALL";
 
-        tbody.innerHTML = ""; // ✅ Correction: innerHTML en majuscules
+        tbody.innerHTML = ""; 
 
         // Filtrage local
         const filtered = allData.filter(d => {
@@ -1243,18 +1247,18 @@ let traficEnCours = false;
                 else if(val >= 14) scoreClass = "color:#16a34a;font-weight:bold";
             }
 
-            // URL du devoir (Mode Miroir DYNAMIQUE)
+            // --- CONSTRUCTION URL DYNAMIQUE POUR LA COPIE ---
             let urlDevoir = "";
-            // Si le devoir a un ID enregistré (nouveau système), on l'utilise
+            // Si le devoir a un ID enregistré et propre
             if (d.devoirId && d.devoirId.startsWith("devoir_")) {
                  urlDevoir = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${d.devoirId}_eleve.html`;
             } else {
-                 // Sinon (vieux devoirs), on garde l'ancien lien par sécurité
+                 // Fallback ancien système
                  urlDevoir = "https://preventionsanteenvironnement.github.io/PSE/devoirs/PSE_devoirs_CAP_A3_sedentarite_v1.html";
             }
-           
+            
 
-            // Insertion Ligne avec les DEUX BOUTONS
+            // Insertion Ligne avec les DEUX BOUTONS (Grille + Copie)
             tbody.innerHTML += `<tr>
                 <td>${dateStr}</td>
                 <td><span class="eleve-link" onclick="openStudentDetail('${d.identifiant}')">${d.identifiant}</span></td>
@@ -1264,12 +1268,12 @@ let traficEnCours = false;
                 <td style="font-weight:bold; ${scoreClass}">${scoreTxt}</td>
                 
                 <td style="display:flex; gap:5px;">
-                    <button onclick="ouvrirCorrection('${d.id}')" 
+                    <button onclick='ouvrirCorrection("${d.id}")' 
                        style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Ouvrir la grille">
                        ✍️ Grille
                     </button>
                     
-                    <button onclick="window.open('${urlDevoir}?docId=${d.id}', '_blank')" 
+                    <button onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})' 
                        style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="Voir copie originale">
                        👁️ Copie
                     </button>
@@ -1861,6 +1865,69 @@ let traficEnCours = false;
         // IMPORTANT : Le fichier doit s'appeler exactement "grille.html"
         window.open("grille.html", "_blank");
     };
+    
+    // --- 4. FONCTION POUR OUVRIR LE MIROIR (COPIE ÉLÈVE) ---
+    window.openMirror = async function(data) {
+        // 1. On trouve l'ID du devoir (ex: devoir_123)
+        const idDevoir = data.devoirId;
+        if(!idDevoir) { alert("ID devoir manquant"); return; }
+        
+        // 2. On reconstruit l'URL du fichier élève sur le site PSE
+        // ATTENTION : Si tu as renommé tes fichiers, assure-toi que l'ID correspond !
+        const urlEleve = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${idDevoir}_eleve.html`;
+        
+        try {
+            // 3. On récupère le fichier HTML vierge
+            const resp = await fetch(urlEleve);
+            if(!resp.ok) throw new Error("Fichier élève introuvable sur le site PSE.\nURL cherchée : " + urlEleve);
+            
+            let html = await resp.text();
+            
+            // 4. On injecte les réponses de l'élève dedans
+            const scriptInjection = `
+                <script>
+                    window.addEventListener('load', function() {
+                        const reponses = ${JSON.stringify(data.reponses)};
+                        console.log("Injection des réponses...", reponses);
+                        
+                        // On désactive tout (mode lecture seule)
+                        document.body.style.pointerEvents = "none";
+                        document.body.style.opacity = "0.9";
+                        
+                        // On remplit les champs
+                        for (const [key, val] of Object.entries(reponses)) {
+                            const el = document.getElementById(key) || document.querySelector('[data-qid="'+key+'"]');
+                            if(el) {
+                                if(el.type === 'radio' || el.type === 'checkbox') {
+                                    if(el.value === val || val === true) el.checked = true;
+                                } else {
+                                    el.value = val;
+                                    if(el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+                                }
+                                // On met en vert pour bien voir
+                                el.style.backgroundColor = "#dcfce7";
+                                el.style.borderColor = "#16a34a";
+                            }
+                        }
+                        
+                        // Bannière d'info
+                        const ban = document.createElement('div');
+                        ban.style = "position:fixed; top:0; left:0; right:0; background:#f59e0b; color:white; text-align:center; padding:10px; font-weight:bold; z-index:99999;";
+                        ban.innerText = "MODE MIROIR : Copie de ${data.eleve?.nom || 'l\'élève'} (Lecture seule)";
+                        document.body.prepend(ban);
+                    });
+                <\/script>
+            `;
+            
+            // 5. On ouvre ça dans un nouvel onglet
+            const newWindow = window.open("", "_blank");
+            newWindow.document.write(html + scriptInjection);
+            
+        } catch(e) {
+            alert("Impossible d'ouvrir la copie : " + e.message);
+        }
+    };
+
     // ==========================================
 // MODULE : GESTIONNAIRE DE SESSIONS (Standard)
 // ==========================================
