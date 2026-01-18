@@ -13,7 +13,7 @@
         @page { size: A4; margin: 10mm; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 210mm; margin: 0 auto; padding: 10px 20px; background-color: #fff; color: #333; }
 
-        /* BOUTONS OUTILS (Invisibles à l'impression) */
+        /* BOUTONS OUTILS */
         .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; }
         .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.2em; cursor: pointer; opacity: 0.8; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }
         .action-btn:hover { opacity: 1; transform: scale(1.05); background: white; }
@@ -23,19 +23,16 @@
 
         h1 { text-align: center; color: #d9534f; margin: 0 0 10px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.5em; }
         
-        /* HEADER IDENTITÉ */
         .header-row { display: flex; gap: 15px; margin-bottom: 10px; align-items: flex-end; background-color: #f8f9fa; padding: 8px 15px; border-radius: 6px; border: 1px solid #ddd; }
         .input-group { display: flex; flex-direction: column; position: relative; }
         .input-group.grow { flex-grow: 1; }
         .input-group label { font-size: 0.8em; color: #666; font-weight: bold; margin-bottom: 2px; }
         .input-group input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; width: 100%; box-sizing: border-box; }
 
-        /* APPRECIATION */
         .appreciation-box { margin-bottom: 10px; position: relative; }
         .appreciation-box label { font-weight: bold; color: #2e7bb6; display: block; margin-bottom: 5px; font-size: 0.9em; cursor: pointer; text-decoration: underline; }
         .appreciation-box textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; font-family: inherit; resize: vertical; background-color: #f0f8ff; box-sizing: border-box; }
 
-        /* TABLEAUX */
         table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
         tr { page-break-inside: avoid; }
         table { page-break-inside: auto; }
@@ -45,11 +42,9 @@
         .correction-th { background-color: #d9534f; color: white; text-align: left; position: relative; }
         .sortable { cursor: pointer; user-select: none; } .sortable:hover { background-color: #c9302c; } .sort-icon { font-size: 0.8em; opacity: 0.7; margin-left: 5px; }
 
-        /* BADGES */
         .badge { display: inline-block; color: white; padding: 3px 0; width: 30px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
         .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; } .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
 
-        /* CHAMPS */
         .q-display { width: 100%; border: none; background: #f9f9f9; text-align: center; font-style: italic; color: #555; font-weight: bold; font-size: 0.9em; }
         .points-container { display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 0.9em; }
         input[type=number] { width: 35px; text-align: center; padding: 3px; border-radius: 3px; }
@@ -122,7 +117,6 @@
     <div class="tools-container no-print">
         <button class="action-btn btn-reset" onclick="resetNewStudent()" title="Nouvel Élève">♻️ Nouvel Élève</button>
         <button class="action-btn btn-print" onclick="window.print()" title="Imprimer">🖨️ Imprimer</button>
-        <span id="modeIndicator" style="background: rgba(255, 255, 255, 0.95); padding: 5px 12px; border-radius: 5px; font-size: 0.85em; font-weight: bold; color: #666; border: 1px solid #ddd;"></span>
     </div>
     
     <div id="saveMessage">Sauvegardé</div>
@@ -237,35 +231,24 @@
 
         // VÉRIFICATION : Arrive-t-on du Cockpit ?
         const paquet = localStorage.getItem("cockpit_transfert");
-        const modeIndicator = document.getElementById('modeIndicator');
         
         if (paquet) {
             console.log("🚀 Mode Connecté : Copie reçue !");
-            if(modeIndicator) {
-                modeIndicator.innerText = "🚀 Mode Cockpit";
-                modeIndicator.style.background = "#e0f2fe";
-                modeIndicator.style.color = "#0369a1";
-                modeIndicator.style.borderColor = "#0369a1";
-            }
             try {
                 const copie = JSON.parse(paquet);
                 localStorage.removeItem("cockpit_transfert"); // Nettoyage de la valise
 
                 // --- GESTION IDENTITÉ RGPD ---
                 if(copie.eleve) {
-                    // On cherche le code (ex: KA47) ou le nom
                     const code = copie.eleve.code || copie.eleve.userCode; 
                     
-                    // Si on a un code et que le fichier data_eleves.js est chargé
                     if (code && typeof ANNUAIRE_DECRYPT !== 'undefined' && ANNUAIRE_DECRYPT[code]) {
-                        // BINGO ! On traduit le code en Vrai Nom
                         const info = ANNUAIRE_DECRYPT[code];
                         if(document.getElementById('inputNom')) document.getElementById('inputNom').value = info.nom;
                         if(document.getElementById('inputPrenom')) document.getElementById('inputPrenom').value = info.prenom;
                         if(document.getElementById('inputClasse')) document.getElementById('inputClasse').value = info.classe;
                     } 
                     else {
-                        // SINON : On affiche ce qu'on a (ex: Anonyme ou le code brut)
                         if(document.getElementById('inputNom')) document.getElementById('inputNom').value = copie.eleve.nom || code || "Anonyme";
                         if(document.getElementById('inputPrenom')) document.getElementById('inputPrenom').value = copie.eleve.prenom || "";
                         if(document.getElementById('inputClasse')) document.getElementById('inputClasse').value = copie.eleve.classe || "";
@@ -292,21 +275,13 @@
                 addCorrectionRow();
             }
         } else {
-            // Mode Manuel (Ouverture directe)
             console.log("✍️ Mode Manuel");
-            if(modeIndicator) {
-                modeIndicator.innerText = "✍️ Mode Manuel";
-                modeIndicator.style.background = "#fff7ed";
-                modeIndicator.style.color = "#c2410c";
-                modeIndicator.style.borderColor = "#c2410c";
-            }
             loadState();
             if(document.getElementById('correctionTable').querySelector('tbody').children.length === 0) {
                 addCorrectionRow();
             }
         }
 
-        // Auto-save local
         document.body.addEventListener('input', saveState);
         document.body.addEventListener('click', () => setTimeout(saveState, 100));
         document.addEventListener('click', function(e) { if (e.target.id !== 'inputNom') document.getElementById('suggestions').style.display = 'none'; });
@@ -314,48 +289,33 @@
 
     // --- 3. MOTEUR DE CONSTRUCTION (FUSION ÉLÈVE + PROF) ---
     async function chargerBlueprintEtConstruire(idDevoir, reponsesEleve) {
-        // Nettoyage de l'ID pour trouver le fichier JSON
+        // --- CORRECTION DU CHEMIN ICI : PLUS DE 'devoirs/' ---
+        // On cherche le fichier à la RACINE du Cockpit
         const idClean = idDevoir.replace('.html', '').replace('_eleve', '');
+        const urlJSON = idClean + "_blueprint.json";
         
-        // ESSAI 1 : Chercher sur GitHub (production)
-        let urlJSON = URL_SITE_ELEVE + idClean + "_blueprint.json";
-        console.log("🔍 Tentative 1 - GitHub : " + urlJSON);
+        console.log("🔍 Téléchargement Blueprint (Local) : " + urlJSON);
 
         try {
-            let response = await fetch(urlJSON);
-            
-            // Si GitHub ne répond pas, essayer en LOCAL
-            if (!response.ok) {
-                urlJSON = idClean + "_blueprint.json";
-                console.log("🔍 Tentative 2 - Local : " + urlJSON);
-                response = await fetch(urlJSON);
-                
-                if (!response.ok) {
-                    throw new Error("Blueprint introuvable (ni sur GitHub, ni en local)");
-                }
-            }
+            const response = await fetch(urlJSON);
+            if (!response.ok) throw new Error("Fichier JSON introuvable dans le Cockpit : " + urlJSON);
             
             const blueprint = await response.json();
             CURRENT_BLUEPRINT = blueprint;
-            console.log("✅ Blueprint chargé avec succès !");
 
             document.getElementById('docTitle').innerText = "Correction : " + (blueprint.titre || idClean);
 
             const tbody = document.getElementById('correctionTable').querySelector('tbody');
             tbody.innerHTML = "";
 
-            // --- CRÉATION DES LIGNES (Avec Réponse Élève) ---
             blueprint.questions.forEach((q) => {
                 const row = tbody.insertRow();
                 
-                // Q°
                 row.insertCell(0).innerHTML = `<input type="text" class="q-display" value="${q.label}" readonly style="font-weight:bold; border:none; width:100%; text-align:center; background:transparent;">`;
                 
-                // Compétence
                 const cellComp = row.insertCell(1);
                 cellComp.innerHTML = `<span class="badge ${q.competence.toLowerCase()}">${q.competence}</span>`;
                 
-                // Niveaux
                 const cellLvl = row.insertCell(2);
                 ['NT', 'I', 'A', 'M'].forEach(lvl => {
                     const btn = document.createElement('span');
@@ -368,7 +328,6 @@
                     cellLvl.appendChild(btn);
                 });
 
-                // C'EST ICI QUE TOUT SE JOUE : FUSION DES RÉPONSES
                 const repEleve = reponsesEleve ? (reponsesEleve[q.qid] || "∅") : "";
                 const repProf = q.reponseAttendue || "Pas de corrigé défini.";
                 
@@ -384,11 +343,9 @@
                     </div>
                 `;
 
-                // Commentaires
                 const cellCom = row.insertCell(4);
                 cellCom.innerHTML = '<div class="editable-div" contenteditable="true" placeholder="Commentaire..."></div>';
                 
-                // Bouton Banque
                 const btnBank = document.createElement('button');
                 btnBank.innerText = "💬";
                 btnBank.className = "no-print";
@@ -396,32 +353,14 @@
                 btnBank.onclick = () => openCommentBank(q.competence, 'I', cellCom.querySelector('.editable-div'));
                 cellCom.appendChild(btnBank);
 
-                // Pas de suppression en mode auto
                 row.insertCell(5).innerHTML = ""; 
             });
 
-            // Mise à jour du Barème en haut
             majEntete(blueprint.questions);
 
         } catch (error) {
-            console.error("❌ Erreur:", error);
-            
-            // Message d'erreur détaillé
-            const errorMsg = `⚠️ Impossible de charger le Blueprint automatiquement.
-
-📍 Fichier recherché :
-  • Sur GitHub : ${URL_SITE_ELEVE}${idClean}_blueprint.json
-  • En local : ${idClean}_blueprint.json
-
-✅ SOLUTIONS :
-1. Vérifiez que le fichier Blueprint existe sur GitHub
-2. Vérifiez qu'il est dans le dossier /devoirs/
-3. Testez l'URL dans votre navigateur
-4. Ou placez le fichier dans le même dossier que cette grille
-
-Je passe en mode manuel.`;
-            
-            alert(errorMsg);
+            console.error(error);
+            alert("Erreur : Fichier JSON introuvable dans le Cockpit : " + urlJSON);
             addCorrectionRow();
         }
     }
