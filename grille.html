@@ -226,8 +226,9 @@
                 
                 CURRENT_BLUEPRINT = await resp.json();
                 document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || idClean);
+                const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
                 
-                renderCorrection(CURRENT_BLUEPRINT, copy.reponses);
+                renderCorrection({ questions }, copy.reponses);
             } catch (e) { alert("Erreur chargement : " + e.message); }
         }
     });
@@ -480,6 +481,20 @@
         msg.style.opacity = 1; setTimeout(() => msg.style.opacity = 0, 1000);
     }
     function resetNewStudent() { if(confirm("Nouveau ?")) location.reload(); }
+    function extractQuestionsFromBlueprint(blueprint) {
+    const questions = [];
+
+    function walk(blocks) {
+        if (!Array.isArray(blocks)) return;
+        blocks.forEach(b => {
+            if (b.type === "question") questions.push(b);
+            if (b.content) walk(b.content);
+        });
+    }
+
+    walk(blueprint.content);
+    return questions;
+}
 </script>
 </body>
 </html>
