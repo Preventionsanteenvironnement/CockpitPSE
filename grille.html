@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - V14 (Persistance Firebase)</title>
+    <title>Grille PSE - V15 (Sécurisée)</title>
 
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -17,12 +17,14 @@
         .action-btn:hover { background: #f0f0f0; }
         .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
         .action-btn.save-btn:hover { background: #bbf7d0; }
+        .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
         
         #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #16a34a; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.85em; opacity: 0; transition: opacity 0.5s; font-weight: bold; }
 
         .status-banner { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; }
         .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
         .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+        .status-banner.auth-required { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
 
         h1 { text-align: center; color: #d9534f; margin: 0 0 5px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.4em; }
 
@@ -102,6 +104,7 @@
 <body>
 
     <div class="tools-container no-print">
+        <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
         <button class="action-btn save-btn" onclick="saveToFirebase()">💾 Enregistrer</button>
         <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
         <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
@@ -181,7 +184,8 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -194,11 +198,16 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    
+    let currentUser = null;
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
     let CURRENT_DOC_ID = null;
+    let CURRENT_ELEVE_CODE = null;
     let CURRENT_COPY = null;
+    let CURRENT_EVALUATION = null;
     let IS_SAVED = true;
     const comps = ['C1','C2','C3','C4','C5','C6'];
 
@@ -211,28 +220,60 @@
     window.setNoteVisual = setNoteVisual;
     window.calculateTotal = calculateTotal;
     window.saveToFirebase = saveToFirebase;
+    window.connexionProf = connexionProf;
 
-    function autoResize(el) {
-        el.style.height = 'auto';
-        el.style.height = (el.scrollHeight) + 'px';
+    onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        updateAuthButton();
+        if (user) console.log("✅ Prof connecté:", user.email);
+    });
+
+    function updateAuthButton() {
+        const btn = document.getElementById('authBtn');
+        if (currentUser) {
+            btn.textContent = "✅ " + currentUser.email.split('@')[0];
+            btn.style.background = "#dcfce7";
+            btn.style.color = "#166534";
+            btn.style.borderColor = "#16a34a";
+        } else {
+            btn.textContent = "🔐 Connexion";
+            btn.style.background = "#dbeafe";
+            btn.style.color = "#1d4ed8";
+            btn.style.borderColor = "#3b82f6";
+        }
     }
 
-    function markUnsaved() {
-        IS_SAVED = false;
-        updateStatusBanner();
+    async function connexionProf() {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            currentUser = result.user;
+            console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
+            alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
+            updateAuthButton();
+            updateStatusBanner();
+        } catch (error) {
+            console.error("❌ Erreur:", error);
+            alert("Erreur: " + error.message);
+        }
     }
+
+    function autoResize(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
+    function markUnsaved() { IS_SAVED = false; updateStatusBanner(); }
 
     function updateStatusBanner() {
         const banner = document.getElementById('statusBanner');
         const text = document.getElementById('statusText');
         const dateEl = document.getElementById('statusDate');
+        banner.classList.remove('saved', 'not-saved', 'auth-required');
         
-        banner.classList.remove('saved', 'not-saved');
-        
-        if (IS_SAVED && CURRENT_COPY?.correction?.savedAt) {
+        if (!currentUser) {
+            banner.classList.add('auth-required');
+            text.innerHTML = '🔐 Connectez-vous pour enregistrer';
+            dateEl.textContent = '';
+        } else if (IS_SAVED && CURRENT_EVALUATION?.savedAt) {
             banner.classList.add('saved');
             text.innerHTML = '✅ Correction enregistrée';
-            const d = new Date(CURRENT_COPY.correction.savedAt);
+            const d = new Date(CURRENT_EVALUATION.savedAt);
             dateEl.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
         } else if (!IS_SAVED) {
             banner.classList.add('not-saved');
@@ -266,17 +307,30 @@
         return questions;
     }
 
+    // ⭐ SAUVEGARDE SÉCURISÉE
     async function saveToFirebase() {
-        if (!CURRENT_DOC_ID) {
-            alert("Erreur : Aucun ID de document.\nImpossible de sauvegarder.");
+        if (!currentUser) {
+            alert("🔐 Connectez-vous d'abord !");
+            connexionProf();
+            return;
+        }
+        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
+            alert("Erreur : Code élève manquant.");
             return;
         }
 
-        console.log("💾 Sauvegarde... ID:", CURRENT_DOC_ID);
+        console.log("💾 Sauvegarde... Élève:", CURRENT_ELEVE_CODE);
 
         try {
-            const correction = {
+            const evaluation = {
                 savedAt: new Date().toISOString(),
+                savedBy: currentUser.email,
+                profUid: currentUser.uid,
+                eleveCode: CURRENT_ELEVE_CODE,
+                classe: document.getElementById('inputClasse').value || "",
+                devoirId: CURRENT_COPY?.devoirId || "unknown",
+                titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
+                copyDocId: CURRENT_DOC_ID,
                 appreciation: document.getElementById('appreciationArea').value || "",
                 note_finale: parseFloat(document.getElementById('finalNote').textContent) || 0,
                 competences: {},
@@ -287,7 +341,7 @@
                 const ptsEl = document.getElementById(`pts_${c}`);
                 const maxEl = document.getElementById(`max_${c}`);
                 if (ptsEl && maxEl) {
-                    correction.competences[c] = {
+                    evaluation.competences[c] = {
                         pts: parseFloat(ptsEl.value) || 0,
                         max: parseFloat(maxEl.value) || 0
                     };
@@ -296,26 +350,22 @@
 
             document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
                 const qid = row.dataset.qid || `q_${idx}`;
-                const level = row.dataset.level || "";
                 const commentDiv = row.querySelector('.editable-div');
-                const comment = commentDiv ? commentDiv.innerText.trim() : "";
-                correction.questions[qid] = { level, comment };
+                evaluation.questions[qid] = { 
+                    level: row.dataset.level || "", 
+                    comment: commentDiv ? commentDiv.innerText.trim() : "" 
+                };
             });
 
-            console.log("📦 Données:", correction);
+            // ⭐ CHEMIN : resultats/{eleveCode}/evaluations/{devoirId}_eval
+            const evalDocId = evaluation.devoirId + "_eval";
+            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
 
-            const docRef = doc(db, "devoirs_rendus", CURRENT_DOC_ID);
-            await updateDoc(docRef, { 
-                correction: correction,
-                note_finale: correction.note_finale
-            });
-
-            CURRENT_COPY.correction = correction;
+            CURRENT_EVALUATION = evaluation;
             IS_SAVED = true;
             updateStatusBanner();
             showSaveMessage(true);
-
-            console.log("✅ Sauvegarde OK !");
+            console.log("✅ OK!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
 
         } catch (e) {
             console.error("❌ Erreur:", e);
@@ -326,28 +376,21 @@
 
     function loadExistingCorrection(correction) {
         if (!correction) return;
-        console.log("📂 Chargement correction:", correction);
-
         if (correction.appreciation) {
             const area = document.getElementById('appreciationArea');
             area.value = correction.appreciation;
             autoResize(area);
         }
-
         if (correction.competences) {
             for (const c in correction.competences) {
                 const ptsEl = document.getElementById(`pts_${c}`);
-                if (ptsEl && correction.competences[c]?.pts !== undefined) {
-                    ptsEl.value = correction.competences[c].pts;
-                }
+                if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
             }
         }
-
         if (correction.questions) {
             document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
                 const qid = row.dataset.qid || `q_${idx}`;
                 const qData = correction.questions[qid];
-                
                 if (qData) {
                     if (qData.level) {
                         row.dataset.level = qData.level;
@@ -361,7 +404,6 @@
                 }
             });
         }
-
         comps.forEach(c => updateCounters(c));
         calculateTotal();
         IS_SAVED = true;
@@ -396,9 +438,7 @@
     function renderCorrection(blueprint, reponses) {
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
-        let maxMap = {};
-        let qMap = {};
-        let activeComps = [];
+        let maxMap = {}, qMap = {}, activeComps = [];
 
         const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
         list.forEach((q, idx) => {
@@ -470,10 +510,8 @@
         comps.forEach(c => {
             const row = document.getElementById(`row_${c}`);
             if(row && row.style.display !== 'none') {
-                const p = parseFloat(document.getElementById(`pts_${c}`).value) || 0;
-                const m = parseFloat(document.getElementById(`max_${c}`).value) || 0;
-                totalPts += p;
-                totalMax += m;
+                totalPts += parseFloat(document.getElementById(`pts_${c}`).value) || 0;
+                totalMax += parseFloat(document.getElementById(`max_${c}`).value) || 0;
             }
         });
         const elNote = document.getElementById('finalNote');
@@ -527,9 +565,6 @@
         list.innerHTML = "";
         document.getElementById('modalTitle').innerText = "Appréciations";
         const apprData = window.DATA_APPRECIATION || {};
-        if(Object.keys(apprData).length === 0) {
-            list.innerHTML = "<div style='padding:20px; text-align:center;'>Banque vide.</div>";
-        }
         for (const [catName, data] of Object.entries(apprData)) {
             const h = document.createElement("div");
             h.className = "bank-title";
@@ -588,50 +623,55 @@
     }
 
     // =============================================
-    // 🚀 CHARGEMENT - RECHARGE DEPUIS FIRESTORE
+    // 🚀 CHARGEMENT
     // =============================================
-
     async function init() {
-        console.log("🚀 Grille V14 - Démarrage...");
+        console.log("🚀 Grille V15 - Démarrage...");
         initSummary([], {});
 
         const rawData = localStorage.getItem("cockpit_transfert");
-        
         if (!rawData) {
             document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
             document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
             return;
         }
-
         localStorage.removeItem("cockpit_transfert");
 
         try {
             const copyFromStorage = JSON.parse(rawData);
             CURRENT_DOC_ID = copyFromStorage.id;
+            CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
             
-            console.log("📄 Document ID:", CURRENT_DOC_ID);
-
-            if (!CURRENT_DOC_ID) {
-                throw new Error("ID manquant. Données cockpit incomplètes.");
+            // Extraire du path si disponible
+            if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
+                const parts = copyFromStorage.path.split('/');
+                if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
             }
 
-            // ⭐ RECHARGER DEPUIS FIRESTORE pour avoir la correction à jour
-            console.log("🔄 Rechargement depuis Firestore...");
-            const docRef = doc(db, "devoirs_rendus", CURRENT_DOC_ID);
-            const docSnap = await getDoc(docRef);
+            console.log("📄 ID:", CURRENT_DOC_ID, "| Élève:", CURRENT_ELEVE_CODE);
 
-            if (!docSnap.exists()) {
-                throw new Error("Document non trouvé: " + CURRENT_DOC_ID);
+            // Charger la copie
+            let docSnap = null;
+            if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
+                console.log("🔄 Nouvelle structure:", copyFromStorage.path);
+                docSnap = await getDoc(doc(db, copyFromStorage.path));
             }
+            if (!docSnap || !docSnap.exists()) {
+                console.log("🔄 Fallback devoirs_rendus");
+                docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    CURRENT_ELEVE_CODE = CURRENT_ELEVE_CODE || data.eleve?.userCode || data.userCode || data.eleveCode;
+                }
+            }
+            if (!docSnap || !docSnap.exists()) throw new Error("Document non trouvé");
 
             CURRENT_COPY = docSnap.data();
             CURRENT_COPY.id = CURRENT_DOC_ID;
-            
-            console.log("✅ Données Firestore:", CURRENT_COPY);
-            console.log("📋 Correction existante:", CURRENT_COPY.correction ? "OUI ✅" : "NON");
+            if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
 
-            // Infos élève
-            document.getElementById('inputNom').value = CURRENT_COPY.eleve?.nom || CURRENT_COPY.eleve?.code || CURRENT_COPY.identifiant || "";
+            // UI
+            document.getElementById('inputNom').value = CURRENT_COPY.eleve?.nom || CURRENT_ELEVE_CODE || "";
             document.getElementById('inputPrenom').value = CURRENT_COPY.eleve?.prenom || "";
             document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
             document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
@@ -640,24 +680,27 @@
             const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
             if (!devoirId) throw new Error("devoirId invalide");
 
-            console.log("📂 Blueprint:", devoirId);
-
             const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
             if (!resp.ok) throw new Error("Blueprint non trouvé: " + devoirId);
 
             CURRENT_BLUEPRINT = await resp.json();
             document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
+            renderCorrection({ questions: extractQuestionsFromBlueprint(CURRENT_BLUEPRINT) }, CURRENT_COPY.reponses || {});
 
-            const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
-            renderCorrection({ questions }, CURRENT_COPY.reponses || {});
-
-            // ⭐ CHARGER LA CORRECTION SI ELLE EXISTE
-            if (CURRENT_COPY.correction) {
-                console.log("📝 Chargement correction existante...");
-                loadExistingCorrection(CURRENT_COPY.correction);
-                IS_SAVED = true;
-            } else {
-                IS_SAVED = false;
+            // Charger évaluation existante
+            if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
+                try {
+                    const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
+                    if (evalSnap.exists()) {
+                        CURRENT_EVALUATION = evalSnap.data();
+                        loadExistingCorrection(CURRENT_EVALUATION);
+                        IS_SAVED = true;
+                    } else if (CURRENT_COPY.correction) {
+                        CURRENT_EVALUATION = CURRENT_COPY.correction;
+                        loadExistingCorrection(CURRENT_COPY.correction);
+                        IS_SAVED = true;
+                    }
+                } catch(e) { IS_SAVED = false; }
             }
             
             updateStatusBanner();
@@ -671,13 +714,7 @@
         }
     }
 
-    window.addEventListener('beforeunload', (e) => {
-        if (!IS_SAVED) {
-            e.preventDefault();
-            e.returnValue = '';
-        }
-    });
-
+    window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
     init();
 </script>
 </body>
