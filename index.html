@@ -396,7 +396,8 @@
                             <th onclick="sortData('temps_secondes')">Temps ↕</th>
                             <th onclick="sortData('exercice_titre')">Exercice ↕</th>
                             <th onclick="sortData('note_finale')">Note ↕</th>
-                            <th>Actions</th>
+<th onclick="sortTable('collages')">📋 ↕</th>
+<th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-eleves">
@@ -990,6 +991,55 @@
     let currentSort = { col: 'date', dir: 'desc' };
     let globalChart = null;
     let detailsChart = null;
+    // ⭐ FONCTION BADGE COLLAGES
+function getPasteBadge(pasteStats) {
+    if (!pasteStats) return '<span style="color:#9ca3af;">-</span>';
+    
+    const external = pasteStats.external || 0;
+    const internal = pasteStats.internal || 0;
+    const total = pasteStats.total || (external + internal);
+    
+    if (external === 0 && total === 0) {
+        return '<span style="color:#10b981;" title="Aucun collage détecté">✓</span>';
+    }
+    
+    if (external === 0) {
+        return `<span style="color:#10b981;" title="${internal} collage(s) interne(s)">✓</span>`;
+    }
+    
+    if (external <= 2) {
+        return `<span style="color:#f59e0b; font-weight:bold;" title="${external} collage(s) externe(s)">⚠️ ${external}</span>`;
+    }
+    
+    return `<span style="color:#ef4444; font-weight:bold;" title="${external} collages externes - Attention !">🚨 ${external}</span>`;
+}
+
+// Fonction détail collages pour modale
+function getPasteDetailHTML(pasteStats) {
+    if (!pasteStats) return '<p style="color:#9ca3af;">Aucune donnée</p>';
+    
+    const events = pasteStats.events || [];
+    if (events.length === 0) {
+        return '<p style="color:#10b981;">✅ Aucun collage détecté</p>';
+    }
+    
+    let html = '<div style="max-height:200px; overflow-y:auto;">';
+    html += '<table style="width:100%; font-size:0.85rem;">';
+    html += '<tr style="background:#f1f5f9;"><th>Heure</th><th>Type</th><th>Longueur</th></tr>';
+    
+    events.forEach(ev => {
+        const time = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString('fr-FR') : '-';
+        const type = ev.isExternal ? 
+            '<span style="color:#ef4444;">🌐 Externe</span>' : 
+            '<span style="color:#10b981;">📝 Interne</span>';
+        const len = ev.length || '?';
+        
+        html += `<tr><td>${time}</td><td>${type}</td><td>${len} car.</td></tr>`;
+    });
+    
+    html += '</table></div>';
+    return html;
+}
 
     // --- FONCTIONS ACCESSIBLES GLOBALEMENT ---
     
@@ -1211,6 +1261,10 @@ const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
                 va = Number(va ?? 0); 
                 vb = Number(vb ?? 0); 
             }
+          if (col === "collages") {
+    va = a.raw?.pasteStats?.external || 0;
+    vb = b.raw?.pasteStats?.external || 0;
+}
 
             if (typeof va === "string") va = va.toLowerCase();
             if (typeof vb === "string") vb = vb.toLowerCase();
@@ -1261,14 +1315,19 @@ const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
                 }
             }
 
-            tbody.innerHTML += `<tr>
-                <td>${dateStr}</td>
-                <td><span class="eleve-link" onclick="openStudentDetail('${d.userCode || d.identifiant}')">${d.identifiant}</span></td>
-                <td><span class="pill pill-blue">${d.classe}</span></td>
-                <td>${timeStr}</td>
-                <td>${d.exercice_titre}</td>
-                <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}</td>
-                <td style="display:flex; gap:5px;">
+            // Récupérer les stats de collage
+const pasteStats = d.raw?.pasteStats || d.pasteStats || null;
+const pasteBadge = getPasteBadge(pasteStats);
+
+tbody.innerHTML += `<tr>
+    <td>${dateStr}</td>
+    <td><span class="eleve-link" onclick="openStudentDetail('${d.userCode || d.identifiant}')">${d.identifiant}</span></td>
+    <td><span class="pill pill-blue">${d.classe}</span></td>
+    <td>${timeStr}</td>
+    <td>${d.exercice_titre}</td>
+    <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}</td>
+    <td style="text-align:center;">${pasteBadge}</td>
+    <td style="display:flex; gap:5px;">
   <button type="button"
   onclick='ouvrirCorrection(${JSON.stringify(d).replace(/'/g,"&#39;")})'
   style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;"
@@ -1345,7 +1404,12 @@ const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
             }
             html += `</div>`;
         }
-        
+        // Section Collages
+const pasteStats = data.raw?.pasteStats || data.pasteStats || null;
+html += `<h3>📋 Analyse Collages</h3>`;
+html += `<div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px;">`;
+html += getPasteDetailHTML(pasteStats);
+html += `</div>`;
         if (data.competences && Object.keys(data.competences).length > 0) {
             html += `<h3>Compétences:</h3>`;
             html += `<div style="background: #f0f9ff; padding: 15px; border-radius: 8px;">`;
