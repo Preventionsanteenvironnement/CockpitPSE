@@ -296,6 +296,7 @@
             <button id="menuBtn" class="menu-btn" aria-label="Menu" onclick="toggleMenu()">☰</button>
             <h1 id="page-title">Tableau de Bord</h1>
             <div class="header-infos">
+                <div id="authBadge" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"></div>
                 <div class="clock-time" id="clock">--:--</div>
                 <div class="clock-date" id="date">--</div>
                 <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
@@ -896,9 +897,18 @@
     // Import Firebase avec compatibilité
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import {
-      getFirestore, collection, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, doc,
+      getFirestore, collection, collectionGroup, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, doc,
       onSnapshot, query, orderBy, where, limit, Timestamp, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    
+    // ⭐ AUTH GOOGLE pour sécuriser les corrections
+    import { 
+      getAuth, 
+      signInWithPopup, 
+      GoogleAuthProvider,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     
     const firebaseConfig = {
       apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -911,6 +921,58 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    
+    // ⭐ AUTH GOOGLE
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    let currentUser = null;
+    
+    // Connexion Google Prof
+    window.connexionProf = async function() {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        currentUser = result.user;
+        console.log("✅ Connecté:", currentUser.email);
+        console.log("📝 Votre UID:", currentUser.uid);
+        alert("✅ Connecté en tant que " + currentUser.email + "\n\nVotre UID (à copier dans les règles Firestore):\n" + currentUser.uid);
+        updateAuthUI();
+        return currentUser;
+      } catch (error) {
+        console.error("❌ Erreur connexion:", error);
+        alert("Erreur de connexion: " + error.message);
+      }
+    };
+    
+    // Déconnexion
+    window.deconnexionProf = async function() {
+      await signOut(auth);
+      currentUser = null;
+      updateAuthUI();
+      console.log("👋 Déconnecté");
+    };
+    
+    // Mettre à jour l'interface selon l'état de connexion
+    function updateAuthUI() {
+      const authBadge = document.getElementById("authBadge");
+      if (authBadge) {
+        if (currentUser) {
+          authBadge.innerHTML = `<span style="color:#16a34a;">✅ ${currentUser.email}</span> <button onclick="deconnexionProf()" style="margin-left:5px;padding:2px 8px;font-size:11px;cursor:pointer;">Déco</button>`;
+          authBadge.style.display = "flex";
+        } else {
+          authBadge.innerHTML = `<button onclick="connexionProf()" style="background:#4285f4;color:white;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:12px;">🔐 Connexion Prof</button>`;
+          authBadge.style.display = "flex";
+        }
+      }
+    }
+    
+    // Vérifier l'état de connexion au démarrage
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      updateAuthUI();
+      if (user) {
+        console.log("✅ Prof connecté:", user.email);
+      }
+    });
     
     // VARIABLES GLOBALES
     let traficEstCharge = false;
@@ -1014,7 +1076,9 @@
         }
         
         try {
-            const qEval = query(collection(db, "devoirs_rendus"), orderBy("createdAtISO", "desc"), limit(100));
+            // ⭐ NOUVELLE STRUCTURE : collectionGroup("copies")
+            // Lit toutes les copies de tous les élèves
+            const qEval = query(collectionGroup(db, "copies"), orderBy("createdAt", "desc"), limit(100));
             const snapEval = await getDocs(qEval);
             
             allData = [];
@@ -1022,11 +1086,15 @@
             let exercices = new Set();
 
             if (!snapEval.empty) {
-                snapEval.forEach(doc => {
-                    const d = doc.data();
+                snapEval.forEach(docSnap => {
+                    const d = docSnap.data();
+                    
+                    // ⭐ Extraire eleveCode du chemin : resultats/{eleveCode}/copies/{docId}
+                    const pathParts = docSnap.ref.path.split('/');
+                    const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
                     
                     // Utiliser userCode comme identifiant stable si disponible
-                    const userCode = d.eleve?.userCode || d.userCode || null;
+                    const userCode = eleveCodeFromPath || d.eleve?.userCode || d.userCode || d.eleveCode || null;
                     const identifiant = userCode || 
                                       (d.eleve?.prenom ? (d.eleve.prenom + " " + d.eleve.nom) : 
                                       (d.identifiant || "Anonyme"));
@@ -1044,7 +1112,9 @@
                     }
                     
                     const item = {
-                        id: doc.id,
+                        id: docSnap.id,
+                        path: docSnap.ref.path,  // ⭐ Chemin complet pour les corrections
+                        eleveCode: userCode,     // ⭐ Code élève extrait
                         raw: d,
                         date: dateValue,
                         identifiant: identifiant,
