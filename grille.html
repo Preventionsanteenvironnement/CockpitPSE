@@ -457,7 +457,36 @@
             row.dataset.level = "";
             row.dataset.qid = qid;
 
-            const repEleve = (reponses && (reponses[qid] ?? reponses[q?.qid])) || "<i>Non répondu</i>";
+            // ⭐ CORRECTION: Chercher la réponse avec plusieurs clés possibles
+            let repEleve = "<i>Non répondu</i>";
+            if (reponses) {
+                // 1. Essayer avec qid (nouveau format: q_0, q_1...)
+                if (reponses[qid] !== undefined) {
+                    repEleve = Array.isArray(reponses[qid]) ? reponses[qid].join('<br>• ') : reponses[qid];
+                }
+                // 2. Essayer avec q.qid
+                else if (q?.qid && reponses[q.qid] !== undefined) {
+                    repEleve = Array.isArray(reponses[q.qid]) ? reponses[q.qid].join('<br>• ') : reponses[q.qid];
+                }
+                // 3. Essayer avec le label (ancien format: Q2, Q3...)
+                else if (reponses[label] !== undefined) {
+                    repEleve = Array.isArray(reponses[label]) ? reponses[label].join('<br>• ') : reponses[label];
+                }
+                // 4. Essayer avec "Q" + label
+                else if (reponses["Q" + label] !== undefined) {
+                    repEleve = Array.isArray(reponses["Q" + label]) ? reponses["Q" + label].join('<br>• ') : reponses["Q" + label];
+                }
+                // 5. Chercher par index dans toutes les clés qui contiennent le label
+                else {
+                    const possibleKeys = Object.keys(reponses).filter(k => 
+                        k === label || k === `Q${label}` || k === `q_${idx}` || k.endsWith(`_${label}`)
+                    );
+                    if (possibleKeys.length > 0) {
+                        const values = possibleKeys.map(k => reponses[k]).flat();
+                        repEleve = values.join('<br>• ');
+                    }
+                }
+            }
 
             row.innerHTML = `
                 <td style="font-weight:bold">${label}</td>
