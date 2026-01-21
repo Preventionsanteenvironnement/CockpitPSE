@@ -1056,20 +1056,17 @@ function getPasteDetailHTML(pasteStats) {
         if (typeof renderMemos === 'function') renderMemos();
     };
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🔧 Fonction chargerDonnees CORRIGÉE v2.0
-    // Fusion copies + évaluations pour afficher les vraies notes
-    // ═══════════════════════════════════════════════════════════════════════
+    // Fonction chargerDonnees (version robuste avec userCode)
     window.chargerDonnees = async function() {
-        console.log("🚀 Démarrage chargement v2.0 (fusion copies + évaluations)...");
+        console.log("🚀 Démarrage chargement...");
         const btns = document.querySelectorAll("button");
         btns.forEach(b => { if(b.innerText.includes("Actualiser")) b.innerText = "⏳..."; });
 
-        // Fonction pour extraire la note (fallback)
+        // Fonction pour extraire la note
         function extractNote20(d){
             const candidates = [
-                d?.note_finale,              // Priorité 1 : note_finale
-                d?.resultat_auto?.score,     // Priorité 2 : score auto
+                d?.resultat_auto?.score,
+                d?.note_finale,
                 d?.meta?.score,              
                 d?.score,
                 d?.note,
@@ -1092,134 +1089,65 @@ function getPasteDetailHTML(pasteStats) {
         }
         
         try {
-            // ════════════════════════════════════════════════════════════
-            // ÉTAPE 1 : Charger toutes les COPIES
-            // ════════════════════════════════════════════════════════════
-            console.log("📂 Chargement des copies...");
-            const qCopies = query(collectionGroup(db, "copies"), limit(100));
-            const snapCopies = await getDocs(qCopies);
+            // ⭐ NOUVELLE STRUCTURE : collectionGroup("copies")
+            // Lit toutes les copies de tous les élèves
+            const qEval = query(collectionGroup(db, "copies"), limit(100));
+            const snapEval = await getDocs(qEval);
             
-            // Map : devoirId_eleveCode → copie
-            const copiesMap = new Map();
-            
-            snapCopies.forEach(docSnap => {
-                const d = docSnap.data();
-                const pathParts = docSnap.ref.path.split('/');
-                const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
-                const userCode = eleveCodeFromPath || d.eleve?.userCode || d.userCode || d.eleveCode || null;
-                const devoirId = d.devoirId || "unknown";
-                
-                const key = `${devoirId}_${userCode}`;
-                
-                copiesMap.set(key, {
-                    docSnap: docSnap,
-                    data: d,
-                    eleveCode: userCode,
-                    devoirId: devoirId
-                });
-            });
-            
-            console.log("✅ Copies chargées:", copiesMap.size);
-            
-            // ════════════════════════════════════════════════════════════
-            // ÉTAPE 2 : Charger toutes les ÉVALUATIONS (corrections)
-            // ════════════════════════════════════════════════════════════
-            console.log("📂 Chargement des évaluations...");
-            const qEvals = query(collectionGroup(db, "evaluations"), limit(100));
-            const snapEvals = await getDocs(qEvals);
-            
-            // Map : devoirId_eleveCode → évaluation
-            const evalsMap = new Map();
-            
-            snapEvals.forEach(docSnap => {
-                const evalData = docSnap.data();
-                const pathParts = docSnap.ref.path.split('/');
-                const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
-                const userCode = eleveCodeFromPath || evalData.eleveCode || null;
-                const devoirId = evalData.devoirId || "unknown";
-                
-                const key = `${devoirId}_${userCode}`;
-                
-                evalsMap.set(key, evalData);
-            });
-            
-            console.log("✅ Évaluations chargées:", evalsMap.size);
-            
-            // ════════════════════════════════════════════════════════════
-            // ÉTAPE 3 : FUSION copies + évaluations
-            // ════════════════════════════════════════════════════════════
             allData = [];
             let classes = new Set();
             let exercices = new Set();
-            
-            copiesMap.forEach((copyObj, key) => {
-                const d = copyObj.data;
-                const docSnap = copyObj.docSnap;
-                const userCode = copyObj.eleveCode;
-                const devoirId = copyObj.devoirId;
-                
-                // ⭐ Chercher l'évaluation correspondante
-                const evaluation = evalsMap.get(key);
-                
-                // Identifiant pour l'affichage
-                const identifiant = userCode || 
-                                  (d.eleve?.prenom ? (d.eleve.prenom + " " + d.eleve.nom) : 
-                                  (d.identifiant || "Anonyme"));
-                
-                // Gestion de la date
-                let dateValue;
-                if (d.createdAtISO) {
-                    dateValue = new Date(d.createdAtISO);
-                } else if (d.date) {
-                    dateValue = new Date(d.date);
-                } else if (d.createdAt?.toDate) {
-                    dateValue = d.createdAt.toDate();
-                } else {
-                    dateValue = new Date();
-                }
-                
-                // ⭐⭐⭐ PRIORITÉ À LA NOTE FINALE DE L'ÉVALUATION ⭐⭐⭐
-                let noteFinal = "--";
-                let estCorrige = false;
-                
-                if (evaluation && evaluation.note_finale !== undefined) {
-                    // Si évaluation existe → utiliser note_finale
-                    noteFinal = evaluation.note_finale;
-                    estCorrige = true;
-                    console.log("✅ Correction trouvée pour", identifiant, devoirId, "→", noteFinal);
-                } else {
-                    // Sinon → utiliser note_auto de la copie
-                    noteFinal = extractNote20(d) ?? "--";
-                    console.log("⚠️ Pas de correction pour", identifiant, devoirId, "→ note auto:", noteFinal);
-                }
-                
-                const item = {
-                    id: docSnap.id,
-                    path: docSnap.ref.path,
-                    eleveCode: userCode,
-                    raw: d,
-                    date: dateValue,
-                    identifiant: identifiant,
-                    userCode: userCode,
-                    classe: d.eleve?.classe || d.classe || "?",
-                    temps_secondes: d.temps_secondes || 0,
-                    exercice_titre: d.titre || devoirId || "Devoir",
-                    devoirId: devoirId,
-                    reponses: d.reponses,
-                    eleve: d.eleve,
-                    note_finale: noteFinal,  // ⭐ NOTE CORRIGÉE
-                    competences: d.competences || {},
-                    estCorrige: estCorrige,  // ⭐ Indicateur de correction
-                    evaluation: evaluation   // ⭐ Évaluation complète si disponible
-                };
-                allData.push(item);
 
-                if(item.classe) classes.add(item.classe);
-                if(item.exercice_titre) exercices.add(item.exercice_titre);
-            });
-            
-            console.log("✅ Données fusionnées:", allData.length, "copies");
-            console.log("📊 Corrections:", allData.filter(d => d.estCorrige).length, "/", allData.length);
+            if (!snapEval.empty) {
+                snapEval.forEach(docSnap => {
+                    const d = docSnap.data();
+                    
+                    // ⭐ Extraire eleveCode du chemin : resultats/{eleveCode}/copies/{docId}
+                   // Extraire eleveCode du chemin : resultats/{eleveCode}/copies/{docId}
+const pathParts = docSnap.ref.path.split('/');
+const eleveCodeFromPath = pathParts.length >= 2 ? pathParts[1] : null;
+                    
+                    // Utiliser userCode comme identifiant stable si disponible
+                    const userCode = eleveCodeFromPath || d.eleve?.userCode || d.userCode || d.eleveCode || null;
+                    const identifiant = userCode || 
+                                      (d.eleve?.prenom ? (d.eleve.prenom + " " + d.eleve.nom) : 
+                                      (d.identifiant || "Anonyme"));
+                    
+                    // Gestion robuste de la date
+                    let dateValue;
+                    if (d.createdAtISO) {
+                        dateValue = new Date(d.createdAtISO);
+                    } else if (d.date) {
+                        dateValue = new Date(d.date);
+                    } else if (d.createdAt?.toDate) {
+                        dateValue = d.createdAt.toDate();
+                    } else {
+                        dateValue = new Date();
+                    }
+                    
+                    const item = {
+                        id: docSnap.id,
+                        path: docSnap.ref.path,  // ⭐ Chemin complet pour les corrections
+                        eleveCode: userCode,     // ⭐ Code élève extrait
+                        raw: d,
+                        date: dateValue,
+                        identifiant: identifiant,
+                        userCode: userCode, // Clé interne stable
+                        classe: d.eleve?.classe || d.classe || "?",
+                        temps_secondes: d.temps_secondes || 0,
+                        exercice_titre: d.titre || d.devoirId || "Devoir",
+                        devoirId: d.devoirId,
+                        reponses: d.reponses,
+                        eleve: d.eleve,
+                        note_finale: extractNote20(d) ?? "--",
+                        competences: d.competences || {} 
+                    };
+                    allData.push(item);
+
+                    if(item.classe) classes.add(item.classe);
+                    if(item.exercice_titre) exercices.add(item.exercice_titre);
+                });
+            }
             
             // Mise à jour des filtres
             const selClass = document.getElementById("filter-class");
@@ -1237,10 +1165,7 @@ function getPasteDetailHTML(pasteStats) {
 
             applyFilters(); 
 
-        } catch(e) { 
-            console.error("❌ Erreur chargement:", e); 
-            alert("Erreur lors du chargement des données:\n\n" + e.message);
-        }
+        } catch(e) { console.error("Erreur Eval:", e); }
 
         // Lancement des stats
         if(typeof chargerStatsCompletes === 'function') await chargerStatsCompletes();
@@ -1341,10 +1266,8 @@ function getPasteDetailHTML(pasteStats) {
                 timeStr = m + " min";
             }
 
-            // ⭐ AFFICHAGE AMÉLIORÉ AVEC INDICATEUR DE CORRECTION
             let scoreStyle = "color:#4b5563";
             let scoreTxt = d.note_finale;
-            let correctionBadge = "";
 
             if (scoreTxt !== "--") {
                 scoreTxt = scoreTxt + "/20";
@@ -1353,13 +1276,6 @@ function getPasteDetailHTML(pasteStats) {
                     if (val < 10) scoreStyle = "color:#dc2626;font-weight:bold";
                     else if (val >= 14) scoreStyle = "color:#16a34a;font-weight:bold";
                 }
-                
-                // ⭐ Badge de correction
-                if (d.estCorrige) {
-                    correctionBadge = '<span style="display:inline-block; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:5px;">✓</span>';
-                }
-            } else {
-                scoreTxt = "--";
             }
 
             // Récupérer les stats de collage
@@ -1372,7 +1288,7 @@ tbody.innerHTML += `<tr>
     <td><span class="pill pill-blue">${d.classe}</span></td>
     <td>${timeStr}</td>
     <td>${d.exercice_titre}</td>
-    <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}${correctionBadge}</td>
+    <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}</td>
     <td style="text-align:center;">${pasteBadge}</td>
     <td style="display:flex; gap:5px;">
   <button type="button"
@@ -1382,7 +1298,7 @@ tbody.innerHTML += `<tr>
 
   <button type="button"
     onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})'
-    style="background:#e0f2fe; color:#0369a1; border:1px solid:#bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;"
+    style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;"
     title="Voir la copie">👁️ Copie</button>
 </td>
             </tr>`;
