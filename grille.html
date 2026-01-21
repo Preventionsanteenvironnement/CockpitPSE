@@ -87,6 +87,33 @@
         .comment-item { padding: 8px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.9em; transition: background 0.1s; }
         .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
 
+        /* === APERÇU COPIE === */
+        .preview-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .preview-modal.active { display: flex; }
+        .preview-content { background: white; width: 90%; max-width: 800px; max-height: 85vh; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .preview-header { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .preview-title { font-weight: 700; font-size: 1.1em; }
+        .preview-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1.3em; font-weight: bold; transition: all 0.2s; }
+        .preview-close:hover { background: rgba(255,255,255,0.4); transform: rotate(90deg); }
+        .preview-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .preview-section { background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #3b82f6; }
+        .preview-section-title { font-weight: 700; color: #1e293b; margin-bottom: 10px; font-size: 0.95em; }
+        .preview-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.9em; }
+        .preview-meta-item { background: white; padding: 8px; border-radius: 6px; }
+        .preview-meta-label { color: #64748b; font-size: 0.8em; margin-bottom: 3px; }
+        .preview-meta-value { font-weight: 700; color: #1e293b; }
+        .preview-reponses { background: white; padding: 15px; border-radius: 8px; }
+        .preview-reponse-item { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+        .preview-reponse-item:last-child { border-bottom: none; }
+        .preview-reponse-q { font-weight: 600; color: #475569; margin-bottom: 5px; }
+        .preview-reponse-a { color: #1e293b; padding-left: 15px; }
+        .preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .preview-stat-card { background: white; padding: 12px; border-radius: 8px; text-align: center; }
+        .preview-stat-value { font-size: 1.5em; font-weight: 800; color: #3b82f6; }
+        .preview-stat-label { font-size: 0.75em; color: #64748b; margin-top: 3px; }
+        .btn-preview { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+        .btn-preview:hover { background: #bfdbfe; }
+        
         @media print {
             .no-print { display: none !important; }
             body { padding: 0; margin: 0; background: white; }
@@ -98,6 +125,7 @@
             .editable-div { border: none; }
             .score-input, .max-input { border: none; text-align: right; width: auto; font-weight: bold; }
             tr[style*="display: none"] { display: none !important; }
+            .preview-modal { display: none !important; }
         }
     </style>
 </head>
@@ -105,6 +133,7 @@
 
     <div class="tools-container no-print">
         <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
+        <button class="action-btn btn-preview" onclick="ouvrirApercuCopie()">👁️ Aperçu Copie</button>
         <button class="action-btn save-btn" onclick="saveToFirebase()">💾 Enregistrer</button>
         <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
         <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
@@ -121,6 +150,19 @@
         <div class="modal-box">
             <div class="modal-header"><span id="modalTitle">Banque</span><span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span></div>
             <div id="modalList" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- MODAL APERÇU COPIE -->
+    <div class="preview-modal" id="previewModal">
+        <div class="preview-content">
+            <div class="preview-header">
+                <div class="preview-title">👁️ Aperçu de la copie élève</div>
+                <button class="preview-close" onclick="fermerApercuCopie()">×</button>
+            </div>
+            <div class="preview-body" id="previewBody">
+                <p style="text-align:center; color:#94a3b8;">Chargement...</p>
+            </div>
         </div>
     </div>
 
@@ -742,6 +784,126 @@
             alert("Erreur:\n\n" + e.message);
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 👁️ APERÇU COPIE ÉLÈVE
+    // ═══════════════════════════════════════════════════════════════════════
+    window.ouvrirApercuCopie = function() {
+        if (!CURRENT_COPY) {
+            alert("Aucune copie chargée");
+            return;
+        }
+        
+        const previewBody = document.getElementById('previewBody');
+        let html = '';
+        
+        // Métadonnées
+        const dateStr = CURRENT_COPY.createdAtISO || 
+                       (CURRENT_COPY.createdAt?.toDate ? CURRENT_COPY.createdAt.toDate().toLocaleString('fr-FR') : 
+                       'Non disponible');
+        const tempsMin = CURRENT_COPY.temps_secondes ? Math.floor(CURRENT_COPY.temps_secondes / 60) : 0;
+        const tempsSec = CURRENT_COPY.temps_secondes ? CURRENT_COPY.temps_secondes % 60 : 0;
+        
+        html += `
+            <div class="preview-section">
+                <div class="preview-section-title">📄 Informations générales</div>
+                <div class="preview-meta">
+                    <div class="preview-meta-item">
+                        <div class="preview-meta-label">Exercice</div>
+                        <div class="preview-meta-value">${CURRENT_COPY.titre || CURRENT_COPY.devoirId || 'Devoir'}</div>
+                    </div>
+                    <div class="preview-meta-item">
+                        <div class="preview-meta-label">Classe</div>
+                        <div class="preview-meta-value">${CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || '?'}</div>
+                    </div>
+                    <div class="preview-meta-item">
+                        <div class="preview-meta-label">Date de rendu</div>
+                        <div class="preview-meta-value">${dateStr}</div>
+                    </div>
+                    <div class="preview-meta-item">
+                        <div class="preview-meta-label">Temps de travail</div>
+                        <div class="preview-meta-value">${tempsMin} min ${tempsSec} sec</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Statistiques
+        const pasteStats = CURRENT_COPY.pasteStats || {};
+        const noteAuto = CURRENT_COPY.note_auto || 0;
+        
+        html += `
+            <div class="preview-section">
+                <div class="preview-section-title">📊 Statistiques</div>
+                <div class="preview-stats">
+                    <div class="preview-stat-card">
+                        <div class="preview-stat-value">${noteAuto}</div>
+                        <div class="preview-stat-label">Note auto /20</div>
+                    </div>
+                    <div class="preview-stat-card">
+                        <div class="preview-stat-value">${pasteStats.total || 0}</div>
+                        <div class="preview-stat-label">Collages détectés</div>
+                    </div>
+                    <div class="preview-stat-card">
+                        <div class="preview-stat-value">${pasteStats.external || 0}</div>
+                        <div class="preview-stat-label">Collages externes</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Réponses
+        const reponses = CURRENT_COPY.reponses || {};
+        if (Object.keys(reponses).length > 0) {
+            html += `
+                <div class="preview-section">
+                    <div class="preview-section-title">✍️ Réponses de l'élève</div>
+                    <div class="preview-reponses">
+            `;
+            
+            for (const [key, value] of Object.entries(reponses)) {
+                let displayValue = value;
+                if (Array.isArray(value)) {
+                    displayValue = value.join(' • ');
+                } else if (typeof value === 'boolean') {
+                    displayValue = value ? '✓ Vrai' : '✗ Faux';
+                } else if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value);
+                }
+                
+                html += `
+                    <div class="preview-reponse-item">
+                        <div class="preview-reponse-q">${key}</div>
+                        <div class="preview-reponse-a">${displayValue}</div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="preview-section">
+                    <div class="preview-section-title">✍️ Réponses de l'élève</div>
+                    <p style="text-align:center; color:#94a3b8; padding:20px;">Aucune réponse enregistrée</p>
+                </div>
+            `;
+        }
+        
+        previewBody.innerHTML = html;
+        document.getElementById('previewModal').classList.add('active');
+    };
+
+    window.fermerApercuCopie = function() {
+        document.getElementById('previewModal').classList.remove('active');
+    };
+
+    // Fermer en cliquant à l'extérieur
+    document.getElementById('previewModal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'previewModal') fermerApercuCopie();
+    });
 
     window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
     init();
