@@ -384,6 +384,12 @@
               <select id="filter-exercice" class="filter-select" onchange="applyFilters()">
                 <option value="ALL">Tous les exercices</option>
               </select>
+              <select id="filter-statut" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Tous les statuts</option>
+                <option value="A_CORRIGER">📝 À corriger</option>
+                <option value="CORRIGES">✅ Corrigés</option>
+                <option value="NON_NOTE">⚠️ Non notés</option>
+              </select>
             </div>
 
             <div style="overflow-x:auto;">
@@ -1255,11 +1261,16 @@ function getPasteDetailHTML(pasteStats) {
         const fClass = document.getElementById("filter-class").value;
         const fExo = document.getElementById("filter-exercice").value;
         const fName = document.getElementById("filter-student").value.toLowerCase();
+        const fStatut = document.getElementById("filter-statut").value;
 
         filteredData = allData.filter(d => {
             if(fClass !== "ALL" && d.classe !== fClass) return false;
             if(fExo !== "ALL" && d.exercice_titre !== fExo) return false;
             if(fName && !d.identifiant.toLowerCase().includes(fName)) return false;
+            // Filtre statut
+            if(fStatut === "A_CORRIGER" && d.estCorrige) return false;
+            if(fStatut === "CORRIGES" && !d.estCorrige) return false;
+            if(fStatut === "NON_NOTE" && d.evaluation?.note_finale !== "NN") return false;
             return true;
         });
         sortData(currentSort.col, false);
@@ -1347,7 +1358,12 @@ function getPasteDetailHTML(pasteStats) {
             let scoreTxt = d.note_finale;
             let correctionBadge = "";
 
-            if (scoreTxt !== "--") {
+            // ⭐ Gérer le cas "Non noté"
+            if (scoreTxt === "NN" || d.evaluation?.nonNote) {
+                scoreTxt = "NN";
+                scoreStyle = "color:#b45309;font-weight:bold";
+                correctionBadge = '<span style="display:inline-block; background:#fef3c7; color:#b45309; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:5px;">⚠️</span>';
+            } else if (scoreTxt !== "--") {
                 scoreTxt = scoreTxt + "/20";
                 const val = parseFloat(d.note_finale);
                 if (!isNaN(val)) {
