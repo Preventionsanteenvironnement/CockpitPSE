@@ -106,6 +106,7 @@
     <div class="tools-container no-print">
         <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
         <button class="action-btn save-btn" onclick="saveToFirebase()">💾 Enregistrer</button>
+        <button class="action-btn" onclick="marquerNonNote()" style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d;">⚠️ Non noté</button>
         <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
         <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
     </div>
@@ -374,8 +375,70 @@
         }
     }
 
+    // ⭐ Fonction pour marquer une copie comme "Non noté"
+    async function marquerNonNote() {
+        if (!currentUser) {
+            alert("🔐 Connectez-vous d'abord !");
+            connexionProf();
+            return;
+        }
+        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
+            alert("Erreur : Code élève manquant.");
+            return;
+        }
+
+        if (!confirm("⚠️ Marquer cette copie comme 'Non noté' ?\n\nL'élève verra que sa copie n'a pas été notée.")) {
+            return;
+        }
+
+        console.log("⚠️ Marquage Non noté... Élève:", CURRENT_ELEVE_CODE);
+
+        try {
+            const evaluation = {
+                savedAt: new Date().toISOString(),
+                savedBy: currentUser.email,
+                profUid: currentUser.uid,
+                eleveCode: CURRENT_ELEVE_CODE,
+                classe: document.getElementById('inputClasse').value || "",
+                devoirId: CURRENT_COPY?.devoirId || "unknown",
+                titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
+                copyDocId: CURRENT_DOC_ID,
+                appreciation: document.getElementById('appreciationArea').value || "Copie non notée.",
+                note_finale: "NN",  // ⭐ Code spécial "Non Noté"
+                nonNote: true,      // ⭐ Flag explicite
+                competences: {},
+                questions: {}
+            };
+
+            const evalDocId = evaluation.devoirId + "_eval";
+            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
+
+            // Mettre à jour l'affichage
+            document.getElementById('finalNote').innerText = "Non noté";
+            document.getElementById('finalNote').style.color = "#b45309";
+            
+            CURRENT_EVALUATION = evaluation;
+            IS_SAVED = true;
+            updateStatusBanner();
+            showSaveMessage(true);
+            console.log("✅ Copie marquée Non noté!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
+
+        } catch (e) {
+            console.error("❌ Erreur:", e);
+            showSaveMessage(false);
+            alert("Erreur:\n\n" + e.message);
+        }
+    }
+
     function loadExistingCorrection(correction) {
         if (!correction) return;
+        
+        // ⭐ Gérer le cas "Non noté"
+        if (correction.nonNote || correction.note_finale === "NN") {
+            document.getElementById('finalNote').innerText = "Non noté";
+            document.getElementById('finalNote').style.color = "#b45309";
+        }
+        
         if (correction.appreciation) {
             const area = document.getElementById('appreciationArea');
             area.value = correction.appreciation;
@@ -405,7 +468,10 @@
             });
         }
         comps.forEach(c => updateCounters(c));
-        calculateTotal();
+        // Ne pas recalculer si c'est Non noté
+        if (!correction.nonNote && correction.note_finale !== "NN") {
+            calculateTotal();
+        }
         IS_SAVED = true;
     }
 
