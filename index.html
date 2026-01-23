@@ -1384,6 +1384,11 @@ tbody.innerHTML += `<tr>
     onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})'
     style="background:#e0f2fe; color:#0369a1; border:1px solid:#bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;"
     title="Voir la copie">👁️ Copie</button>
+
+  <button type="button"
+    onclick='deleteSubmission("${d.path}", "${d.eleveCode}", "${d.devoirId}", "${d.identifiant}")'
+    style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;"
+    title="Supprimer définitivement">🗑️</button>
 </td>
             </tr>`;
         });
@@ -1477,6 +1482,69 @@ html += `</div>`;
                 modal.remove();
             }
         });
+    };
+
+    // ⭐ Fonction de SUPPRESSION définitive d'une soumission
+    window.deleteSubmission = async function(path, eleveCode, devoirId, identifiant) {
+        // ⚠️ Vérification de connexion prof
+        if (!currentUser) {
+            alert("❌ Vous devez être connecté en tant que professeur pour supprimer.");
+            return;
+        }
+        
+        // ⚠️ Confirmation double sécurité
+        const confirmMsg = `⚠️ ATTENTION - SUPPRESSION DÉFINITIVE\n\n` +
+                          `Élève : ${identifiant}\n` +
+                          `Devoir : ${devoirId}\n\n` +
+                          `Cette action supprimera :\n` +
+                          `• La copie de l'élève\n` +
+                          `• La correction associée (si existante)\n\n` +
+                          `Cette action est IRRÉVERSIBLE.\n\n` +
+                          `Voulez-vous vraiment supprimer ?`;
+        
+        if (!confirm(confirmMsg)) return;
+        
+        // Seconde confirmation
+        if (!confirm("❗ Dernière confirmation : êtes-vous VRAIMENT sûr ?")) return;
+        
+        try {
+            console.log("🗑️ Suppression en cours...");
+            console.log("   Path copie:", path);
+            console.log("   Élève:", eleveCode);
+            console.log("   Devoir:", devoirId);
+            
+            // 1️⃣ Supprimer la COPIE
+            const copyRef = doc(db, path);
+            await deleteDoc(copyRef);
+            console.log("✅ Copie supprimée");
+            
+            // 2️⃣ Supprimer l'ÉVALUATION associée (si elle existe)
+            if (eleveCode && devoirId) {
+                const evalPath = `resultats/${eleveCode}/evaluations/${devoirId}_eval`;
+                const evalRef = doc(db, evalPath);
+                const evalSnap = await getDoc(evalRef);
+                
+                if (evalSnap.exists()) {
+                    await deleteDoc(evalRef);
+                    console.log("✅ Évaluation supprimée");
+                } else {
+                    console.log("ℹ️ Pas d'évaluation associée");
+                }
+            }
+            
+            // 3️⃣ Rafraîchir l'affichage
+            alert("✅ Document supprimé définitivement !");
+            chargerDonnees(); // Recharger la liste
+            
+        } catch (error) {
+            console.error("❌ Erreur suppression:", error);
+            
+            if (error.code === "permission-denied") {
+                alert("❌ Permission refusée.\n\nVérifiez que :\n1. Vous êtes connecté\n2. Les règles Firestore autorisent la suppression");
+            } else {
+                alert("❌ Erreur lors de la suppression :\n" + error.message);
+            }
+        }
     };
 
     // Fonction openStudentDetail avec clé userCode
