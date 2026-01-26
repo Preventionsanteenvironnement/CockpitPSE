@@ -105,13 +105,33 @@
 
     <div class="tools-container no-print">
         <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
-        <button class="action-btn save-btn" onclick="saveToFirebase()">💾 Enregistrer</button>
-        <button class="action-btn" onclick="marquerNonNote()" style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d;">⚠️ Non noté</button>
+        <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
+        <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:6px; border:1px solid #16a34a;">
+            <select id="publishType" style="padding:5px; border-radius:4px; border:1px solid #ccc; font-size:0.95em;">
+                <option value="note">📊 Noté</option>
+                <option value="nn">⚠️ Non noté</option>
+                <option value="absent">🚫 Absent</option>
+            </select>
+            <button class="action-btn save-btn" onclick="publierCorrection()">✅ Publier</button>
+        </div>
         <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
         <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
     </div>
 
     <div id="saveMessage">✅ Correction enregistrée !</div>
+
+    <!-- Modal de confirmation -->
+    <div id="confirmModal" class="modal-overlay no-print">
+        <div class="modal-box" style="width:400px; text-align:center;">
+            <div class="modal-header"><span>✅ Confirmation</span><span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span></div>
+            <div style="padding:20px;">
+                <div id="confirmIcon" style="font-size:3em; margin-bottom:10px;">✅</div>
+                <div id="confirmMessage" style="font-size:1.1em; color:#166534; margin-bottom:15px;">Correction publiée !</div>
+                <div id="confirmDetails" style="font-size:0.9em; color:#64748b;"></div>
+                <button onclick="fermerConfirmModal()" style="margin-top:15px; padding:8px 20px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer; font-size:1em;">OK</button>
+            </div>
+        </div>
+    </div>
 
     <div id="statusBanner" class="status-banner no-print">
         <span id="statusText">⏳ Chargement...</span>
@@ -308,8 +328,49 @@
         return questions;
     }
 
-    // ⭐ SAUVEGARDE SÉCURISÉE
-    async function saveToFirebase() {
+    // ⭐ COLLECTER TOUTES LES DONNÉES DE CORRECTION
+    function collecterDonneesCorrection() {
+        const data = {
+            savedAt: new Date().toISOString(),
+            savedBy: currentUser?.email || "anonyme",
+            profUid: currentUser?.uid || "",
+            eleveCode: CURRENT_ELEVE_CODE,
+            classe: document.getElementById('inputClasse').value || "",
+            devoirId: CURRENT_COPY?.devoirId || "unknown",
+            titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
+            copyDocId: CURRENT_DOC_ID,
+            appreciation: document.getElementById('appreciationArea').value || "",
+            competences: {},
+            questions: {}
+        };
+
+        // Collecter les compétences
+        comps.forEach(c => {
+            const ptsEl = document.getElementById(`pts_${c}`);
+            const maxEl = document.getElementById(`max_${c}`);
+            if (ptsEl && maxEl) {
+                data.competences[c] = {
+                    pts: parseFloat(ptsEl.value) || 0,
+                    max: parseFloat(maxEl.value) || 0
+                };
+            }
+        });
+
+        // Collecter les questions (commentaires + niveaux)
+        document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
+            const qid = row.dataset.qid || `q_${idx}`;
+            const commentDiv = row.querySelector('.editable-div');
+            data.questions[qid] = { 
+                level: row.dataset.level || "", 
+                comment: commentDiv ? commentDiv.innerText.trim() : "" 
+            };
+        });
+
+        return data;
+    }
+
+    // ⭐ SAUVEGARDER BROUILLON (l'élève ne voit rien)
+    window.sauvegarderBrouillon = async function() {
         if (!currentUser) {
             alert("🔐 Connectez-vous d'abord !");
             connexionProf();
@@ -320,53 +381,25 @@
             return;
         }
 
-        console.log("💾 Sauvegarde... Élève:", CURRENT_ELEVE_CODE);
+        console.log("💾 Sauvegarde brouillon... Élève:", CURRENT_ELEVE_CODE);
 
         try {
-            const evaluation = {
-                savedAt: new Date().toISOString(),
-                savedBy: currentUser.email,
-                profUid: currentUser.uid,
-                eleveCode: CURRENT_ELEVE_CODE,
-                classe: document.getElementById('inputClasse').value || "",
-                devoirId: CURRENT_COPY?.devoirId || "unknown",
-                titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
-                copyDocId: CURRENT_DOC_ID,
-                appreciation: document.getElementById('appreciationArea').value || "",
-                note_finale: parseFloat(document.getElementById('finalNote').textContent) || 0,
-                competences: {},
-                questions: {}
-            };
+            const brouillon = collecterDonneesCorrection();
+            brouillon.statut = "brouillon";
+            brouillon.note_finale = parseFloat(document.getElementById('finalNote').textContent) || 0;
+            brouillon.publie = false;  // ⭐ L'élève ne voit PAS
 
-            comps.forEach(c => {
-                const ptsEl = document.getElementById(`pts_${c}`);
-                const maxEl = document.getElementById(`max_${c}`);
-                if (ptsEl && maxEl) {
-                    evaluation.competences[c] = {
-                        pts: parseFloat(ptsEl.value) || 0,
-                        max: parseFloat(maxEl.value) || 0
-                    };
-                }
-            });
+            const brouillonDocId = brouillon.devoirId + "_brouillon";
+            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
 
-            document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-                const qid = row.dataset.qid || `q_${idx}`;
-                const commentDiv = row.querySelector('.editable-div');
-                evaluation.questions[qid] = { 
-                    level: row.dataset.level || "", 
-                    comment: commentDiv ? commentDiv.innerText.trim() : "" 
-                };
-            });
-
-            // ⭐ CHEMIN : resultats/{eleveCode}/evaluations/{devoirId}_eval
-            const evalDocId = evaluation.devoirId + "_eval";
-            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
-
-            CURRENT_EVALUATION = evaluation;
+            CURRENT_EVALUATION = brouillon;
             IS_SAVED = true;
             updateStatusBanner();
-            showSaveMessage(true);
-            console.log("✅ OK!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
+            
+            // Message de confirmation
+            afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
+            
+            console.log("✅ Brouillon sauvegardé!", `resultats/${CURRENT_ELEVE_CODE}/brouillons/${brouillonDocId}`);
 
         } catch (e) {
             console.error("❌ Erreur:", e);
@@ -375,8 +408,8 @@
         }
     }
 
-    // ⭐ Fonction pour marquer une copie comme "Non noté"
-    window.marquerNonNote = async function() {
+    // ⭐ PUBLIER CORRECTION (l'élève voit)
+    window.publierCorrection = async function() {
         if (!currentUser) {
             alert("🔐 Connectez-vous d'abord !");
             connexionProf();
@@ -387,47 +420,95 @@
             return;
         }
 
-        if (!confirm("⚠️ Marquer cette copie comme 'Non noté' ?\n\nL'élève verra que sa copie n'a pas été notée.")) {
+        const typePublication = document.getElementById('publishType').value;
+        let noteFinale, statut, messageConfirm, iconConfirm, couleur;
+
+        switch(typePublication) {
+            case "note":
+                noteFinale = parseFloat(document.getElementById('finalNote').textContent) || 0;
+                statut = "noté";
+                messageConfirm = `Correction publiée avec la note ${noteFinale}/20`;
+                iconConfirm = "✅";
+                couleur = "#16a34a";
+                break;
+            case "nn":
+                noteFinale = "NN";
+                statut = "non_noté";
+                messageConfirm = "Copie publiée comme 'Non noté'";
+                iconConfirm = "⚠️";
+                couleur = "#b45309";
+                break;
+            case "absent":
+                noteFinale = "ABS";
+                statut = "absent";
+                messageConfirm = "Copie marquée comme 'Absent'";
+                iconConfirm = "🚫";
+                couleur = "#dc2626";
+                break;
+        }
+
+        // Confirmation avant publication
+        if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) {
             return;
         }
 
-        console.log("⚠️ Marquage Non noté... Élève:", CURRENT_ELEVE_CODE);
+        console.log("✅ Publication... Élève:", CURRENT_ELEVE_CODE, "Type:", typePublication);
 
         try {
-            const evaluation = {
-                savedAt: new Date().toISOString(),
-                savedBy: currentUser.email,
-                profUid: currentUser.uid,
-                eleveCode: CURRENT_ELEVE_CODE,
-                classe: document.getElementById('inputClasse').value || "",
-                devoirId: CURRENT_COPY?.devoirId || "unknown",
-                titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
-                copyDocId: CURRENT_DOC_ID,
-                appreciation: document.getElementById('appreciationArea').value || "Copie non notée.",
-                note_finale: "NN",  // ⭐ Code spécial "Non Noté"
-                nonNote: true,      // ⭐ Flag explicite
-                competences: {},
-                questions: {}
-            };
+            const evaluation = collecterDonneesCorrection();
+            evaluation.note_finale = noteFinale;
+            evaluation.statut = statut;
+            evaluation.publie = true;  // ⭐ L'élève VOIT
+            
+            // Flags spéciaux pour compatibilité
+            if (typePublication === "nn") {
+                evaluation.nonNote = true;
+            } else if (typePublication === "absent") {
+                evaluation.absent = true;
+                evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
+            }
 
             const evalDocId = evaluation.devoirId + "_eval";
             await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
 
             // Mettre à jour l'affichage
-            document.getElementById('finalNote').innerText = "Non noté";
-            document.getElementById('finalNote').style.color = "#b45309";
-            
+            if (typePublication === "note") {
+                document.getElementById('finalNote').style.color = "#d9534f";
+            } else if (typePublication === "nn") {
+                document.getElementById('finalNote').innerText = "Non noté";
+                document.getElementById('finalNote').style.color = "#b45309";
+            } else if (typePublication === "absent") {
+                document.getElementById('finalNote').innerText = "Absent";
+                document.getElementById('finalNote').style.color = "#dc2626";
+            }
+
             CURRENT_EVALUATION = evaluation;
             IS_SAVED = true;
             updateStatusBanner();
-            showSaveMessage(true);
-            console.log("✅ Copie marquée Non noté!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
+            
+            // Message de confirmation visuel
+            afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
+            
+            console.log("✅ Publié!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
 
         } catch (e) {
             console.error("❌ Erreur:", e);
             showSaveMessage(false);
             alert("Erreur:\n\n" + e.message);
         }
+    }
+
+    // ⭐ Afficher la modal de confirmation
+    function afficherConfirmation(icon, message, details, couleur) {
+        document.getElementById('confirmIcon').textContent = icon;
+        document.getElementById('confirmMessage').textContent = message;
+        document.getElementById('confirmMessage').style.color = couleur;
+        document.getElementById('confirmDetails').textContent = details;
+        document.getElementById('confirmModal').style.display = 'flex';
+    }
+
+    window.fermerConfirmModal = function() {
+        document.getElementById('confirmModal').style.display = 'none';
     }
 
     function loadExistingCorrection(correction) {
