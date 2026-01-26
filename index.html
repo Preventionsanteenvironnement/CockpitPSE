@@ -888,7 +888,9 @@
     // ⭐ AUTH GOOGLE pour sécuriser les corrections
     import { 
       getAuth, 
-      signInWithPopup, 
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
       GoogleAuthProvider,
       onAuthStateChanged,
       signOut
@@ -911,16 +913,26 @@
     const googleProvider = new GoogleAuthProvider();
     let currentUser = null;
     
-    // Connexion Google Prof
+    // Connexion Google Prof (compatible mobile + desktop)
     window.connexionProf = async function() {
       try {
-        const result = await signInWithPopup(auth, googleProvider);
-        currentUser = result.user;
-        console.log("✅ Connecté:", currentUser.email);
-        console.log("📝 Votre UID:", currentUser.uid);
-        alert("✅ Connecté en tant que " + currentUser.email + "\n\nVotre UID (à copier dans les règles Firestore):\n" + currentUser.uid);
-        updateAuthUI();
-        return currentUser;
+        // Détecter si on est sur mobile/tablet
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          // Redirection sur mobile (évite le problème de popup bloqué)
+          console.log("📱 Mobile détecté → redirection Google");
+          await signInWithRedirect(auth, googleProvider);
+        } else {
+          // Popup sur desktop (comme avant)
+          const result = await signInWithPopup(auth, googleProvider);
+          currentUser = result.user;
+          console.log("✅ Connecté:", currentUser.email);
+          console.log("📝 Votre UID:", currentUser.uid);
+          alert("✅ Connecté en tant que " + currentUser.email + "\n\nVotre UID (à copier dans les règles Firestore):\n" + currentUser.uid);
+          updateAuthUI();
+          return currentUser;
+        }
       } catch (error) {
         console.error("❌ Erreur connexion:", error);
         alert("Erreur de connexion: " + error.message);
@@ -955,6 +967,20 @@
       updateAuthUI();
       if (user) {
         console.log("✅ Prof connecté:", user.email);
+      }
+    });
+    
+    // ⭐ Gérer le retour de redirection (pour mobile)
+    getRedirectResult(auth).then((result) => {
+      if (result && result.user) {
+        currentUser = result.user;
+        console.log("✅ Connecté via redirection:", currentUser.email);
+        console.log("📝 Votre UID:", currentUser.uid);
+        updateAuthUI();
+      }
+    }).catch((error) => {
+      if (error.code !== 'auth/popup-closed-by-user') {
+        console.error("❌ Erreur retour redirection:", error);
       }
     });
     
