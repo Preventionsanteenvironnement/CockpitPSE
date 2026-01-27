@@ -500,7 +500,7 @@
                         <th>Classe</th>
                         <th>Module</th>
                         <th>Note</th>
-                        <th>Infos</th>
+                        <th>Cours</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -549,21 +549,15 @@
                 <input type="text" id="editCommentaire" placeholder="Optionnel...">
             </div>
             <div class="form-group">
-                <label>📌 Infos (non évalué)</label>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;">
-                    <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; cursor: pointer;">
-                        <input type="checkbox" id="editCoursRemis"> 📄 Cours remis
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; cursor: pointer;">
-                        <input type="checkbox" id="editMenace1"> ⚠️ Menace 1
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; cursor: pointer;">
-                        <input type="checkbox" id="editMenace2"> ⚠️ Menace 2
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; cursor: pointer;">
-                        <input type="checkbox" id="editMenace3"> 🚨 Menace 3
-                    </label>
-                </div>
+                <label>📄 Cours distribué</label>
+                <select id="editCoursDistrib">
+                    <option value="aucun">Aucun</option>
+                    <option value="seance1">Séance 1</option>
+                    <option value="seance2">Séance 2</option>
+                    <option value="seance3">Séance 3</option>
+                    <option value="seance4">Séance 4</option>
+                    <option value="complet">📚 Cours complet</option>
+                </select>
             </div>
         </div>
         <div class="modal-footer">
@@ -761,13 +755,23 @@
             const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
             const noteDisplay = s.absent ? '🚫 ABS' : `${s.noteSur20}/20`;
             
-            // Construire les badges infos
-            const infos = [];
-            if (s.coursRemis) infos.push('📄');
-            if (s.menace1) infos.push('⚠️1');
-            if (s.menace2) infos.push('⚠️2');
-            if (s.menace3) infos.push('🚨3');
-            const infosDisplay = infos.length > 0 ? infos.join(' ') : '-';
+            // Construire l'affichage du cours
+            let coursDisplay = '-';
+            if (s.coursDistrib && s.coursDistrib !== 'aucun') {
+                const coursLabels = {
+                    'seance1': 'S1',
+                    'seance2': 'S2',
+                    'seance3': 'S3',
+                    'seance4': 'S4',
+                    'complet': '📚'
+                };
+                const label = coursLabels[s.coursDistrib] || s.coursDistrib;
+                if (s.absent && s.coursRecu === false) {
+                    coursDisplay = `<span style="color: #dc2626;">❌ ${label}</span>`;
+                } else {
+                    coursDisplay = `<span style="color: #16a34a;">✅ ${label}</span>`;
+                }
+            }
             
             return `
                 <tr>
@@ -776,7 +780,7 @@
                     <td><span class="classe-badge">${s.classe || '--'}</span></td>
                     <td>${s.module || '--'}</td>
                     <td><span class="note-badge ${noteClass}">${noteDisplay}</span></td>
-                    <td style="font-size: 0.9em;">${infosDisplay}</td>
+                    <td style="font-size: 0.9em;">${coursDisplay}</td>
                     <td class="actions-cell">
                         <button class="btn-icon btn-edit" onclick="ouvrirModalEdit(${idx})" title="Modifier">✏️</button>
                         <button class="btn-icon btn-delete" onclick="ouvrirModalDelete(${idx})" title="Supprimer">🗑️</button>
@@ -809,11 +813,8 @@
         document.getElementById('editStatut').value = s.absent ? 'absent' : 'present';
         document.getElementById('editCommentaire').value = s.commentaire || '';
         
-        // Infos
-        document.getElementById('editCoursRemis').checked = s.coursRemis || false;
-        document.getElementById('editMenace1').checked = s.menace1 || false;
-        document.getElementById('editMenace2').checked = s.menace2 || false;
-        document.getElementById('editMenace3').checked = s.menace3 || false;
+        // Cours distribué
+        document.getElementById('editCoursDistrib').value = s.coursDistrib || 'aucun';
         
         document.getElementById('modalEdit').classList.add('active');
     };
@@ -830,11 +831,8 @@
         const note = parseFloat(document.getElementById('editNote').value) || 0;
         const commentaire = document.getElementById('editCommentaire').value.trim();
         
-        // Récupérer les infos
-        const coursRemis = document.getElementById('editCoursRemis').checked;
-        const menace1 = document.getElementById('editMenace1').checked;
-        const menace2 = document.getElementById('editMenace2').checked;
-        const menace3 = document.getElementById('editMenace3').checked;
+        // Récupérer le cours distribué
+        const coursDistrib = document.getElementById('editCoursDistrib').value;
         
         try {
             const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
@@ -843,10 +841,8 @@
                 absent: statut === 'absent',
                 noteSur20: statut === 'absent' ? null : note,
                 commentaire: commentaire || null,
-                coursRemis: coursRemis,
-                menace1: menace1,
-                menace2: menace2,
-                menace3: menace3
+                coursDistrib: coursDistrib,
+                coursRecu: statut === 'absent' ? false : (coursDistrib !== 'aucun')
             });
             
             alert("✅ Modification enregistrée !");
