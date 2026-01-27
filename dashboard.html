@@ -417,9 +417,9 @@
         apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
         authDomain: "devoirs-pse.firebaseapp.com",
         projectId: "devoirs-pse",
-        storageBucket: "devoirs-pse.firebasestorage.app",
-        messagingSenderId: "490aborede357691",
-        appId: "1:490357691049:web:0e0e0e0e0e0e0e0e0e0e0e"
+        storageBucket: "devoirs-pse.appspot.com",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
     };
     
     const app = initializeApp(firebaseConfig);
@@ -463,8 +463,31 @@
     // Initialiser les classes dans le select
     function initClasses() {
         const select = document.getElementById('filterClasse');
-        const classes = [...new Set((window.BDD_ELEVES || []).map(e => e.classe))].sort();
         
+        // Définir les groupes
+        const groupes = [
+            { nom: "BTAGO (groupé)", classes: ["BTAGO1", "BTAGO2"] },
+            { nom: "BTMELEC (groupé)", classes: ["BTMELEC"] },
+            { nom: "B1AGO (groupé)", classes: ["B1AGO1", "B1AGO2"] },
+            { nom: "B2GATL (groupé)", classes: ["B2GATL1", "B2GATL2"] }
+        ];
+        
+        // Ajouter les groupes
+        groupes.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.classes.join(',');
+            opt.textContent = g.nom;
+            select.appendChild(opt);
+        });
+        
+        // Ajouter un séparateur
+        const sep = document.createElement('option');
+        sep.disabled = true;
+        sep.textContent = "───────────";
+        select.appendChild(sep);
+        
+        // Ajouter les classes individuelles
+        const classes = [...new Set((window.BDD_ELEVES || []).map(e => e.classe))].sort();
         classes.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c;
@@ -486,15 +509,26 @@
             // Récupérer les élèves
             let eleves = window.BDD_ELEVES || [];
             if (filterClasse) {
-                eleves = eleves.filter(e => e.classe === filterClasse);
+                // Gérer les groupes (valeur = "BTAGO1,BTAGO2")
+                const classesFiltre = filterClasse.split(',');
+                eleves = eleves.filter(e => classesFiltre.includes(e.classe));
+            }
+            
+            if (eleves.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">📊</div><p>Aucun élève dans cette classe</p></div></td></tr>';
+                return;
             }
             
             // Récupérer les consultations
             const consultationsMap = {};
-            const consultationsSnap = await getDocs(collection(db, "consultations"));
-            consultationsSnap.forEach(doc => {
-                consultationsMap[doc.id] = doc.data();
-            });
+            try {
+                const consultationsSnap = await getDocs(collection(db, "consultations"));
+                consultationsSnap.forEach(doc => {
+                    consultationsMap[doc.id] = doc.data();
+                });
+            } catch (err) {
+                console.log("⚠️ Pas de données consultations (collection peut-être vide)");
+            }
             
             // Récupérer les dernières notes
             const notesMap = {};
