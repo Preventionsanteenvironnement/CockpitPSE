@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - V15 (Sécurisée)</title>
+    <title>Grille PSE - V16 (Bug Fix)</title>
 
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -120,7 +120,6 @@
 
     <div id="saveMessage">✅ Correction enregistrée !</div>
 
-    <!-- Modal de confirmation -->
     <div id="confirmModal" class="modal-overlay no-print">
         <div class="modal-box" style="width:400px; text-align:center;">
             <div class="modal-header"><span>✅ Confirmation</span><span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span></div>
@@ -327,7 +326,6 @@
         return questions;
     }
 
-    // ⭐ COLLECTER TOUTES LES DONNÉES DE CORRECTION
     function collecterDonneesCorrection() {
         const data = {
             savedAt: new Date().toISOString(),
@@ -343,7 +341,6 @@
             questions: {}
         };
 
-        // Collecter les compétences
         comps.forEach(c => {
             const ptsEl = document.getElementById(`pts_${c}`);
             const maxEl = document.getElementById(`max_${c}`);
@@ -355,7 +352,6 @@
             }
         });
 
-        // Collecter les questions (commentaires + niveaux)
         document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
             const qid = row.dataset.qid || `q_${idx}`;
             const commentDiv = row.querySelector('.editable-div');
@@ -368,7 +364,6 @@
         return data;
     }
 
-    // ⭐ SAUVEGARDER BROUILLON (l'élève ne voit rien)
     window.sauvegarderBrouillon = async function() {
         if (!currentUser) {
             alert("🔐 Connectez-vous d'abord !");
@@ -386,7 +381,7 @@
             const brouillon = collecterDonneesCorrection();
             brouillon.statut = "brouillon";
             brouillon.note_finale = parseFloat(document.getElementById('finalNote').textContent) || 0;
-            brouillon.publie = false;  // ⭐ L'élève ne voit PAS
+            brouillon.publie = false;
 
             const brouillonDocId = brouillon.devoirId + "_brouillon";
             await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
@@ -395,7 +390,6 @@
             IS_SAVED = true;
             updateStatusBanner();
             
-            // Message de confirmation
             afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
             
             console.log("✅ Brouillon sauvegardé!", `resultats/${CURRENT_ELEVE_CODE}/brouillons/${brouillonDocId}`);
@@ -407,7 +401,6 @@
         }
     }
 
-    // ⭐ PUBLIER CORRECTION (l'élève voit)
     window.publierCorrection = async function() {
         if (!currentUser) {
             alert("🔐 Connectez-vous d'abord !");
@@ -446,7 +439,6 @@
                 break;
         }
 
-        // Confirmation avant publication
         if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) {
             return;
         }
@@ -457,9 +449,8 @@
             const evaluation = collecterDonneesCorrection();
             evaluation.note_finale = noteFinale;
             evaluation.statut = statut;
-            evaluation.publie = true;  // ⭐ L'élève VOIT
+            evaluation.publie = true;
             
-            // Flags spéciaux pour compatibilité
             if (typePublication === "nn") {
                 evaluation.nonNote = true;
             } else if (typePublication === "absent") {
@@ -470,7 +461,6 @@
             const evalDocId = evaluation.devoirId + "_eval";
             await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
 
-            // Mettre à jour l'affichage
             if (typePublication === "note") {
                 document.getElementById('finalNote').style.color = "#d9534f";
             } else if (typePublication === "nn") {
@@ -485,7 +475,6 @@
             IS_SAVED = true;
             updateStatusBanner();
             
-            // Message de confirmation visuel
             afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
             
             console.log("✅ Publié!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
@@ -497,7 +486,6 @@
         }
     }
 
-    // ⭐ Afficher la modal de confirmation
     function afficherConfirmation(icon, message, details, couleur) {
         document.getElementById('confirmIcon').textContent = icon;
         document.getElementById('confirmMessage').textContent = message;
@@ -513,7 +501,6 @@
     function loadExistingCorrection(correction) {
         if (!correction) return;
         
-        // ⭐ Gérer le cas "Non noté"
         if (correction.nonNote || correction.note_finale === "NN") {
             document.getElementById('finalNote').innerText = "Non noté";
             document.getElementById('finalNote').style.color = "#b45309";
@@ -548,7 +535,6 @@
             });
         }
         comps.forEach(c => updateCounters(c));
-        // Ne pas recalculer si c'est Non noté
         if (!correction.nonNote && correction.note_finale !== "NN") {
             calculateTotal();
         }
@@ -581,17 +567,61 @@
         setTimeout(calculateTotal, 100);
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ⭐ FONCTION CORRIGÉE - V16 - Recherche des réponses par qid EXACT
+    // ═══════════════════════════════════════════════════════════════════
+    function getReponseEleve(reponses, q) {
+        if (!reponses) return "<i>Non répondu</i>";
+        
+        const qid = q?.qid;    // Le VRAI qid du blueprint (ex: "q_6" pour François)
+        const label = q?.label;
+        
+        // 1. PRIORITÉ : Chercher avec le qid EXACT du blueprint
+        if (qid && reponses[qid] !== undefined) {
+            const val = reponses[qid];
+            if (Array.isArray(val)) {
+                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
+            }
+            return String(val);
+        }
+        
+        // 2. Fallback : Chercher avec le label (anciens formats)
+        if (label && reponses[label] !== undefined) {
+            const val = reponses[label];
+            if (Array.isArray(val)) {
+                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
+            }
+            return String(val);
+        }
+        
+        // 3. Fallback : "Q" + label
+        if (label && reponses["Q" + label] !== undefined) {
+            const val = reponses["Q" + label];
+            if (Array.isArray(val)) {
+                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
+            }
+            return String(val);
+        }
+        
+        // 4. PAS TROUVÉ = Non répondu (PAS de fallback dangereux !)
+        return "<i>Non répondu</i>";
+    }
+
     function renderCorrection(blueprint, reponses) {
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
         let maxMap = {}, qMap = {}, activeComps = [];
 
         const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
+        
+        console.log("📋 Blueprint questions:", list.length);
+        console.log("📦 Réponses reçues:", Object.keys(reponses || {}));
+        
         list.forEach((q, idx) => {
             const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
             const bareme = Number(q?.bareme) || 0;
             const label = q?.label || ("Q" + (idx + 1));
-            const qid = q?.qid || q?.id || q?.name || `q_${idx}`;
+            const qid = q?.qid || `q_${idx}`;
 
             if(!activeComps.includes(competence)) activeComps.push(competence);
             maxMap[competence] = (maxMap[competence] || 0) + bareme;
@@ -603,36 +633,11 @@
             row.dataset.level = "";
             row.dataset.qid = qid;
 
-            // ⭐ CORRECTION: Chercher la réponse avec plusieurs clés possibles
-            let repEleve = "<i>Non répondu</i>";
-            if (reponses) {
-                // 1. Essayer avec qid (nouveau format: q_0, q_1...)
-                if (reponses[qid] !== undefined) {
-                    repEleve = Array.isArray(reponses[qid]) ? reponses[qid].join('<br>• ') : reponses[qid];
-                }
-                // 2. Essayer avec q.qid
-                else if (q?.qid && reponses[q.qid] !== undefined) {
-                    repEleve = Array.isArray(reponses[q.qid]) ? reponses[q.qid].join('<br>• ') : reponses[q.qid];
-                }
-                // 3. Essayer avec le label (ancien format: Q2, Q3...)
-                else if (reponses[label] !== undefined) {
-                    repEleve = Array.isArray(reponses[label]) ? reponses[label].join('<br>• ') : reponses[label];
-                }
-                // 4. Essayer avec "Q" + label
-                else if (reponses["Q" + label] !== undefined) {
-                    repEleve = Array.isArray(reponses["Q" + label]) ? reponses["Q" + label].join('<br>• ') : reponses["Q" + label];
-                }
-                // 5. Chercher par index dans toutes les clés qui contiennent le label
-                else {
-                    const possibleKeys = Object.keys(reponses).filter(k => 
-                        k === label || k === `Q${label}` || k === `q_${idx}` || k.endsWith(`_${label}`)
-                    );
-                    if (possibleKeys.length > 0) {
-                        const values = possibleKeys.map(k => reponses[k]).flat();
-                        repEleve = values.join('<br>• ');
-                    }
-                }
-            }
+            // ⭐ CORRECTION V16 : Utiliser la nouvelle fonction
+            const repEleve = getReponseEleve(reponses, q);
+            
+            // Debug
+            console.log(`Q${label} (${qid}):`, reponses?.[qid] ? "✅ Trouvé" : "❌ Non trouvé");
 
             row.innerHTML = `
                 <td style="font-weight:bold">${label}</td>
@@ -689,7 +694,6 @@
             }
         });
         const elNote = document.getElementById('finalNote');
-        // ⭐ Note = somme simple des points (pas de ratio)
         elNote.innerText = totalPts.toFixed(1) + " / 20";
         elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
     }
@@ -791,11 +795,8 @@
         window.close();
     }
 
-    // =============================================
-    // 🚀 CHARGEMENT
-    // =============================================
     async function init() {
-        console.log("🚀 Grille V15 - Démarrage...");
+        console.log("🚀 Grille V16 (Bug Fix) - Démarrage...");
         initSummary([], {});
 
         const rawData = localStorage.getItem("cockpit_transfert");
@@ -811,7 +812,6 @@
             CURRENT_DOC_ID = copyFromStorage.id;
             CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
             
-            // Extraire du path si disponible
             if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
                 const parts = copyFromStorage.path.split('/');
                 if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
@@ -819,7 +819,6 @@
 
             console.log("📄 ID:", CURRENT_DOC_ID, "| Élève:", CURRENT_ELEVE_CODE);
 
-            // Charger la copie
             let docSnap = null;
             if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
                 console.log("🔄 Nouvelle structure:", copyFromStorage.path);
@@ -839,13 +838,11 @@
             CURRENT_COPY.id = CURRENT_DOC_ID;
             if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
 
-            // UI
             document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
             document.getElementById('inputPrenom').value = "";
             document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
             document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
 
-            // Blueprint
             const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
             if (!devoirId) throw new Error("devoirId invalide");
 
@@ -854,9 +851,16 @@
 
             CURRENT_BLUEPRINT = await resp.json();
             document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
+            
+            // ⭐ Debug : Afficher le mapping qid → label
+            console.log("📋 Mapping Blueprint:");
+            extractQuestionsFromBlueprint(CURRENT_BLUEPRINT).forEach(q => {
+                console.log(`  ${q.qid} → label "${q.label}"`);
+            });
+            console.log("📦 Clés réponses élève:", Object.keys(CURRENT_COPY.reponses || {}));
+            
             renderCorrection({ questions: extractQuestionsFromBlueprint(CURRENT_BLUEPRINT) }, CURRENT_COPY.reponses || {});
 
-            // Charger évaluation existante
             if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
                 try {
                     const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
@@ -873,7 +877,7 @@
             }
             
             updateStatusBanner();
-            console.log("✅ Grille prête !");
+            console.log("✅ Grille V16 prête !");
 
         } catch (e) {
             document.getElementById('statusText').innerHTML = "❌ " + e.message;
