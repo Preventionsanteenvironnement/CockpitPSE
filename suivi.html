@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Suivi de Séance - PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --primary: #3b82f6;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --border: #e2e8f0;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 15px;
+            padding-bottom: 100px;
+        }
+        
+        .container { max-width: 500px; margin: 0 auto; }
+        
+        /* === HEADER === */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 1.4em;
+            color: var(--primary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .header .date {
+            color: var(--muted);
+            font-size: 0.85em;
+        }
+        
+        /* === CARDS === */
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* === FORM === */
+        label.field-label {
+            display: block;
+            font-size: 0.8em;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        select {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 1em;
+            font-family: inherit;
+            margin-bottom: 15px;
+            background: white;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+        }
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* === CHECKBOXES CRITÈRES === */
+        .criteres-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .critere-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .critere-item:has(input:checked) {
+            background: #eff6ff;
+            border-color: var(--primary);
+        }
+        .critere-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+        }
+        .critere-item span {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        /* === BOUTONS === */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3);
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: var(--text);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* === ÉLÈVE HEADER === */
+        .eleve-banner {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .eleve-code {
+            font-size: 2.5em;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+        .eleve-info {
+            text-align: right;
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+        
+        /* === SECTIONS SAISIE === */
+        .section-saisie {
+            margin-bottom: 20px;
+        }
+        .section-saisie h3 {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* === OPTIONS BOUTONS === */
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .options-grid.cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .options-grid.cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .opt-btn {
+            padding: 16px 8px;
+            border: 3px solid var(--border);
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .opt-btn:active {
+            transform: scale(0.95);
+        }
+        .opt-btn .emoji {
+            font-size: 1.6em;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .opt-btn .label {
+            font-size: 0.7em;
+            font-weight: 600;
+            color: var(--muted);
+        }
+        .opt-btn.selected {
+            border-color: var(--success);
+            background: #f0fdf4;
+            transform: scale(1.02);
+        }
+        .opt-btn.selected .label {
+            color: var(--success);
+        }
+        
+        /* Couleurs spécifiques */
+        .opt-btn[data-value="tresbien"].selected,
+        .opt-btn[data-value="bonne"].selected,
+        .opt-btn[data-value="ok"].selected,
+        .opt-btn[data-value="2"].selected { 
+            border-color: #16a34a; 
+            background: #f0fdf4; 
+        }
+        .opt-btn[data-value="fait"].selected { 
+            border-color: #22c55e; 
+            background: #f0fdf4; 
+        }
+        .opt-btn[data-value="partiel"].selected,
+        .opt-btn[data-value="moyenne"].selected,
+        .opt-btn[data-value="1"].selected { 
+            border-color: #f59e0b; 
+            background: #fffbeb; 
+        }
+        .opt-btn[data-value="insuffisant"].selected,
+        .opt-btn[data-value="insuffisante"].selected,
+        .opt-btn[data-value="oubli"].selected,
+        .opt-btn[data-value="0"].selected { 
+            border-color: #dc2626; 
+            background: #fef2f2; 
+        }
+        
+        /* === NOTE PREVIEW === */
+        .note-box {
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+        .note-box .value {
+            font-size: 3em;
+            font-weight: 800;
+            color: var(--success);
+        }
+        .note-box .label {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-top: 5px;
+        }
+        
+        /* === COMMENTAIRES === */
+        .comment-section {
+            margin-bottom: 20px;
+        }
+        .comment-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .comment-tag {
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+        }
+        .comment-tag.positif {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .comment-tag.encouragement {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .comment-tag.alerte {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .comment-tag:active {
+            transform: scale(0.95);
+        }
+        
+        .comment-input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.95em;
+            font-family: inherit;
+            resize: none;
+            min-height: 60px;
+        }
+        .comment-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* === LISTE ÉLÈVES === */
+        .eleves-list {
+            max-height: 250px;
+            overflow-y: auto;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+        }
+        .eleve-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .eleve-row:last-child { border-bottom: none; }
+        .eleve-row:active { background: #f1f5f9; }
+        .eleve-row.current { background: #eff6ff; }
+        .eleve-row.done { background: #f0fdf4; }
+        .eleve-row .code {
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+        .eleve-row .status {
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .eleve-row .status.done { color: var(--success); }
+        .eleve-row .status.pending { color: var(--muted); }
+        
+        /* === ACTIONS === */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+        }
+        
+        /* === TOAST === */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 16px 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        /* === ÉCRANS === */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* === RESPONSIVE === */
+        @media (max-width: 400px) {
+            body { padding: 10px; }
+            .card { padding: 15px; }
+            .eleve-code { font-size: 2em; }
+            .opt-btn { padding: 12px 6px; }
+            .opt-btn .emoji { font-size: 1.3em; }
+            .options-grid { gap: 6px; }
+            .note-box .value { font-size: 2.5em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- ÉCRAN 1 : CONFIGURATION -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="screenConfig" class="screen active">
+            <div class="header">
+                <h1>📋 Suivi de Séance</h1>
+                <div class="date" id="dateJour"></div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">⚙️ Configuration</div>
+                
+                <label class="field-label">Classe / Groupe</label>
+                <select id="selectClasse" onchange="onClasseChange()">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+                
+                <label class="field-label">Module</label>
+                <select id="selectModule">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+                
+                <label class="field-label">Compétences travaillées (optionnel)</label>
+                <div class="criteres-grid" id="competencesGrid" style="margin-bottom: 15px;">
+                    <!-- Rempli dynamiquement -->
+                </div>
+                
+                <label class="field-label">Critères à évaluer</label>
+                <div class="criteres-grid">
+                    <label class="critere-item">
+                        <input type="checkbox" id="checkTravail" checked>
+                        <span>📝 Travail</span>
+                    </label>
+                    <label class="critere-item">
+                        <input type="checkbox" id="checkOral" checked>
+                        <span>🗣️ Oral</span>
+                    </label>
+                    <label class="critere-item">
+                        <input type="checkbox" id="checkAttention" checked>
+                        <span>🧠 Attention</span>
+                    </label>
+                    <label class="critere-item">
+                        <input type="checkbox" id="checkPorteVue">
+                        <span>📁 Porte-vue</span>
+                    </label>
+                </div>
+                
+                <label class="critere-item" style="margin-bottom: 20px;">
+                    <input type="checkbox" id="checkCommentaire">
+                    <span>💬 Appréciation</span>
+                </label>
+                
+                <button class="btn btn-primary" onclick="demarrerSeance()">
+                    🚀 Démarrer la séance
+                </button>
+            </div>
+        </div>
+        
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- ÉCRAN 2 : SAISIE -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <div id="screenSaisie" class="screen">
+            
+            <div class="eleve-banner">
+                <div>
+                    <div class="eleve-code" id="eleveCode">--</div>
+                    <div id="eleveClasse">--</div>
+                </div>
+                <div class="eleve-info">
+                    <div id="eleveHeure">--:--</div>
+                    <div id="eleveModule">--</div>
+                </div>
+            </div>
+            
+            <!-- TRAVAIL -->
+            <div class="section-saisie" id="sectionTravail">
+                <h3>📝 Travail</h3>
+                <div class="options-grid">
+                    <div class="opt-btn" data-critere="travail" data-value="tresbien" onclick="selectOption(this)">
+                        <span class="emoji">✓✓</span>
+                        <span class="label">Très bien</span>
+                    </div>
+                    <div class="opt-btn" data-critere="travail" data-value="fait" onclick="selectOption(this)">
+                        <span class="emoji">✓</span>
+                        <span class="label">Fait</span>
+                    </div>
+                    <div class="opt-btn" data-critere="travail" data-value="partiel" onclick="selectOption(this)">
+                        <span class="emoji">⚠️</span>
+                        <span class="label">Partiel</span>
+                    </div>
+                    <div class="opt-btn" data-critere="travail" data-value="insuffisant" onclick="selectOption(this)">
+                        <span class="emoji">❌</span>
+                        <span class="label">Non fait</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ORAL -->
+            <div class="section-saisie" id="sectionOral">
+                <h3>🗣️ Participation orale</h3>
+                <div class="options-grid cols-3">
+                    <div class="opt-btn" data-critere="oral" data-value="0" onclick="selectOption(this)">
+                        <span class="emoji">0</span>
+                        <span class="label">Aucune</span>
+                    </div>
+                    <div class="opt-btn" data-critere="oral" data-value="1" onclick="selectOption(this)">
+                        <span class="emoji">1</span>
+                        <span class="label">Bien</span>
+                    </div>
+                    <div class="opt-btn" data-critere="oral" data-value="2" onclick="selectOption(this)">
+                        <span class="emoji">2</span>
+                        <span class="label">Très bien</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ATTENTION -->
+            <div class="section-saisie" id="sectionAttention">
+                <h3>🧠 Attention / Concentration</h3>
+                <div class="options-grid cols-3">
+                    <div class="opt-btn" data-critere="attention" data-value="bonne" onclick="selectOption(this)">
+                        <span class="emoji">😊</span>
+                        <span class="label">Bonne</span>
+                    </div>
+                    <div class="opt-btn" data-critere="attention" data-value="moyenne" onclick="selectOption(this)">
+                        <span class="emoji">😐</span>
+                        <span class="label">Moyenne</span>
+                    </div>
+                    <div class="opt-btn" data-critere="attention" data-value="insuffisante" onclick="selectOption(this)">
+                        <span class="emoji">😕</span>
+                        <span class="label">Insuffisante</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PORTE-VUE -->
+            <div class="section-saisie" id="sectionPorteVue">
+                <h3>📁 Porte-vue</h3>
+                <div class="options-grid cols-2">
+                    <div class="opt-btn" data-critere="porteVue" data-value="ok" onclick="selectOption(this)">
+                        <span class="emoji">✅</span>
+                        <span class="label">OK</span>
+                    </div>
+                    <div class="opt-btn" data-critere="porteVue" data-value="oubli" onclick="selectOption(this)">
+                        <span class="emoji">❌</span>
+                        <span class="label">Oublié</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- COMMENTAIRE -->
+            <div class="section-saisie" id="sectionCommentaire">
+                <h3>💬 Appréciation</h3>
+                <div class="comment-tags" id="commentTags"></div>
+                <textarea class="comment-input" id="inputCommentaire" placeholder="Ajouter un commentaire..."></textarea>
+            </div>
+            
+            <!-- NOTE -->
+            <div class="note-box">
+                <div class="label">Note de la séance</div>
+                <div class="value" id="notePreview">--/20</div>
+            </div>
+            
+            <!-- ACTIONS -->
+            <div class="actions-grid">
+                <button class="btn btn-secondary" onclick="retourConfig()">← Retour</button>
+                <button class="btn btn-success" onclick="validerSaisie()">✓ Valider</button>
+            </div>
+            
+            <!-- LISTE ÉLÈVES -->
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">👥 Élèves (<span id="compteurEleves">0</span>)</div>
+                <div class="eleves-list" id="listeEleves"></div>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+    <!-- TOAST -->
+    <div class="toast" id="toast">✅ Enregistré !</div>
+    
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SCRIPTS -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.appspot.com",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // ═══════════════════════════════════════════════════════════════
+        // VARIABLES GLOBALES
+        // ═══════════════════════════════════════════════════════════════
+        let currentUser = null;
+        let seanceConfig = {
+            classe: null,
+            classesEffectives: [],
+            module: null,
+            competence: null,
+            criteres: { travail: true, oral: true, attention: true, porteVue: false, commentaire: false },
+            dateDebut: null
+        };
+        let currentEleve = null;
+        let saisie = { travail: null, oral: null, attention: null, porteVue: null };
+        let elevesSeance = []; // { code, classe, done, note }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // INITIALISATION
+        // ═══════════════════════════════════════════════════════════════
+        window.addEventListener('DOMContentLoaded', () => {
+            // Date
+            const now = new Date();
+            document.getElementById('dateJour').textContent = now.toLocaleDateString('fr-FR', {
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+            });
+            
+            // Liste des classes/groupes
+            const select = document.getElementById('selectClasse');
+            const liste = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+            liste.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item.label;
+                select.appendChild(opt);
+            });
+            
+            // Banque de commentaires
+            renderCommentTags();
+            
+            // Auth
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) console.log("✅ Connecté:", user.email);
+            });
+        });
+        
+        function renderCommentTags() {
+            const container = document.getElementById('commentTags');
+            if (!window.BANQUE_COMMENTAIRES) return;
+            
+            let html = '';
+            ['positif', 'encouragement', 'alerte'].forEach(cat => {
+                (window.BANQUE_COMMENTAIRES[cat] || []).forEach(txt => {
+                    html += `<button type="button" class="comment-tag ${cat}" onclick="addComment('${txt.replace(/'/g, "\\'")}')">${txt}</button>`;
+                });
+            });
+            container.innerHTML = html;
+        }
+        
+        window.addComment = function(txt) {
+            const input = document.getElementById('inputCommentaire');
+            if (input.value) {
+                input.value += ' ' + txt;
+            } else {
+                input.value = txt;
+            }
+        };
+        
+        // ═══════════════════════════════════════════════════════════════
+        // CONFIGURATION
+        // ═══════════════════════════════════════════════════════════════
+        window.onClasseChange = function() {
+            const classeId = document.getElementById('selectClasse').value;
+            const selectModule = document.getElementById('selectModule');
+            const competencesGrid = document.getElementById('competencesGrid');
+            
+            // Reset
+            selectModule.innerHTML = '<option value="">-- Sélectionner --</option>';
+            competencesGrid.innerHTML = '';
+            
+            if (!classeId) return;
+            
+            // Trouver une classe du groupe pour avoir le niveau
+            const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const firstClasse = classes[0];
+            
+            // Modules
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClasse) : [];
+            modules.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.id} - ${m.titre}`;
+                selectModule.appendChild(opt);
+            });
+            
+            // Compétences (checkboxes multiples)
+            const competences = window.getCompetencesForClasse ? window.getCompetencesForClasse(firstClasse) : [];
+            competencesGrid.innerHTML = competences.map(c => `
+                <label class="critere-item">
+                    <input type="checkbox" name="competences" value="${c.id}">
+                    <span>${c.id}</span>
+                </label>
+            `).join('');
+        };
+        
+        window.demarrerSeance = function() {
+            const classeId = document.getElementById('selectClasse').value;
+            const moduleId = document.getElementById('selectModule').value;
+            
+            // Récupérer les compétences cochées
+            const competencesChecked = Array.from(document.querySelectorAll('input[name="competences"]:checked')).map(cb => cb.value);
+            
+            if (!classeId) return alert("Sélectionnez une classe !");
+            if (!moduleId) return alert("Sélectionnez un module !");
+            
+            // Récupérer les classes effectives (groupe ou simple)
+            const classesEffectives = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            
+            // Trouver le titre du module
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(classesEffectives[0]) : [];
+            const moduleObj = modules.find(m => m.id === moduleId);
+            
+            seanceConfig = {
+                classe: classeId,
+                classesEffectives: classesEffectives,
+                module: moduleId,
+                moduleTitre: moduleObj ? moduleObj.titre : moduleId,
+                competences: competencesChecked, // Tableau de compétences
+                criteres: {
+                    travail: document.getElementById('checkTravail').checked,
+                    oral: document.getElementById('checkOral').checked,
+                    attention: document.getElementById('checkAttention').checked,
+                    porteVue: document.getElementById('checkPorteVue').checked,
+                    commentaire: document.getElementById('checkCommentaire').checked
+                },
+                dateDebut: new Date()
+            };
+            
+            // Afficher/masquer sections
+            document.getElementById('sectionTravail').style.display = seanceConfig.criteres.travail ? 'block' : 'none';
+            document.getElementById('sectionOral').style.display = seanceConfig.criteres.oral ? 'block' : 'none';
+            document.getElementById('sectionAttention').style.display = seanceConfig.criteres.attention ? 'block' : 'none';
+            document.getElementById('sectionPorteVue').style.display = seanceConfig.criteres.porteVue ? 'block' : 'none';
+            document.getElementById('sectionCommentaire').style.display = seanceConfig.criteres.commentaire ? 'block' : 'none';
+            
+            // Charger élèves
+            chargerEleves();
+            
+            // Changer d'écran
+            document.getElementById('screenConfig').classList.remove('active');
+            document.getElementById('screenSaisie').classList.add('active');
+            
+            // Sélectionner premier élève
+            if (elevesSeance.length > 0) {
+                selectionnerEleve(elevesSeance[0].code);
+            }
+            
+            console.log("🚀 Séance démarrée:", seanceConfig);
+        };
+        
+        function chargerEleves() {
+            elevesSeance = [];
+            const eleves = window.BDD_ELEVES || [];
+            
+            seanceConfig.classesEffectives.forEach(classe => {
+                eleves.filter(e => e.classe === classe).forEach(e => {
+                    elevesSeance.push({
+                        code: e.userCode,
+                        classe: e.classe,
+                        done: false,
+                        note: null
+                    });
+                });
+            });
+            
+            // Trier par code
+            elevesSeance.sort((a, b) => a.code.localeCompare(b.code));
+            
+            document.getElementById('compteurEleves').textContent = elevesSeance.length;
+            renderListeEleves();
+        }
+        
+        function renderListeEleves() {
+            const container = document.getElementById('listeEleves');
+            container.innerHTML = elevesSeance.map(e => `
+                <div class="eleve-row ${e.done ? 'done' : ''} ${currentEleve === e.code ? 'current' : ''}" 
+                     onclick="selectionnerEleve('${e.code}')">
+                    <span class="code">${e.code}</span>
+                    <span class="status ${e.done ? 'done' : 'pending'}">
+                        ${e.done ? '✅ ' + e.note + '/20' : '⏳'}
+                    </span>
+                </div>
+            `).join('');
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // SAISIE
+        // ═══════════════════════════════════════════════════════════════
+        window.selectionnerEleve = function(code) {
+            currentEleve = code;
+            saisie = { travail: null, oral: null, attention: null, porteVue: null };
+            
+            // Reset boutons
+            document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('selected'));
+            
+            // Reset commentaire
+            document.getElementById('inputCommentaire').value = '';
+            
+            // Afficher infos
+            const eleveObj = elevesSeance.find(e => e.code === code);
+            document.getElementById('eleveCode').textContent = code;
+            document.getElementById('eleveClasse').textContent = eleveObj ? eleveObj.classe : seanceConfig.classe;
+            document.getElementById('eleveHeure').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('eleveModule').textContent = seanceConfig.module;
+            
+            updateNotePreview();
+            renderListeEleves();
+        };
+        
+        window.selectOption = function(btn) {
+            const critere = btn.dataset.critere;
+            const value = btn.dataset.value;
+            
+            // Désélectionner autres du même critère
+            document.querySelectorAll(`.opt-btn[data-critere="${critere}"]`).forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            
+            // Enregistrer
+            if (critere === 'oral') {
+                saisie[critere] = parseInt(value);
+            } else {
+                saisie[critere] = value;
+            }
+            
+            updateNotePreview();
+        };
+        
+        function updateNotePreview() {
+            if (!window.calculerPointsSaisie) {
+                document.getElementById('notePreview').textContent = '--/20';
+                return;
+            }
+            
+            const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
+            const hasValue = Object.values(saisie).some(v => v !== null);
+            
+            document.getElementById('notePreview').textContent = hasValue ? result.noteSur20 + '/20' : '--/20';
+        }
+        
+        window.validerSaisie = async function() {
+            if (!currentEleve) return alert("Aucun élève sélectionné !");
+            
+            // Vérifier qu'au moins un critère est rempli
+            const hasValue = Object.entries(saisie).some(([k, v]) => seanceConfig.criteres[k] && v !== null);
+            if (!hasValue) return alert("Remplissez au moins un critère !");
+            
+            const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
+            const commentaire = document.getElementById('inputCommentaire').value.trim();
+            
+            const data = {
+                date: new Date().toISOString().split('T')[0],
+                heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                classe: seanceConfig.classe,
+                module: seanceConfig.module,
+                moduleTitre: seanceConfig.moduleTitre,
+                competences: seanceConfig.competences, // Tableau de compétences
+                travail: saisie.travail,
+                oral: saisie.oral,
+                attention: saisie.attention,
+                porteVue: saisie.porteVue,
+                commentaire: commentaire || null,
+                criteresActifs: seanceConfig.criteres,
+                points: result.points,
+                maxPoints: result.maxPoints,
+                noteSur20: result.noteSur20,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser?.email || "anonyme"
+            };
+            
+            try {
+                // Enregistrer
+                const docId = `${data.date}_${seanceConfig.module}_${Date.now()}`;
+                await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
+                
+                // Mettre à jour stats
+                await updateStats(currentEleve, result.noteSur20, saisie);
+                
+                // Marquer fait
+                const idx = elevesSeance.findIndex(e => e.code === currentEleve);
+                if (idx !== -1) {
+                    elevesSeance[idx].done = true;
+                    elevesSeance[idx].note = result.noteSur20;
+                }
+                renderListeEleves();
+                
+                // Toast
+                showToast("✅ " + currentEleve + " - " + result.noteSur20 + "/20");
+                
+                // Élève suivant
+                const next = elevesSeance.find(e => !e.done);
+                if (next) {
+                    setTimeout(() => selectionnerEleve(next.code), 300);
+                }
+                
+                console.log("✅ Enregistré:", data);
+                
+            } catch (err) {
+                console.error("❌ Erreur:", err);
+                alert("Erreur: " + err.message);
+            }
+        };
+        
+        async function updateStats(eleveCode, note, saisieData) {
+            try {
+                const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
+                const snap = await getDoc(ref);
+                
+                let stats = snap.exists() ? snap.data() : {
+                    totalNotes: 0,
+                    nombreSeances: 0,
+                    moyenne: 0,
+                    travail: { tresbien: 0, fait: 0, partiel: 0, insuffisant: 0 },
+                    oral: { 0: 0, 1: 0, 2: 0 },
+                    attention: { bonne: 0, moyenne: 0, insuffisante: 0 },
+                    porteVue: { ok: 0, oubli: 0 }
+                };
+                
+                // Mise à jour
+                stats.totalNotes += note;
+                stats.nombreSeances += 1;
+                stats.moyenne = Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10;
+                
+                // Compteurs détaillés
+                if (saisieData.travail && stats.travail[saisieData.travail] !== undefined) {
+                    stats.travail[saisieData.travail]++;
+                }
+                if (saisieData.oral !== null && stats.oral[saisieData.oral] !== undefined) {
+                    stats.oral[saisieData.oral]++;
+                }
+                if (saisieData.attention && stats.attention[saisieData.attention] !== undefined) {
+                    stats.attention[saisieData.attention]++;
+                }
+                if (saisieData.porteVue && stats.porteVue[saisieData.porteVue] !== undefined) {
+                    stats.porteVue[saisieData.porteVue]++;
+                }
+                
+                stats.lastUpdate = serverTimestamp();
+                
+                await setDoc(ref, stats);
+                console.log("📊 Stats:", stats);
+                
+            } catch (err) {
+                console.error("❌ Stats error:", err);
+            }
+        }
+        
+        window.retourConfig = function() {
+            if (elevesSeance.some(e => e.done)) {
+                if (!confirm("Quitter la séance ? Les données enregistrées sont conservées.")) return;
+            }
+            document.getElementById('screenSaisie').classList.remove('active');
+            document.getElementById('screenConfig').classList.add('active');
+        };
+        
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+        
+        console.log("✅ Suivi PSE v2 prêt");
+    </script>
+</body>
+</html>
