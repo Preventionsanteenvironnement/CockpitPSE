@@ -645,7 +645,7 @@
     const googleProvider = new GoogleAuthProvider();
     
     let currentUser = null;
-    let allSuivis = [];
+    window.allSuivis = [];
     let editingDoc = null;
     let deletingDoc = null;
     
@@ -696,7 +696,7 @@
         const dateFilter = document.getElementById('filterDate').value;
         const eleveFilter = document.getElementById('filterEleve').value.toUpperCase().trim();
         
-        allSuivis = [];
+        window.allSuivis = [];
         
         // Récupérer les élèves à chercher
         let elevesToSearch = [];
@@ -736,7 +736,7 @@
                     // Filtrer par date si spécifié
                     if (dateFilter && data.date !== dateFilter) return;
                     
-                    allSuivis.push({
+                    window.allSuivis.push({
                         id: docSnap.id,
                         eleveCode: code,
                         ...data
@@ -748,7 +748,7 @@
         }
         
         // Trier par date décroissante
-        allSuivis.sort((a, b) => {
+        window.allSuivis.sort((a, b) => {
             const dateA = a.date + ' ' + (a.heure || '00:00');
             const dateB = b.date + ' ' + (b.heure || '00:00');
             return dateB.localeCompare(dateA);
@@ -761,18 +761,18 @@
         const tbody = document.getElementById('tableBody');
         
         // Stats
-        const presents = allSuivis.filter(s => !s.absent);
-        const absents = allSuivis.filter(s => s.absent);
+        const presents = window.allSuivis.filter(s => !s.absent);
+        const absents = window.allSuivis.filter(s => s.absent);
         const moyenne = presents.length > 0 
             ? (presents.reduce((acc, s) => acc + (s.noteSur20 || 0), 0) / presents.length).toFixed(1)
             : '--';
         
-        document.getElementById('statTotal').textContent = allSuivis.length;
+        document.getElementById('statTotal').textContent = window.allSuivis.length;
         document.getElementById('statPresents').textContent = presents.length;
         document.getElementById('statAbsents').textContent = absents.length;
         document.getElementById('statMoyenne').textContent = moyenne;
         
-        if (allSuivis.length === 0) {
+        if (window.allSuivis.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="9">
@@ -786,7 +786,7 @@
             return;
         }
         
-        tbody.innerHTML = allSuivis.map((s, idx) => {
+        tbody.innerHTML = window.allSuivis.map((s, idx) => {
             const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
             const noteDisplay = s.absent ? '🚫 ABS' : `${s.noteSur20}/20`;
             
@@ -862,15 +862,17 @@
         const filterDate = document.getElementById('filterDate').value;
         const box = document.getElementById('completerSeanceBox');
         
+        console.log("🔍 Vérification séance:", filterClasse, filterDate, "suivis:", window.window.allSuivis.length);
+        
         // Afficher seulement si une classe ET une date sont sélectionnées
-        if (!filterClasse || !filterDate || allSuivis.length === 0) {
+        if (!filterClasse || !filterDate || window.window.allSuivis.length === 0) {
             box.style.display = 'none';
             seanceACompleter = null;
             return;
         }
         
         // Trouver le module de la séance (prendre le premier)
-        const moduleSeance = allSuivis[0].module;
+        const moduleSeance = window.window.allSuivis[0].module;
         
         // Trouver tous les élèves de cette classe
         const elevesClasse = (window.BDD_ELEVES || []).filter(e => {
@@ -882,6 +884,8 @@
             return e.classe === filterClasse;
         });
         
+        console.log("📋 Élèves de la classe:", elevesClasse.length);
+        
         if (elevesClasse.length === 0) {
             box.style.display = 'none';
             seanceACompleter = null;
@@ -889,7 +893,7 @@
         }
         
         // Compter les élèves déjà notés
-        const elevesNotes = allSuivis.map(s => s.eleveCode);
+        const elevesNotes = window.window.allSuivis.map(s => s.eleveCode);
         const elevesRestants = elevesClasse.filter(e => !elevesNotes.includes(e.userCode));
         
         // Stocker les infos
@@ -910,14 +914,18 @@
         document.getElementById('completerSeanceInfo').textContent = 
             `${nbNotes} élève${nbNotes > 1 ? 's' : ''} noté${nbNotes > 1 ? 's' : ''} sur ${nbTotal} — ${nbRestants} restant${nbRestants > 1 ? 's' : ''}`;
         
-        // Afficher le bouton seulement s'il reste des élèves à noter
-        if (nbRestants > 0) {
-            box.style.display = 'flex';
-        } else {
-            box.style.display = 'flex';
+        console.log("✅ Affichage bouton:", nbNotes, "/", nbTotal, "restants:", nbRestants);
+        
+        // Afficher le bouton
+        box.style.display = 'flex';
+        
+        if (nbRestants === 0) {
             box.style.background = 'linear-gradient(135deg, #f0fdf4, #bbf7d0)';
             document.getElementById('completerSeanceInfo').textContent = `✅ Séance complète ! ${nbTotal} élèves notés`;
             box.querySelector('button').style.display = 'none';
+        } else {
+            box.style.background = 'linear-gradient(135deg, #f0fdf4, #dcfce7)';
+            box.querySelector('button').style.display = 'flex';
         }
     }
     
@@ -951,7 +959,7 @@
     
     // MODAL ÉDITION
     window.ouvrirModalEdit = function(idx) {
-        const s = allSuivis[idx];
+        const s = window.allSuivis[idx];
         editingDoc = s;
         
         document.getElementById('editEleve').value = s.eleveCode + ' - ' + (s.classe || '');
@@ -1041,7 +1049,7 @@
     
     // MODAL SUPPRESSION
     window.ouvrirModalDelete = function(idx) {
-        const s = allSuivis[idx];
+        const s = window.allSuivis[idx];
         deletingDoc = s;
         
         document.getElementById('deleteInfo').textContent = 
