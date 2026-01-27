@@ -895,7 +895,7 @@
         console.log("🔄 Chargement du module Firebase...");
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         
         console.log("✅ Imports Firebase OK");
@@ -1352,7 +1352,7 @@
         // ═══════════════════════════════════════════════════════════════
         // SAISIE
         // ═══════════════════════════════════════════════════════════════
-        window.selectionnerEleve = function(code) {
+        window.selectionnerEleve = async function(code) {
             currentEleve = code;
             saisie = { travail: null, oral: null, attention: null, porteVue: null, bavardage: null, telephone: null };
             
@@ -1377,9 +1377,116 @@
             document.getElementById('eleveHeure').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             document.getElementById('eleveModule').textContent = seanceConfig.module;
             
+            // Si élève déjà noté précédemment, charger ses données
+            if (eleveObj && eleveObj.dejaNotePrecedemment) {
+                console.log("📂 Chargement données existantes pour", code);
+                await chargerDonneesEleve(code);
+            }
+            
             updateNotePreview();
             renderListeEleves();
         };
+        
+        // Fonction pour charger les données d'un élève depuis Firebase
+        async function chargerDonneesEleve(code) {
+            try {
+                const dateSeance = seanceConfig.date || new Date().toISOString().split('T')[0];
+                const suiviRef = collection(db, "resultats", code, "suivi");
+                const suiviSnap = await getDocs(suiviRef);
+                
+                let donneesTrouvees = null;
+                suiviSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    // Chercher la saisie de la même date et module
+                    if (data.date === dateSeance && data.module === seanceConfig.module) {
+                        donneesTrouvees = { id: docSnap.id, ...data };
+                    }
+                });
+                
+                if (donneesTrouvees) {
+                    console.log("✅ Données trouvées:", donneesTrouvees);
+                    preremplirFormulaire(donneesTrouvees);
+                } else {
+                    console.log("⚠️ Pas de données trouvées pour cette date/module");
+                }
+            } catch (error) {
+                console.error("❌ Erreur chargement données élève:", error);
+            }
+        }
+        
+        // Pré-remplir le formulaire avec les données existantes
+        function preremplirFormulaire(data) {
+            // Travail
+            if (data.travail) {
+                const btnTravail = document.querySelector(`.opt-btn[data-critere="travail"][data-value="${data.travail}"]`);
+                if (btnTravail) {
+                    btnTravail.classList.add('selected');
+                    saisie.travail = data.travail;
+                }
+            }
+            
+            // Oral
+            if (data.oral !== undefined && data.oral !== null) {
+                const btnOral = document.querySelector(`.opt-btn[data-critere="oral"][data-value="${data.oral}"]`);
+                if (btnOral) {
+                    btnOral.classList.add('selected');
+                    saisie.oral = data.oral;
+                }
+            }
+            
+            // Attention
+            if (data.attention) {
+                const btnAttention = document.querySelector(`.opt-btn[data-critere="attention"][data-value="${data.attention}"]`);
+                if (btnAttention) {
+                    btnAttention.classList.add('selected');
+                    saisie.attention = data.attention;
+                }
+            }
+            
+            // Porte-vue
+            if (data.porteVue) {
+                const btnPorteVue = document.querySelector(`.opt-btn[data-critere="porteVue"][data-value="${data.porteVue}"]`);
+                if (btnPorteVue) {
+                    btnPorteVue.classList.add('selected');
+                    saisie.porteVue = data.porteVue;
+                }
+            }
+            
+            // Bavardage
+            if (data.bavardage) {
+                const btnBavardage = document.querySelector(`.opt-btn[data-critere="bavardage"][data-value="${data.bavardage}"]`);
+                if (btnBavardage) {
+                    btnBavardage.classList.add('selected');
+                    saisie.bavardage = data.bavardage;
+                }
+            }
+            
+            // Téléphone
+            if (data.telephone) {
+                const btnTelephone = document.querySelector(`.opt-btn[data-critere="telephone"][data-value="${data.telephone}"]`);
+                if (btnTelephone) {
+                    btnTelephone.classList.add('selected');
+                    saisie.telephone = data.telephone;
+                }
+            }
+            
+            // Commentaire
+            if (data.commentaire) {
+                document.getElementById('inputCommentaire').value = data.commentaire;
+            }
+            
+            // Cours distribué
+            if (data.coursDistrib) {
+                const radio = document.querySelector(`input[name="coursDistrib"][value="${data.coursDistrib}"]`);
+                if (radio) radio.checked = true;
+            }
+            
+            // Mettre à jour l'aperçu de la note
+            updateNotePreview();
+            
+            // Afficher un toast
+            showToast(`📋 Données chargées - Note: ${data.noteSur20}/20`, 2000);
+        }
         
         window.selectOption = function(btn) {
             const critere = btn.dataset.critere;
