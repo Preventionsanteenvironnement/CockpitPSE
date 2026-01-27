@@ -282,6 +282,52 @@
             background: #fef2f2; 
         }
         
+        /* === BOUTONS COMPORTEMENT === */
+        .opt-btn.good {
+            border-color: #bbf7d0;
+            background: #f0fdf4;
+        }
+        .opt-btn.good.selected {
+            border-color: #22c55e;
+            background: #dcfce7;
+            color: #166534;
+        }
+        .opt-btn.warning {
+            border-color: #fde68a;
+            background: #fffbeb;
+        }
+        .opt-btn.warning.selected {
+            border-color: #f59e0b;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .opt-btn.danger {
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
+        .opt-btn.danger.selected {
+            border-color: #ef4444;
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .opt-btn.danger-max {
+            border-color: #fca5a5;
+            background: #fee2e2;
+        }
+        .opt-btn.danger-max.selected {
+            border-color: #dc2626;
+            background: #dc2626;
+            color: white;
+        }
+        .options-grid.cols-5 {
+            grid-template-columns: repeat(5, 1fr);
+        }
+        @media (max-width: 600px) {
+            .options-grid.cols-5 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
         /* === NOTE PREVIEW === */
         .note-box {
             text-align: center;
@@ -714,6 +760,60 @@
                 </div>
             </div>
             
+            <!-- BAVARDAGE -->
+            <div class="section-saisie" id="sectionBavardage">
+                <h3>💬 Bavardage <span style="font-weight: 400; font-size: 0.75em; color: #dc2626;">(plafonne la note)</span></h3>
+                <div class="options-grid cols-5">
+                    <div class="opt-btn good" data-critere="bavardage" data-value="aucun" onclick="selectOption(this)">
+                        <span class="emoji">😊</span>
+                        <span class="label">Aucun</span>
+                    </div>
+                    <div class="opt-btn warning" data-critere="bavardage" data-value="rappel1" onclick="selectOption(this)">
+                        <span class="emoji">1️⃣</span>
+                        <span class="label">Rappel 1</span>
+                    </div>
+                    <div class="opt-btn warning" data-critere="bavardage" data-value="rappel2" onclick="selectOption(this)">
+                        <span class="emoji">2️⃣</span>
+                        <span class="label">Rappel 2</span>
+                    </div>
+                    <div class="opt-btn danger" data-critere="bavardage" data-value="rappel3" onclick="selectOption(this)">
+                        <span class="emoji">3️⃣</span>
+                        <span class="label">Rappel 3</span>
+                    </div>
+                    <div class="opt-btn danger-max" data-critere="bavardage" data-value="retenu" onclick="selectOption(this)">
+                        <span class="emoji">🚨</span>
+                        <span class="label">Retenu</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TÉLÉPHONE -->
+            <div class="section-saisie" id="sectionTelephone">
+                <h3>📱 Téléphone <span style="font-weight: 400; font-size: 0.75em; color: #f59e0b;">(malus)</span></h3>
+                <div class="options-grid cols-5">
+                    <div class="opt-btn good" data-critere="telephone" data-value="ok" onclick="selectOption(this)">
+                        <span class="emoji">✅</span>
+                        <span class="label">OK</span>
+                    </div>
+                    <div class="opt-btn warning" data-critere="telephone" data-value="rappel1" onclick="selectOption(this)">
+                        <span class="emoji">1️⃣</span>
+                        <span class="label">Rappel 1</span>
+                    </div>
+                    <div class="opt-btn warning" data-critere="telephone" data-value="rappel2" onclick="selectOption(this)">
+                        <span class="emoji">2️⃣</span>
+                        <span class="label">Rappel 2</span>
+                    </div>
+                    <div class="opt-btn danger" data-critere="telephone" data-value="rappel3" onclick="selectOption(this)">
+                        <span class="emoji">3️⃣</span>
+                        <span class="label">Rappel 3</span>
+                    </div>
+                    <div class="opt-btn danger-max" data-critere="telephone" data-value="confisque" onclick="selectOption(this)">
+                        <span class="emoji">🚫</span>
+                        <span class="label">Confisqué</span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- COMMENTAIRE -->
             <div class="section-saisie" id="sectionCommentaire">
                 <h3>💬 Appréciation</h3>
@@ -876,7 +976,7 @@
             dateDebut: null
         };
         let currentEleve = null;
-        let saisie = { travail: null, oral: null, attention: null, porteVue: null };
+        let saisie = { travail: null, oral: null, attention: null, porteVue: null, bavardage: null, telephone: null };
         let elevesSeance = []; // { code, classe, done, note }
         
         // ═══════════════════════════════════════════════════════════════
@@ -1173,7 +1273,7 @@
         // ═══════════════════════════════════════════════════════════════
         window.selectionnerEleve = function(code) {
             currentEleve = code;
-            saisie = { travail: null, oral: null, attention: null, porteVue: null };
+            saisie = { travail: null, oral: null, attention: null, porteVue: null, bavardage: null, telephone: null };
             
             // Reset boutons
             document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('selected'));
@@ -1213,16 +1313,120 @@
             updateNotePreview();
         };
         
+        // ═══════════════════════════════════════════════════════════════
+        // NOUVEAU CALCUL DE NOTE AVEC BAVARDAGE/TÉLÉPHONE
+        // ═══════════════════════════════════════════════════════════════
+        
+        // Plafonds bavardage
+        const PLAFOND_BAVARDAGE = {
+            'aucun': 20,
+            'rappel1': 14,
+            'rappel2': 10,
+            'rappel3': 6,
+            'retenu': 4
+        };
+        
+        // Malus téléphone
+        const MALUS_TELEPHONE = {
+            'ok': 0,
+            'rappel1': 1,
+            'rappel2': 2,
+            'rappel3': 3,
+            'confisque': 5
+        };
+        
+        function calculerNoteAvecComportement(saisieData, criteres) {
+            // 1. Calcul de base (ancien système)
+            let points = 0;
+            let maxPoints = 0;
+            
+            // Travail (0-4 pts)
+            if (criteres?.travail !== false && saisieData.travail) {
+                maxPoints += 4;
+                if (saisieData.travail === 'tresbien') points += 4;
+                else if (saisieData.travail === 'fait') points += 3;
+                else if (saisieData.travail === 'partiel') points += 1.5;
+                else if (saisieData.travail === 'insuffisant') points += 0;
+            }
+            
+            // Oral (0-2 pts)
+            if (criteres?.oral !== false && saisieData.oral !== null && saisieData.oral !== undefined) {
+                maxPoints += 2;
+                points += parseInt(saisieData.oral) || 0;
+            }
+            
+            // Attention (0-3 pts)
+            if (criteres?.attention !== false && saisieData.attention) {
+                maxPoints += 3;
+                if (saisieData.attention === 'bonne') points += 3;
+                else if (saisieData.attention === 'moyenne') points += 1.5;
+                else if (saisieData.attention === 'insuffisante') points += 0;
+            }
+            
+            // Porte-vue (0-1 pt)
+            if (criteres?.porteVue !== false && saisieData.porteVue) {
+                maxPoints += 1;
+                if (saisieData.porteVue === 'ok') points += 1;
+            }
+            
+            // 2. Convertir en note /20
+            let noteBase = maxPoints > 0 ? Math.round((points / maxPoints) * 20 * 10) / 10 : 0;
+            
+            // 3. Appliquer le PLAFOND bavardage
+            const bavardage = saisieData.bavardage || 'aucun';
+            const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+            let notePlafonnee = Math.min(noteBase, plafond);
+            
+            // 4. Appliquer le MALUS téléphone
+            const telephone = saisieData.telephone || 'ok';
+            const malus = MALUS_TELEPHONE[telephone] || 0;
+            let noteFinale = Math.max(0, notePlafonnee - malus);
+            
+            // Arrondir à 0.5
+            noteFinale = Math.round(noteFinale * 2) / 2;
+            
+            return {
+                points: points,
+                maxPoints: maxPoints,
+                noteBase: noteBase,
+                plafond: plafond,
+                malus: malus,
+                noteSur20: noteFinale,
+                bavardage: bavardage,
+                telephone: telephone
+            };
+        }
+        
         function updateNotePreview() {
-            if (!window.calculerPointsSaisie) {
-                document.getElementById('notePreview').textContent = '--/20';
+            const result = calculerNoteAvecComportement(saisie, seanceConfig.criteres);
+            const hasValue = Object.values(saisie).some(v => v !== null);
+            
+            const noteEl = document.getElementById('notePreview');
+            if (!hasValue) {
+                noteEl.textContent = '--/20';
+                noteEl.style.color = '#22c55e';
                 return;
             }
             
-            const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
-            const hasValue = Object.values(saisie).some(v => v !== null);
+            // Afficher la note avec indication si plafonnée
+            let display = result.noteSur20 + '/20';
             
-            document.getElementById('notePreview').textContent = hasValue ? result.noteSur20 + '/20' : '--/20';
+            // Changer la couleur selon le plafond
+            if (result.bavardage === 'retenu') {
+                noteEl.style.color = '#dc2626'; // Rouge vif
+                display += ' 🚨';
+            } else if (result.bavardage === 'rappel3') {
+                noteEl.style.color = '#dc2626';
+                display += ' ⚠️';
+            } else if (result.bavardage === 'rappel2' || result.bavardage === 'rappel1') {
+                noteEl.style.color = '#f59e0b'; // Orange
+            } else if (result.malus > 0) {
+                noteEl.style.color = '#f59e0b';
+            } else {
+                noteEl.style.color = '#22c55e'; // Vert
+            }
+            
+            noteEl.textContent = display;
         }
         
         window.validerSaisie = async function() {
@@ -1232,9 +1436,9 @@
             const hasValue = Object.entries(saisie).some(([k, v]) => seanceConfig.criteres[k] && v !== null);
             if (!hasValue) return alert("Remplissez au moins un critère !");
             
-            const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
+            const result = calculerNoteAvecComportement(saisie, seanceConfig.criteres);
             const commentaire = document.getElementById('inputCommentaire').value.trim();
-            const coursDistrib = getCoursDistrib(); // Récupérer le cours distribué
+            const coursDistrib = getCoursDistrib();
             
             const data = {
                 date: new Date().toISOString().split('T')[0],
@@ -1242,19 +1446,27 @@
                 classe: seanceConfig.classe,
                 module: seanceConfig.module,
                 moduleTitre: seanceConfig.moduleTitre,
-                competences: seanceConfig.competences, // Tableau de compétences
+                competences: seanceConfig.competences,
+                // Critères classiques
                 travail: saisie.travail,
                 oral: saisie.oral,
                 attention: saisie.attention,
                 porteVue: saisie.porteVue,
+                // NOUVEAUX CRITÈRES COMPORTEMENT
+                bavardage: saisie.bavardage || 'aucun',
+                telephone: saisie.telephone || 'ok',
+                // Commentaire et cours
                 commentaire: commentaire || null,
-                // Distribution cours
-                coursDistrib: coursDistrib, // 'aucun', 'seance1', 'seance2', 'seance3', 'seance4', 'complet'
+                coursDistrib: coursDistrib,
+                // Calcul
                 criteresActifs: seanceConfig.criteres,
                 points: result.points,
                 maxPoints: result.maxPoints,
-                noteSur20: result.noteSur20,
-                absent: false, // Pas absent
+                noteBase: result.noteBase,      // Note avant plafond/malus
+                plafond: result.plafond,        // Plafond appliqué
+                malus: result.malus,            // Malus appliqué
+                noteSur20: result.noteSur20,    // Note finale
+                absent: false,
                 createdAt: serverTimestamp(),
                 createdBy: currentUser?.email || "anonyme"
             };
@@ -1276,8 +1488,11 @@
                 }
                 renderListeEleves();
                 
-                // Toast
-                showToast("✅ " + currentEleve + " - " + result.noteSur20 + "/20");
+                // Toast avec indication comportement
+                let toastMsg = "✅ " + currentEleve + " - " + result.noteSur20 + "/20";
+                if (result.bavardage !== 'aucun') toastMsg += " (bavardage)";
+                if (result.telephone !== 'ok') toastMsg += " (📱)";
+                showToast(toastMsg);
                 
                 // Élève suivant (non fait ET non absent)
                 const next = elevesSeance.find(e => !e.done && !e.absent);
