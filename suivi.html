@@ -351,6 +351,53 @@
             border-color: var(--primary);
         }
         
+        /* === INFO TAGS (non évalués) === */
+        .info-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .info-tag {
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 2px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+        }
+        .info-tag:hover {
+            border-color: #cbd5e1;
+            background: #f1f5f9;
+        }
+        .info-tag.selected {
+            border-color: #3b82f6;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .info-tag.warning {
+            border-color: #fde68a;
+            background: #fefce8;
+            color: #a16207;
+        }
+        .info-tag.warning.selected {
+            border-color: #f59e0b;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .info-tag.danger {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+        .info-tag.danger.selected {
+            border-color: #dc2626;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
         /* === LISTE ÉLÈVES === */
         .eleves-list {
             max-height: 250px;
@@ -676,6 +723,25 @@
                 <textarea class="comment-input" id="inputCommentaire" placeholder="Ajouter un commentaire..."></textarea>
             </div>
             
+            <!-- INFOS (non évaluées) -->
+            <div class="section-saisie" id="sectionInfos">
+                <h3>📌 Infos <span style="font-weight: 400; font-size: 0.75em; color: #64748b;">(non évalué)</span></h3>
+                <div class="info-tags">
+                    <button type="button" class="info-tag" data-info="coursRemis" onclick="toggleInfo(this)">
+                        📄 Cours remis
+                    </button>
+                    <button type="button" class="info-tag warning" data-info="menace1" onclick="toggleInfo(this)">
+                        ⚠️ Menace 1
+                    </button>
+                    <button type="button" class="info-tag warning" data-info="menace2" onclick="toggleInfo(this)">
+                        ⚠️ Menace 2
+                    </button>
+                    <button type="button" class="info-tag danger" data-info="menace3" onclick="toggleInfo(this)">
+                        🚨 Menace 3
+                    </button>
+                </div>
+            </div>
+            
             <!-- NOTE -->
             <div class="note-box">
                 <div class="label">Note de la séance</div>
@@ -930,6 +996,22 @@
         };
         
         // ═══════════════════════════════════════════════════════════════
+        // INFO TAGS (non évalués)
+        // ═══════════════════════════════════════════════════════════════
+        window.toggleInfo = function(btn) {
+            btn.classList.toggle('selected');
+        };
+        
+        function getSelectedInfos() {
+            const infos = {};
+            document.querySelectorAll('.info-tag.selected').forEach(btn => {
+                const infoType = btn.dataset.info;
+                infos[infoType] = true;
+            });
+            return infos;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
         // CONFIGURATION
         // ═══════════════════════════════════════════════════════════════
         window.onClasseChange = function() {
@@ -1092,6 +1174,9 @@
             // Reset commentaire
             document.getElementById('inputCommentaire').value = '';
             
+            // Reset info-tags
+            document.querySelectorAll('.info-tag').forEach(b => b.classList.remove('selected'));
+            
             // Afficher infos
             const eleveObj = elevesSeance.find(e => e.code === code);
             document.getElementById('eleveCode').textContent = code;
@@ -1142,6 +1227,7 @@
             
             const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
             const commentaire = document.getElementById('inputCommentaire').value.trim();
+            const infos = getSelectedInfos(); // Récupérer les infos sélectionnées
             
             const data = {
                 date: new Date().toISOString().split('T')[0],
@@ -1155,6 +1241,11 @@
                 attention: saisie.attention,
                 porteVue: saisie.porteVue,
                 commentaire: commentaire || null,
+                // Infos (non évaluées)
+                coursRemis: infos.coursRemis || false,
+                menace1: infos.menace1 || false,
+                menace2: infos.menace2 || false,
+                menace3: infos.menace3 || false,
                 criteresActifs: seanceConfig.criteres,
                 points: result.points,
                 maxPoints: result.maxPoints,
@@ -1204,6 +1295,8 @@
         window.marquerAbsent = async function() {
             if (!currentEleve) return alert("Aucun élève sélectionné !");
             
+            const infos = getSelectedInfos(); // Récupérer les infos même pour absent
+            
             const data = {
                 date: new Date().toISOString().split('T')[0],
                 heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
@@ -1213,6 +1306,11 @@
                 competences: seanceConfig.competences,
                 absent: true,
                 noteSur20: null,
+                // Infos (non évaluées) - utile même pour absent
+                coursRemis: infos.coursRemis || false,
+                menace1: infos.menace1 || false,
+                menace2: infos.menace2 || false,
+                menace3: infos.menace3 || false,
                 createdAt: serverTimestamp(),
                 createdBy: currentUser?.email || "anonyme"
             };
