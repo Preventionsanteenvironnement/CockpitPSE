@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Tableau de Bord - Cockpit PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --primary: #8b5cf6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --border: #e2e8f0;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* === HEADER === */
+        .header {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            color: white;
+            padding: 25px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header h1 {
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        /* === FILTRES === */
+        .filters {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+            color: var(--muted);
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95em;
+            background: white;
+        }
+        
+        .btn-search {
+            background: var(--primary);
+            color: white;
+            width: 100%;
+        }
+        
+        /* === STATS === */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            background: var(--card);
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        
+        .stat-value.success { color: var(--success); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+        
+        .stat-label {
+            font-size: 0.8em;
+            color: var(--muted);
+            margin-top: 5px;
+        }
+        
+        /* === TABLEAU === */
+        .table-container {
+            background: var(--card);
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: var(--muted);
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:hover {
+            background: #f8fafc;
+        }
+        
+        .code-badge {
+            font-weight: 700;
+            background: #eff6ff;
+            color: #3b82f6;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        
+        .classe-badge {
+            font-size: 0.85em;
+            color: var(--muted);
+        }
+        
+        .note-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        .note-badge.excellent { background: #dcfce7; color: #166534; }
+        .note-badge.good { background: #dbeafe; color: #1e40af; }
+        .note-badge.average { background: #fef3c7; color: #92400e; }
+        .note-badge.poor { background: #fee2e2; color: #991b1b; }
+        .note-badge.none { background: #f1f5f9; color: #64748b; }
+        
+        .vu-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .vu-badge.oui { background: #dcfce7; color: #166534; }
+        .vu-badge.non { background: #fee2e2; color: #991b1b; }
+        
+        .date-consultation {
+            font-size: 0.85em;
+            color: var(--muted);
+        }
+        
+        .visites-count {
+            background: #eff6ff;
+            color: #3b82f6;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        
+        /* === EMPTY STATE === */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+        
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+        
+        /* === LOGIN === */
+        .login-screen {
+            max-width: 400px;
+            margin: 60px auto;
+            text-align: center;
+        }
+        
+        .login-card {
+            background: var(--card);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .login-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .btn-google {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 28px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        
+        .btn-google:hover {
+            background: #3367d6;
+        }
+        
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; }
+            .filters-grid { grid-template-columns: 1fr; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- ÉCRAN LOGIN -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-card">
+            <div class="login-icon">🔐</div>
+            <h2>Tableau de Bord</h2>
+            <p style="color: var(--muted); margin-top: 10px;">Accès réservé au professeur</p>
+            <button class="btn-google" onclick="connexionGoogle()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/>
+                </svg>
+                Connexion avec Google
+            </button>
+        </div>
+    </div>
+    
+    <!-- ÉCRAN PRINCIPAL -->
+    <div id="mainScreen" style="display: none;">
+        
+        <!-- HEADER -->
+        <div class="header">
+            <h1>📊 Tableau de Bord</h1>
+            <div class="header-actions">
+                <a href="suivi.html" class="btn btn-light">➕ Saisie</a>
+                <a href="historique-suivi.html" class="btn btn-light">📋 Historique</a>
+                <a href="index.html" class="btn btn-light">🏠 Cockpit</a>
+            </div>
+        </div>
+        
+        <!-- FILTRES -->
+        <div class="filters">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label>Classe</label>
+                    <select id="filterClasse" onchange="chargerDonnees()">
+                        <option value="">Toutes les classes</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Statut consultation</label>
+                    <select id="filterVu" onchange="filtrerAffichage()">
+                        <option value="">Tous</option>
+                        <option value="oui">👁️ A consulté</option>
+                        <option value="non">❌ Pas encore vu</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-search" onclick="chargerDonnees()">🔍 Actualiser</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- STATS -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Élèves</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value success" id="statVu">0</div>
+                <div class="stat-label">👁️ Ont consulté</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value danger" id="statPasVu">0</div>
+                <div class="stat-label">❌ Pas vu</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value warning" id="statPourcent">0%</div>
+                <div class="stat-label">Taux consultation</div>
+            </div>
+        </div>
+        
+        <!-- TABLEAU -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Élève</th>
+                        <th>Classe</th>
+                        <th>Dernière note</th>
+                        <th>👁️ Vu</th>
+                        <th>Visites</th>
+                        <th>Dernière consultation</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <p>Sélectionnez une classe pour afficher le tableau de bord</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+    </div>
+    
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "490aborede357691",
+        appId: "1:490357691049:web:0e0e0e0e0e0e0e0e0e0e0e"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    
+    let currentUser = null;
+    let allData = [];
+    
+    // Vérifier l'état de connexion
+    onAuthStateChanged(auth, (user) => {
+        if (user && user.email === "ennealyon@gmail.com") {
+            currentUser = user;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainScreen').style.display = 'block';
+            initClasses();
+        } else if (user) {
+            alert("Accès non autorisé");
+            signOut(auth);
+        }
+    });
+    
+    // Connexion Google
+    window.connexionGoogle = async function() {
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            if (error.code === 'auth/popup-blocked') {
+                await signInWithRedirect(auth, googleProvider);
+            } else {
+                console.error("Erreur connexion:", error);
+                alert("Erreur: " + error.message);
+            }
+        }
+    };
+    
+    // Gérer retour redirect
+    getRedirectResult(auth).catch(console.error);
+    
+    // Initialiser les classes dans le select
+    function initClasses() {
+        const select = document.getElementById('filterClasse');
+        const classes = [...new Set((window.BDD_ELEVES || []).map(e => e.classe))].sort();
+        
+        classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            select.appendChild(opt);
+        });
+        
+        console.log("✅ Classes chargées:", classes.length);
+    }
+    
+    // Charger les données
+    window.chargerDonnees = async function() {
+        const filterClasse = document.getElementById('filterClasse').value;
+        const tbody = document.getElementById('tableBody');
+        
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">⏳ Chargement...</td></tr>';
+        
+        try {
+            // Récupérer les élèves
+            let eleves = window.BDD_ELEVES || [];
+            if (filterClasse) {
+                eleves = eleves.filter(e => e.classe === filterClasse);
+            }
+            
+            // Récupérer les consultations
+            const consultationsMap = {};
+            const consultationsSnap = await getDocs(collection(db, "consultations"));
+            consultationsSnap.forEach(doc => {
+                consultationsMap[doc.id] = doc.data();
+            });
+            
+            // Récupérer les dernières notes
+            const notesMap = {};
+            for (const eleve of eleves) {
+                try {
+                    const suiviRef = collection(db, "resultats", eleve.userCode, "suivi");
+                    const suiviSnap = await getDocs(suiviRef);
+                    let derniereNote = null;
+                    let derniereDate = null;
+                    
+                    suiviSnap.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (!derniereDate || data.date > derniereDate) {
+                            derniereDate = data.date;
+                            derniereNote = data.noteSur20;
+                        }
+                    });
+                    
+                    if (derniereNote !== null) {
+                        notesMap[eleve.userCode] = derniereNote;
+                    }
+                } catch (err) {
+                    // Ignorer les erreurs individuelles
+                }
+            }
+            
+            // Construire les données
+            allData = eleves.map(e => {
+                const consultation = consultationsMap[e.userCode];
+                return {
+                    code: e.userCode,
+                    classe: e.classe,
+                    derniereNote: notesMap[e.userCode] ?? null,
+                    vu: !!consultation,
+                    visites: consultation?.nombreVisites || 0,
+                    derniereConsultation: consultation?.derniereConsultation || null
+                };
+            });
+            
+            // Trier par classe puis code
+            allData.sort((a, b) => {
+                if (a.classe !== b.classe) return a.classe.localeCompare(b.classe);
+                return a.code.localeCompare(b.code);
+            });
+            
+            filtrerAffichage();
+            
+        } catch (error) {
+            console.error("Erreur chargement:", error);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color: #dc2626;">❌ Erreur de chargement</td></tr>';
+        }
+    };
+    
+    // Filtrer et afficher
+    window.filtrerAffichage = function() {
+        const filterVu = document.getElementById('filterVu').value;
+        
+        let data = allData;
+        if (filterVu === 'oui') {
+            data = data.filter(d => d.vu);
+        } else if (filterVu === 'non') {
+            data = data.filter(d => !d.vu);
+        }
+        
+        // Stats
+        const total = allData.length;
+        const vu = allData.filter(d => d.vu).length;
+        const pasVu = total - vu;
+        const pourcent = total > 0 ? Math.round((vu / total) * 100) : 0;
+        
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statVu').textContent = vu;
+        document.getElementById('statPasVu').textContent = pasVu;
+        document.getElementById('statPourcent').textContent = pourcent + '%';
+        
+        // Tableau
+        const tbody = document.getElementById('tableBody');
+        
+        if (data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <p>Aucun élève trouvé</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = data.map(d => {
+            const noteClass = d.derniereNote === null ? 'none' : 
+                              d.derniereNote >= 16 ? 'excellent' :
+                              d.derniereNote >= 12 ? 'good' :
+                              d.derniereNote >= 8 ? 'average' : 'poor';
+            
+            const noteDisplay = d.derniereNote === null ? '--' : d.derniereNote + '/20';
+            
+            const vuBadge = d.vu 
+                ? '<span class="vu-badge oui">👁️ Oui</span>'
+                : '<span class="vu-badge non">❌ Non</span>';
+            
+            const visitesDisplay = d.visites > 0 
+                ? `<span class="visites-count">${d.visites}</span>`
+                : '-';
+            
+            const dateDisplay = d.derniereConsultation 
+                ? formatDate(d.derniereConsultation)
+                : '<span style="color: #94a3b8;">Jamais</span>';
+            
+            return `
+                <tr>
+                    <td><span class="code-badge">${d.code}</span></td>
+                    <td><span class="classe-badge">${d.classe}</span></td>
+                    <td><span class="note-badge ${noteClass}">${noteDisplay}</span></td>
+                    <td>${vuBadge}</td>
+                    <td>${visitesDisplay}</td>
+                    <td class="date-consultation">${dateDisplay}</td>
+                </tr>
+            `;
+        }).join('');
+    };
+    
+    function formatDate(isoString) {
+        if (!isoString) return '';
+        const d = new Date(isoString);
+        return d.toLocaleDateString('fr-FR', { 
+            day: '2-digit', 
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    
+    console.log("✅ Dashboard prêt");
+</script>
+
+</body>
+</html>
