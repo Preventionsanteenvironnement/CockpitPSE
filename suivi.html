@@ -351,51 +351,49 @@
             border-color: var(--primary);
         }
         
-        /* === INFO TAGS (non évalués) === */
-        .info-tags {
+        /* === DISTRIBUTION COURS === */
+        .cours-options {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
         }
-        .info-tag {
-            padding: 10px 16px;
+        .cours-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 14px;
             border-radius: 10px;
-            font-size: 0.85em;
-            font-weight: 600;
+            font-size: 0.9em;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.15s;
             border: 2px solid #e2e8f0;
             background: #f8fafc;
             color: #475569;
         }
-        .info-tag:hover {
+        .cours-option:hover {
             border-color: #cbd5e1;
             background: #f1f5f9;
         }
-        .info-tag.selected {
+        .cours-option:has(input:checked) {
             border-color: #3b82f6;
             background: #dbeafe;
             color: #1e40af;
         }
-        .info-tag.warning {
-            border-color: #fde68a;
-            background: #fefce8;
-            color: #a16207;
+        .cours-option.complet {
+            border-color: #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
         }
-        .info-tag.warning.selected {
-            border-color: #f59e0b;
-            background: #fef3c7;
-            color: #92400e;
+        .cours-option.complet:has(input:checked) {
+            border-color: #16a34a;
+            background: #dcfce7;
+            color: #166534;
         }
-        .info-tag.danger {
-            border-color: #fecaca;
-            background: #fef2f2;
-            color: #b91c1c;
-        }
-        .info-tag.danger.selected {
-            border-color: #dc2626;
-            background: #fee2e2;
-            color: #991b1b;
+        .cours-option input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #3b82f6;
         }
         
         /* === LISTE ÉLÈVES === */
@@ -723,22 +721,34 @@
                 <textarea class="comment-input" id="inputCommentaire" placeholder="Ajouter un commentaire..."></textarea>
             </div>
             
-            <!-- INFOS (non évaluées) -->
-            <div class="section-saisie" id="sectionInfos">
-                <h3>📌 Infos <span style="font-weight: 400; font-size: 0.75em; color: #64748b;">(non évalué)</span></h3>
-                <div class="info-tags">
-                    <button type="button" class="info-tag" data-info="coursRemis" onclick="toggleInfo(this)">
-                        📄 Cours remis
-                    </button>
-                    <button type="button" class="info-tag warning" data-info="menace1" onclick="toggleInfo(this)">
-                        ⚠️ Menace 1
-                    </button>
-                    <button type="button" class="info-tag warning" data-info="menace2" onclick="toggleInfo(this)">
-                        ⚠️ Menace 2
-                    </button>
-                    <button type="button" class="info-tag danger" data-info="menace3" onclick="toggleInfo(this)">
-                        🚨 Menace 3
-                    </button>
+            <!-- DISTRIBUTION COURS -->
+            <div class="section-saisie" id="sectionCours">
+                <h3>📄 Distribution cours</h3>
+                <div class="cours-options">
+                    <label class="cours-option">
+                        <input type="radio" name="coursDistrib" value="aucun" checked>
+                        <span>Aucun</span>
+                    </label>
+                    <label class="cours-option">
+                        <input type="radio" name="coursDistrib" value="seance1">
+                        <span>Séance 1</span>
+                    </label>
+                    <label class="cours-option">
+                        <input type="radio" name="coursDistrib" value="seance2">
+                        <span>Séance 2</span>
+                    </label>
+                    <label class="cours-option">
+                        <input type="radio" name="coursDistrib" value="seance3">
+                        <span>Séance 3</span>
+                    </label>
+                    <label class="cours-option">
+                        <input type="radio" name="coursDistrib" value="seance4">
+                        <span>Séance 4</span>
+                    </label>
+                    <label class="cours-option complet">
+                        <input type="radio" name="coursDistrib" value="complet">
+                        <span>📚 Cours complet</span>
+                    </label>
                 </div>
             </div>
             
@@ -996,19 +1006,16 @@
         };
         
         // ═══════════════════════════════════════════════════════════════
-        // INFO TAGS (non évalués)
+        // DISTRIBUTION COURS
         // ═══════════════════════════════════════════════════════════════
-        window.toggleInfo = function(btn) {
-            btn.classList.toggle('selected');
-        };
+        function getCoursDistrib() {
+            const selected = document.querySelector('input[name="coursDistrib"]:checked');
+            return selected ? selected.value : 'aucun';
+        }
         
-        function getSelectedInfos() {
-            const infos = {};
-            document.querySelectorAll('.info-tag.selected').forEach(btn => {
-                const infoType = btn.dataset.info;
-                infos[infoType] = true;
-            });
-            return infos;
+        function resetCoursDistrib() {
+            const aucun = document.querySelector('input[name="coursDistrib"][value="aucun"]');
+            if (aucun) aucun.checked = true;
         }
         
         // ═══════════════════════════════════════════════════════════════
@@ -1174,8 +1181,8 @@
             // Reset commentaire
             document.getElementById('inputCommentaire').value = '';
             
-            // Reset info-tags
-            document.querySelectorAll('.info-tag').forEach(b => b.classList.remove('selected'));
+            // Reset cours distribué
+            resetCoursDistrib();
             
             // Afficher infos
             const eleveObj = elevesSeance.find(e => e.code === code);
@@ -1227,7 +1234,7 @@
             
             const result = window.calculerPointsSaisie(saisie, seanceConfig.criteres);
             const commentaire = document.getElementById('inputCommentaire').value.trim();
-            const infos = getSelectedInfos(); // Récupérer les infos sélectionnées
+            const coursDistrib = getCoursDistrib(); // Récupérer le cours distribué
             
             const data = {
                 date: new Date().toISOString().split('T')[0],
@@ -1241,11 +1248,8 @@
                 attention: saisie.attention,
                 porteVue: saisie.porteVue,
                 commentaire: commentaire || null,
-                // Infos (non évaluées)
-                coursRemis: infos.coursRemis || false,
-                menace1: infos.menace1 || false,
-                menace2: infos.menace2 || false,
-                menace3: infos.menace3 || false,
+                // Distribution cours
+                coursDistrib: coursDistrib, // 'aucun', 'seance1', 'seance2', 'seance3', 'seance4', 'complet'
                 criteresActifs: seanceConfig.criteres,
                 points: result.points,
                 maxPoints: result.maxPoints,
@@ -1295,7 +1299,7 @@
         window.marquerAbsent = async function() {
             if (!currentEleve) return alert("Aucun élève sélectionné !");
             
-            const infos = getSelectedInfos(); // Récupérer les infos même pour absent
+            const coursDistrib = getCoursDistrib(); // Récupérer le cours distribué ce jour
             
             const data = {
                 date: new Date().toISOString().split('T')[0],
@@ -1306,11 +1310,9 @@
                 competences: seanceConfig.competences,
                 absent: true,
                 noteSur20: null,
-                // Infos (non évaluées) - utile même pour absent
-                coursRemis: infos.coursRemis || false,
-                menace1: infos.menace1 || false,
-                menace2: infos.menace2 || false,
-                menace3: infos.menace3 || false,
+                // Distribution cours - absent donc non reçu mais on note ce qui a été distribué
+                coursDistrib: coursDistrib, // Ce qui a été distribué ce jour
+                coursRecu: false, // L'élève n'a pas reçu le cours (absent)
                 createdAt: serverTimestamp(),
                 createdBy: currentUser?.email || "anonyme"
             };
