@@ -500,13 +500,15 @@
                         <th>Classe</th>
                         <th>Module</th>
                         <th>Note</th>
+                        <th>💬</th>
+                        <th>📱</th>
                         <th>Cours</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="7">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📋</div>
                                 <p>Sélectionnez des filtres pour afficher l'historique</p>
@@ -542,6 +544,26 @@
                 <select id="editStatut">
                     <option value="present">Présent (avec note)</option>
                     <option value="absent">Absent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>💬 Bavardage (plafonne la note)</label>
+                <select id="editBavardage">
+                    <option value="aucun">✅ Aucun</option>
+                    <option value="rappel1">⚠️ Rappel 1 (max 14/20)</option>
+                    <option value="rappel2">⚠️ Rappel 2 (max 10/20)</option>
+                    <option value="rappel3">🚫 Rappel 3 (max 6/20)</option>
+                    <option value="retenu">🚨 Retenu fin de cours (max 4/20)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>📱 Téléphone (malus)</label>
+                <select id="editTelephone">
+                    <option value="ok">✅ OK</option>
+                    <option value="rappel1">⚠️ Rappel 1 (-1 pt)</option>
+                    <option value="rappel2">⚠️ Rappel 2 (-2 pts)</option>
+                    <option value="rappel3">🚫 Rappel 3 (-3 pts)</option>
+                    <option value="confisque">🚫 Confisqué (-5 pts)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -740,7 +762,7 @@
         if (allSuivis.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6">
+                    <td colspan="9">
                         <div class="empty-state">
                             <div class="empty-state-icon">📋</div>
                             <p>Aucune saisie trouvée</p>
@@ -773,6 +795,30 @@
                 }
             }
             
+            // Affichage bavardage
+            let bavardageDisplay = '-';
+            if (s.bavardage && s.bavardage !== 'aucun') {
+                const bavLabels = {
+                    'rappel1': '1️⃣',
+                    'rappel2': '2️⃣',
+                    'rappel3': '3️⃣',
+                    'retenu': '🚨'
+                };
+                bavardageDisplay = `<span style="color: ${s.bavardage === 'retenu' || s.bavardage === 'rappel3' ? '#dc2626' : '#f59e0b'};">${bavLabels[s.bavardage] || s.bavardage}</span>`;
+            }
+            
+            // Affichage téléphone
+            let telephoneDisplay = '-';
+            if (s.telephone && s.telephone !== 'ok') {
+                const telLabels = {
+                    'rappel1': '1️⃣',
+                    'rappel2': '2️⃣',
+                    'rappel3': '3️⃣',
+                    'confisque': '🚫'
+                };
+                telephoneDisplay = `<span style="color: ${s.telephone === 'confisque' || s.telephone === 'rappel3' ? '#dc2626' : '#f59e0b'};">${telLabels[s.telephone] || s.telephone}</span>`;
+            }
+            
             return `
                 <tr>
                     <td>${formatDate(s.date)} ${s.heure || ''}</td>
@@ -780,6 +826,8 @@
                     <td><span class="classe-badge">${s.classe || '--'}</span></td>
                     <td>${s.module || '--'}</td>
                     <td><span class="note-badge ${noteClass}">${noteDisplay}</span></td>
+                    <td style="font-size: 1.1em; text-align: center;">${bavardageDisplay}</td>
+                    <td style="font-size: 1.1em; text-align: center;">${telephoneDisplay}</td>
                     <td style="font-size: 0.9em;">${coursDisplay}</td>
                     <td class="actions-cell">
                         <button class="btn-icon btn-edit" onclick="ouvrirModalEdit(${idx})" title="Modifier">✏️</button>
@@ -813,6 +861,10 @@
         document.getElementById('editStatut').value = s.absent ? 'absent' : 'present';
         document.getElementById('editCommentaire').value = s.commentaire || '';
         
+        // Bavardage et téléphone
+        document.getElementById('editBavardage').value = s.bavardage || 'aucun';
+        document.getElementById('editTelephone').value = s.telephone || 'ok';
+        
         // Cours distribué
         document.getElementById('editCoursDistrib').value = s.coursDistrib || 'aucun';
         
@@ -824,28 +876,62 @@
         editingDoc = null;
     };
     
+    // Plafonds et malus pour recalcul
+    const PLAFOND_BAVARDAGE = {
+        'aucun': 20,
+        'rappel1': 14,
+        'rappel2': 10,
+        'rappel3': 6,
+        'retenu': 4
+    };
+    
+    const MALUS_TELEPHONE = {
+        'ok': 0,
+        'rappel1': 1,
+        'rappel2': 2,
+        'rappel3': 3,
+        'confisque': 5
+    };
+    
     window.sauvegarderModification = async function() {
         if (!editingDoc) return;
         
         const statut = document.getElementById('editStatut').value;
-        const note = parseFloat(document.getElementById('editNote').value) || 0;
+        let note = parseFloat(document.getElementById('editNote').value) || 0;
         const commentaire = document.getElementById('editCommentaire').value.trim();
+        
+        // Récupérer bavardage et téléphone
+        const bavardage = document.getElementById('editBavardage').value;
+        const telephone = document.getElementById('editTelephone').value;
         
         // Récupérer le cours distribué
         const coursDistrib = document.getElementById('editCoursDistrib').value;
+        
+        // Recalculer la note avec plafond et malus
+        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+        const malus = MALUS_TELEPHONE[telephone] || 0;
+        
+        // Appliquer plafond puis malus
+        let noteFinale = Math.min(note, plafond);
+        noteFinale = Math.max(0, noteFinale - malus);
+        noteFinale = Math.round(noteFinale * 2) / 2; // Arrondir à 0.5
         
         try {
             const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
             
             await updateDoc(ref, {
                 absent: statut === 'absent',
-                noteSur20: statut === 'absent' ? null : note,
+                noteSur20: statut === 'absent' ? null : noteFinale,
+                bavardage: bavardage,
+                telephone: telephone,
+                plafond: plafond,
+                malus: malus,
                 commentaire: commentaire || null,
                 coursDistrib: coursDistrib,
                 coursRecu: statut === 'absent' ? false : (coursDistrib !== 'aucun')
             });
             
-            alert("✅ Modification enregistrée !");
+            alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
             fermerModal();
             chargerHistorique();
             
