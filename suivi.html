@@ -662,6 +662,16 @@
                     <span>💬 Appréciation</span>
                 </label>
                 
+                <label class="field-label">📄 Cours distribué aujourd'hui</label>
+                <select id="selectCoursDefaut" style="margin-bottom: 20px;">
+                    <option value="aucun">Aucun cours distribué</option>
+                    <option value="seance1">Séance 1</option>
+                    <option value="seance2">Séance 2</option>
+                    <option value="seance3">Séance 3</option>
+                    <option value="seance4">Séance 4</option>
+                    <option value="complet">📚 Cours complet</option>
+                </select>
+                
                 <button class="btn btn-primary" onclick="demarrerSeance()">
                     🚀 Démarrer la séance
                 </button>
@@ -1162,6 +1172,9 @@
             // Récupérer les compétences cochées
             const competencesChecked = Array.from(document.querySelectorAll('input[name="competences"]:checked')).map(cb => cb.value);
             
+            // Récupérer le cours par défaut
+            const coursDefaut = document.getElementById('selectCoursDefaut').value;
+            
             if (!classeId) return alert("Sélectionnez une classe !");
             if (!moduleId) return alert("Sélectionnez un module !");
             
@@ -1178,6 +1191,7 @@
                 module: moduleId,
                 moduleTitre: moduleObj ? moduleObj.titre : moduleId,
                 competences: competencesChecked, // Tableau de compétences
+                coursDefaut: coursDefaut, // Cours distribué par défaut pour tous
                 criteres: {
                     travail: document.getElementById('checkTravail').checked,
                     oral: document.getElementById('checkOral').checked,
@@ -1281,8 +1295,13 @@
             // Reset commentaire
             document.getElementById('inputCommentaire').value = '';
             
-            // Reset cours distribué
-            resetCoursDistrib();
+            // Appliquer le cours par défaut (si défini dans la config)
+            if (seanceConfig.coursDefaut && seanceConfig.coursDefaut !== 'aucun') {
+                const radio = document.querySelector(`input[name="coursDistrib"][value="${seanceConfig.coursDefaut}"]`);
+                if (radio) radio.checked = true;
+            } else {
+                resetCoursDistrib();
+            }
             
             // Afficher infos
             const eleveObj = elevesSeance.find(e => e.code === code);
