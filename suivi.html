@@ -677,7 +677,74 @@
                 currentUser = user;
                 if (user) console.log("✅ Connecté:", user.email);
             });
+            
+            // ⭐ SCAN QR : Vérifier si paramètre ?eleve=CODE dans l'URL
+            checkQRScan();
         });
+        
+        // ═══════════════════════════════════════════════════════════════
+        // SCAN QR CODE - Mode rapide
+        // ═══════════════════════════════════════════════════════════════
+        function checkQRScan() {
+            const params = new URLSearchParams(window.location.search);
+            const eleveCode = params.get('eleve');
+            
+            if (!eleveCode) return;
+            
+            console.log("📱 Scan QR détecté:", eleveCode);
+            
+            // Chercher l'élève dans data_eleves.js
+            if (!window.ELEVES_DATA) {
+                alert("Données élèves non chargées !");
+                return;
+            }
+            
+            const eleve = window.ELEVES_DATA.find(e => e.code === eleveCode.toUpperCase());
+            if (!eleve) {
+                alert("Élève non trouvé: " + eleveCode);
+                return;
+            }
+            
+            console.log("✅ Élève trouvé:", eleve);
+            
+            // Pré-remplir la classe
+            const selectClasse = document.getElementById('selectClasse');
+            selectClasse.value = eleve.classe;
+            onClasseChange();
+            
+            // Stocker l'élève à sélectionner après démarrage
+            window.pendingEleveFromQR = eleveCode.toUpperCase();
+            
+            // Afficher un message
+            showToast("📱 " + eleve.prenom + " " + eleve.nom + " (" + eleve.classe + ")", 3000);
+        }
+        
+        // Toast notification
+        function showToast(message, duration = 2000) {
+            let toast = document.getElementById('toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast';
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #1e293b;
+                    color: white;
+                    padding: 15px 25px;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    z-index: 9999;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                    transition: opacity 0.3s;
+                `;
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, duration);
+        }
         
         function renderCommentTags() {
             const container = document.getElementById('commentTags');
@@ -785,8 +852,17 @@
             document.getElementById('screenConfig').classList.remove('active');
             document.getElementById('screenSaisie').classList.add('active');
             
-            // Sélectionner premier élève
-            if (elevesSeance.length > 0) {
+            // ⭐ Sélectionner l'élève du QR code OU le premier élève
+            if (window.pendingEleveFromQR) {
+                const qrEleve = elevesSeance.find(e => e.code === window.pendingEleveFromQR);
+                if (qrEleve) {
+                    selectionnerEleve(qrEleve.code);
+                    showToast("📱 " + qrEleve.code + " sélectionné", 2000);
+                } else if (elevesSeance.length > 0) {
+                    selectionnerEleve(elevesSeance[0].code);
+                }
+                window.pendingEleveFromQR = null; // Reset
+            } else if (elevesSeance.length > 0) {
                 selectionnerEleve(elevesSeance[0].code);
             }
             
