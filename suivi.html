@@ -1056,7 +1056,40 @@
         function checkQRScan() {
             const params = new URLSearchParams(window.location.search);
             const eleveCode = params.get('eleve');
+            const reprendre = params.get('reprendre');
             
+            // Mode REPRENDRE une séance depuis l'historique
+            if (reprendre === 'true') {
+                console.log("🔄 Mode reprendre séance détecté");
+                
+                const classe = params.get('classe');
+                const module = params.get('module');
+                const elevesNotesStr = params.get('elevesNotes') || '';
+                const elevesNotes = elevesNotesStr ? elevesNotesStr.split(',') : [];
+                
+                // Stocker les élèves déjà notés pour les marquer
+                window.elevesDejaNotes = elevesNotes;
+                
+                // Pré-remplir la classe
+                if (classe) {
+                    const selectClasse = document.getElementById('selectClasse');
+                    selectClasse.value = classe;
+                    onClasseChange();
+                    
+                    // Pré-remplir le module après un petit délai (pour laisser le temps au select de se remplir)
+                    setTimeout(() => {
+                        if (module) {
+                            const selectModule = document.getElementById('selectModule');
+                            selectModule.value = module;
+                        }
+                    }, 100);
+                }
+                
+                showToast("📋 Reprise de séance - " + elevesNotes.length + " élève(s) déjà noté(s)", 3000);
+                return;
+            }
+            
+            // Mode SCAN QR CODE élève
             if (!eleveCode) return;
             
             console.log("📱 Scan QR détecté:", eleveCode);
@@ -1258,20 +1291,29 @@
             elevesSeance = [];
             const eleves = window.BDD_ELEVES || [];
             
+            // Récupérer les élèves déjà notés (si on reprend une séance)
+            const elevesDejaNotesListe = window.elevesDejaNotes || [];
+            
             seanceConfig.classesEffectives.forEach(classe => {
                 eleves.filter(e => e.classe === classe).forEach(e => {
+                    const dejaNotes = elevesDejaNotesListe.includes(e.userCode);
                     elevesSeance.push({
                         code: e.userCode,
                         classe: e.classe,
-                        done: false,
+                        done: dejaNotes,
                         absent: false,
-                        note: null
+                        note: dejaNotes ? '✓' : null,
+                        dejaNotePrecedemment: dejaNotes // Marqueur spécial
                     });
                 });
             });
             
-            // Trier par code
-            elevesSeance.sort((a, b) => a.code.localeCompare(b.code));
+            // Trier : d'abord les non-notés, puis les notés
+            elevesSeance.sort((a, b) => {
+                if (a.dejaNotePrecedemment && !b.dejaNotePrecedemment) return 1;
+                if (!a.dejaNotePrecedemment && b.dejaNotePrecedemment) return -1;
+                return a.code.localeCompare(b.code);
+            });
             
             document.getElementById('compteurEleves').textContent = elevesSeance.length;
             renderListeEleves();
@@ -1286,6 +1328,10 @@
                 if (e.absent) {
                     statusClass = 'absent';
                     statusText = '🚫 ABS';
+                } else if (e.dejaNotePrecedemment && !e.modifieCetteSesssion) {
+                    // Élève noté dans une session précédente
+                    statusClass = 'done';
+                    statusText = '✅ déjà';
                 } else if (e.done) {
                     statusClass = 'done';
                     statusText = '✅ ' + e.note + '/20';
@@ -1294,7 +1340,7 @@
                 return `
                 <div class="eleve-row ${statusClass} ${currentEleve === e.code ? 'current' : ''}" 
                      onclick="selectionnerEleve('${e.code}')"
-                     title="${e.done || e.absent ? 'Cliquer pour modifier' : 'Cliquer pour évaluer'}">
+                     title="${e.dejaNotePrecedemment ? 'Déjà noté - Cliquer pour modifier' : (e.done || e.absent ? 'Cliquer pour modifier' : 'Cliquer pour évaluer')}">
                     <span class="code">${e.code}</span>
                     <span class="status ${statusClass}">
                         ${statusText}
