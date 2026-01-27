@@ -915,26 +915,39 @@
         const googleProvider = new GoogleAuthProvider();
         
         // ═══════════════════════════════════════════════════════════════
-        // CONNEXION GOOGLE
+        // CONNEXION GOOGLE (optimisé pour Safari iOS)
         // ═══════════════════════════════════════════════════════════════
         window.connexionGoogle = async function() {
             try {
-                // Détecter si on est sur mobile
-                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    // Redirection sur mobile
-                    console.log("📱 Mobile détecté → redirection Google");
-                    await signInWithRedirect(auth, googleProvider);
-                } else {
-                    // Popup sur desktop
-                    const result = await signInWithPopup(auth, googleProvider);
-                    console.log("✅ Connecté:", result.user.email);
-                    afficherEcranConfig();
-                }
+                // Toujours essayer popup d'abord (plus fiable sur iOS 16.4+)
+                console.log("🔐 Tentative connexion popup...");
+                const result = await signInWithPopup(auth, googleProvider);
+                console.log("✅ Connecté via popup:", result.user.email);
+                afficherEcranConfig();
             } catch (error) {
-                console.error("❌ Erreur connexion:", error);
-                alert("Erreur de connexion: " + error.message);
+                console.log("⚠️ Popup échouée, tentative redirect...", error.code);
+                
+                // Si popup bloquée ou échouée, essayer redirect
+                if (error.code === 'auth/popup-blocked' || 
+                    error.code === 'auth/popup-closed-by-user' ||
+                    error.code === 'auth/cancelled-popup-request' ||
+                    error.code === 'auth/internal-error') {
+                    try {
+                        // Sauvegarder l'élève en attente avant redirect
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const eleveCode = urlParams.get('eleve');
+                        if (eleveCode) {
+                            sessionStorage.setItem('pendingEleve', eleveCode);
+                        }
+                        await signInWithRedirect(auth, googleProvider);
+                    } catch (redirectError) {
+                        console.error("❌ Erreur redirect:", redirectError);
+                        alert("Erreur de connexion. Essayez d'ouvrir le lien dans Safari directement.");
+                    }
+                } else {
+                    console.error("❌ Erreur connexion:", error);
+                    alert("Erreur de connexion: " + error.message);
+                }
             }
         };
         
@@ -951,6 +964,14 @@
             
             // Vérifier si scan QR en attente
             checkQRScan();
+            
+            // Vérifier si élève en attente depuis sessionStorage (après redirect)
+            const pendingEleve = sessionStorage.getItem('pendingEleve');
+            if (pendingEleve) {
+                window.pendingEleveFromQR = pendingEleve;
+                sessionStorage.removeItem('pendingEleve');
+                console.log("📱 Élève récupéré après redirect:", pendingEleve);
+            }
         }
         
         window.deconnexion = async function() {
