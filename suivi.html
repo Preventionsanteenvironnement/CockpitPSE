@@ -382,6 +382,8 @@
         }
         .eleve-row .status.done { color: var(--success); }
         .eleve-row .status.pending { color: var(--muted); }
+        .eleve-row .status.absent { color: #92400e; }
+        .eleve-row.absent { background: #fef3c7; }
         
         /* === ACTIONS === */
         .actions-grid {
@@ -680,8 +682,9 @@
             </div>
             
             <!-- ACTIONS -->
-            <div class="actions-grid">
+            <div class="actions-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                 <button class="btn btn-secondary" onclick="retourConfig()">← Retour</button>
+                <button class="btn btn-absent" onclick="marquerAbsent()" style="background: #fef3c7; color: #92400e; border: 2px solid #fbbf24;">🚫 Absent</button>
                 <button class="btn btn-success" onclick="validerSaisie()">✓ Valider</button>
             </div>
             
@@ -1036,6 +1039,7 @@
                         code: e.userCode,
                         classe: e.classe,
                         done: false,
+                        absent: false,
                         note: null
                     });
                 });
@@ -1050,15 +1054,28 @@
         
         function renderListeEleves() {
             const container = document.getElementById('listeEleves');
-            container.innerHTML = elevesSeance.map(e => `
-                <div class="eleve-row ${e.done ? 'done' : ''} ${currentEleve === e.code ? 'current' : ''}" 
-                     onclick="selectionnerEleve('${e.code}')">
+            container.innerHTML = elevesSeance.map(e => {
+                let statusClass = 'pending';
+                let statusText = '⏳';
+                
+                if (e.absent) {
+                    statusClass = 'absent';
+                    statusText = '🚫 ABS';
+                } else if (e.done) {
+                    statusClass = 'done';
+                    statusText = '✅ ' + e.note + '/20';
+                }
+                
+                return `
+                <div class="eleve-row ${statusClass} ${currentEleve === e.code ? 'current' : ''}" 
+                     onclick="selectionnerEleve('${e.code}')"
+                     title="${e.done || e.absent ? 'Cliquer pour modifier' : 'Cliquer pour évaluer'}">
                     <span class="code">${e.code}</span>
-                    <span class="status ${e.done ? 'done' : 'pending'}">
-                        ${e.done ? '✅ ' + e.note + '/20' : '⏳'}
+                    <span class="status ${statusClass}">
+                        ${statusText}
                     </span>
                 </div>
-            `).join('');
+            `}).join('');
         }
         
         // ═══════════════════════════════════════════════════════════════
@@ -1141,6 +1158,7 @@
                 points: result.points,
                 maxPoints: result.maxPoints,
                 noteSur20: result.noteSur20,
+                absent: false, // Pas absent
                 createdAt: serverTimestamp(),
                 createdBy: currentUser?.email || "anonyme"
             };
@@ -1153,10 +1171,11 @@
                 // Mettre à jour stats
                 await updateStats(currentEleve, result.noteSur20, saisie);
                 
-                // Marquer fait
+                // Marquer fait (et enlever absent si c'était le cas)
                 const idx = elevesSeance.findIndex(e => e.code === currentEleve);
                 if (idx !== -1) {
                     elevesSeance[idx].done = true;
+                    elevesSeance[idx].absent = false;
                     elevesSeance[idx].note = result.noteSur20;
                 }
                 renderListeEleves();
@@ -1164,8 +1183,8 @@
                 // Toast
                 showToast("✅ " + currentEleve + " - " + result.noteSur20 + "/20");
                 
-                // Élève suivant
-                const next = elevesSeance.find(e => !e.done);
+                // Élève suivant (non fait ET non absent)
+                const next = elevesSeance.find(e => !e.done && !e.absent);
                 if (next) {
                     setTimeout(() => selectionnerEleve(next.code), 300);
                 }
@@ -1177,6 +1196,83 @@
                 alert("Erreur: " + err.message);
             }
         };
+        
+        // ═══════════════════════════════════════════════════════════════
+        // MARQUER ABSENT
+        // ═══════════════════════════════════════════════════════════════
+        window.marquerAbsent = async function() {
+            if (!currentEleve) return alert("Aucun élève sélectionné !");
+            
+            const data = {
+                date: new Date().toISOString().split('T')[0],
+                heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                classe: seanceConfig.classe,
+                module: seanceConfig.module,
+                moduleTitre: seanceConfig.moduleTitre,
+                competences: seanceConfig.competences,
+                absent: true,
+                noteSur20: null,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser?.email || "anonyme"
+            };
+            
+            try {
+                // Enregistrer l'absence
+                const docId = `${data.date}_${seanceConfig.module}_${Date.now()}`;
+                await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
+                
+                // Mettre à jour stats (incrémenter nbAbsences)
+                await updateStatsAbsence(currentEleve);
+                
+                // Marquer absent
+                const idx = elevesSeance.findIndex(e => e.code === currentEleve);
+                if (idx !== -1) {
+                    elevesSeance[idx].absent = true;
+                    elevesSeance[idx].done = false;
+                    elevesSeance[idx].note = null;
+                }
+                renderListeEleves();
+                
+                // Toast
+                showToast("🚫 " + currentEleve + " - Absent");
+                
+                // Élève suivant
+                const next = elevesSeance.find(e => !e.done && !e.absent);
+                if (next) {
+                    setTimeout(() => selectionnerEleve(next.code), 300);
+                }
+                
+                console.log("🚫 Absence enregistrée:", currentEleve);
+                
+            } catch (err) {
+                console.error("❌ Erreur:", err);
+                alert("Erreur: " + err.message);
+            }
+        };
+        
+        async function updateStatsAbsence(eleveCode) {
+            try {
+                const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
+                const snap = await getDoc(ref);
+                
+                if (snap.exists()) {
+                    const current = snap.data();
+                    await updateDoc(ref, {
+                        nbAbsences: (current.nbAbsences || 0) + 1,
+                        lastUpdate: serverTimestamp()
+                    });
+                } else {
+                    await setDoc(ref, {
+                        nbSeances: 0,
+                        nbAbsences: 1,
+                        totalNotes: 0,
+                        lastUpdate: serverTimestamp()
+                    });
+                }
+            } catch (err) {
+                console.error("Erreur stats absence:", err);
+            }
+        }
         
         async function updateStats(eleveCode, note, saisieData) {
             try {
