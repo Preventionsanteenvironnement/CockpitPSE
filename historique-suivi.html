@@ -797,6 +797,50 @@
     function afficherHistorique() {
         const tbody = document.getElementById('tableBody');
         
+        // 🔍 DÉTECTION DES DOUBLONS
+        const doublonsMap = new Map();
+        window.allSuivis.forEach((s, idx) => {
+            const key = `${s.eleveCode}_${s.date}_${s.module}`;
+            if (!doublonsMap.has(key)) {
+                doublonsMap.set(key, []);
+            }
+            doublonsMap.get(key).push(idx);
+        });
+        
+        // Identifier les indices des doublons
+        const doublonsIndices = new Set();
+        doublonsMap.forEach((indices, key) => {
+            if (indices.length > 1) {
+                indices.forEach(i => doublonsIndices.add(i));
+            }
+        });
+        
+        // Afficher alerte si doublons trouvés
+        const nbDoublons = doublonsIndices.size;
+        let doublonsAlert = document.getElementById('doublonsAlert');
+        if (!doublonsAlert) {
+            doublonsAlert = document.createElement('div');
+            doublonsAlert.id = 'doublonsAlert';
+            doublonsAlert.style.cssText = 'background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; display: none;';
+            const filtersDiv = document.querySelector('.filters');
+            if (filtersDiv) filtersDiv.after(doublonsAlert);
+        }
+        
+        if (nbDoublons > 0) {
+            doublonsAlert.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.5em;">⚠️</span>
+                    <div>
+                        <strong style="color: #92400e;">${nbDoublons} doublon(s) détecté(s) !</strong>
+                        <div style="font-size: 0.9em; color: #a16207;">Même élève + même date + même module. Les lignes concernées sont surlignées en orange.</div>
+                    </div>
+                </div>
+            `;
+            doublonsAlert.style.display = 'block';
+        } else {
+            doublonsAlert.style.display = 'none';
+        }
+        
         // Stats
         const presents = window.allSuivis.filter(s => !s.absent);
         const absents = window.allSuivis.filter(s => s.absent);
@@ -826,6 +870,10 @@
         tbody.innerHTML = window.allSuivis.map((s, idx) => {
             const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
             const noteDisplay = s.absent ? '🚫 ABS' : `${s.noteSur20}/20`;
+            
+            // 🔍 Vérifier si c'est un doublon
+            const isDoublon = doublonsIndices.has(idx);
+            const doublonStyle = isDoublon ? 'background: #fef3c7 !important; border-left: 4px solid #f59e0b;' : '';
             
             // Construire l'affichage du cours (maintenant array)
             let coursDisplay = '-';
@@ -882,8 +930,8 @@
             }
             
             return `
-                <tr>
-                    <td>${formatDate(s.date)} ${s.heure || ''}</td>
+                <tr style="${doublonStyle}"${isDoublon ? ' title="⚠️ DOUBLON DÉTECTÉ"' : ''}>
+                    <td>${isDoublon ? '⚠️ ' : ''}${formatDate(s.date)} ${s.heure || ''}</td>
                     <td><span class="code-badge">${s.eleveCode}</span></td>
                     <td><span class="classe-badge">${s.classe || '--'}</span></td>
                     <td>${s.module || '--'}</td>
