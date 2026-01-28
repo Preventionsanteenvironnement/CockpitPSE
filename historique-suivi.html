@@ -880,14 +880,8 @@
     }
     
     function getCoursDisplay(s) {
-        if (!s.coursRecu && !s.coursDistrib) return '-';
-        if (s.coursDistrib === 'complet') return '📚';
+        if (!s.coursRecu && !s.coursDistrib && !s.S1 && !s.S2 && !s.S3 && !s.S4) return '-';
         const parts = [];
-        if (s.coursDistrib) {
-            const match = s.coursDistrib.match(/seance(\d)/);
-            if (match) parts.push('S' + match[1]);
-            else if (s.coursDistrib !== 'aucun') parts.push(s.coursDistrib);
-        }
         // Gérer les nouveaux champs S1, S2, etc.
         if (s.S1) parts.push('S1');
         if (s.S2) parts.push('S2');
@@ -895,6 +889,14 @@
         if (s.S4) parts.push('S4');
         if (s.coursComplet) parts.push('📚');
         if (s.correction) parts.push('✏️');
+        // Ancien format coursDistrib
+        if (s.coursDistrib && typeof s.coursDistrib === 'string') {
+            if (s.coursDistrib === 'complet') parts.push('📚');
+            else if (s.coursDistrib.includes('seance')) {
+                const num = s.coursDistrib.replace('seance', '');
+                if (num && !parts.includes('S' + num)) parts.push('S' + num);
+            }
+        }
         return parts.length > 0 ? '✅ ' + parts.join(' ') : '-';
     }
     
