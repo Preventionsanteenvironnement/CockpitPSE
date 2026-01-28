@@ -339,6 +339,103 @@
         }
         .note-box .value { font-size: 2em; font-weight: 800; color: var(--success); }
         
+        /* === OBJECTIF === */
+        .objectif-box {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .objectif-box h4 {
+            font-size: 0.9em;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+        .objectif-texte {
+            background: white;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .objectif-validation {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .objectif-validation label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        .objectif-validation label.atteint { background: #dcfce7; color: #166534; }
+        .objectif-validation label.non-atteint { background: #fee2e2; color: #991b1b; }
+        .objectif-validation label.en-cours { background: #fef3c7; color: #92400e; }
+        .objectif-validation label:has(input:checked) { outline: 2px solid currentColor; }
+        .objectif-aucun {
+            text-align: center;
+            padding: 10px;
+            color: #64748b;
+            font-style: italic;
+            font-size: 0.85em;
+        }
+        
+        /* === COMMENTAIRES TAGS === */
+        .comment-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .comment-tag {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.1s;
+        }
+        .comment-tag:active { transform: scale(0.95); }
+        .comment-tag.positif { background: #dcfce7; color: #166534; }
+        .comment-tag.encouragement { background: #dbeafe; color: #1e40af; }
+        .comment-tag.alerte { background: #fee2e2; color: #991b1b; }
+        
+        /* === AJUSTEMENT NOTE === */
+        .note-ajustement {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .note-ajustement label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+        .ajustement-fields {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fef3c7;
+            border-radius: 8px;
+        }
+        .ajustement-fields input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            margin-top: 5px;
+        }
+        .ajustement-fields input[type="number"] { width: 80px; }
+        
         /* === COURS CHECKBOXES === */
         .cours-grid { display: flex; flex-wrap: wrap; gap: 8px; }
         .cours-checkbox {
@@ -503,6 +600,7 @@
                     <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance4">📄 S4</label>
                     <label class="cours-checkbox"><input type="checkbox" name="defCours" value="complet">📚 Complet</label>
                     <label class="cours-checkbox"><input type="checkbox" name="defCours" value="correction">✏️ Correction</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="evaluation">📝 Évaluation</label>
                 </div>
             </div>
             
@@ -611,6 +709,7 @@
     let currentSession = null;
     let currentEleve = null;
     let saisie = {};
+    let objectifPrecedent = null;
     
     const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
     const MALUS = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
@@ -884,16 +983,21 @@
     }
     
     // MODAL
-    window.openModal = function(code) {
+    window.openModal = async function(code) {
         currentEleve = currentSession.eleves.find(e => e.code === code);
         if (!currentEleve) return;
         
         document.getElementById('modalEleve').textContent = `${currentEleve.prenom} ${currentEleve.nom} (${code})`;
         
         saisie = { travail: null, oral: null, attention: null, porteVue: null, coursAJour: null, autonomie: null, initiative: null, securite: null, bavardage: 'aucun', telephone: 'ok' };
+        objectifPrecedent = null;
+        
         if (currentEleve.note && !currentEleve.note.absent) saisie = { ...currentEleve.note };
         
         document.getElementById('modalBody').innerHTML = buildForm();
+        
+        // Charger l'objectif de l'élève depuis Firebase
+        await chargerObjectifEleve(code);
         
         // Sélections
         Object.entries(saisie).forEach(([k, v]) => {
@@ -916,15 +1020,104 @@
             });
         }
         
+        // Si note ajustée précédemment, restaurer
+        if (currentEleve.note?.ajustementManuel) {
+            document.getElementById('ajusterNote').checked = true;
+            document.getElementById('ajustementFields').style.display = 'block';
+            document.getElementById('noteManuelle').value = currentEleve.note.noteSur20;
+            if (currentEleve.note.justificationAjustement) {
+                document.getElementById('justifAjustement').value = currentEleve.note.justificationAjustement;
+            }
+        }
+        
+        // Si validation objectif précédente, restaurer
+        if (currentEleve.note?.objectifValide?.statut) {
+            const radio = document.querySelector(`input[name="objValid"][value="${currentEleve.note.objectifValide.statut}"]`);
+            if (radio) radio.checked = true;
+        }
+        
         updatePreview();
         document.getElementById('modalNotation').classList.add('active');
+    };
+    
+    // Charger l'objectif de l'élève depuis Firebase
+    async function chargerObjectifEleve(code) {
+        try {
+            const objectifRef = doc(db, "resultats", code, "objectifs", "current");
+            const objectifSnap = await getDoc(objectifRef);
+            
+            const sectionObj = document.getElementById('sectionObjectif');
+            const existant = document.getElementById('objectifExistant');
+            const aucun = document.getElementById('objectifAucun');
+            
+            if (objectifSnap.exists()) {
+                objectifPrecedent = objectifSnap.data();
+                document.getElementById('objectifTexte').textContent = '🎯 ' + objectifPrecedent.texte;
+                existant.style.display = 'block';
+                aucun.style.display = 'none';
+            } else {
+                objectifPrecedent = null;
+                existant.style.display = 'none';
+                aucun.style.display = 'block';
+            }
+        } catch (error) {
+            console.log("Pas d'objectif:", error);
+            document.getElementById('objectifExistant').style.display = 'none';
+            document.getElementById('objectifAucun').style.display = 'block';
+        }
+    }
+    
+    // Fonction pour ajouter un commentaire tag
+    window.addComment = function(txt) {
+        const input = document.getElementById('mComment');
+        if (input.value) {
+            input.value += ' ' + txt;
+        } else {
+            input.value = txt;
+        }
+    };
+    
+    // Fonction pour toggle ajustement note
+    window.toggleAjustement = function() {
+        const checked = document.getElementById('ajusterNote').checked;
+        document.getElementById('ajustementFields').style.display = checked ? 'block' : 'none';
+        if (checked) {
+            const r = calcNote();
+            document.getElementById('noteManuelle').value = r.note;
+        }
     };
     
     window.closeModal = () => document.getElementById('modalNotation').classList.remove('active');
     
     function buildForm() {
         const c = currentSession.criteres || {};
-        let h = `<div class="note-box"><div style="font-size:0.85em;color:var(--muted);">Note calculée</div><div class="value" id="preview">--</div></div>`;
+        
+        // Note box avec ajustement
+        let h = `<div class="note-box">
+            <div style="font-size:0.85em;color:var(--muted);">Note calculée</div>
+            <div class="value" id="preview">--</div>
+            <div class="note-ajustement">
+                <label><input type="checkbox" id="ajusterNote" onchange="toggleAjustement()"> ✏️ Ajuster la note manuellement</label>
+                <div id="ajustementFields" class="ajustement-fields" style="display:none;">
+                    <label>Note finale : <input type="number" id="noteManuelle" min="0" max="20" step="0.5" style="width:70px;"> /20</label>
+                    <input type="text" id="justifAjustement" placeholder="Justification (optionnel)..." style="margin-top:8px;">
+                </div>
+            </div>
+        </div>`;
+        
+        // Section Objectif élève
+        h += `<div class="objectif-box" id="sectionObjectif">
+            <h4>🎯 Objectif de l'élève</h4>
+            <div id="objectifExistant" style="display:none;">
+                <div class="objectif-texte" id="objectifTexte">--</div>
+                <div class="objectif-validation">
+                    <label class="atteint"><input type="radio" name="objValid" value="atteint" onchange="updatePreview()"> ✅ Atteint</label>
+                    <label class="non-atteint"><input type="radio" name="objValid" value="non_atteint" onchange="updatePreview()"> ❌ Non atteint</label>
+                    <label class="en-cours"><input type="radio" name="objValid" value="en_cours" onchange="updatePreview()"> ⏳ En cours</label>
+                </div>
+            </div>
+            <div id="objectifAucun" class="objectif-aucun" style="display:none;">Pas d'objectif fixé pour cet élève</div>
+        </div>`;
         
         if (c.travail) h += section('Travail', 'travail', [['tresbien','✓✓','Très bien'],['fait','✓','Fait'],['partiel','⚠️','Partiel'],['insuffisant','❌','Non fait'],['ne','➖','NE']], 5);
         if (c.oral) h += section('Oral', 'oral', [['0','0','Aucune'],['1','1','Faible'],['2','2','Correcte'],['3','3','Bonne'],['4','4','Excellente'],['ne','➖','NE']], 6);
@@ -958,9 +1151,24 @@
             <label class="cours-checkbox"><input type="checkbox" name="mCours" value="seance4">📄 S4</label>
             <label class="cours-checkbox"><input type="checkbox" name="mCours" value="complet">📚 Complet</label>
             <label class="cours-checkbox"><input type="checkbox" name="mCours" value="correction">✏️ Correction</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="evaluation">📝 Évaluation</label>
         </div></div>`;
         
-        h += `<div class="section-saisie"><h3>💬 Commentaire</h3><textarea id="mComment" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;min-height:50px;font-family:inherit;">${currentEleve.note?.commentaire || ''}</textarea></div>`;
+        // Commentaires avec tags
+        h += `<div class="section-saisie"><h3>💬 Appréciation</h3>
+            <div class="comment-tags" id="commentTags">
+                <button type="button" class="comment-tag positif" onclick="addComment('Excellent travail')">Excellent travail</button>
+                <button type="button" class="comment-tag positif" onclick="addComment('Bonne participation')">Bonne participation</button>
+                <button type="button" class="comment-tag positif" onclick="addComment('Travail sérieux')">Travail sérieux</button>
+                <button type="button" class="comment-tag encouragement" onclick="addComment('À poursuivre')">À poursuivre</button>
+                <button type="button" class="comment-tag encouragement" onclick="addComment('Peut mieux faire')">Peut mieux faire</button>
+                <button type="button" class="comment-tag encouragement" onclick="addComment('Efforts à maintenir')">Efforts à maintenir</button>
+                <button type="button" class="comment-tag alerte" onclick="addComment('Manque de travail')">Manque de travail</button>
+                <button type="button" class="comment-tag alerte" onclick="addComment('Bavardages excessifs')">Bavardages excessifs</button>
+                <button type="button" class="comment-tag alerte" onclick="addComment('Matériel incomplet')">Matériel incomplet</button>
+            </div>
+            <textarea id="mComment" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;min-height:50px;font-family:inherit;">${currentEleve.note?.commentaire || ''}</textarea>
+        </div>`;
         
         return h;
     }
@@ -995,20 +1203,63 @@
         if (c.securite && saisie.securite && saisie.securite !== 'ne') { max += 2; if (saisie.securite === 'oui') pts += 2; else if (saisie.securite === 'partiel') pts += 1; }
         
         let base = max > 0 ? Math.round((pts / max) * 20 * 10) / 10 : 0;
-        let plafond = PLAFOND[saisie.bavardage || 'aucun'] || 20;
-        let malus = MALUS[saisie.telephone || 'ok'] || 0;
+        const bavardage = saisie.bavardage || 'aucun';
+        const telephone = saisie.telephone || 'ok';
+        let plafond = PLAFOND[bavardage] || 20;
+        let malus = MALUS[telephone] || 0;
         let note = Math.max(0, Math.min(base, plafond) - malus);
+        
+        // Bonus objectif atteint (+0.5 si pas de problème bavardage/téléphone)
+        let bonusObjectif = 0;
+        const objectifValidation = document.querySelector('input[name="objValid"]:checked');
+        const bavardageOk = (bavardage === 'aucun' || bavardage === 'ne');
+        const telephoneOk = (telephone === 'ok' || telephone === 'ne');
+        if (objectifValidation && objectifValidation.value === 'atteint' && bavardageOk && telephoneOk) {
+            bonusObjectif = 0.5;
+            note = Math.min(20, note + bonusObjectif);
+        }
+        
         note = Math.round(note * 2) / 2;
         
-        return { pts, max, base, plafond, malus, note };
+        return { pts, max, base, plafond, malus, bonusObjectif, bavardage, telephone, note };
     }
     
     function updatePreview() {
         const r = calcNote();
         const el = document.getElementById('preview');
         if (el) {
-            el.textContent = r.note + '/20';
-            el.style.color = r.note >= 12 ? '#16a34a' : r.note >= 8 ? '#f59e0b' : '#dc2626';
+            let display = r.note + '/20';
+            
+            // Couleur selon bavardage et note
+            if (r.bavardage === 'retenu') {
+                el.style.color = '#dc2626';
+                display += ' 🚨';
+            } else if (r.bavardage === 'rappel3') {
+                el.style.color = '#dc2626';
+                display += ' ⚠️';
+            } else if (r.bavardage === 'rappel2' || r.bavardage === 'rappel1') {
+                el.style.color = '#f59e0b';
+            } else if (r.malus > 0) {
+                el.style.color = '#f59e0b';
+            } else if (r.bonusObjectif > 0) {
+                el.style.color = '#16a34a';
+                display += ' 🎯';
+            } else if (r.note >= 12) {
+                el.style.color = '#16a34a';
+            } else if (r.note >= 8) {
+                el.style.color = '#f59e0b';
+            } else {
+                el.style.color = '#dc2626';
+            }
+            
+            el.textContent = display;
+            
+            // Mettre à jour le champ note manuelle si pas coché
+            const ajusterEl = document.getElementById('ajusterNote');
+            const noteManuelleEl = document.getElementById('noteManuelle');
+            if (ajusterEl && !ajusterEl.checked && noteManuelleEl) {
+                noteManuelleEl.value = r.note;
+            }
         }
     }
     
@@ -1019,12 +1270,69 @@
         const cours = Array.from(document.querySelectorAll('input[name="mCours"]:checked')).map(c => c.value);
         const comment = document.getElementById('mComment')?.value.trim() || null;
         
-        const data = { ...saisie, noteSur20: r.note, noteBase: r.base, plafond: r.plafond, malus: r.malus, points: r.pts, maxPoints: r.max, coursDistrib: cours, commentaire: comment, absent: false, heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), updatedAt: serverTimestamp(), updatedBy: user?.email };
+        // Note finale (ajustée ou calculée)
+        let noteFinale = r.note;
+        let ajustementManuel = false;
+        let justification = null;
+        
+        const ajusterEl = document.getElementById('ajusterNote');
+        if (ajusterEl && ajusterEl.checked) {
+            const noteManuelle = parseFloat(document.getElementById('noteManuelle').value);
+            if (!isNaN(noteManuelle) && noteManuelle >= 0 && noteManuelle <= 20) {
+                noteFinale = noteManuelle;
+                ajustementManuel = true;
+                justification = document.getElementById('justifAjustement')?.value.trim() || null;
+            }
+        }
+        
+        // Objectif - validation par le prof
+        const objectifValidation = document.querySelector('input[name="objValid"]:checked');
+        const objectifValide = objectifPrecedent ? {
+            texte: objectifPrecedent.texte,
+            statut: objectifValidation ? objectifValidation.value : 'en_cours'
+        } : null;
+        
+        const data = { 
+            ...saisie, 
+            noteSur20: noteFinale, 
+            noteCalculee: r.note,
+            noteBase: r.base, 
+            plafond: r.plafond, 
+            malus: r.malus, 
+            bonusObjectif: r.bonusObjectif,
+            points: r.pts, 
+            maxPoints: r.max, 
+            coursDistrib: cours, 
+            commentaire: comment, 
+            ajustementManuel: ajustementManuel,
+            justificationAjustement: justification,
+            objectifValide: objectifValide,
+            absent: false, 
+            heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), 
+            updatedAt: serverTimestamp(), 
+            updatedBy: user?.email 
+        };
         
         await setDoc(doc(db, "sessions", currentSession.id, "notes", currentEleve.code), data);
         await setDoc(doc(db, "resultats", currentEleve.code, "suivi", `${currentSession.date}_${currentSession.module}`), { ...data, date: currentSession.date, classe: currentSession.classe, module: currentSession.module, createdAt: serverTimestamp(), createdBy: user?.email });
         
-        toast(`✅ ${currentEleve.prenom} - ${r.note}/20`);
+        // Si objectif atteint ou non atteint, archiver et supprimer current
+        if (objectifValide && (objectifValide.statut === 'atteint' || objectifValide.statut === 'non_atteint')) {
+            try {
+                const archiveId = `${currentSession.date}_${currentSession.module}`;
+                await setDoc(doc(db, "resultats", currentEleve.code, "objectifs", archiveId), {
+                    ...objectifPrecedent,
+                    statut: objectifValide.statut,
+                    dateValidation: serverTimestamp(),
+                    validePar: user?.email
+                });
+                // Note: On ne supprime pas "current" pour que l'élève puisse en fixer un nouveau
+            } catch (e) {
+                console.log("Erreur archivage objectif:", e);
+            }
+        }
+        
+        toast(`✅ ${currentEleve.prenom} - ${noteFinale}/20`);
         closeModal();
         loadEleves();
     };
