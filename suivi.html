@@ -1444,6 +1444,17 @@
                 window.elevesDejaNotes = elevesNotes;
                 window.dateSeanceOriginale = dateSeance; // 📅 STOCKER LA DATE ORIGINALE
                 
+                // 📅 METTRE À JOUR L'AFFICHAGE DE LA DATE EN HAUT
+                if (dateSeance) {
+                    const [year, month, day] = dateSeance.split('-');
+                    const dateObj = new Date(year, month - 1, day);
+                    document.getElementById('dateJour').textContent = dateObj.toLocaleDateString('fr-FR', {
+                        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                    });
+                    // Ajouter un indicateur visuel
+                    document.getElementById('dateJour').innerHTML += ' <span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; margin-left: 10px;">📋 Reprise</span>';
+                }
+                
                 if (classe) {
                     const selectClasse = document.getElementById('selectClasse');
                     selectClasse.value = classe;
@@ -2199,7 +2210,34 @@
             try {
                 // Enregistrer suivi (ID fixe = date + module, pour permettre la mise à jour)
                 const docId = `${data.date}_${seanceConfig.module}`;
-                await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
+                const docRef = doc(db, "resultats", currentEleve, "suivi", docId);
+                
+                // 🔒 VÉRIFICATION DOUBLON : regarder si un enregistrement existe déjà
+                const existingSnap = await getDoc(docRef);
+                if (existingSnap.exists()) {
+                    const existingData = existingSnap.data();
+                    const existingNote = existingData.noteSur20;
+                    const isCurrentSession = elevesSeance.find(e => e.code === currentEleve)?.done;
+                    
+                    // Si l'élève n'est pas déjà marqué "done" dans cette session, c'est un doublon potentiel
+                    if (!isCurrentSession) {
+                        const confirmation = confirm(
+                            `⚠️ ATTENTION : ${currentEleve} a déjà une note pour cette date !\n\n` +
+                            `📅 Date : ${data.date}\n` +
+                            `📚 Module : ${seanceConfig.module}\n` +
+                            `📝 Note existante : ${existingNote}/20\n` +
+                            `🆕 Nouvelle note : ${noteFinale}/20\n\n` +
+                            `Voulez-vous REMPLACER l'ancienne note ?`
+                        );
+                        
+                        if (!confirmation) {
+                            showToast("❌ Annulé - Note non modifiée", 2000);
+                            return;
+                        }
+                    }
+                }
+                
+                await setDoc(docRef, data);
                 
                 // Archiver et supprimer l'objectif si validé (atteint ou non_atteint)
                 if (objectifPrecedent && objectifValidation) {
@@ -2277,7 +2315,31 @@
             
             try {
                 const docId = `${data.date}_${seanceConfig.module}`;
-                await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
+                const docRef = doc(db, "resultats", currentEleve, "suivi", docId);
+                
+                // 🔒 VÉRIFICATION DOUBLON
+                const existingSnap = await getDoc(docRef);
+                if (existingSnap.exists()) {
+                    const existingData = existingSnap.data();
+                    const existingNote = existingData.noteSur20;
+                    const wasAbsent = existingData.absent;
+                    
+                    const confirmation = confirm(
+                        `⚠️ ATTENTION : ${currentEleve} a déjà un enregistrement pour cette date !\n\n` +
+                        `📅 Date : ${data.date}\n` +
+                        `📚 Module : ${seanceConfig.module}\n` +
+                        `📝 Existant : ${wasAbsent ? 'Absent' : existingNote + '/20'}\n` +
+                        `🆕 Nouveau : Absent\n\n` +
+                        `Voulez-vous REMPLACER ?`
+                    );
+                    
+                    if (!confirmation) {
+                        showToast("❌ Annulé", 2000);
+                        return;
+                    }
+                }
+                
+                await setDoc(docRef, data);
                 
                 await updateStatsAbsence(currentEleve);
                 
