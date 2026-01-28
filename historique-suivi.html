@@ -204,6 +204,9 @@
         th { background: #f8fafc; font-weight: 700; font-size: 0.75em; text-transform: uppercase; color: var(--muted); }
         tr:hover { background: #f8fafc; }
         tr.doublon { background: #fef3c7 !important; }
+        tr.non-note { background: #f3f4f6 !important; }
+        tr.non-note:hover { background: #e5e7eb !important; }
+        tr.separator-row:hover { background: #fef3c7 !important; }
         
         .code-badge { font-weight: 700; background: #eff6ff; color: #3b82f6; padding: 4px 10px; border-radius: 6px; font-size: 0.85em; }
         .classe-badge { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
@@ -712,8 +715,12 @@
             select.appendChild(opt);
         });
         
-        // Date par défaut = aujourd'hui
+        // Date par défaut = aujourd'hui (mais peut être effacée)
         document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
+        
+        // Ajouter un bouton pour effacer la date
+        const dateInput = document.getElementById('filterDate');
+        dateInput.title = "Laissez vide pour voir toutes les sessions";
     }
     
     // Charger historique
@@ -816,12 +823,13 @@
             }
             
             // Afficher tableau
-            if (window.allSuivis.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Aucune saisie trouvée</p></div></td></tr>';
+            if (window.allSuivis.length === 0 && !filterDate) {
+                tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Aucune saisie trouvée pour cette classe</p></div></td></tr>';
                 return;
             }
             
-            tbody.innerHTML = window.allSuivis.map((s, idx) => {
+            // Construire le HTML des élèves NOTÉS
+            let tableHTML = window.allSuivis.map((s, idx) => {
                 const key = `${s.eleveCode}_${s.date}_${s.module || 'C11'}`;
                 const isDoublon = doublonKeys.has(key);
                 
@@ -848,6 +856,49 @@
                     </td>
                 </tr>`;
             }).join('');
+            
+            // AJOUTER LES ÉLÈVES NON NOTÉS (seulement si date spécifiée)
+            if (filterDate && window.allSuivis.length > 0) {
+                const elevesNotes = window.allSuivis.map(s => s.eleveCode);
+                const elevesNonNotes = bdd.filter(e => classesFiltre.includes(e.classe) && !elevesNotes.includes(e.userCode));
+                
+                if (elevesNonNotes.length > 0) {
+                    // Récupérer le module de la séance
+                    const moduleSeance = window.allSuivis[0]?.module || 'C11';
+                    
+                    // Stocker pour utilisation dans le formulaire
+                    window.elevesNonNotes = elevesNonNotes.map(e => ({
+                        code: e.userCode,
+                        classe: e.classe,
+                        date: filterDate,
+                        module: moduleSeance
+                    }));
+                    
+                    // Ajouter séparateur
+                    tableHTML += `<tr class="separator-row"><td colspan="9" style="background: #fef3c7; text-align: center; font-weight: 600; color: #92400e; padding: 10px;">
+                        ⚠️ ${elevesNonNotes.length} élève(s) non noté(s) pour cette séance
+                    </td></tr>`;
+                    
+                    // Ajouter lignes des non notés
+                    elevesNonNotes.forEach((e, idx) => {
+                        tableHTML += `<tr class="non-note" data-nonnote-idx="${idx}">
+                            <td>${formatDate(filterDate)} <span style="color: #dc2626;">⏳</span></td>
+                            <td><span class="code-badge" style="background: #fee2e2; color: #991b1b;">${window.afficherAvecNom(e.userCode)}</span></td>
+                            <td><span class="classe-badge">${e.classe}</span></td>
+                            <td><span class="module-badge">${moduleSeance}</span></td>
+                            <td><span class="note-badge" style="background: #f3f4f6; color: #6b7280;">Non noté</span></td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td class="actions-cell">
+                                <button class="btn-action btn-edit" onclick="ouvrirModalCreate(${idx})" title="Noter cet élève" style="background: #dcfce7;">➕</button>
+                            </td>
+                        </tr>`;
+                    });
+                }
+            }
+            
+            tbody.innerHTML = tableHTML || '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Aucune saisie trouvée</p></div></td></tr>';
             
         } catch (error) {
             console.error("Erreur:", error);
@@ -952,6 +1003,10 @@
     window.fermerModal = function() {
         document.getElementById('modalEdit').classList.remove('active');
         editingDoc = null;
+        creatingEleve = null;
+        // Remettre le titre original
+        document.querySelector('#modalEdit .modal-header h2').textContent = '✏️ Modifier la saisie';
+        document.querySelector('#modalEdit .btn-save').textContent = '💾 Sauvegarder';
     };
     
     // Plafonds et malus
@@ -1041,6 +1096,205 @@
         }
     };
     
+    // === MODAL CRÉATION (pour élèves non notés) ===
+    let creatingEleve = null;
+    
+    window.ouvrirModalCreate = function(idx) {
+        const e = window.elevesNonNotes[idx];
+        creatingEleve = e;
+        
+        // Remplir le formulaire avec les infos de base
+        document.getElementById('editEleve').value = window.afficherAvecNom(e.code) + ' - ' + e.classe;
+        document.getElementById('editDate').value = e.date;
+        document.getElementById('editNote').value = '';
+        document.getElementById('editStatut').value = 'present';
+        document.getElementById('editCommentaire').value = '';
+        
+        // Réinitialiser tous les champs
+        document.getElementById('editTravail').value = 'ne';
+        document.getElementById('editOral').value = 'ne';
+        document.getElementById('editAttention').value = 'ne';
+        document.getElementById('editPorteVue').value = 'ne';
+        document.getElementById('editCoursJour').value = 'ne';
+        document.getElementById('editAutonomie').value = 'ne';
+        document.getElementById('editInitiative').value = 'ne';
+        document.getElementById('editSecurite').value = 'ne';
+        document.getElementById('editBavardage').value = 'aucun';
+        document.getElementById('editTelephone').value = 'ok';
+        
+        // Réinitialiser checkboxes cours
+        document.getElementById('checkS1').checked = false;
+        document.getElementById('checkS2').checked = false;
+        document.getElementById('checkS3').checked = false;
+        document.getElementById('checkS4').checked = false;
+        document.getElementById('checkComplet').checked = false;
+        document.getElementById('checkCorrection').checked = false;
+        
+        // Changer le titre et le bouton
+        document.querySelector('#modalEdit .modal-header h2').textContent = '➕ Noter cet élève';
+        document.querySelector('#modalEdit .btn-save').textContent = '💾 Créer la note';
+        
+        document.getElementById('modalEdit').classList.add('active');
+    };
+    
+    window.sauvegarderModification = async function() {
+        // Si c'est une CRÉATION (élève non noté)
+        if (creatingEleve) {
+            await creerNouvelleNote();
+            return;
+        }
+        
+        // Sinon c'est une MODIFICATION (code existant)
+        if (!editingDoc) return;
+        
+        const newDate = document.getElementById('editDate').value;
+        const oldDate = editingDoc.date;
+        const dateChanged = newDate !== oldDate;
+        
+        const statut = document.getElementById('editStatut').value;
+        let note = parseFloat(document.getElementById('editNote').value) || 0;
+        const commentaire = document.getElementById('editCommentaire').value.trim();
+        
+        const bavardage = document.getElementById('editBavardage').value;
+        const telephone = document.getElementById('editTelephone').value;
+        
+        // Recalculer note
+        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+        const malus = MALUS_TELEPHONE[telephone] || 0;
+        let noteFinale = Math.min(note, plafond);
+        noteFinale = Math.max(0, noteFinale - malus);
+        noteFinale = Math.round(noteFinale * 2) / 2;
+        
+        // Récupérer tous les champs
+        const updateData = {
+            date: newDate,
+            absent: statut === 'absent',
+            noteSur20: statut === 'absent' ? null : noteFinale,
+            bavardage: bavardage,
+            telephone: telephone,
+            plafond: plafond,
+            malus: malus,
+            commentaire: commentaire || null,
+            travail: document.getElementById('editTravail').value,
+            oral: document.getElementById('editOral').value === 'ne' ? null : parseInt(document.getElementById('editOral').value),
+            attention: document.getElementById('editAttention').value,
+            porteVue: document.getElementById('editPorteVue').value,
+            coursJour: document.getElementById('editCoursJour').value,
+            autonomie: document.getElementById('editAutonomie').value,
+            initiative: document.getElementById('editInitiative').value,
+            securite: document.getElementById('editSecurite').value,
+            S1: document.getElementById('checkS1').checked,
+            S2: document.getElementById('checkS2').checked,
+            S3: document.getElementById('checkS3').checked,
+            S4: document.getElementById('checkS4').checked,
+            coursComplet: document.getElementById('checkComplet').checked,
+            correction: document.getElementById('checkCorrection').checked,
+            coursRecu: document.getElementById('checkS1').checked || document.getElementById('checkS2').checked || 
+                       document.getElementById('checkS3').checked || document.getElementById('checkS4').checked ||
+                       document.getElementById('checkComplet').checked
+        };
+        
+        try {
+            if (dateChanged) {
+                const oldRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
+                await deleteDoc(oldRef);
+                
+                const newId = newDate + '_' + (editingDoc.module || 'C11') + '_' + Date.now();
+                const newRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", newId);
+                await setDoc(newRef, {
+                    ...updateData,
+                    classe: editingDoc.classe,
+                    module: editingDoc.module || 'C11',
+                    heure: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
+                });
+                
+                alert("✅ Modification enregistrée !");
+            } else {
+                const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
+                await updateDoc(ref, updateData);
+                alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
+            }
+            
+            fermerModal();
+            chargerHistorique();
+            
+        } catch (err) {
+            console.error("Erreur modification:", err);
+            alert("Erreur: " + err.message);
+        }
+    };
+    
+    // Fonction pour CRÉER une nouvelle note (élève non noté)
+    async function creerNouvelleNote() {
+        const e = creatingEleve;
+        if (!e) return;
+        
+        const statut = document.getElementById('editStatut').value;
+        let note = parseFloat(document.getElementById('editNote').value) || 0;
+        const commentaire = document.getElementById('editCommentaire').value.trim();
+        
+        const bavardage = document.getElementById('editBavardage').value;
+        const telephone = document.getElementById('editTelephone').value;
+        
+        // Calculer note finale
+        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+        const malus = MALUS_TELEPHONE[telephone] || 0;
+        let noteFinale = Math.min(note, plafond);
+        noteFinale = Math.max(0, noteFinale - malus);
+        noteFinale = Math.round(noteFinale * 2) / 2;
+        
+        const newData = {
+            date: e.date,
+            classe: e.classe,
+            module: e.module,
+            absent: statut === 'absent',
+            noteSur20: statut === 'absent' ? null : noteFinale,
+            bavardage: bavardage,
+            telephone: telephone,
+            plafond: plafond,
+            malus: malus,
+            commentaire: commentaire || null,
+            travail: document.getElementById('editTravail').value,
+            oral: document.getElementById('editOral').value === 'ne' ? null : parseInt(document.getElementById('editOral').value),
+            attention: document.getElementById('editAttention').value,
+            porteVue: document.getElementById('editPorteVue').value,
+            coursJour: document.getElementById('editCoursJour').value,
+            autonomie: document.getElementById('editAutonomie').value,
+            initiative: document.getElementById('editInitiative').value,
+            securite: document.getElementById('editSecurite').value,
+            S1: document.getElementById('checkS1').checked,
+            S2: document.getElementById('checkS2').checked,
+            S3: document.getElementById('checkS3').checked,
+            S4: document.getElementById('checkS4').checked,
+            coursComplet: document.getElementById('checkComplet').checked,
+            correction: document.getElementById('checkCorrection').checked,
+            coursRecu: document.getElementById('checkS1').checked || document.getElementById('checkS2').checked || 
+                       document.getElementById('checkS3').checked || document.getElementById('checkS4').checked ||
+                       document.getElementById('checkComplet').checked,
+            heure: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
+        };
+        
+        try {
+            const newId = e.date + '_' + e.module + '_' + Date.now();
+            const newRef = doc(db, "resultats", e.code, "suivi", newId);
+            await setDoc(newRef, newData);
+            
+            alert("✅ Note créée pour " + window.afficherAvecNom(e.code) + " : " + noteFinale + "/20");
+            
+            // Réinitialiser
+            creatingEleve = null;
+            document.querySelector('#modalEdit .modal-header h2').textContent = '✏️ Modifier la saisie';
+            document.querySelector('#modalEdit .btn-save').textContent = '💾 Sauvegarder';
+            
+            fermerModal();
+            chargerHistorique();
+            
+        } catch (err) {
+            console.error("Erreur création:", err);
+            alert("Erreur: " + err.message);
+        }
+    }
+    
     // === MODAL SUPPRESSION ===
     window.ouvrirModalDelete = function(idx) {
         const s = window.allSuivis[idx];
@@ -1057,12 +1311,10 @@
         deletingDoc = null;
     };
     
-    // CORRECTION: Suppression d'UNE SEULE ligne
     window.confirmerSuppression = async function() {
         if (!deletingDoc) return;
         
         try {
-            // Supprimer UNIQUEMENT ce document spécifique
             const ref = doc(db, "resultats", deletingDoc.eleveCode, "suivi", deletingDoc.id);
             await deleteDoc(ref);
             
@@ -1076,7 +1328,7 @@
         }
     };
     
-    console.log("✅ Historique Suivi v2 prêt (correction doublons + formulaire complet)");
+    console.log("✅ Historique Suivi v3 prêt (élèves non notés + formulaire complet)");
 </script>
 
 </body>
