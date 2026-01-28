@@ -1103,6 +1103,8 @@
     };
     
     async function chargerBilanClasse(classeId) {
+        console.log("🔍 chargerBilanClasse appelée avec:", classeId);
+        
         if (!classeId) {
             document.getElementById('bilanSection').classList.remove('active');
             return;
@@ -1110,9 +1112,15 @@
         
         currentClasseForBilan = classeId;
         const classesEffectives = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
-        const eleves = window.ELEVES_DATA ? window.ELEVES_DATA.filter(e => classesEffectives.includes(e.classe)) : [];
+        console.log("📋 Classes effectives:", classesEffectives);
         
-        if (eleves.length === 0) return;
+        const eleves = window.ELEVES_DATA ? window.ELEVES_DATA.filter(e => classesEffectives.includes(e.classe)) : [];
+        console.log("👥 Élèves trouvés:", eleves.length);
+        
+        if (eleves.length === 0) {
+            console.log("⚠️ Aucun élève dans ELEVES_DATA pour cette classe");
+            return;
+        }
         
         bilanData = [];
         
@@ -1140,13 +1148,10 @@
             }
         }
         
+        console.log("📊 bilanData:", bilanData.length, "élèves avec données de suivi");
+        
         if (bilanData.length === 0) {
             document.getElementById('bilanSection').classList.remove('active');
-            // Afficher un message informatif
-            const btnBilan = document.getElementById('btnBilan');
-            if (btnBilan) {
-                btnBilan.style.display = 'none';
-            }
             console.log("⚠️ Bilan: Aucune donnée de suivi trouvée pour cette classe");
             return;
         }
@@ -1552,11 +1557,27 @@
     };
     
     // Fonction pour afficher le bilan et scroller vers lui
-    window.afficherBilan = function() {
+    window.afficherBilan = async function() {
         const bilanSection = document.getElementById('bilanSection');
-        if (bilanSection && bilanSection.classList.contains('active')) {
-            // Scroller vers la section
+        const classeId = document.getElementById('filterClasse').value;
+        
+        // Si pas de classe sélectionnée, informer l'utilisateur
+        if (!classeId || classeId === '') {
+            alert('⚠️ Veuillez d\'abord sélectionner une classe et cliquer sur Actualiser');
+            return;
+        }
+        
+        // Si la section n'est pas encore active, charger les données
+        if (!bilanSection.classList.contains('active')) {
+            console.log("🔄 Chargement du bilan pour", classeId);
+            await chargerBilanClasse(classeId);
+        }
+        
+        // Scroller vers la section si elle est maintenant active
+        if (bilanSection.classList.contains('active')) {
             bilanSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            alert('⚠️ Aucune donnée de suivi trouvée pour cette classe.\n\nVérifiez que vous avez bien saisi des données dans "Saisie" ou "Historique".');
         }
     };
     
@@ -1566,11 +1587,12 @@
         await originalChargerDonnees();
         const classeId = document.getElementById('filterClasse').value;
         
-        // Afficher/cacher le bouton bilan selon si une classe est sélectionnée
+        // Afficher le bouton bilan si une classe est sélectionnée
         const btnBilan = document.getElementById('btnBilan');
         if (classeId && classeId !== '') {
-            await chargerBilanClasse(classeId);
             if (btnBilan) btnBilan.style.display = 'block';
+            // Charger les données du bilan
+            await chargerBilanClasse(classeId);
         } else {
             document.getElementById('bilanSection').classList.remove('active');
             if (btnBilan) btnBilan.style.display = 'none';
