@@ -565,6 +565,10 @@
                 <input type="text" id="editEleve" readonly style="background: #f8fafc;">
             </div>
             <div class="form-group">
+                <label>📅 Date de la séance</label>
+                <input type="date" id="editDate">
+            </div>
+            <div class="form-group">
                 <label>Note sur 20</label>
                 <input type="number" id="editNote" min="0" max="20" step="0.5">
             </div>
@@ -665,7 +669,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     
     const firebaseConfig = {
@@ -986,6 +990,7 @@
         editingDoc = s;
         
         document.getElementById('editEleve').value = s.eleveCode + ' - ' + (s.classe || '');
+        document.getElementById('editDate').value = s.date || '';
         document.getElementById('editNote').value = s.noteSur20 || '';
         document.getElementById('editStatut').value = s.absent ? 'absent' : 'present';
         document.getElementById('editCommentaire').value = s.commentaire || '';
@@ -1035,6 +1040,7 @@
     window.sauvegarderModification = async function() {
         if (!editingDoc) return;
         
+        const nouvelleDate = document.getElementById('editDate').value;
         const statut = document.getElementById('editStatut').value;
         let note = parseFloat(document.getElementById('editNote').value) || 0;
         const commentaire = document.getElementById('editCommentaire').value.trim();
@@ -1055,21 +1061,59 @@
         noteFinale = Math.round(noteFinale * 2) / 2;
         
         try {
-            const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
+            const ancienneDate = editingDoc.date;
+            const dateChangee = nouvelleDate && nouvelleDate !== ancienneDate;
             
-            await updateDoc(ref, {
-                absent: statut === 'absent',
-                noteSur20: statut === 'absent' ? null : noteFinale,
-                bavardage: bavardage,
-                telephone: telephone,
-                plafond: plafond,
-                malus: malus,
-                commentaire: commentaire || null,
-                coursDistrib: coursDistrib.length > 0 ? coursDistrib : [],
-                coursRecu: statut === 'absent' ? false : (coursDistrib.length > 0)
-            });
+            if (dateChangee) {
+                // La date a changé : créer nouveau doc + supprimer ancien
+                const ancienRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
+                const ancienSnap = await getDoc(ancienRef);
+                const anciennesDonnees = ancienSnap.exists() ? ancienSnap.data() : {};
+                
+                // Nouveau ID basé sur nouvelle date
+                const nouveauId = `${nouvelleDate}_${editingDoc.module}`;
+                const nouveauRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", nouveauId);
+                
+                // Créer nouveau document avec toutes les données
+                await setDoc(nouveauRef, {
+                    ...anciennesDonnees,
+                    date: nouvelleDate,
+                    absent: statut === 'absent',
+                    noteSur20: statut === 'absent' ? null : noteFinale,
+                    bavardage: bavardage,
+                    telephone: telephone,
+                    plafond: plafond,
+                    malus: malus,
+                    commentaire: commentaire || null,
+                    coursDistrib: coursDistrib.length > 0 ? coursDistrib : [],
+                    coursRecu: statut === 'absent' ? false : (coursDistrib.length > 0),
+                    modifiedAt: serverTimestamp()
+                });
+                
+                // Supprimer ancien document
+                await deleteDoc(ancienRef);
+                
+                alert("✅ Date modifiée ! " + ancienneDate + " → " + nouvelleDate + "\nNote finale: " + noteFinale + "/20");
+            } else {
+                // Date inchangée : simple mise à jour
+                const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
+                
+                await updateDoc(ref, {
+                    absent: statut === 'absent',
+                    noteSur20: statut === 'absent' ? null : noteFinale,
+                    bavardage: bavardage,
+                    telephone: telephone,
+                    plafond: plafond,
+                    malus: malus,
+                    commentaire: commentaire || null,
+                    coursDistrib: coursDistrib.length > 0 ? coursDistrib : [],
+                    coursRecu: statut === 'absent' ? false : (coursDistrib.length > 0),
+                    modifiedAt: serverTimestamp()
+                });
+                
+                alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
+            }
             
-            alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
             fermerModal();
             chargerHistorique();
             
