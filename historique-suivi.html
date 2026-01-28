@@ -8,29 +8,6 @@
     
     <script src="data_modules.js"></script>
     <script src="data_eleves.js"></script>
-
-    <!-- ⭐ MODULE MES ÉLÈVES ⭐ -->
-    <script>
-    (function() {
-        const CLE_ELEVES = 'cockpit_eleves_noms';
-        window.getNomEleve = function(code) {
-            if (!code) return null;
-            const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
-            return eleves[code.toUpperCase()] || null;
-        };
-        window.afficherAvecNom = function(code) {
-            if (!code) return code || '';
-            const nom = window.getNomEleve(code);
-            return nom ? code + ' (' + nom + ')' : code;
-        };
-        window.hasElevesCharges = function() {
-            return Object.keys(JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}')).length > 0;
-        };
-        window.getNbElevesCharges = function() {
-            return Object.keys(JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}')).length;
-        };
-    })();
-    </script>
     
     <style>
         :root {
@@ -55,39 +32,7 @@
             padding: 20px;
         }
         
-        .container { max-width: 1100px; margin: 0 auto; }
-        
-        /* === NAVIGATION === */
-        .nav-bar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        .nav-btn {
-            padding: 10px 18px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.9em;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .nav-btn.active {
-            background: var(--primary);
-            color: white;
-        }
-        .nav-btn:not(.active) {
-            background: var(--card);
-            color: var(--text);
-            border: 2px solid var(--border);
-        }
-        .nav-btn:not(.active):hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
+        .container { max-width: 900px; margin: 0 auto; }
         
         /* === HEADER === */
         .header {
@@ -96,8 +41,43 @@
             padding: 25px;
             border-radius: 16px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
         }
-        .header h1 { font-size: 1.5em; margin-bottom: 5px; }
+        
+        .header h1 {
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+        
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+        }
         
         /* === FILTRES === */
         .filters {
@@ -107,176 +87,210 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
+        
         .filters-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
             align-items: end;
         }
+        
         .filter-group label {
             display: block;
+            font-size: 0.8em;
             font-weight: 600;
-            margin-bottom: 6px;
-            font-size: 0.85em;
             color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
         }
-        .filter-group select, .filter-group input {
+        
+        .filter-group select,
+        .filter-group input {
             width: 100%;
-            padding: 10px 12px;
+            padding: 10px;
             border: 2px solid var(--border);
             border-radius: 8px;
             font-size: 0.95em;
-            background: white;
+            font-family: inherit;
         }
-        .btn { padding: 10px 20px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.9em; }
-        .btn-search { background: var(--primary); color: white; width: 100%; }
-        .btn-search:hover { background: #7c3aed; }
+        
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .btn-search {
+            background: var(--primary);
+            color: white;
+            padding: 10px 25px;
+        }
+        
+        .btn-search:hover {
+            opacity: 0.9;
+        }
         
         /* === STATS === */
         .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 15px;
+            display: flex;
+            gap: 20px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
+        
         .stat-item {
             background: var(--card);
-            padding: 15px;
+            padding: 15px 25px;
             border-radius: 10px;
-            text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
-        .stat-value { font-size: 1.6em; font-weight: 800; color: var(--primary); }
-        .stat-value.success { color: var(--success); }
-        .stat-value.warning { color: var(--warning); }
-        .stat-label { font-size: 0.75em; color: var(--muted); margin-top: 3px; }
         
-        /* === ALERTES === */
-        .alert-doublons {
-            background: #fef3c7;
-            border: 2px solid #f59e0b;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 800;
+            color: var(--primary);
         }
-        .alert-doublons-icon { font-size: 1.5em; }
-        .alert-doublons-text { flex: 1; }
-        .alert-doublons strong { color: #92400e; }
         
-        /* === SÉANCE EN COURS === */
-        .seance-encours {
-            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-            border: 2px solid #22c55e;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+        .stat-label {
+            font-size: 0.8em;
+            color: var(--muted);
         }
-        .seance-info { display: flex; align-items: center; gap: 10px; }
-        .seance-info-icon { font-size: 1.3em; }
-        .btn-completer {
-            background: #16a34a;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .btn-completer:hover { background: #15803d; }
         
-        /* === TABLE === */
+        /* === TABLEAU === */
         .table-container {
             background: var(--card);
             border-radius: 12px;
-            overflow-x: auto;
+            overflow-x: auto; /* Scroll horizontal sur mobile */
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
         }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background: #f8fafc; font-weight: 700; font-size: 0.75em; text-transform: uppercase; color: var(--muted); }
-        tr:hover { background: #f8fafc; }
-        tr.doublon { background: #fef3c7 !important; }
-        tr.non-note { background: #f3f4f6 !important; }
-        tr.non-note:hover { background: #e5e7eb !important; }
-        tr.separator-row:hover { background: #fef3c7 !important; }
         
-        .code-badge { font-weight: 700; background: #eff6ff; color: #3b82f6; padding: 4px 10px; border-radius: 6px; font-size: 0.85em; }
-        .classe-badge { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
-        .module-badge { font-size: 0.85em; color: var(--muted); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 700px; /* Force le scroll si écran trop petit */
+        }
         
-        .note-badge { padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85em; }
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        
+        tr:hover {
+            background: #f8fafc;
+        }
+        
+        .code-badge {
+            font-weight: 700;
+            background: #eff6ff;
+            color: #3b82f6;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        
+        .classe-badge {
+            font-size: 0.8em;
+            color: var(--muted);
+        }
+        
+        .note-badge {
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+        
         .note-badge.excellent { background: #dcfce7; color: #166534; }
         .note-badge.good { background: #dbeafe; color: #1e40af; }
         .note-badge.average { background: #fef3c7; color: #92400e; }
         .note-badge.poor { background: #fee2e2; color: #991b1b; }
-        .note-badge.absent { background: #f3e8ff; color: #7c3aed; }
+        .note-badge.absent { background: #fef3c7; color: #92400e; }
         
-        .bav-badge, .tel-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            font-size: 0.8em;
-            font-weight: 700;
+        .actions-cell {
+            display: flex;
+            gap: 8px;
         }
-        .bav-badge { background: #fef3c7; color: #92400e; }
-        .tel-badge { background: #fee2e2; color: #991b1b; }
-        .bav-badge.ok, .tel-badge.ok { background: #dcfce7; color: #166534; }
         
-        .cours-badge { font-size: 0.85em; }
-        .cours-badge.oui { color: var(--success); }
-        .cours-badge.non { color: var(--muted); }
-        
-        .actions-cell { display: flex; gap: 8px; }
-        .btn-action {
-            width: 36px;
-            height: 36px;
+        .btn-icon {
+            width: 32px;
+            height: 32px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 1.1em;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s;
         }
-        .btn-edit { background: #fef3c7; }
-        .btn-edit:hover { background: #fde68a; }
-        .btn-delete { background: #fee2e2; }
-        .btn-delete:hover { background: #fecaca; }
         
-        .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
-        .empty-state-icon { font-size: 4em; margin-bottom: 15px; }
+        .btn-edit {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+        
+        .btn-edit:hover {
+            background: #bfdbfe;
+        }
+        
+        .btn-delete {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .btn-delete:hover {
+            background: #fecaca;
+        }
+        
+        /* === EMPTY STATE === */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+        
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
         
         /* === MODAL === */
         .modal-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background: rgba(0,0,0,0.5);
             z-index: 1000;
             align-items: center;
             justify-content: center;
             padding: 20px;
         }
-        .modal-overlay.active { display: flex; }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
         .modal {
             background: white;
             border-radius: 16px;
-            max-width: 550px;
+            max-width: 500px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
         }
+        
         .modal-header {
             padding: 20px;
             border-bottom: 1px solid var(--border);
@@ -284,9 +298,23 @@
             justify-content: space-between;
             align-items: center;
         }
-        .modal-header h2 { font-size: 1.2em; }
-        .modal-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--muted); }
-        .modal-body { padding: 20px; }
+        
+        .modal-header h2 {
+            font-size: 1.2em;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--muted);
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
         .modal-footer {
             padding: 20px;
             border-top: 1px solid var(--border);
@@ -295,45 +323,97 @@
             justify-content: flex-end;
         }
         
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9em; }
-        .form-group input, .form-group select, .form-group textarea {
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+        }
+        
+        .form-group input,
+        .form-group select {
             width: 100%;
-            padding: 10px 12px;
+            padding: 10px;
             border: 2px solid var(--border);
             border-radius: 8px;
-            font-size: 0.95em;
+            font-size: 1em;
         }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         
-        .btn-cancel { background: #f1f5f9; color: var(--text); }
-        .btn-save { background: var(--primary); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
+        .btn-cancel {
+            background: #e2e8f0;
+            color: var(--text);
+        }
+        
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        /* === RESPONSIVE === */
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            table {
+                font-size: 0.85em;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+            }
+            
+            .actions-cell {
+                flex-direction: column;
+            }
+        }
         
         /* === LOGIN === */
-        .login-screen { max-width: 400px; margin: 60px auto; text-align: center; }
-        .login-card { background: var(--card); padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        .login-icon { font-size: 4em; margin-bottom: 20px; }
+        .login-screen {
+            max-width: 400px;
+            margin: 60px auto;
+            text-align: center;
+        }
+        
+        .login-card {
+            background: var(--card);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .login-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
         .btn-google {
-            display: inline-flex; align-items: center; gap: 12px;
-            padding: 14px 28px; background: #4285f4; color: white;
-            border: none; border-radius: 12px; font-size: 1em; font-weight: 600; cursor: pointer; margin-top: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 28px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
         }
-        .btn-google:hover { background: #3367d6; }
         
-        /* === CHECKBOX COURS === */
-        .cours-checks { display: flex; flex-wrap: wrap; gap: 10px; }
-        .cours-check {
-            display: flex; align-items: center; gap: 6px;
-            padding: 8px 12px; background: #f8fafc; border-radius: 8px; cursor: pointer;
-        }
-        .cours-check input { width: auto; margin: 0; }
-        .cours-check.checked { background: #dbeafe; }
-        
-        @media (max-width: 768px) {
-            .filters-grid { grid-template-columns: 1fr; }
-            .form-row { grid-template-columns: 1fr; }
-            .nav-bar { justify-content: center; }
+        .btn-google:hover {
+            background: #3367d6;
         }
     </style>
 </head>
@@ -359,17 +439,13 @@
     <!-- ÉCRAN PRINCIPAL -->
     <div id="mainScreen" style="display: none;">
         
-        <!-- NAVIGATION -->
-        <nav class="nav-bar">
-            <a href="suivi.html" class="nav-btn">📝 Suivi de Classe</a>
-            <a href="dashboard.html" class="nav-btn">📊 Tableau de Bord</a>
-            <a href="historique-suivi.html" class="nav-btn active">📋 Historique</a>
-            <a href="index.html" class="nav-btn">🏠 Cockpit</a>
-        </nav>
-        
         <!-- HEADER -->
         <div class="header">
             <h1>📋 Historique du Suivi</h1>
+            <div class="header-actions">
+                <a href="suivi.html" class="btn btn-light">➕ Nouvelle saisie</a>
+                <a href="index.html" class="btn btn-light">🏠 Cockpit</a>
+            </div>
         </div>
         
         <!-- FILTRES -->
@@ -377,17 +453,17 @@
             <div class="filters-grid">
                 <div class="filter-group">
                     <label>Classe</label>
-                    <select id="filterClasse">
-                        <option value="">-- Sélectionner --</option>
+                    <select id="filterClasse" onchange="chargerHistorique()">
+                        <option value="">Toutes</option>
                     </select>
                 </div>
                 <div class="filter-group">
                     <label>Date</label>
-                    <input type="date" id="filterDate">
+                    <input type="date" id="filterDate" onchange="chargerHistorique()">
                 </div>
                 <div class="filter-group">
-                    <label>Élève (optionnel)</label>
-                    <input type="text" id="filterEleve" placeholder="Code élève...">
+                    <label>Élève</label>
+                    <input type="text" id="filterEleve" placeholder="Code élève..." oninput="chargerHistorique()">
                 </div>
                 <div class="filter-group">
                     <label>&nbsp;</label>
@@ -396,33 +472,35 @@
             </div>
         </div>
         
-        <!-- ALERTE DOUBLONS (cachée par défaut) -->
-        <div class="alert-doublons" id="alertDoublons" style="display: none;">
-            <span class="alert-doublons-icon">⚠️</span>
-            <div class="alert-doublons-text">
-                <strong><span id="nbDoublons">0</span> doublon(s) détecté(s) !</strong><br>
-                <small>Même élève + même date + même module. Les lignes concernées sont surlignées en orange.</small>
-            </div>
-        </div>
-        
         <!-- STATS -->
         <div class="stats-bar">
-            <div class="stat-item"><div class="stat-value" id="statSaisies">0</div><div class="stat-label">Saisies</div></div>
-            <div class="stat-item"><div class="stat-value success" id="statPresents">0</div><div class="stat-label">Présents</div></div>
-            <div class="stat-item"><div class="stat-value warning" id="statAbsents">0</div><div class="stat-label">Absents</div></div>
-            <div class="stat-item"><div class="stat-value" id="statMoyenne">--</div><div class="stat-label">Moyenne</div></div>
+            <div class="stat-item">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">Saisies</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statPresents">0</div>
+                <div class="stat-label">Présents</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statAbsents">0</div>
+                <div class="stat-label">Absents</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statMoyenne">--</div>
+                <div class="stat-label">Moyenne</div>
+            </div>
         </div>
         
-        <!-- SÉANCE EN COURS (cachée par défaut) -->
-        <div class="seance-encours" id="seanceEncours" style="display: none;">
-            <div class="seance-info">
-                <span class="seance-info-icon">📝</span>
-                <div>
-                    <strong>Séance en cours</strong><br>
-                    <span id="seanceInfo">--</span>
-                </div>
+        <!-- BOUTON COMPLÉTER LA SÉANCE -->
+        <div id="completerSeanceBox" style="display: none; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 2px solid #22c55e; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <div style="font-weight: 700; color: #166534;">📋 Séance en cours</div>
+                <div style="font-size: 0.9em; color: #15803d;" id="completerSeanceInfo">-- élèves notés sur --</div>
             </div>
-            <button class="btn-completer" onclick="completerSeance()">+ Compléter cette séance</button>
+            <button onclick="completerSeance()" style="background: #22c55e; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                ➕ Compléter cette séance
+            </button>
         </div>
         
         <!-- TABLEAU -->
@@ -442,7 +520,14 @@
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Sélectionnez une classe et cliquez sur Rechercher</p></div></td></tr>
+                    <tr>
+                        <td colspan="9">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <p>Sélectionnez des filtres pour afficher l'historique</p>
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -451,7 +536,7 @@
     
 </div>
 
-<!-- MODAL ÉDITION COMPLET -->
+<!-- MODAL ÉDITION -->
 <div class="modal-overlay" id="modalEdit">
     <div class="modal">
         <div class="modal-header">
@@ -464,149 +549,77 @@
                 <input type="text" id="editEleve" readonly style="background: #f8fafc;">
             </div>
             
-            <div class="form-group">
-                <label>📅 Date de la séance</label>
-                <input type="date" id="editDate">
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Note sur 20</label>
-                    <input type="number" id="editNote" min="0" max="20" step="0.5">
+            <!-- 🎯 OBJECTIF DE L'ÉLÈVE -->
+            <div class="form-group" id="objectifEleveSection" style="display: none;">
+                <label>🎯 Objectif de l'élève</label>
+                <div id="objectifEleveBox" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 12px; border-radius: 8px; border: 2px solid #f59e0b;">
+                    <div style="font-weight: 600; color: #78350f; margin-bottom: 8px;" id="objectifEleveTexte">--</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: #dcfce7; border-radius: 6px; cursor: pointer;">
+                            <input type="radio" name="editObjectifValidation" value="atteint"> ✅ Atteint
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: #fee2e2; border-radius: 6px; cursor: pointer;">
+                            <input type="radio" name="editObjectifValidation" value="non_atteint"> ❌ Non atteint
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: #dbeafe; border-radius: 6px; cursor: pointer;">
+                            <input type="radio" name="editObjectifValidation" value="en_cours" checked> ⏳ En cours
+                        </label>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Statut</label>
-                    <select id="editStatut">
-                        <option value="present">Présent (avec note)</option>
-                        <option value="absent">Absent</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>📝 Travail</label>
-                    <select id="editTravail">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="tresbien">✅ Très bien</option>
-                        <option value="fait">👍 Fait</option>
-                        <option value="partiel">⚠️ Partiel</option>
-                        <option value="insuffisant">❌ Insuffisant/Non fait</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>🗣️ Participation orale</label>
-                    <select id="editOral">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="4">4 - Excellente</option>
-                        <option value="3">3 - Bonne</option>
-                        <option value="2">2 - Correcte</option>
-                        <option value="1">1 - Faible</option>
-                        <option value="0">0 - Aucune</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>👁️ Attention</label>
-                    <select id="editAttention">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="bonne">✅ Bonne</option>
-                        <option value="moyenne">⚠️ Moyenne</option>
-                        <option value="insuffisante">❌ Insuffisante</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>📂 Porte-vue</label>
-                    <select id="editPorteVue">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="ok">✅ OK</option>
-                        <option value="incomplet">⚠️ Incomplet</option>
-                        <option value="absent">❌ Absent</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>📖 Cours à jour</label>
-                    <select id="editCoursJour">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="oui">✅ Oui</option>
-                        <option value="partiel">⚠️ Partiel</option>
-                        <option value="non">❌ Non</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>🎯 Autonomie</label>
-                    <select id="editAutonomie">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="bonne">✅ Bonne</option>
-                        <option value="moyenne">⚠️ Moyenne</option>
-                        <option value="faible">❌ Faible</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>💡 Initiative</label>
-                    <select id="editInitiative">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="oui">✅ Oui</option>
-                        <option value="non">❌ Non</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>🛡️ Respect du cadre</label>
-                    <select id="editSecurite">
-                        <option value="ne">-- Non évalué --</option>
-                        <option value="oui">✅ Oui</option>
-                        <option value="partiel">⚠️ Partiel</option>
-                        <option value="non">❌ Non</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label>💬 Bavardage (plafonne la note)</label>
-                    <select id="editBavardage">
-                        <option value="aucun">✅ Aucun</option>
-                        <option value="rappel1">⚠️ Rappel 1 (max 14/20)</option>
-                        <option value="rappel2">⚠️ Rappel 2 (max 10/20)</option>
-                        <option value="rappel3">🚫 Rappel 3 (max 6/20)</option>
-                        <option value="retenu">🚨 Retenu (max 4/20)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>📱 Téléphone (malus)</label>
-                    <select id="editTelephone">
-                        <option value="ok">✅ OK</option>
-                        <option value="rappel1">⚠️ Rappel 1 (-1 pt)</option>
-                        <option value="rappel2">⚠️ Rappel 2 (-2 pts)</option>
-                        <option value="rappel3">🚫 Rappel 3 (-3 pts)</option>
-                        <option value="confisque">🚫 Confisqué (-5 pts)</option>
-                    </select>
+                <div id="objectifEleveAucun" style="display: none; padding: 12px; background: #f3f4f6; border-radius: 8px; color: #6b7280; font-style: italic;">
+                    Cet élève n'a pas fixé d'objectif.
                 </div>
             </div>
             
             <div class="form-group">
-                <label>💬 Commentaire</label>
-                <textarea id="editCommentaire" rows="2" placeholder="Optionnel..."></textarea>
+                <label>Note sur 20</label>
+                <input type="number" id="editNote" min="0" max="20" step="0.5">
+                <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 10px; background: #fef3c7; border-radius: 8px; cursor: pointer;">
+                    <input type="checkbox" id="editForceNote" style="width: 18px; height: 18px;">
+                    <span style="font-size: 0.9em; color: #92400e;">✏️ <strong>Forcer cette note</strong> (ignorer plafond bavardage/malus téléphone)</span>
+                </label>
             </div>
-            
             <div class="form-group">
-                <label>📄 Cours distribués / Actions</label>
-                <div class="cours-checks" id="coursChecks">
-                    <label class="cours-check"><input type="checkbox" id="checkS1" value="S1"> S1</label>
-                    <label class="cours-check"><input type="checkbox" id="checkS2" value="S2"> S2</label>
-                    <label class="cours-check"><input type="checkbox" id="checkS3" value="S3"> S3</label>
-                    <label class="cours-check"><input type="checkbox" id="checkS4" value="S4"> S4</label>
-                    <label class="cours-check"><input type="checkbox" id="checkComplet" value="complet"> 📚 Complet</label>
-                    <label class="cours-check"><input type="checkbox" id="checkCorrection" value="correction"> ✏️ Correction</label>
-                </div>
+                <label>Statut</label>
+                <select id="editStatut">
+                    <option value="present">Présent (avec note)</option>
+                    <option value="absent">Absent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>💬 Bavardage (plafonne la note)</label>
+                <select id="editBavardage">
+                    <option value="aucun">✅ Aucun</option>
+                    <option value="rappel1">⚠️ Rappel 1 (max 14/20)</option>
+                    <option value="rappel2">⚠️ Rappel 2 (max 10/20)</option>
+                    <option value="rappel3">🚫 Rappel 3 (max 6/20)</option>
+                    <option value="retenu">🚨 Retenu fin de cours (max 4/20)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>📱 Téléphone (malus)</label>
+                <select id="editTelephone">
+                    <option value="ok">✅ OK</option>
+                    <option value="rappel1">⚠️ Rappel 1 (-1 pt)</option>
+                    <option value="rappel2">⚠️ Rappel 2 (-2 pts)</option>
+                    <option value="rappel3">🚫 Rappel 3 (-3 pts)</option>
+                    <option value="confisque">🚫 Confisqué (-5 pts)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Commentaire</label>
+                <input type="text" id="editCommentaire" placeholder="Optionnel...">
+            </div>
+            <div class="form-group">
+                <label>📄 Cours distribué</label>
+                <select id="editCoursDistrib">
+                    <option value="aucun">Aucun</option>
+                    <option value="seance1">Séance 1</option>
+                    <option value="seance2">Séance 2</option>
+                    <option value="seance3">Séance 3</option>
+                    <option value="seance4">Séance 4</option>
+                    <option value="complet">📚 Cours complet</option>
+                </select>
             </div>
         </div>
         <div class="modal-footer">
@@ -620,16 +633,16 @@
 <div class="modal-overlay" id="modalDelete">
     <div class="modal">
         <div class="modal-header">
-            <h2>🗑️ Supprimer cette saisie</h2>
+            <h2>🗑️ Supprimer la saisie</h2>
             <button class="modal-close" onclick="fermerModalDelete()">&times;</button>
         </div>
         <div class="modal-body">
-            <p>Voulez-vous vraiment supprimer <strong>uniquement cette saisie</strong> ?</p>
-            <p style="margin-top: 15px; padding: 15px; background: #fee2e2; border-radius: 8px; color: #991b1b;">
+            <p>Êtes-vous sûr de vouloir supprimer cette saisie ?</p>
+            <p style="margin-top: 10px; padding: 15px; background: #fee2e2; border-radius: 8px; color: #991b1b;">
                 <strong id="deleteInfo">--</strong>
             </p>
-            <p style="margin-top: 15px; font-size: 0.9em; color: var(--muted);">
-                ⚠️ Cette action est irréversible. Seule cette ligne sera supprimée.
+            <p style="margin-top: 10px; color: var(--muted); font-size: 0.9em;">
+                Cette action est irréversible.
             </p>
         </div>
         <div class="modal-footer">
@@ -641,8 +654,8 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     
     const firebaseConfig = {
         apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -659,255 +672,303 @@
     const googleProvider = new GoogleAuthProvider();
     
     let currentUser = null;
+    window.allSuivis = [];
     let editingDoc = null;
     let deletingDoc = null;
-    window.allSuivis = [];
     
     // Auth
     onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "ennealyon@gmail.com") {
-            currentUser = user;
+        currentUser = user;
+        if (user) {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainScreen').style.display = 'block';
-            initClasses();
-        } else if (user) {
-            alert("Accès non autorisé");
-            signOut(auth);
+            initFilters();
+            chargerHistorique();
+        } else {
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('mainScreen').style.display = 'none';
         }
     });
     
     window.connexionGoogle = async function() {
         try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (error) {
-            if (error.code === 'auth/popup-blocked') {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
                 await signInWithRedirect(auth, googleProvider);
+            } else {
+                await signInWithPopup(auth, googleProvider);
             }
+        } catch (error) {
+            console.error("Erreur connexion:", error);
+            alert("Erreur: " + error.message);
         }
     };
     
-    getRedirectResult(auth).catch(console.error);
-    
-    // Init classes
-    function initClasses() {
+    function initFilters() {
         const select = document.getElementById('filterClasse');
-        const groupes = [
-            { nom: "BTAGO (groupé)", classes: ["BTAGO1", "BTAGO2"] },
-            { nom: "BTMELEC", classes: ["BTMELEC"] },
-            { nom: "B1AGO (groupé)", classes: ["B1AGO1", "B1AGO2"] },
-            { nom: "B2GATL (groupé)", classes: ["B2GATL1", "B2GATL2"] }
-        ];
-        groupes.forEach(g => {
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        classes.forEach(item => {
             const opt = document.createElement('option');
-            opt.value = g.classes.join(',');
-            opt.textContent = g.nom;
-            select.appendChild(opt);
-        });
-        const sep = document.createElement('option');
-        sep.disabled = true;
-        sep.textContent = "───────────";
-        select.appendChild(sep);
-        const classes = [...new Set((window.BDD_ELEVES || []).map(e => e.classe))].sort();
-        classes.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c;
-            opt.textContent = c;
+            opt.value = item.id;
+            opt.textContent = item.label;
             select.appendChild(opt);
         });
         
-        // Date par défaut = aujourd'hui (mais peut être effacée)
+        // Date par défaut : aujourd'hui
         document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
-        
-        // Ajouter un bouton pour effacer la date
-        const dateInput = document.getElementById('filterDate');
-        dateInput.title = "Laissez vide pour voir toutes les sessions";
     }
     
-    // Charger historique
     window.chargerHistorique = async function() {
-        const filterClasse = document.getElementById('filterClasse').value;
-        const filterDate = document.getElementById('filterDate').value;
-        const filterEleve = document.getElementById('filterEleve').value.trim().toUpperCase();
+        const classeFilter = document.getElementById('filterClasse').value;
+        const dateFilter = document.getElementById('filterDate').value;
+        const eleveFilter = document.getElementById('filterEleve').value.toUpperCase().trim();
+        
+        window.allSuivis = [];
+        
+        // Récupérer les élèves à chercher
+        let elevesToSearch = [];
+        
+        if (eleveFilter) {
+            // Chercher un élève spécifique
+            elevesToSearch = [eleveFilter];
+        } else if (classeFilter) {
+            // Chercher tous les élèves de la classe
+            const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeFilter) : [classeFilter];
+            const bdd = window.BDD_ELEVES || [];
+            classes.forEach(cl => {
+                bdd.filter(e => e.classe === cl).forEach(e => {
+                    elevesToSearch.push(e.userCode);
+                });
+            });
+        } else {
+            // Tous les élèves
+            const bdd = window.BDD_ELEVES || [];
+            elevesToSearch = bdd.map(e => e.userCode);
+        }
+        
+        // Limiter pour éviter trop de requêtes
+        if (elevesToSearch.length > 50) {
+            elevesToSearch = elevesToSearch.slice(0, 50);
+        }
+        
+        // Charger les suivis
+        for (const code of elevesToSearch) {
+            try {
+                const suiviRef = collection(db, "resultats", code, "suivi");
+                const suiviSnap = await getDocs(suiviRef);
+                
+                suiviSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    
+                    // Filtrer par date si spécifié
+                    if (dateFilter && data.date !== dateFilter) return;
+                    
+                    window.allSuivis.push({
+                        id: docSnap.id,
+                        eleveCode: code,
+                        ...data
+                    });
+                });
+            } catch (err) {
+                console.error("Erreur chargement", code, err);
+            }
+        }
+        
+        // Trier par date décroissante
+        window.allSuivis.sort((a, b) => {
+            const dateA = a.date + ' ' + (a.heure || '00:00');
+            const dateB = b.date + ' ' + (b.heure || '00:00');
+            return dateB.localeCompare(dateA);
+        });
+        
+        afficherHistorique();
+    };
+    
+    function afficherHistorique() {
         const tbody = document.getElementById('tableBody');
         
-        if (!filterClasse) {
-            tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Sélectionnez une classe</p></div></td></tr>';
+        // Stats
+        const presents = window.allSuivis.filter(s => !s.absent);
+        const absents = window.allSuivis.filter(s => s.absent);
+        const moyenne = presents.length > 0 
+            ? (presents.reduce((acc, s) => acc + (s.noteSur20 || 0), 0) / presents.length).toFixed(1)
+            : '--';
+        
+        document.getElementById('statTotal').textContent = window.allSuivis.length;
+        document.getElementById('statPresents').textContent = presents.length;
+        document.getElementById('statAbsents').textContent = absents.length;
+        document.getElementById('statMoyenne').textContent = moyenne;
+        
+        if (window.allSuivis.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📋</div>
+                            <p>Aucune saisie trouvée</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
             return;
         }
         
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px;">⏳ Chargement...</td></tr>';
-        
-        try {
-            const classesFiltre = filterClasse.split(',');
-            const bdd = window.BDD_ELEVES || [];
-            let elevesToSearch = [];
+        tbody.innerHTML = window.allSuivis.map((s, idx) => {
+            const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
+            const noteDisplay = s.absent ? '🚫 ABS' : `${s.noteSur20}/20`;
             
-            if (filterEleve) {
-                elevesToSearch = [filterEleve];
-            } else {
-                elevesToSearch = bdd.filter(e => classesFiltre.includes(e.classe)).map(e => e.userCode);
-            }
-            
-            window.allSuivis = [];
-            
-            for (const code of elevesToSearch) {
-                try {
-                    const suiviRef = collection(db, "resultats", code, "suivi");
-                    const suiviSnap = await getDocs(suiviRef);
-                    suiviSnap.forEach(docSnap => {
-                        const data = docSnap.data();
-                        // Filtrer par date si spécifiée
-                        if (!filterDate || data.date === filterDate) {
-                            window.allSuivis.push({
-                                id: docSnap.id,
-                                eleveCode: code,
-                                ...data
-                            });
-                        }
-                    });
-                } catch (err) {}
-            }
-            
-            // Tri par date décroissante puis par code
-            window.allSuivis.sort((a, b) => {
-                if (a.date !== b.date) return b.date.localeCompare(a.date);
-                return a.eleveCode.localeCompare(b.eleveCode);
-            });
-            
-            // Détection des doublons
-            const doublonKeys = new Set();
-            const compteur = {};
-            window.allSuivis.forEach(s => {
-                const key = `${s.eleveCode}_${s.date}_${s.module || 'C11'}`;
-                compteur[key] = (compteur[key] || 0) + 1;
-                if (compteur[key] > 1) doublonKeys.add(key);
-            });
-            
-            // Afficher alerte doublons
-            const nbDoublons = doublonKeys.size;
-            if (nbDoublons > 0) {
-                document.getElementById('alertDoublons').style.display = 'flex';
-                document.getElementById('nbDoublons').textContent = nbDoublons;
-            } else {
-                document.getElementById('alertDoublons').style.display = 'none';
-            }
-            
-            // Stats
-            const presents = window.allSuivis.filter(s => !s.absent);
-            const absents = window.allSuivis.filter(s => s.absent);
-            const notes = presents.filter(s => s.noteSur20 !== null && s.noteSur20 !== undefined).map(s => s.noteSur20);
-            const moyenne = notes.length > 0 ? (notes.reduce((a,b) => a+b, 0) / notes.length).toFixed(1) : '--';
-            
-            document.getElementById('statSaisies').textContent = window.allSuivis.length;
-            document.getElementById('statPresents').textContent = presents.length;
-            document.getElementById('statAbsents').textContent = absents.length;
-            document.getElementById('statMoyenne').textContent = moyenne;
-            
-            // Séance en cours
-            if (filterDate) {
-                const classesEffectives = classesFiltre;
-                const elevesClasse = bdd.filter(e => classesEffectives.includes(e.classe));
-                const elevesNotes = window.allSuivis.map(s => s.eleveCode);
-                const elevesRestants = elevesClasse.filter(e => !elevesNotes.includes(e.userCode));
-                
-                if (elevesRestants.length > 0 && window.allSuivis.length > 0) {
-                    document.getElementById('seanceEncours').style.display = 'flex';
-                    document.getElementById('seanceInfo').textContent = 
-                        `${window.allSuivis.length} élèves notés sur ${elevesClasse.length} — ${elevesRestants.length} restant(s)`;
-                    window.elevesRestantsSeance = elevesRestants.map(e => e.userCode);
+            // Construire l'affichage du cours
+            let coursDisplay = '-';
+            if (s.coursDistrib && s.coursDistrib !== 'aucun') {
+                const coursLabels = {
+                    'seance1': 'S1',
+                    'seance2': 'S2',
+                    'seance3': 'S3',
+                    'seance4': 'S4',
+                    'complet': '📚'
+                };
+                const label = coursLabels[s.coursDistrib] || s.coursDistrib;
+                if (s.absent && s.coursRecu === false) {
+                    coursDisplay = `<span style="color: #dc2626;">❌ ${label}</span>`;
                 } else {
-                    document.getElementById('seanceEncours').style.display = 'none';
+                    coursDisplay = `<span style="color: #16a34a;">✅ ${label}</span>`;
                 }
-            } else {
-                document.getElementById('seanceEncours').style.display = 'none';
             }
             
-            // Afficher tableau
-            if (window.allSuivis.length === 0 && !filterDate) {
-                tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Aucune saisie trouvée pour cette classe</p></div></td></tr>';
-                return;
+            // Affichage bavardage
+            let bavardageDisplay = '-';
+            if (s.bavardage && s.bavardage !== 'aucun') {
+                const bavLabels = {
+                    'rappel1': '1️⃣',
+                    'rappel2': '2️⃣',
+                    'rappel3': '3️⃣',
+                    'retenu': '🚨'
+                };
+                bavardageDisplay = `<span style="color: ${s.bavardage === 'retenu' || s.bavardage === 'rappel3' ? '#dc2626' : '#f59e0b'};">${bavLabels[s.bavardage] || s.bavardage}</span>`;
             }
             
-            // Construire le HTML des élèves NOTÉS
-            let tableHTML = window.allSuivis.map((s, idx) => {
-                const key = `${s.eleveCode}_${s.date}_${s.module || 'C11'}`;
-                const isDoublon = doublonKeys.has(key);
-                
-                const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
-                const noteDisplay = s.absent ? 'ABS' : (s.noteSur20 !== null ? s.noteSur20 + '/20' : '--');
-                
-                const bavCount = getBavCount(s.bavardage);
-                const telCount = getTelCount(s.telephone);
-                
-                const coursDisplay = getCoursDisplay(s);
-                
-                return `<tr class="${isDoublon ? 'doublon' : ''}" data-idx="${idx}">
-                    <td>${isDoublon ? '⚠️ ' : ''}${formatDate(s.date)} ${s.heure || ''}</td>
-                    <td><span class="code-badge">${window.afficherAvecNom(s.eleveCode)}</span></td>
+            // Affichage téléphone
+            let telephoneDisplay = '-';
+            if (s.telephone && s.telephone !== 'ok') {
+                const telLabels = {
+                    'rappel1': '1️⃣',
+                    'rappel2': '2️⃣',
+                    'rappel3': '3️⃣',
+                    'confisque': '🚫'
+                };
+                telephoneDisplay = `<span style="color: ${s.telephone === 'confisque' || s.telephone === 'rappel3' ? '#dc2626' : '#f59e0b'};">${telLabels[s.telephone] || s.telephone}</span>`;
+            }
+            
+            return `
+                <tr>
+                    <td>${formatDate(s.date)} ${s.heure || ''}</td>
+                    <td><span class="code-badge">${s.eleveCode}</span></td>
                     <td><span class="classe-badge">${s.classe || '--'}</span></td>
-                    <td><span class="module-badge">${s.module || 'C11'}</span></td>
+                    <td>${s.module || '--'}</td>
                     <td><span class="note-badge ${noteClass}">${noteDisplay}</span></td>
-                    <td>${bavCount !== null ? '<span class="bav-badge' + (bavCount === 0 ? ' ok' : '') + '">' + (bavCount || '✓') + '</span>' : '-'}</td>
-                    <td>${telCount !== null ? '<span class="tel-badge' + (telCount === 0 ? ' ok' : '') + '">' + (telCount || '✓') + '</span>' : '-'}</td>
-                    <td><span class="cours-badge ${s.coursRecu ? 'oui' : 'non'}">${coursDisplay}</span></td>
+                    <td style="font-size: 1.1em; text-align: center;">${bavardageDisplay}</td>
+                    <td style="font-size: 1.1em; text-align: center;">${telephoneDisplay}</td>
+                    <td style="font-size: 0.9em;">${coursDisplay}</td>
                     <td class="actions-cell">
-                        <button class="btn-action btn-edit" onclick="ouvrirModalEdit(${idx})" title="Modifier">✏️</button>
-                        <button class="btn-action btn-delete" onclick="ouvrirModalDelete(${idx})" title="Supprimer">🗑️</button>
+                        <button class="btn-icon btn-edit" onclick="ouvrirModalEdit(${idx})" title="Modifier">✏️</button>
+                        <button class="btn-icon btn-delete" onclick="ouvrirModalDelete(${idx})" title="Supprimer">🗑️</button>
                     </td>
-                </tr>`;
-            }).join('');
-            
-            // AJOUTER LES ÉLÈVES NON NOTÉS (seulement si date spécifiée)
-            if (filterDate && window.allSuivis.length > 0) {
-                const elevesNotes = window.allSuivis.map(s => s.eleveCode);
-                const elevesNonNotes = bdd.filter(e => classesFiltre.includes(e.classe) && !elevesNotes.includes(e.userCode));
-                
-                if (elevesNonNotes.length > 0) {
-                    // Récupérer le module de la séance
-                    const moduleSeance = window.allSuivis[0]?.module || 'C11';
-                    
-                    // Stocker pour utilisation dans le formulaire
-                    window.elevesNonNotes = elevesNonNotes.map(e => ({
-                        code: e.userCode,
-                        classe: e.classe,
-                        date: filterDate,
-                        module: moduleSeance
-                    }));
-                    
-                    // Ajouter séparateur
-                    tableHTML += `<tr class="separator-row"><td colspan="9" style="background: #fef3c7; text-align: center; font-weight: 600; color: #92400e; padding: 10px;">
-                        ⚠️ ${elevesNonNotes.length} élève(s) non noté(s) pour cette séance
-                    </td></tr>`;
-                    
-                    // Ajouter lignes des non notés
-                    elevesNonNotes.forEach((e, idx) => {
-                        tableHTML += `<tr class="non-note" data-nonnote-idx="${idx}">
-                            <td>${formatDate(filterDate)} <span style="color: #dc2626;">⏳</span></td>
-                            <td><span class="code-badge" style="background: #fee2e2; color: #991b1b;">${window.afficherAvecNom(e.userCode)}</span></td>
-                            <td><span class="classe-badge">${e.classe}</span></td>
-                            <td><span class="module-badge">${moduleSeance}</span></td>
-                            <td><span class="note-badge" style="background: #f3f4f6; color: #6b7280;">Non noté</span></td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td class="actions-cell">
-                                <button class="btn-action btn-edit" onclick="ouvrirModalCreate(${idx})" title="Noter cet élève" style="background: #dcfce7;">➕</button>
-                            </td>
-                        </tr>`;
-                    });
-                }
-            }
-            
-            tbody.innerHTML = tableHTML || '<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><p>Aucune saisie trouvée</p></div></td></tr>';
-            
-        } catch (error) {
-            console.error("Erreur:", error);
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color: #dc2626;">❌ Erreur de chargement</td></tr>';
+                </tr>
+            `;
+        }).join('');
+        
+        // Vérifier si on peut afficher le bouton "Compléter la séance"
+        verifierSeanceACompleter();
+    }
+    
+    // Variable pour stocker les infos de la séance à compléter
+    let seanceACompleter = null;
+    
+    function verifierSeanceACompleter() {
+        const filterClasse = document.getElementById('filterClasse').value;
+        const filterDate = document.getElementById('filterDate').value;
+        const box = document.getElementById('completerSeanceBox');
+        
+        console.log("🔍 Vérification séance:", filterClasse, filterDate, "suivis:", window.window.allSuivis.length);
+        
+        // Afficher seulement si une classe ET une date sont sélectionnées
+        if (!filterClasse || !filterDate || window.window.allSuivis.length === 0) {
+            box.style.display = 'none';
+            seanceACompleter = null;
+            return;
         }
+        
+        // Trouver le module de la séance (prendre le premier)
+        const moduleSeance = window.window.allSuivis[0].module;
+        
+        // Trouver tous les élèves de cette classe
+        // Si filterClasse = "BTAGO", on cherche BTAGO1, BTAGO2, etc.
+        const elevesClasse = (window.BDD_ELEVES || []).filter(e => {
+            // Chercher correspondance exacte OU classes qui commencent par filterClasse
+            return e.classe === filterClasse || e.classe.startsWith(filterClasse);
+        });
+        
+        console.log("📋 Élèves de la classe:", elevesClasse.length, "filterClasse:", filterClasse);
+        
+        if (elevesClasse.length === 0) {
+            box.style.display = 'none';
+            seanceACompleter = null;
+            return;
+        }
+        
+        // Compter les élèves déjà notés
+        const elevesNotes = window.window.allSuivis.map(s => s.eleveCode);
+        const elevesRestants = elevesClasse.filter(e => !elevesNotes.includes(e.userCode));
+        
+        // Stocker les infos
+        seanceACompleter = {
+            classe: filterClasse,
+            date: filterDate,
+            module: moduleSeance,
+            elevesNotes: elevesNotes,
+            elevesRestants: elevesRestants.map(e => e.userCode),
+            totalEleves: elevesClasse.length
+        };
+        
+        // Mettre à jour l'affichage
+        const nbNotes = elevesNotes.length;
+        const nbTotal = elevesClasse.length;
+        const nbRestants = elevesRestants.length;
+        
+        document.getElementById('completerSeanceInfo').textContent = 
+            `${nbNotes} élève${nbNotes > 1 ? 's' : ''} noté${nbNotes > 1 ? 's' : ''} sur ${nbTotal} — ${nbRestants} restant${nbRestants > 1 ? 's' : ''}`;
+        
+        console.log("✅ Affichage bouton:", nbNotes, "/", nbTotal, "restants:", nbRestants);
+        
+        // Afficher le bouton
+        box.style.display = 'flex';
+        
+        if (nbRestants === 0) {
+            box.style.background = 'linear-gradient(135deg, #f0fdf4, #bbf7d0)';
+            document.getElementById('completerSeanceInfo').textContent = `✅ Séance complète ! ${nbTotal} élèves notés`;
+            box.querySelector('button').style.display = 'none';
+        } else {
+            box.style.background = 'linear-gradient(135deg, #f0fdf4, #dcfce7)';
+            box.querySelector('button').style.display = 'flex';
+        }
+    }
+    
+    window.completerSeance = function() {
+        if (!seanceACompleter) return;
+        
+        // Construire l'URL avec les paramètres
+        const params = new URLSearchParams();
+        params.set('reprendre', 'true');
+        params.set('classe', seanceACompleter.classe);
+        params.set('date', seanceACompleter.date);
+        params.set('module', seanceACompleter.module);
+        params.set('elevesNotes', seanceACompleter.elevesNotes.join(','));
+        
+        // Ouvrir suivi.html avec les paramètres
+        window.location.href = 'suivi.html?' + params.toString();
     };
     
     function getNoteClass(note) {
-        if (note === null || note === undefined) return '';
         if (note >= 16) return 'excellent';
         if (note >= 12) return 'good';
         if (note >= 8) return 'average';
@@ -920,82 +981,22 @@
         return `${d}/${m}/${y}`;
     }
     
-    function getBavCount(bav) {
-        const map = { 'aucun': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'retenu': 4 };
-        return bav ? (map[bav] ?? null) : null;
-    }
-    
-    function getTelCount(tel) {
-        const map = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 4 };
-        return tel ? (map[tel] ?? null) : null;
-    }
-    
-    function getCoursDisplay(s) {
-        if (!s.coursRecu && !s.coursDistrib && !s.S1 && !s.S2 && !s.S3 && !s.S4) return '-';
-        const parts = [];
-        // Gérer les nouveaux champs S1, S2, etc.
-        if (s.S1) parts.push('S1');
-        if (s.S2) parts.push('S2');
-        if (s.S3) parts.push('S3');
-        if (s.S4) parts.push('S4');
-        if (s.coursComplet) parts.push('📚');
-        if (s.correction) parts.push('✏️');
-        // Ancien format coursDistrib
-        if (s.coursDistrib && typeof s.coursDistrib === 'string') {
-            if (s.coursDistrib === 'complet') parts.push('📚');
-            else if (s.coursDistrib.includes('seance')) {
-                const num = s.coursDistrib.replace('seance', '');
-                if (num && !parts.includes('S' + num)) parts.push('S' + num);
-            }
-        }
-        return parts.length > 0 ? '✅ ' + parts.join(' ') : '-';
-    }
-    
-    // Compléter séance
-    window.completerSeance = function() {
-        const filterClasse = document.getElementById('filterClasse').value;
-        const filterDate = document.getElementById('filterDate').value;
-        const premier = window.allSuivis[0];
-        const module = premier ? premier.module : 'C11';
-        
-        // Récupérer les codes des élèves déjà notés
-        const elevesNotes = window.allSuivis.map(s => s.eleveCode).join(',');
-        
-        // Rediriger vers suivi.html avec les paramètres (reprendre=true pour garder la date)
-        window.location.href = `suivi.html?classe=${encodeURIComponent(filterClasse)}&date=${filterDate}&module=${module}&reprendre=true&elevesNotes=${encodeURIComponent(elevesNotes)}`;
-    };
-    
-    // === MODAL ÉDITION ===
+    // MODAL ÉDITION
     window.ouvrirModalEdit = function(idx) {
         const s = window.allSuivis[idx];
         editingDoc = s;
         
-        document.getElementById('editEleve').value = window.afficherAvecNom(s.eleveCode) + ' - ' + (s.classe || '');
-        document.getElementById('editDate').value = s.date || '';
-        document.getElementById('editNote').value = s.noteSur20 ?? '';
+        document.getElementById('editEleve').value = s.eleveCode + ' - ' + (s.classe || '');
+        document.getElementById('editNote').value = s.noteSur20 || '';
         document.getElementById('editStatut').value = s.absent ? 'absent' : 'present';
         document.getElementById('editCommentaire').value = s.commentaire || '';
         
-        // Champs complets
-        document.getElementById('editTravail').value = s.travail || 'ne';
-        document.getElementById('editOral').value = s.oral !== undefined && s.oral !== null ? String(s.oral) : 'ne';
-        document.getElementById('editAttention').value = s.attention || 'ne';
-        document.getElementById('editPorteVue').value = s.porteVue || 'ne';
-        document.getElementById('editCoursJour').value = s.coursJour || 'ne';
-        document.getElementById('editAutonomie').value = s.autonomie || 'ne';
-        document.getElementById('editInitiative').value = s.initiative || 'ne';
-        document.getElementById('editSecurite').value = s.securite || 'ne';
-        
+        // Bavardage et téléphone
         document.getElementById('editBavardage').value = s.bavardage || 'aucun';
         document.getElementById('editTelephone').value = s.telephone || 'ok';
         
-        // Checkboxes cours
-        document.getElementById('checkS1').checked = s.S1 || (s.coursDistrib === 'seance1');
-        document.getElementById('checkS2').checked = s.S2 || (s.coursDistrib === 'seance2');
-        document.getElementById('checkS3').checked = s.S3 || (s.coursDistrib === 'seance3');
-        document.getElementById('checkS4').checked = s.S4 || (s.coursDistrib === 'seance4');
-        document.getElementById('checkComplet').checked = s.coursComplet || (s.coursDistrib === 'complet');
-        document.getElementById('checkCorrection').checked = s.correction || false;
+        // Cours distribué
+        document.getElementById('editCoursDistrib').value = s.coursDistrib || 'aucun';
         
         document.getElementById('modalEdit').classList.add('active');
     };
@@ -1003,90 +1004,74 @@
     window.fermerModal = function() {
         document.getElementById('modalEdit').classList.remove('active');
         editingDoc = null;
-        creatingEleve = null;
-        // Remettre le titre original
-        document.querySelector('#modalEdit .modal-header h2').textContent = '✏️ Modifier la saisie';
-        document.querySelector('#modalEdit .btn-save').textContent = '💾 Sauvegarder';
     };
     
-    // Plafonds et malus
-    const PLAFOND_BAVARDAGE = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
-    const MALUS_TELEPHONE = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
+    // Plafonds et malus pour recalcul
+    const PLAFOND_BAVARDAGE = {
+        'aucun': 20,
+        'rappel1': 14,
+        'rappel2': 10,
+        'rappel3': 6,
+        'retenu': 4
+    };
+    
+    const MALUS_TELEPHONE = {
+        'ok': 0,
+        'rappel1': 1,
+        'rappel2': 2,
+        'rappel3': 3,
+        'confisque': 5
+    };
     
     window.sauvegarderModification = async function() {
         if (!editingDoc) return;
-        
-        const newDate = document.getElementById('editDate').value;
-        const oldDate = editingDoc.date;
-        const dateChanged = newDate !== oldDate;
         
         const statut = document.getElementById('editStatut').value;
         let note = parseFloat(document.getElementById('editNote').value) || 0;
         const commentaire = document.getElementById('editCommentaire').value.trim();
         
+        // Récupérer bavardage et téléphone
         const bavardage = document.getElementById('editBavardage').value;
         const telephone = document.getElementById('editTelephone').value;
         
-        // Recalculer note
-        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
-        const malus = MALUS_TELEPHONE[telephone] || 0;
-        let noteFinale = Math.min(note, plafond);
-        noteFinale = Math.max(0, noteFinale - malus);
-        noteFinale = Math.round(noteFinale * 2) / 2;
+        // Récupérer le cours distribué
+        const coursDistrib = document.getElementById('editCoursDistrib').value;
         
-        // Récupérer tous les champs
-        const updateData = {
-            date: newDate,
-            absent: statut === 'absent',
-            noteSur20: statut === 'absent' ? null : noteFinale,
-            bavardage: bavardage,
-            telephone: telephone,
-            plafond: plafond,
-            malus: malus,
-            commentaire: commentaire || null,
-            travail: document.getElementById('editTravail').value,
-            oral: document.getElementById('editOral').value === 'ne' ? null : parseInt(document.getElementById('editOral').value),
-            attention: document.getElementById('editAttention').value,
-            porteVue: document.getElementById('editPorteVue').value,
-            coursJour: document.getElementById('editCoursJour').value,
-            autonomie: document.getElementById('editAutonomie').value,
-            initiative: document.getElementById('editInitiative').value,
-            securite: document.getElementById('editSecurite').value,
-            S1: document.getElementById('checkS1').checked,
-            S2: document.getElementById('checkS2').checked,
-            S3: document.getElementById('checkS3').checked,
-            S4: document.getElementById('checkS4').checked,
-            coursComplet: document.getElementById('checkComplet').checked,
-            correction: document.getElementById('checkCorrection').checked,
-            coursRecu: document.getElementById('checkS1').checked || document.getElementById('checkS2').checked || 
-                       document.getElementById('checkS3').checked || document.getElementById('checkS4').checked ||
-                       document.getElementById('checkComplet').checked
-        };
+        // Vérifier si on force la note
+        const forceNote = document.getElementById('editForceNote').checked;
+        
+        let noteFinale;
+        let plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+        let malus = MALUS_TELEPHONE[telephone] || 0;
+        
+        if (forceNote) {
+            // Note forcée : pas de plafond ni malus
+            noteFinale = note;
+            plafond = 20; // Enregistrer plafond fictif
+            malus = 0;    // Enregistrer malus fictif
+        } else {
+            // Appliquer plafond puis malus
+            noteFinale = Math.min(note, plafond);
+            noteFinale = Math.max(0, noteFinale - malus);
+        }
+        noteFinale = Math.round(noteFinale * 2) / 2; // Arrondir à 0.5
         
         try {
-            if (dateChanged) {
-                // IMPORTANT: Si la date change, supprimer l'ancien doc et créer un nouveau
-                const oldRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
-                await deleteDoc(oldRef);
-                
-                // Créer nouveau doc avec nouvel ID basé sur la date
-                const newId = newDate + '_' + (editingDoc.module || 'C11') + '_' + Date.now();
-                const newRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", newId);
-                await setDoc(newRef, {
-                    ...updateData,
-                    classe: editingDoc.classe,
-                    module: editingDoc.module || 'C11',
-                    heure: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
-                });
-                
-                alert("✅ Modification enregistrée ! (Date changée: ancien document supprimé)");
-            } else {
-                // Date inchangée: simple mise à jour
-                const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
-                await updateDoc(ref, updateData);
-                alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
-            }
+            const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
             
+            await updateDoc(ref, {
+                absent: statut === 'absent',
+                noteSur20: statut === 'absent' ? null : noteFinale,
+                bavardage: bavardage,
+                telephone: telephone,
+                plafond: plafond,
+                malus: malus,
+                commentaire: commentaire || null,
+                coursDistrib: coursDistrib,
+                coursRecu: statut === 'absent' ? false : (coursDistrib !== 'aucun')
+            });
+            
+            alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
             fermerModal();
             chargerHistorique();
             
@@ -1096,212 +1081,13 @@
         }
     };
     
-    // === MODAL CRÉATION (pour élèves non notés) ===
-    let creatingEleve = null;
-    
-    window.ouvrirModalCreate = function(idx) {
-        const e = window.elevesNonNotes[idx];
-        creatingEleve = e;
-        
-        // Remplir le formulaire avec les infos de base
-        document.getElementById('editEleve').value = window.afficherAvecNom(e.code) + ' - ' + e.classe;
-        document.getElementById('editDate').value = e.date;
-        document.getElementById('editNote').value = '';
-        document.getElementById('editStatut').value = 'present';
-        document.getElementById('editCommentaire').value = '';
-        
-        // Réinitialiser tous les champs
-        document.getElementById('editTravail').value = 'ne';
-        document.getElementById('editOral').value = 'ne';
-        document.getElementById('editAttention').value = 'ne';
-        document.getElementById('editPorteVue').value = 'ne';
-        document.getElementById('editCoursJour').value = 'ne';
-        document.getElementById('editAutonomie').value = 'ne';
-        document.getElementById('editInitiative').value = 'ne';
-        document.getElementById('editSecurite').value = 'ne';
-        document.getElementById('editBavardage').value = 'aucun';
-        document.getElementById('editTelephone').value = 'ok';
-        
-        // Réinitialiser checkboxes cours
-        document.getElementById('checkS1').checked = false;
-        document.getElementById('checkS2').checked = false;
-        document.getElementById('checkS3').checked = false;
-        document.getElementById('checkS4').checked = false;
-        document.getElementById('checkComplet').checked = false;
-        document.getElementById('checkCorrection').checked = false;
-        
-        // Changer le titre et le bouton
-        document.querySelector('#modalEdit .modal-header h2').textContent = '➕ Noter cet élève';
-        document.querySelector('#modalEdit .btn-save').textContent = '💾 Créer la note';
-        
-        document.getElementById('modalEdit').classList.add('active');
-    };
-    
-    window.sauvegarderModification = async function() {
-        // Si c'est une CRÉATION (élève non noté)
-        if (creatingEleve) {
-            await creerNouvelleNote();
-            return;
-        }
-        
-        // Sinon c'est une MODIFICATION (code existant)
-        if (!editingDoc) return;
-        
-        const newDate = document.getElementById('editDate').value;
-        const oldDate = editingDoc.date;
-        const dateChanged = newDate !== oldDate;
-        
-        const statut = document.getElementById('editStatut').value;
-        let note = parseFloat(document.getElementById('editNote').value) || 0;
-        const commentaire = document.getElementById('editCommentaire').value.trim();
-        
-        const bavardage = document.getElementById('editBavardage').value;
-        const telephone = document.getElementById('editTelephone').value;
-        
-        // Recalculer note
-        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
-        const malus = MALUS_TELEPHONE[telephone] || 0;
-        let noteFinale = Math.min(note, plafond);
-        noteFinale = Math.max(0, noteFinale - malus);
-        noteFinale = Math.round(noteFinale * 2) / 2;
-        
-        // Récupérer tous les champs
-        const updateData = {
-            date: newDate,
-            absent: statut === 'absent',
-            noteSur20: statut === 'absent' ? null : noteFinale,
-            bavardage: bavardage,
-            telephone: telephone,
-            plafond: plafond,
-            malus: malus,
-            commentaire: commentaire || null,
-            travail: document.getElementById('editTravail').value,
-            oral: document.getElementById('editOral').value === 'ne' ? null : parseInt(document.getElementById('editOral').value),
-            attention: document.getElementById('editAttention').value,
-            porteVue: document.getElementById('editPorteVue').value,
-            coursJour: document.getElementById('editCoursJour').value,
-            autonomie: document.getElementById('editAutonomie').value,
-            initiative: document.getElementById('editInitiative').value,
-            securite: document.getElementById('editSecurite').value,
-            S1: document.getElementById('checkS1').checked,
-            S2: document.getElementById('checkS2').checked,
-            S3: document.getElementById('checkS3').checked,
-            S4: document.getElementById('checkS4').checked,
-            coursComplet: document.getElementById('checkComplet').checked,
-            correction: document.getElementById('checkCorrection').checked,
-            coursRecu: document.getElementById('checkS1').checked || document.getElementById('checkS2').checked || 
-                       document.getElementById('checkS3').checked || document.getElementById('checkS4').checked ||
-                       document.getElementById('checkComplet').checked
-        };
-        
-        try {
-            if (dateChanged) {
-                const oldRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
-                await deleteDoc(oldRef);
-                
-                const newId = newDate + '_' + (editingDoc.module || 'C11') + '_' + Date.now();
-                const newRef = doc(db, "resultats", editingDoc.eleveCode, "suivi", newId);
-                await setDoc(newRef, {
-                    ...updateData,
-                    classe: editingDoc.classe,
-                    module: editingDoc.module || 'C11',
-                    heure: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
-                });
-                
-                alert("✅ Modification enregistrée !");
-            } else {
-                const ref = doc(db, "resultats", editingDoc.eleveCode, "suivi", editingDoc.id);
-                await updateDoc(ref, updateData);
-                alert("✅ Modification enregistrée ! Note finale: " + noteFinale + "/20");
-            }
-            
-            fermerModal();
-            chargerHistorique();
-            
-        } catch (err) {
-            console.error("Erreur modification:", err);
-            alert("Erreur: " + err.message);
-        }
-    };
-    
-    // Fonction pour CRÉER une nouvelle note (élève non noté)
-    async function creerNouvelleNote() {
-        const e = creatingEleve;
-        if (!e) return;
-        
-        const statut = document.getElementById('editStatut').value;
-        let note = parseFloat(document.getElementById('editNote').value) || 0;
-        const commentaire = document.getElementById('editCommentaire').value.trim();
-        
-        const bavardage = document.getElementById('editBavardage').value;
-        const telephone = document.getElementById('editTelephone').value;
-        
-        // Calculer note finale
-        const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
-        const malus = MALUS_TELEPHONE[telephone] || 0;
-        let noteFinale = Math.min(note, plafond);
-        noteFinale = Math.max(0, noteFinale - malus);
-        noteFinale = Math.round(noteFinale * 2) / 2;
-        
-        const newData = {
-            date: e.date,
-            classe: e.classe,
-            module: e.module,
-            absent: statut === 'absent',
-            noteSur20: statut === 'absent' ? null : noteFinale,
-            bavardage: bavardage,
-            telephone: telephone,
-            plafond: plafond,
-            malus: malus,
-            commentaire: commentaire || null,
-            travail: document.getElementById('editTravail').value,
-            oral: document.getElementById('editOral').value === 'ne' ? null : parseInt(document.getElementById('editOral').value),
-            attention: document.getElementById('editAttention').value,
-            porteVue: document.getElementById('editPorteVue').value,
-            coursJour: document.getElementById('editCoursJour').value,
-            autonomie: document.getElementById('editAutonomie').value,
-            initiative: document.getElementById('editInitiative').value,
-            securite: document.getElementById('editSecurite').value,
-            S1: document.getElementById('checkS1').checked,
-            S2: document.getElementById('checkS2').checked,
-            S3: document.getElementById('checkS3').checked,
-            S4: document.getElementById('checkS4').checked,
-            coursComplet: document.getElementById('checkComplet').checked,
-            correction: document.getElementById('checkCorrection').checked,
-            coursRecu: document.getElementById('checkS1').checked || document.getElementById('checkS2').checked || 
-                       document.getElementById('checkS3').checked || document.getElementById('checkS4').checked ||
-                       document.getElementById('checkComplet').checked,
-            heure: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
-        };
-        
-        try {
-            const newId = e.date + '_' + e.module + '_' + Date.now();
-            const newRef = doc(db, "resultats", e.code, "suivi", newId);
-            await setDoc(newRef, newData);
-            
-            alert("✅ Note créée pour " + window.afficherAvecNom(e.code) + " : " + noteFinale + "/20");
-            
-            // Réinitialiser
-            creatingEleve = null;
-            document.querySelector('#modalEdit .modal-header h2').textContent = '✏️ Modifier la saisie';
-            document.querySelector('#modalEdit .btn-save').textContent = '💾 Sauvegarder';
-            
-            fermerModal();
-            chargerHistorique();
-            
-        } catch (err) {
-            console.error("Erreur création:", err);
-            alert("Erreur: " + err.message);
-        }
-    }
-    
-    // === MODAL SUPPRESSION ===
+    // MODAL SUPPRESSION
     window.ouvrirModalDelete = function(idx) {
         const s = window.allSuivis[idx];
         deletingDoc = s;
         
         document.getElementById('deleteInfo').textContent = 
-            `${window.afficherAvecNom(s.eleveCode)} - ${formatDate(s.date)} - ${s.absent ? 'Absent' : s.noteSur20 + '/20'}`;
+            `${s.eleveCode} - ${formatDate(s.date)} - ${s.absent ? 'Absent' : s.noteSur20 + '/20'}`;
         
         document.getElementById('modalDelete').classList.add('active');
     };
@@ -1328,7 +1114,7 @@
         }
     };
     
-    console.log("✅ Historique Suivi v3 prêt (élèves non notés + formulaire complet)");
+    console.log("✅ Historique Suivi prêt");
 </script>
 
 </body>
