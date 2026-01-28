@@ -149,6 +149,8 @@
         .stat-value.warning { color: var(--warning); }
         .stat-value.danger { color: var(--danger); }
         
+        .note-badge.absent { background: #fef3c7; color: #92400e; }
+        
         .stat-label {
             font-size: 0.8em;
             color: var(--muted);
@@ -538,17 +540,23 @@
                     const suiviSnap = await getDocs(suiviRef);
                     let derniereNote = null;
                     let derniereDate = null;
+                    let dernierAbsent = false;
                     
                     suiviSnap.forEach(docSnap => {
                         const data = docSnap.data();
                         if (!derniereDate || data.date > derniereDate) {
                             derniereDate = data.date;
                             derniereNote = data.noteSur20;
+                            dernierAbsent = data.absent === true;
                         }
                     });
                     
-                    if (derniereNote !== null) {
-                        notesMap[eleve.userCode] = derniereNote;
+                    if (derniereDate) {
+                        // On stocke un objet avec note et statut absent
+                        notesMap[eleve.userCode] = {
+                            note: derniereNote,
+                            absent: dernierAbsent
+                        };
                     }
                 } catch (err) {
                     // Ignorer les erreurs individuelles
@@ -558,10 +566,12 @@
             // Construire les données
             allData = eleves.map(e => {
                 const consultation = consultationsMap[e.userCode];
+                const noteData = notesMap[e.userCode];
                 return {
                     code: e.userCode,
                     classe: e.classe,
-                    derniereNote: notesMap[e.userCode] ?? null,
+                    derniereNote: noteData ? noteData.note : null,
+                    estAbsent: noteData ? noteData.absent : false,
                     vu: !!consultation,
                     visites: consultation?.nombreVisites || 0,
                     derniereConsultation: consultation?.derniereConsultation || null
@@ -622,12 +632,19 @@
         }
         
         tbody.innerHTML = data.map(d => {
-            const noteClass = d.derniereNote === null ? 'none' : 
-                              d.derniereNote >= 16 ? 'excellent' :
-                              d.derniereNote >= 12 ? 'good' :
-                              d.derniereNote >= 8 ? 'average' : 'poor';
+            let noteClass = 'none';
+            let noteDisplay = '--';
             
-            const noteDisplay = d.derniereNote === null ? '--' : d.derniereNote + '/20';
+            if (d.estAbsent) {
+                noteClass = 'absent';
+                noteDisplay = 'ABS';
+            } else if (d.derniereNote !== null) {
+                noteDisplay = d.derniereNote + '/20';
+                if (d.derniereNote >= 16) noteClass = 'excellent';
+                else if (d.derniereNote >= 12) noteClass = 'good';
+                else if (d.derniereNote >= 8) noteClass = 'average';
+                else noteClass = 'poor';
+            }
             
             const vuBadge = d.vu 
                 ? '<span class="vu-badge oui">👁️ Oui</span>'
