@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Suivi de Classe - Cockpit PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    <style>
+        :root {
+            --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --muted: #64748b;
+            --primary: #6366f1; --primary-dark: #4f46e5;
+            --success: #16a34a; --success-light: #dcfce7;
+            --warning: #f59e0b; --warning-light: #fef3c7;
+            --danger: #dc2626; --danger-light: #fee2e2;
+            --border: #e2e8f0; --shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        .header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 15px 20px; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .header h1 { font-size: 1.3em; display: flex; align-items: center; gap: 10px; }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .header-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .header-btn:hover { background: rgba(255,255,255,0.3); }
+        .header-btn.active { background: white; color: var(--primary); }
+        
+        .tabs { background: var(--card); border-bottom: 2px solid var(--border); padding: 0 20px; display: flex; gap: 5px; overflow-x: auto; }
+        .tab { padding: 15px 20px; font-size: 0.9em; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab .badge { background: var(--danger); color: white; font-size: 0.7em; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        .card { background: var(--card); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .card-title { font-size: 1.1em; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--card); border-radius: 12px; padding: 20px; text-align: center; box-shadow: var(--shadow); }
+        .stat-value { font-size: 2em; font-weight: 800; color: var(--primary); }
+        .stat-value.success { color: var(--success); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+        .stat-label { font-size: 0.8em; color: var(--muted); margin-top: 5px; }
+        
+        .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .filter-label { font-size: 0.75em; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+        .filter-control { padding: 10px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 0.9em; background: var(--card); color: var(--text); min-width: 150px; }
+        .filter-control:focus { outline: none; border-color: var(--primary); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: 12px; font-size: 0.95em; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--success), #15803d); color: white; }
+        .btn-warning { background: linear-gradient(135deg, var(--warning), #d97706); color: white; }
+        .btn-danger { background: linear-gradient(135deg, var(--danger), #b91c1c); color: white; }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn-sm { padding: 8px 16px; font-size: 0.85em; }
+        .btn-lg { padding: 16px 32px; font-size: 1.1em; }
+        .btn-block { width: 100%; }
+        
+        .sessions-list { display: flex; flex-direction: column; gap: 12px; }
+        .session-item { background: var(--card); border-radius: 12px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; border-left: 4px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .session-item:hover { transform: translateX(5px); box-shadow: var(--shadow); }
+        .session-item.complete { border-left-color: var(--success); }
+        .session-item.incomplete { border-left-color: var(--warning); }
+        .session-info h3 { font-size: 1em; font-weight: 600; margin-bottom: 4px; }
+        .session-info .meta { font-size: 0.85em; color: var(--muted); display: flex; gap: 15px; flex-wrap: wrap; }
+        .session-stats { display: flex; gap: 10px; align-items: center; }
+        .session-progress { width: 100px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .session-progress-bar { height: 100%; background: var(--success); }
+        
+        .eleves-table { width: 100%; border-collapse: collapse; }
+        .eleves-table th { text-align: left; padding: 12px 15px; font-size: 0.8em; font-weight: 600; color: var(--muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
+        .eleves-table td { padding: 12px 15px; border-bottom: 1px solid var(--border); }
+        .eleves-table tr:hover { background: rgba(99,102,241,0.05); }
+        .eleves-table tr.manquant { background: var(--warning-light); }
+        .eleves-table tr.absent { background: var(--danger-light); opacity: 0.7; }
+        .eleve-code { font-weight: 700; color: var(--primary); cursor: pointer; }
+        .eleve-nom { font-size: 0.85em; color: var(--muted); }
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+        .status-badge.fait { background: var(--success-light); color: var(--success); }
+        .status-badge.absent { background: var(--danger-light); color: var(--danger); }
+        .status-badge.manquant { background: var(--warning-light); color: var(--warning); }
+        .note-badge { font-weight: 700; padding: 4px 10px; border-radius: 8px; }
+        .note-badge.good { background: var(--success-light); color: var(--success); }
+        .note-badge.medium { background: var(--warning-light); color: var(--warning); }
+        .note-badge.bad { background: var(--danger-light); color: var(--danger); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s; padding: 20px; overflow-y: auto; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: var(--card); border-radius: 20px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--card); z-index: 10; }
+        .modal-header h2 { font-size: 1.2em; }
+        .modal-close { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--border); color: var(--text); font-size: 1.2em; cursor: pointer; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: 0; background: var(--card); }
+        
+        .section-saisie { margin-bottom: 20px; }
+        .section-saisie h3 { font-size: 0.95em; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .options-grid { display: grid; gap: 8px; }
+        .options-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .options-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+        .options-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
+        .options-grid.cols-6 { grid-template-columns: repeat(6, 1fr); }
+        .opt-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px; border: 2px solid var(--border); border-radius: 12px; background: var(--card); cursor: pointer; transition: all 0.15s; min-height: 70px; }
+        .opt-btn:hover { border-color: var(--primary); }
+        .opt-btn.selected { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+        .opt-btn .emoji { font-size: 1.4em; margin-bottom: 4px; }
+        .opt-btn .label { font-size: 0.75em; font-weight: 600; color: var(--muted); text-align: center; }
+        .opt-btn.good { border-color: #86efac; background: #f0fdf4; }
+        .opt-btn.good.selected { background: #dcfce7; border-color: var(--success); }
+        .opt-btn.warning.selected { background: #fef9c3; border-color: var(--warning); }
+        .opt-btn.danger.selected { background: #fee2e2; border-color: var(--danger); }
+        .opt-btn.danger-max.selected { background: #fecaca; border-color: #b91c1c; }
+        .opt-btn.ne-btn { opacity: 0.6; }
+        .opt-btn.ne-btn.selected { opacity: 1; background: var(--border); }
+        
+        .objectif-box { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 2px solid var(--warning); border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+        .objectif-box h4 { font-size: 0.9em; color: #92400e; margin-bottom: 10px; }
+        .objectif-texte { background: white; padding: 12px 15px; border-radius: 8px; font-weight: 600; margin-bottom: 12px; }
+        .objectif-validation { display: flex; gap: 8px; flex-wrap: wrap; }
+        .objectif-validation label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+        .objectif-validation label.atteint { background: #dcfce7; color: #166534; }
+        .objectif-validation label.non-atteint { background: #fee2e2; color: #991b1b; }
+        .objectif-validation label.en-cours { background: #e0e7ff; color: #3730a3; }
+        .objectif-validation label:has(input:checked) { outline: 3px solid currentColor; outline-offset: 2px; }
+        
+        .comment-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .comment-tag { padding: 6px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: none; }
+        .comment-tag.positif { background: #dcfce7; color: #166534; }
+        .comment-tag.encouragement { background: #dbeafe; color: #1e40af; }
+        .comment-tag.alerte { background: #fee2e2; color: #991b1b; }
+        .comment-textarea { width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 10px; font-family: inherit; min-height: 80px; resize: vertical; }
+        .comment-textarea:focus { outline: none; border-color: var(--primary); }
+        
+        .cours-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .cours-checkbox { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; font-size: 0.85em; }
+        .cours-checkbox:has(input:checked) { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+        .cours-checkbox input { display: none; }
+        
+        .note-box { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 20px; }
+        .note-box .label { font-size: 0.9em; color: var(--muted); margin-bottom: 8px; }
+        .note-box .value { font-size: 3em; font-weight: 800; color: var(--success); }
+        .note-ajustement { margin-top: 15px; padding-top: 15px; border-top: 2px dashed var(--border); }
+        .ajustement-fields { margin-top: 10px; padding: 15px; background: var(--warning-light); border-radius: 10px; display: none; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.85em; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; }
+        .form-group select, .form-group input { width: 100%; padding: 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 1em; background: var(--card); color: var(--text); }
+        .form-group select:focus, .form-group input:focus { outline: none; border-color: var(--primary); }
+        
+        .criteres-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+        .critere-item { display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; }
+        .critere-item:has(input:checked) { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+        .critere-item input { width: 20px; height: 20px; accent-color: var(--primary); }
+        
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--text); color: var(--bg); padding: 15px 25px; border-radius: 12px; font-weight: 600; z-index: 2000; opacity: 0; transition: all 0.3s; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+        .empty-state .icon { font-size: 4em; margin-bottom: 20px; }
+        .empty-state h3 { font-size: 1.2em; color: var(--text); margin-bottom: 10px; }
+        
+        .progress-container { margin-bottom: 20px; }
+        .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9em; }
+        .progress-bar { height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--success), #22c55e); }
+        
+        .rgpd-banner { background: linear-gradient(135deg, #dbeafe, #bfdbfe); border: 2px solid #3b82f6; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .chart-container { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+        .leaderboard-list { display: flex; flex-direction: column; gap: 10px; }
+        .leaderboard-item { display: flex; align-items: center; gap: 15px; padding: 12px 15px; background: var(--bg); border-radius: 10px; }
+        .leaderboard-rank { width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .leaderboard-rank.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .leaderboard-rank.silver { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+        .leaderboard-rank.bronze { background: linear-gradient(135deg, #d97706, #b45309); }
+        
+        @media (max-width: 768px) {
+            .header-content { flex-direction: column; text-align: center; }
+            .header-actions { justify-content: center; }
+            .container { padding: 15px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .filters { flex-direction: column; }
+            .filter-control { width: 100%; }
+            .session-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .options-grid.cols-5, .options-grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
+            .modal { border-radius: 16px 16px 0 0; max-height: 95vh; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>📋 Suivi de Classe</h1>
+            <div class="header-actions">
+                <span id="userStatus">--</span>
+                <button class="header-btn" onclick="openRgpdModal()">👤 Élèves</button>
+                <button class="header-btn" onclick="toggleTheme()">🌙</button>
+                <a href="indexcokpit.html" class="header-btn">🏠 Cockpit</a>
+                <button class="header-btn" onclick="deconnexion()">🚪</button>
+            </div>
+        </div>
+    </header>
+    
+    <nav class="tabs">
+        <div class="tab active" data-tab="sessions" onclick="showTab('sessions')">📋 Sessions<span class="badge" id="badgeIncomplete" style="display:none">0</span></div>
+        <div class="tab" data-tab="dashboard" onclick="showTab('dashboard')">📊 Dashboard</div>
+    </nav>
+    
+    <main class="container">
+        <div class="rgpd-banner" id="rgpdBanner" style="display:none">
+            <span>🔒 Les noms des élèves ne sont pas chargés. Importez votre fichier CSV.</span>
+            <button class="btn btn-sm btn-primary" onclick="openRgpdModal()">📥 Importer</button>
+        </div>
+        
+        <!-- ÉCRAN SESSIONS -->
+        <div class="screen active" id="screenSessions">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Sessions</div></div>
+                <div class="stat-card"><div class="stat-value warning" id="statIncomplete">0</div><div class="stat-label">Incomplètes</div></div>
+                <div class="stat-card"><div class="stat-value success" id="statNotes">0</div><div class="stat-label">Élèves notés</div></div>
+                <div class="stat-card"><div class="stat-value" id="statMoyenne">--</div><div class="stat-label">Moyenne</div></div>
+            </div>
+            
+            <div class="card">
+                <div class="filters">
+                    <div class="filter-group"><span class="filter-label">Classe</span><select class="filter-control" id="filterClasse"><option value="">Toutes</option></select></div>
+                    <div class="filter-group"><span class="filter-label">Date</span><input type="date" class="filter-control" id="filterDate"></div>
+                    <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖️</button>
+                    <button class="btn btn-primary btn-sm" onclick="chargerSessions()">🔍</button>
+                    <button class="btn btn-success" onclick="showNewSession()">➕ Nouvelle session</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">📅 Mes sessions</h2></div>
+                <div class="sessions-list" id="sessionsList"><div class="empty-state"><div class="icon">⏳</div><h3>Chargement...</h3></div></div>
+            </div>
+        </div>
+        
+        <!-- ÉCRAN DASHBOARD -->
+        <div class="screen" id="screenDashboard">
+            <div class="dashboard-grid">
+                <div class="chart-container"><h3 class="card-title">🏆 Top élèves</h3><div class="leaderboard-list" id="topEleves"></div></div>
+                <div class="chart-container"><h3 class="card-title">📊 Bavardage</h3><div id="chartBav"></div></div>
+                <div class="chart-container"><h3 class="card-title">📱 Téléphone</h3><div id="chartTel"></div></div>
+                <div class="chart-container"><h3 class="card-title">📈 Évolution</h3><div id="chartEvo"></div></div>
+            </div>
+        </div>
+        
+        <!-- ÉCRAN NOUVELLE SESSION -->
+        <div class="screen" id="screenNew">
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">🆕 Nouvelle session</h2><button class="btn btn-secondary btn-sm" onclick="showTab('sessions')">← Retour</button></div>
+                <div class="form-group"><label>📅 Date</label><input type="date" id="newDate"><small style="color:var(--muted);margin-top:5px;display:block;">💡 Vous pouvez antidater pour noter une séance passée</small></div>
+                <div class="form-group"><label>🏫 Classe</label><select id="newClasse" onchange="onClasseChange()"><option value="">-- Sélectionner --</option></select></div>
+                <div class="form-group"><label>📚 Module</label><select id="newModule"><option value="">-- Sélectionner classe d'abord --</option></select></div>
+                <div class="form-group"><label>✅ Critères</label>
+                    <div class="criteres-grid">
+                        <label class="critere-item"><input type="checkbox" id="cTravail" checked> 📝 Travail</label>
+                        <label class="critere-item"><input type="checkbox" id="cOral" checked> 🗣️ Oral</label>
+                        <label class="critere-item"><input type="checkbox" id="cAttention" checked> 🧠 Attention</label>
+                        <label class="critere-item"><input type="checkbox" id="cPorteVue"> 📁 Porte-vue</label>
+                        <label class="critere-item"><input type="checkbox" id="cCoursAJour"> 📋 Cours à jour</label>
+                        <label class="critere-item"><input type="checkbox" id="cAutonomie"> 🎯 Autonomie</label>
+                        <label class="critere-item"><input type="checkbox" id="cInitiative"> 💡 Initiative</label>
+                        <label class="critere-item"><input type="checkbox" id="cSecurite"> ⚠️ Sécurité</label>
+                    </div>
+                </div>
+                <div class="form-group"><label>📄 Cours par défaut</label>
+                    <div class="cours-grid">
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance1">📄 S1</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance2">📄 S2</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance3">📄 S3</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance4">📄 S4</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="complet">📚 Complet</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="correction">✏️ Correction</label>
+                        <label class="cours-checkbox"><input type="checkbox" name="defCours" value="evaluation">📝 Éval</label>
+                    </div>
+                </div>
+                <button class="btn btn-success btn-lg btn-block" onclick="creerSession()">🚀 Démarrer la séance</button>
+            </div>
+        </div>
+        
+        <!-- ÉCRAN VUE SESSION -->
+        <div class="screen" id="screenSession">
+            <div class="card">
+                <div class="card-header">
+                    <div><h2 class="card-title" id="sessionTitre">--</h2><div style="color:var(--muted)" id="sessionMeta">--</div></div>
+                    <button class="btn btn-secondary btn-sm" onclick="showTab('sessions')">← Retour</button>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-header"><span id="progText">0/0</span><span id="progPct">0%</span></div>
+                    <div class="progress-bar"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+                </div>
+                <div class="stats-grid" style="margin-bottom:20px">
+                    <div class="stat-card"><div class="stat-value success" id="sNotes">0</div><div class="stat-label">✅ Notés</div></div>
+                    <div class="stat-card"><div class="stat-value danger" id="sAbsents">0</div><div class="stat-label">🚫 Absents</div></div>
+                    <div class="stat-card"><div class="stat-value warning" id="sManquants">0</div><div class="stat-label">⏳ Manquants</div></div>
+                    <div class="stat-card"><div class="stat-value" id="sMoyenne">--</div><div class="stat-label">Moyenne</div></div>
+                </div>
+                <div style="overflow-x:auto"><table class="eleves-table"><thead><tr><th>Élève</th><th>Statut</th><th>Note</th><th>💬</th><th>📱</th><th>Cours</th><th>Action</th></tr></thead><tbody id="elevesBody"></tbody></table></div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- MODAL NOTATION -->
+    <div class="modal-overlay" id="modalNotation">
+        <div class="modal">
+            <div class="modal-header"><h2>📝 <span id="modalEleve">--</span></h2><button class="modal-close" onclick="fermerModal()">×</button></div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fermerModal()">Annuler</button>
+                <button class="btn btn-warning" onclick="marquerAbsent()">🚫 Absent</button>
+                <button class="btn btn-success" onclick="validerNote()">✅ Valider</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL RGPD -->
+    <div class="modal-overlay" id="modalRgpd">
+        <div class="modal">
+            <div class="modal-header"><h2>👤 Gestion noms (RGPD)</h2><button class="modal-close" onclick="fermerRgpd()">×</button></div>
+            <div class="modal-body">
+                <p style="color:var(--muted);margin-bottom:15px">Les noms sont stockés localement sur votre appareil.</p>
+                <div class="form-group"><label>📥 Importer CSV</label><input type="file" id="inputCsv" accept=".csv,.txt" style="padding:10px;border:2px dashed var(--border);border-radius:10px;width:100%"><small style="color:var(--muted)">Format: CODE,NOM PRENOM</small></div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+                    <button class="btn btn-primary" onclick="importerCsv()">📥 Importer</button>
+                    <button class="btn btn-secondary" onclick="exporterCsv()">📤 Exporter</button>
+                    <button class="btn btn-danger" onclick="effacerNoms()">🗑️ Effacer</button>
+                </div>
+                <div style="margin-top:20px;padding:15px;background:var(--bg);border-radius:10px"><strong>État:</strong> <span id="rgpdStatus">--</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast">✅ OK</div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.appspot.com",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let user = null;
+        let nomsEleves = {};
+        let allSuivis = [];
+        let currentSession = null;
+        let currentEleve = null;
+        let saisie = {};
+        let objectifEleve = null;
+        
+        const CLE_NOMS = 'cockpit_noms_eleves';
+        const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
+        const MALUS = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
+        
+        // AUTH
+        onAuthStateChanged(auth, async (u) => {
+            user = u;
+            if (u) {
+                document.getElementById('userStatus').textContent = '✅ ' + u.email;
+                chargerNomsLocaux();
+                initFiltres();
+                await chargerSessions();
+            } else {
+                document.getElementById('userStatus').innerHTML = '<button class="header-btn" onclick="connexion()">🔐 Connexion</button>';
+            }
+        });
+        
+        window.connexion = () => signInWithPopup(auth, new GoogleAuthProvider());
+        window.deconnexion = () => signOut(auth);
+        
+        // RGPD
+        function chargerNomsLocaux() {
+            try { nomsEleves = JSON.parse(localStorage.getItem(CLE_NOMS) || '{}'); } catch(e) { nomsEleves = {}; }
+            const count = Object.keys(nomsEleves).length;
+            document.getElementById('rgpdBanner').style.display = count === 0 ? 'flex' : 'none';
+            document.getElementById('rgpdStatus').textContent = count > 0 ? count + ' élèves chargés' : 'Aucun nom';
+        }
+        
+        function getNom(code) { return nomsEleves[code] || ''; }
+        
+        window.openRgpdModal = () => { document.getElementById('modalRgpd').classList.add('active'); chargerNomsLocaux(); };
+        window.fermerRgpd = () => document.getElementById('modalRgpd').classList.remove('active');
+        
+        window.importerCsv = function() {
+            const input = document.getElementById('inputCsv');
+            if (!input.files.length) return alert('Sélectionnez un fichier');
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let count = 0;
+                e.target.result.split('\n').forEach(line => {
+                    line = line.trim();
+                    if (!line) return;
+                    const parts = line.split(',');
+                    if (parts.length >= 2) {
+                        const code = parts[0].trim();
+                        const nom = parts.slice(1).join(',').trim();
+                        if (code && nom) { nomsEleves[code] = nom; count++; }
+                    }
+                });
+                localStorage.setItem(CLE_NOMS, JSON.stringify(nomsEleves));
+                chargerNomsLocaux();
+                toast('✅ ' + count + ' élèves importés');
+                if (currentSession) afficherSession(currentSession);
+            };
+            reader.readAsText(input.files[0]);
+        };
+        
+        window.exporterCsv = function() {
+            const entries = Object.entries(nomsEleves);
+            if (!entries.length) return alert('Aucun nom');
+            const csv = entries.map(([c, n]) => c + ',' + n).join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+            a.download = 'mes_eleves_' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        };
+        
+        window.effacerNoms = function() {
+            if (!confirm('Supprimer tous les noms ?')) return;
+            localStorage.removeItem(CLE_NOMS);
+            nomsEleves = {};
+            chargerNomsLocaux();
+            toast('🗑️ Effacé');
+        };
+        
+        // NAVIGATION
+        window.showTab = function(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab[data-tab="'+tab+'"]')?.classList.add('active');
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if (tab === 'sessions') document.getElementById('screenSessions').classList.add('active');
+            else if (tab === 'dashboard') { document.getElementById('screenDashboard').classList.add('active'); chargerDashboard(); }
+        };
+        
+        window.showNewSession = function() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screenNew').classList.add('active');
+            document.getElementById('newDate').value = new Date().toISOString().slice(0,10);
+        };
+        
+        // FILTRES
+        function initFiltres() {
+            const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+            ['filterClasse', 'newClasse'].forEach(id => {
+                const sel = document.getElementById(id);
+                classes.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.label; sel.appendChild(o); });
+            });
+        }
+        
+        window.clearFilters = function() {
+            document.getElementById('filterClasse').value = '';
+            document.getElementById('filterDate').value = '';
+            chargerSessions();
+        };
+        
+        window.onClasseChange = function() {
+            const classeId = document.getElementById('newClasse').value;
+            const sel = document.getElementById('newModule');
+            sel.innerHTML = '<option value="">-- Sélectionner --</option>';
+            if (!classeId) return;
+            const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(classes[0]) : [];
+            modules.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.id + ' - ' + m.titre; sel.appendChild(o); });
+        };
+        
+        // CHARGER SESSIONS
+        window.chargerSessions = async function() {
+            const fClasse = document.getElementById('filterClasse').value;
+            const fDate = document.getElementById('filterDate').value;
+            allSuivis = [];
+            const sessionsMap = {};
+            
+            try {
+                const eleves = window.BDD_ELEVES || [];
+                for (const eleve of eleves) {
+                    const snap = await getDocs(collection(db, "resultats", eleve.userCode, "suivi"));
+                    snap.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (fClasse) {
+                            const cg = window.getClassesFromGroupe ? window.getClassesFromGroupe(fClasse) : [fClasse];
+                            if (!cg.includes(data.classe) && !cg.includes(eleve.classe)) return;
+                        }
+                        if (fDate && data.date !== fDate) return;
+                        
+                        allSuivis.push({ id: docSnap.id, eleveCode: eleve.userCode, eleveClasse: eleve.classe, ...data });
+                        
+                        const key = data.date + '_' + data.classe + '_' + data.module;
+                        if (!sessionsMap[key]) sessionsMap[key] = { id: key, date: data.date, classe: data.classe, module: data.module, eleves: [], nbNotes: 0, nbAbsents: 0, totalNotes: 0 };
+                        sessionsMap[key].eleves.push({ code: eleve.userCode, ...data });
+                        if (data.absent) sessionsMap[key].nbAbsents++;
+                        else if (data.noteSur20 !== null && data.noteSur20 !== undefined) { sessionsMap[key].nbNotes++; sessionsMap[key].totalNotes += data.noteSur20; }
+                    });
+                }
+                
+                const sessions = Object.values(sessionsMap);
+                sessions.sort((a, b) => b.date.localeCompare(a.date));
+                
+                sessions.forEach(s => {
+                    const cg = window.getClassesFromGroupe ? window.getClassesFromGroupe(s.classe) : [s.classe];
+                    let total = 0;
+                    cg.forEach(c => { total += (window.BDD_ELEVES || []).filter(e => e.classe === c).length; });
+                    s.nbTotal = total;
+                    s.nbManquants = total - s.nbNotes - s.nbAbsents;
+                    s.moyenne = s.nbNotes > 0 ? Math.round(s.totalNotes / s.nbNotes * 10) / 10 : null;
+                });
+                
+                afficherSessions(sessions);
+            } catch (error) {
+                console.error("Erreur:", error);
+                toast("❌ Erreur");
+            }
+        };
+        
+        function afficherSessions(sessions) {
+            const container = document.getElementById('sessionsList');
+            const total = sessions.length;
+            const inc = sessions.filter(s => s.nbManquants > 0).length;
+            const notes = sessions.reduce((s, x) => s + x.nbNotes, 0);
+            const pts = sessions.reduce((s, x) => s + (x.totalNotes || 0), 0);
+            const moy = notes > 0 ? Math.round(pts / notes * 10) / 10 : '--';
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statIncomplete').textContent = inc;
+            document.getElementById('statNotes').textContent = notes;
+            document.getElementById('statMoyenne').textContent = moy;
+            
+            const badge = document.getElementById('badgeIncomplete');
+            badge.textContent = inc;
+            badge.style.display = inc > 0 ? 'inline' : 'none';
+            
+            if (!sessions.length) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><h3>Aucune session</h3><p>Créez votre première session</p><button class="btn btn-success" onclick="showNewSession()">➕ Nouvelle</button></div>';
+                return;
+            }
+            
+            container.innerHTML = sessions.map(s => {
+                const [y, m, d] = s.date.split('-');
+                const prog = s.nbTotal > 0 ? Math.round((s.nbNotes + s.nbAbsents) / s.nbTotal * 100) : 0;
+                const cls = s.nbManquants === 0 ? 'complete' : 'incomplete';
+                return '<div class="session-item ' + cls + '" onclick="ouvrirSession(\'' + s.id + '\')"><div class="session-info"><h3>📅 ' + d + '/' + m + ' - ' + s.module + '</h3><div class="meta"><span>🏫 ' + s.classe + '</span><span>✅ ' + s.nbNotes + '</span><span>🚫 ' + s.nbAbsents + '</span>' + (s.nbManquants > 0 ? '<span style="color:var(--warning)">⏳ ' + s.nbManquants + '</span>' : '') + (s.moyenne ? '<span>📊 ' + s.moyenne + '/20</span>' : '') + '</div></div><div class="session-stats"><div class="session-progress"><div class="session-progress-bar" style="width:' + prog + '%"></div></div><span>' + prog + '%</span></div></div>';
+            }).join('');
+        }
+        
+        // CRÉER SESSION
+        window.creerSession = async function() {
+            const date = document.getElementById('newDate').value;
+            const classe = document.getElementById('newClasse').value;
+            const module = document.getElementById('newModule').value;
+            if (!date || !classe || !module) return alert('Remplissez tous les champs');
+            
+            const criteres = {
+                travail: document.getElementById('cTravail').checked,
+                oral: document.getElementById('cOral').checked,
+                attention: document.getElementById('cAttention').checked,
+                porteVue: document.getElementById('cPorteVue').checked,
+                coursAJour: document.getElementById('cCoursAJour').checked,
+                autonomie: document.getElementById('cAutonomie').checked,
+                initiative: document.getElementById('cInitiative').checked,
+                securite: document.getElementById('cSecurite').checked
+            };
+            const coursDefaut = Array.from(document.querySelectorAll('input[name="defCours"]:checked')).map(c => c.value);
+            
+            currentSession = { id: date + '_' + classe + '_' + module, date, classe, module, criteres, coursDefaut, eleves: [] };
+            toast('✅ Session créée');
+            afficherSession(currentSession);
+        };
+        
+        // OUVRIR SESSION
+        window.ouvrirSession = async function(sessionId) {
+            const parts = sessionId.split('_');
+            const date = parts[0];
+            const classe = parts[1];
+            const module = parts.slice(2).join('_');
+            currentSession = { id: sessionId, date, classe, module, criteres: { travail:true, oral:true, attention:true, porteVue:true, coursAJour:true, autonomie:true, initiative:true, securite:true }, coursDefaut: [], eleves: [] };
+            await afficherSession(currentSession);
+        };
+        
+        // AFFICHER SESSION
+        async function afficherSession(session) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screenSession').classList.add('active');
+            
+            const [y, m, d] = session.date.split('-');
+            document.getElementById('sessionTitre').textContent = '📅 ' + d + '/' + m + '/' + y + ' - ' + session.module;
+            document.getElementById('sessionMeta').textContent = '🏫 ' + session.classe;
+            
+            const cg = window.getClassesFromGroupe ? window.getClassesFromGroupe(session.classe) : [session.classe];
+            let eleves = [];
+            cg.forEach(c => { (window.BDD_ELEVES || []).filter(e => e.classe === c).forEach(e => { eleves.push({ code: e.userCode, classe: e.classe, nom: getNom(e.userCode), note: null, absent: false, statut: 'manquant' }); }); });
+            
+            for (let eleve of eleves) {
+                try {
+                    const docSnap = await getDoc(doc(db, "resultats", eleve.code, "suivi", session.date + '_' + session.module));
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        eleve.note = data;
+                        eleve.absent = data.absent || false;
+                        eleve.statut = data.absent ? 'absent' : 'fait';
+                        if (!session.criteres.travail && data.travail !== undefined) session.criteres = data.criteresActifs || session.criteres;
+                    }
+                } catch(e) {}
+            }
+            
+            currentSession.eleves = eleves;
+            eleves.sort((a, b) => { const o = { manquant: 0, fait: 1, absent: 2 }; return o[a.statut] - o[b.statut] || a.code.localeCompare(b.code); });
+            
+            const nbNotes = eleves.filter(e => e.statut === 'fait').length;
+            const nbAbsents = eleves.filter(e => e.statut === 'absent').length;
+            const nbManquants = eleves.filter(e => e.statut === 'manquant').length;
+            const notes = eleves.filter(e => e.note && !e.absent && e.note.noteSur20 !== null).map(e => e.note.noteSur20);
+            const moyenne = notes.length > 0 ? Math.round(notes.reduce((a, b) => a + b, 0) / notes.length * 10) / 10 : '--';
+            
+            document.getElementById('sNotes').textContent = nbNotes;
+            document.getElementById('sAbsents').textContent = nbAbsents;
+            document.getElementById('sManquants').textContent = nbManquants;
+            document.getElementById('sMoyenne').textContent = moyenne;
+            
+            const total = eleves.length;
+            const done = nbNotes + nbAbsents;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            document.getElementById('progText').textContent = done + '/' + total + ' élèves notés';
+            document.getElementById('progPct').textContent = pct + '%';
+            document.getElementById('progFill').style.width = pct + '%';
+            
+            const tbody = document.getElementById('elevesBody');
+            tbody.innerHTML = eleves.map(e => {
+                const nomD = e.nom ? '<span class="eleve-nom">' + e.nom + '</span>' : '';
+                let noteD = '--', noteC = '';
+                if (e.statut === 'fait' && e.note && e.note.noteSur20 !== null) {
+                    const n = e.note.noteSur20;
+                    noteD = n + '/20';
+                    noteC = n >= 12 ? 'good' : n >= 8 ? 'medium' : 'bad';
+                }
+                let bavD = '-', telD = '-', coursD = '-';
+                if (e.note && !e.absent) {
+                    const bav = e.note.bavardage || 'aucun';
+                    bavD = bav === 'aucun' ? '😊' : bav === 'rappel1' ? '1️⃣' : bav === 'rappel2' ? '2️⃣' : bav === 'rappel3' ? '3️⃣' : bav === 'retenu' ? '🚨' : '-';
+                    const tel = e.note.telephone || 'ok';
+                    telD = tel === 'ok' ? '✅' : tel === 'rappel1' ? '1️⃣' : tel === 'rappel2' ? '2️⃣' : tel === 'rappel3' ? '3️⃣' : tel === 'confisque' ? '🚫' : '-';
+                    const cours = e.note.coursDistrib;
+                    if (cours && cours.length) coursD = cours.map(c => c === 'seance1' ? 'S1' : c === 'seance2' ? 'S2' : c === 'seance3' ? 'S3' : c === 'seance4' ? 'S4' : c === 'complet' ? '📚' : c === 'correction' ? '✏️' : c === 'evaluation' ? '📝' : c).join(' ');
+                }
+                const statusB = e.statut === 'fait' ? '<span class="status-badge fait">✅ Noté</span>' : e.statut === 'absent' ? '<span class="status-badge absent">🚫 Absent</span>' : '<span class="status-badge manquant">⏳ Manquant</span>';
+                return '<tr class="' + e.statut + '"><td><span class="eleve-code" onclick="ouvrirNotation(\'' + e.code + '\')">' + e.code + '</span> ' + nomD + '</td><td>' + statusB + '</td><td><span class="note-badge ' + noteC + '">' + noteD + '</span></td><td>' + bavD + '</td><td>' + telD + '</td><td>' + coursD + '</td><td><button class="btn btn-sm btn-primary" onclick="ouvrirNotation(\'' + e.code + '\')">✏️</button></td></tr>';
+            }).join('');
+        }
+        
+        // MODAL NOTATION
+        window.ouvrirNotation = async function(code) {
+            currentEleve = currentSession.eleves.find(e => e.code === code);
+            if (!currentEleve) return;
+            
+            const nom = getNom(code);
+            document.getElementById('modalEleve').textContent = nom ? code + ' - ' + nom : code;
+            
+            saisie = { travail: null, oral: null, attention: null, porteVue: null, coursAJour: null, autonomie: null, initiative: null, securite: null, bavardage: 'aucun', telephone: 'ok' };
+            if (currentEleve.note && !currentEleve.absent) saisie = { ...currentEleve.note };
+            
+            objectifEleve = null;
+            try {
+                const objSnap = await getDoc(doc(db, "resultats", code, "objectifs", "current"));
+                if (objSnap.exists()) objectifEleve = objSnap.data();
+            } catch(e) {}
+            
+            document.getElementById('modalBody').innerHTML = genererFormulaire();
+            
+            Object.entries(saisie).forEach(([k, v]) => {
+                if (v !== null && v !== undefined) {
+                    const btn = document.querySelector('.opt-btn[data-c="' + k + '"][data-v="' + v + '"]');
+                    if (btn) btn.classList.add('selected');
+                }
+            });
+            
+            const cours = currentEleve.note?.coursDistrib || currentSession.coursDefaut || [];
+            (Array.isArray(cours) ? cours : []).forEach(c => { const cb = document.querySelector('input[name="modalCours"][value="' + c + '"]'); if (cb) cb.checked = true; });
+            
+            if (currentEleve.note?.commentaire) document.getElementById('modalComment').value = currentEleve.note.commentaire;
+            if (currentEleve.note?.ajustementManuel) {
+                document.getElementById('ajusterNote').checked = true;
+                document.getElementById('ajustementFields').style.display = 'block';
+                document.getElementById('noteManuelle').value = currentEleve.note.noteSur20;
+                if (currentEleve.note.justificationAjustement) document.getElementById('justifAjustement').value = currentEleve.note.justificationAjustement;
+            }
+            if (currentEleve.note?.objectifValide?.statut) {
+                const r = document.querySelector('input[name="objVal"][value="' + currentEleve.note.objectifValide.statut + '"]');
+                if (r) r.checked = true;
+            }
+            
+            updateNotePreview();
+            document.getElementById('modalNotation').classList.add('active');
+        };
+        
+        function genererFormulaire() {
+            const c = currentSession.criteres || {};
+            let h = '';
+            
+            h += '<div class="note-box"><div class="label">Note calculée</div><div class="value" id="notePreview">--/20</div><div class="note-ajustement"><label><input type="checkbox" id="ajusterNote" onchange="toggleAjust()"> ✏️ Ajuster manuellement</label><div id="ajustementFields" class="ajustement-fields"><label>Note: <input type="number" id="noteManuelle" min="0" max="20" step="0.5" style="width:70px"> /20</label><input type="text" id="justifAjustement" placeholder="Justification..." style="width:100%;margin-top:8px"></div></div></div>';
+            
+            h += '<div class="objectif-box"><h4>🎯 Objectif</h4>' + (objectifEleve ? '<div class="objectif-texte">🎯 ' + objectifEleve.texte + '</div><div class="objectif-validation"><label class="atteint"><input type="radio" name="objVal" value="atteint" onchange="updateNotePreview()"> ✅ Atteint</label><label class="non-atteint"><input type="radio" name="objVal" value="non_atteint" onchange="updateNotePreview()"> ❌ Non atteint</label><label class="en-cours"><input type="radio" name="objVal" value="en_cours" checked onchange="updateNotePreview()"> ⏳ En cours</label></div>' : '<p style="color:var(--muted);font-style:italic">Pas d\'objectif fixé</p>') + '</div>';
+            
+            if (c.travail) h += sectionCritere('📝 Travail', 'travail', [['tresbien','✓✓','Très bien'],['fait','✓','Fait'],['partiel','⚠️','Partiel'],['insuffisant','❌','Non fait'],['ne','⏸️','NE']], 5);
+            if (c.oral) h += sectionCritere('🗣️ Oral', 'oral', [['0','0','Aucune'],['1','1','Faible'],['2','2','Correcte'],['3','3','Bonne'],['4','4','Excellente'],['ne','⏸️','NE']], 6);
+            if (c.attention) h += sectionCritere('🧠 Attention', 'attention', [['bonne','😊','Bonne'],['moyenne','😐','Moyenne'],['insuffisante','😕','Insuffisante'],['ne','⏸️','NE']], 4);
+            if (c.porteVue) h += sectionCritere('📁 Porte-vue', 'porteVue', [['ok','✅','OK'],['oubli','❌','Oublié'],['ne','⏸️','NE']], 3);
+            if (c.coursAJour) h += sectionCritere('📋 Cours à jour', 'coursAJour', [['a_jour','✅','À jour'],['incomplet','⚠️','Incomplet'],['pas_a_jour','❌','Pas à jour'],['ne','⏸️','NE']], 4);
+            if (c.autonomie) h += sectionCritere('🎯 Autonomie', 'autonomie', [['bonne','😊','Bonne'],['moyenne','😐','Moyenne'],['insuffisante','😕','Insuffisante'],['ne','⏸️','NE']], 4);
+            if (c.initiative) h += sectionCritere('💡 Initiative', 'initiative', [['oui','😊','Oui'],['parfois','😐','Parfois'],['non','😕','Non'],['ne','⏸️','NE']], 4);
+            if (c.securite) h += sectionCritere('⚠️ Sécurité', 'securite', [['oui','✅','Oui'],['partiel','⚠️','Partiel'],['non','❌','Non'],['ne','⏸️','NE']], 4);
+            
+            h += '<div class="section-saisie"><h3>💬 Bavardage <span style="color:var(--danger);font-size:0.8em">(plafonne)</span></h3><div class="options-grid cols-6"><div class="opt-btn good" data-c="bavardage" data-v="aucun" onclick="selectOpt(this)"><span class="emoji">😊</span><span class="label">Aucun</span></div><div class="opt-btn" data-c="bavardage" data-v="rappel1" onclick="selectOpt(this)"><span class="emoji">1️⃣</span><span class="label">Rappel 1</span></div><div class="opt-btn" data-c="bavardage" data-v="rappel2" onclick="selectOpt(this)"><span class="emoji">2️⃣</span><span class="label">Rappel 2</span></div><div class="opt-btn" data-c="bavardage" data-v="rappel3" onclick="selectOpt(this)"><span class="emoji">3️⃣</span><span class="label">Rappel 3</span></div><div class="opt-btn" data-c="bavardage" data-v="retenu" onclick="selectOpt(this)"><span class="emoji">🚨</span><span class="label">Retenu</span></div><div class="opt-btn ne-btn" data-c="bavardage" data-v="ne" onclick="selectOpt(this)"><span class="emoji">⏸️</span><span class="label">NE</span></div></div></div>';
+            
+            h += '<div class="section-saisie"><h3>📱 Téléphone <span style="color:var(--warning);font-size:0.8em">(malus)</span></h3><div class="options-grid cols-6"><div class="opt-btn good" data-c="telephone" data-v="ok" onclick="selectOpt(this)"><span class="emoji">✅</span><span class="label">OK</span></div><div class="opt-btn" data-c="telephone" data-v="rappel1" onclick="selectOpt(this)"><span class="emoji">1️⃣</span><span class="label">Rappel 1</span></div><div class="opt-btn" data-c="telephone" data-v="rappel2" onclick="selectOpt(this)"><span class="emoji">2️⃣</span><span class="label">Rappel 2</span></div><div class="opt-btn" data-c="telephone" data-v="rappel3" onclick="selectOpt(this)"><span class="emoji">3️⃣</span><span class="label">Rappel 3</span></div><div class="opt-btn" data-c="telephone" data-v="confisque" onclick="selectOpt(this)"><span class="emoji">🚫</span><span class="label">Confisqué</span></div><div class="opt-btn ne-btn" data-c="telephone" data-v="ne" onclick="selectOpt(this)"><span class="emoji">⏸️</span><span class="label">NE</span></div></div></div>';
+            
+            h += '<div class="section-saisie"><h3>📄 Cours distribués</h3><div class="cours-grid"><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="seance1">📄 S1</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="seance2">📄 S2</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="seance3">📄 S3</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="seance4">📄 S4</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="complet">📚 Complet</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="correction">✏️ Correction</label><label class="cours-checkbox"><input type="checkbox" name="modalCours" value="evaluation">📝 Éval</label></div></div>';
+            
+            h += '<div class="section-saisie"><h3>💬 Appréciation</h3><div class="comment-tags"><button type="button" class="comment-tag positif" onclick="addComment(\'Excellent travail\')">Excellent travail</button><button type="button" class="comment-tag positif" onclick="addComment(\'Bonne participation\')">Bonne participation</button><button type="button" class="comment-tag positif" onclick="addComment(\'Sérieux\')">Sérieux</button><button type="button" class="comment-tag encouragement" onclick="addComment(\'Efforts à poursuivre\')">Efforts à poursuivre</button><button type="button" class="comment-tag encouragement" onclick="addComment(\'Peut mieux faire\')">Peut mieux faire</button><button type="button" class="comment-tag alerte" onclick="addComment(\'Manque de travail\')">Manque de travail</button><button type="button" class="comment-tag alerte" onclick="addComment(\'Bavardages\')">Bavardages</button></div><textarea class="comment-textarea" id="modalComment" placeholder="Ajouter une appréciation..."></textarea></div>';
+            
+            return h;
+        }
+        
+        function sectionCritere(titre, key, options, cols) {
+            let h = '<div class="section-saisie"><h3>' + titre + '</h3><div class="options-grid cols-' + cols + '">';
+            options.forEach(([v, emoji, label]) => { h += '<div class="opt-btn ' + (v === 'ne' ? 'ne-btn' : '') + '" data-c="' + key + '" data-v="' + v + '" onclick="selectOpt(this)"><span class="emoji">' + emoji + '</span><span class="label">' + label + '</span></div>'; });
+            h += '</div></div>';
+            return h;
+        }
+        
+        window.selectOpt = function(btn) {
+            const c = btn.dataset.c, v = btn.dataset.v;
+            document.querySelectorAll('.opt-btn[data-c="' + c + '"]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            saisie[c] = (c === 'oral' && v !== 'ne') ? parseInt(v) : v;
+            updateNotePreview();
+        };
+        
+        window.addComment = function(txt) {
+            const input = document.getElementById('modalComment');
+            input.value = input.value ? input.value + ' ' + txt : txt;
+        };
+        
+        window.toggleAjust = function() {
+            const checked = document.getElementById('ajusterNote').checked;
+            document.getElementById('ajustementFields').style.display = checked ? 'block' : 'none';
+            if (checked) document.getElementById('noteManuelle').value = calculerNote().note;
+        };
+        
+        function calculerNote() {
+            const c = currentSession.criteres || {};
+            let pts = 0, max = 0;
+            
+            if (c.travail && saisie.travail && saisie.travail !== 'ne') { max += 4; if (saisie.travail === 'tresbien') pts += 4; else if (saisie.travail === 'fait') pts += 3; else if (saisie.travail === 'partiel') pts += 1.5; }
+            if (c.oral && saisie.oral !== null && saisie.oral !== undefined && saisie.oral !== 'ne') { max += 4; pts += parseInt(saisie.oral) || 0; }
+            if (c.attention && saisie.attention && saisie.attention !== 'ne') { max += 3; if (saisie.attention === 'bonne') pts += 3; else if (saisie.attention === 'moyenne') pts += 1.5; }
+            if (c.porteVue && saisie.porteVue && saisie.porteVue !== 'ne') { max += 1; if (saisie.porteVue === 'ok') pts += 1; }
+            if (c.coursAJour && saisie.coursAJour && saisie.coursAJour !== 'ne') { max += 2; if (saisie.coursAJour === 'a_jour') pts += 2; else if (saisie.coursAJour === 'incomplet') pts += 1; }
+            if (c.autonomie && saisie.autonomie && saisie.autonomie !== 'ne') { max += 2; if (saisie.autonomie === 'bonne') pts += 2; else if (saisie.autonomie === 'moyenne') pts += 1; }
+            if (c.initiative && saisie.initiative && saisie.initiative !== 'ne') { max += 2; if (saisie.initiative === 'oui') pts += 2; else if (saisie.initiative === 'parfois') pts += 1; }
+            if (c.securite && saisie.securite && saisie.securite !== 'ne') { max += 2; if (saisie.securite === 'oui') pts += 2; else if (saisie.securite === 'partiel') pts += 1; }
+            
+            let base = max > 0 ? Math.round((pts / max) * 20 * 10) / 10 : 0;
+            const bavardage = saisie.bavardage || 'aucun';
+            const telephone = saisie.telephone || 'ok';
+            let plafond = (bavardage === 'ne') ? 20 : (PLAFOND[bavardage] || 20);
+            let malus = (telephone === 'ne') ? 0 : (MALUS[telephone] || 0);
+            
+            let note = Math.max(0, Math.min(base, plafond) - malus);
+            
+            let bonus = 0;
+            const objVal = document.querySelector('input[name="objVal"]:checked');
+            const bavOk = bavardage === 'aucun' || bavardage === 'ne';
+            const telOk = telephone === 'ok' || telephone === 'ne';
+            if (objVal && objVal.value === 'atteint' && bavOk && telOk) { bonus = 0.5; note = Math.min(20, note + bonus); }
+            
+            note = Math.round(note * 2) / 2;
+            return { pts, max, base, plafond, malus, bonus, note, bavardage, telephone };
+        }
+        
+        window.updateNotePreview = function() {
+            const r = calculerNote();
+            const el = document.getElementById('notePreview');
+            if (!el) return;
+            
+            let display = r.note + '/20';
+            if (r.bavardage === 'retenu') { el.style.color = 'var(--danger)'; display += ' 🚨'; }
+            else if (r.bavardage === 'rappel3') { el.style.color = 'var(--danger)'; display += ' ⚠️'; }
+            else if (r.bavardage === 'rappel2' || r.bavardage === 'rappel1' || r.malus > 0) { el.style.color = 'var(--warning)'; }
+            else if (r.bonus > 0) { el.style.color = 'var(--success)'; display += ' 🎯'; }
+            else { el.style.color = 'var(--success)'; }
+            el.textContent = display;
+            
+            const ajuster = document.getElementById('ajusterNote');
+            const noteM = document.getElementById('noteManuelle');
+            if (ajuster && !ajuster.checked && noteM) noteM.value = r.note;
+        };
+        
+        window.fermerModal = () => { document.getElementById('modalNotation').classList.remove('active'); currentEleve = null; };
+        
+        // VALIDER NOTE
+        window.validerNote = async function() {
+            if (!currentEleve || !currentSession) return;
+            
+            const r = calculerNote();
+            const cours = Array.from(document.querySelectorAll('input[name="modalCours"]:checked')).map(c => c.value);
+            const comment = document.getElementById('modalComment')?.value.trim() || null;
+            
+            let noteFinale = r.note;
+            let ajustementManuel = false;
+            let justification = null;
+            
+            const ajuster = document.getElementById('ajusterNote');
+            if (ajuster && ajuster.checked) {
+                const noteM = parseFloat(document.getElementById('noteManuelle').value);
+                if (!isNaN(noteM) && noteM >= 0 && noteM <= 20) {
+                    noteFinale = noteM;
+                    ajustementManuel = true;
+                    justification = document.getElementById('justifAjustement')?.value.trim() || null;
+                }
+            }
+            
+            const objVal = document.querySelector('input[name="objVal"]:checked');
+            const objectifValide = objectifEleve ? { texte: objectifEleve.texte, statut: objVal ? objVal.value : 'en_cours' } : null;
+            
+            const data = {
+                date: currentSession.date,
+                heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                classe: currentSession.classe,
+                module: currentSession.module,
+                criteresActifs: currentSession.criteres,
+                travail: saisie.travail, oral: saisie.oral, attention: saisie.attention, porteVue: saisie.porteVue,
+                coursAJour: saisie.coursAJour, autonomie: saisie.autonomie, initiative: saisie.initiative, securite: saisie.securite,
+                bavardage: saisie.bavardage || 'aucun', telephone: saisie.telephone || 'ok',
+                points: r.pts, maxPoints: r.max, noteBase: r.base, noteCalculee: r.note,
+                plafond: r.plafond, malus: r.malus, bonusObjectif: r.bonus,
+                noteSur20: noteFinale, ajustementManuel, justificationAjustement: justification,
+                objectifValide, coursDistrib: cours, commentaire: comment,
+                absent: false, createdAt: serverTimestamp(), createdBy: user?.email || 'anonyme'
+            };
+            
+            try {
+                const docId = currentSession.date + '_' + currentSession.module;
+                await setDoc(doc(db, "resultats", currentEleve.code, "suivi", docId), data);
+                
+                if (objectifValide && (objectifValide.statut === 'atteint' || objectifValide.statut === 'non_atteint')) {
+                    try {
+                        await setDoc(doc(db, "resultats", currentEleve.code, "objectifs", docId), { ...objectifEleve, statut: objectifValide.statut, dateValidation: serverTimestamp() });
+                    } catch(e) {}
+                }
+                
+                toast('✅ ' + currentEleve.code + ' - ' + noteFinale + '/20');
+                fermerModal();
+                await afficherSession(currentSession);
+            } catch (error) {
+                console.error("Erreur:", error);
+                toast("❌ Erreur");
+            }
+        };
+        
+        // MARQUER ABSENT
+        window.marquerAbsent = async function() {
+            if (!currentEleve || !currentSession) return;
+            
+            const cours = Array.from(document.querySelectorAll('input[name="modalCours"]:checked')).map(c => c.value);
+            
+            const data = {
+                date: currentSession.date,
+                heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                classe: currentSession.classe, module: currentSession.module,
+                absent: true, noteSur20: null, coursDistrib: cours,
+                createdAt: serverTimestamp(), createdBy: user?.email || 'anonyme'
+            };
+            
+            try {
+                const docId = currentSession.date + '_' + currentSession.module;
+                await setDoc(doc(db, "resultats", currentEleve.code, "suivi", docId), data);
+                toast('🚫 ' + currentEleve.code + ' - Absent');
+                fermerModal();
+                await afficherSession(currentSession);
+            } catch (error) {
+                console.error("Erreur:", error);
+                toast("❌ Erreur");
+            }
+        };
+        
+        // DASHBOARD
+        async function chargerDashboard() {
+            const elevesStats = {};
+            const bavStats = { aucun: 0, rappel1: 0, rappel2: 0, rappel3: 0, retenu: 0 };
+            const telStats = { ok: 0, rappel1: 0, rappel2: 0, rappel3: 0, confisque: 0 };
+            const parDate = {};
+            
+            allSuivis.forEach(s => {
+                if (s.absent || !s.noteSur20) return;
+                
+                if (!elevesStats[s.eleveCode]) elevesStats[s.eleveCode] = { code: s.eleveCode, classe: s.eleveClasse || s.classe, totalNotes: 0, nbSeances: 0, parfaites: 0 };
+                const e = elevesStats[s.eleveCode];
+                e.totalNotes += s.noteSur20; e.nbSeances++;
+                if (s.noteSur20 >= 12 && (s.bavardage === 'aucun' || !s.bavardage) && (s.telephone === 'ok' || !s.telephone)) e.parfaites++;
+                
+                const bav = s.bavardage || 'aucun';
+                if (bavStats[bav] !== undefined) bavStats[bav]++;
+                
+                const tel = s.telephone || 'ok';
+                if (telStats[tel] !== undefined) telStats[tel]++;
+                
+                if (s.date) {
+                    if (!parDate[s.date]) parDate[s.date] = { total: 0, nb: 0 };
+                    parDate[s.date].total += s.noteSur20; parDate[s.date].nb++;
+                }
+            });
+            
+            const classement = Object.values(elevesStats).map(e => ({ ...e, moyenne: Math.round(e.totalNotes / e.nbSeances * 10) / 10, nom: getNom(e.code) })).sort((a, b) => b.moyenne - a.moyenne).slice(0, 10);
+            
+            document.getElementById('topEleves').innerHTML = classement.length ? classement.map((e, i) => {
+                const rc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                return '<div class="leaderboard-item"><div class="leaderboard-rank ' + rc + '">' + (i + 1) + '</div><div style="flex:1"><div style="font-weight:600">' + (e.nom || e.code) + '</div><div style="font-size:0.85em;color:var(--muted)">' + e.classe + ' • ' + e.nbSeances + ' séances • ' + e.parfaites + ' ⭐</div></div><div style="font-weight:700;color:var(--success)">' + e.moyenne + '/20</div></div>';
+            }).join('') : '<p style="color:var(--muted);text-align:center;padding:20px">Pas de données</p>';
+            
+            const totalBav = Object.values(bavStats).reduce((a, b) => a + b, 0);
+            document.getElementById('chartBav').innerHTML = totalBav > 0 ? '<div style="display:flex;flex-direction:column;gap:8px">' + Object.entries({ 'aucun': '😊 Aucun', 'rappel1': '1️⃣ Rappel 1', 'rappel2': '2️⃣ Rappel 2', 'rappel3': '3️⃣ Rappel 3', 'retenu': '🚨 Retenu' }).map(([k, l]) => { const pct = Math.round(bavStats[k] / totalBav * 100); const col = k === 'aucun' ? 'var(--success)' : k === 'retenu' || k === 'rappel3' ? 'var(--danger)' : 'var(--warning)'; return '<div style="display:flex;align-items:center;gap:10px"><span style="width:90px;font-size:0.85em">' + l + '</span><div style="flex:1;background:var(--border);height:20px;border-radius:5px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + col + '"></div></div><span style="font-weight:600">' + pct + '%</span></div>'; }).join('') + '</div>' : '<p style="color:var(--muted);text-align:center">Pas de données</p>';
+            
+            const totalTel = Object.values(telStats).reduce((a, b) => a + b, 0);
+            document.getElementById('chartTel').innerHTML = totalTel > 0 ? '<div style="display:flex;flex-direction:column;gap:8px">' + Object.entries({ 'ok': '✅ OK', 'rappel1': '1️⃣ Rappel 1', 'rappel2': '2️⃣ Rappel 2', 'rappel3': '3️⃣ Rappel 3', 'confisque': '🚫 Confisqué' }).map(([k, l]) => { const pct = Math.round(telStats[k] / totalTel * 100); const col = k === 'ok' ? 'var(--success)' : k === 'confisque' || k === 'rappel3' ? 'var(--danger)' : 'var(--warning)'; return '<div style="display:flex;align-items:center;gap:10px"><span style="width:90px;font-size:0.85em">' + l + '</span><div style="flex:1;background:var(--border);height:20px;border-radius:5px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + col + '"></div></div><span style="font-weight:600">' + pct + '%</span></div>'; }).join('') + '</div>' : '<p style="color:var(--muted);text-align:center">Pas de données</p>';
+            
+            const dates = Object.keys(parDate).sort().slice(-7);
+            document.getElementById('chartEvo').innerHTML = dates.length > 0 ? '<div style="display:flex;flex-direction:column;gap:8px">' + dates.map(d => { const [y, m, day] = d.split('-'); const moy = Math.round(parDate[d].total / parDate[d].nb * 10) / 10; const w = Math.round(moy / 20 * 100); const col = moy >= 12 ? 'var(--success)' : moy >= 8 ? 'var(--warning)' : 'var(--danger)'; return '<div style="display:flex;align-items:center;gap:10px"><span style="width:50px;font-size:0.85em">' + day + '/' + m + '</span><div style="flex:1;background:var(--border);height:20px;border-radius:5px;overflow:hidden"><div style="width:' + w + '%;height:100%;background:' + col + '"></div></div><span style="font-weight:600">' + moy + '</span></div>'; }).join('') + '</div>' : '<p style="color:var(--muted);text-align:center">Pas assez de données</p>';
+        }
+        
+        // THEME
+        window.toggleTheme = function() {
+            const body = document.body;
+            body.dataset.theme = body.dataset.theme === 'dark' ? '' : 'dark';
+            localStorage.setItem('theme', body.dataset.theme || 'light');
+        };
+        if (localStorage.getItem('theme') === 'dark') document.body.dataset.theme = 'dark';
+        
+        // TOAST
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+        
+        console.log("✅ Suivi Complet PSE chargé");
+    </script>
+</body>
+</html>
