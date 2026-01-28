@@ -226,6 +226,9 @@
         .options-grid.cols-5 {
             grid-template-columns: repeat(5, 1fr);
         }
+        .options-grid.cols-6 {
+            grid-template-columns: repeat(6, 1fr);
+        }
         
         .opt-btn {
             padding: 16px 8px;
@@ -340,6 +343,9 @@
         
         @media (max-width: 600px) {
             .options-grid.cols-5 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .options-grid.cols-6 {
                 grid-template-columns: repeat(3, 1fr);
             }
         }
@@ -901,7 +907,7 @@
             <!-- TRAVAIL -->
             <div class="section-saisie" id="sectionTravail">
                 <h3>📝 Travail</h3>
-                <div class="options-grid">
+                <div class="options-grid cols-5">
                     <div class="opt-btn" data-critere="travail" data-value="tresbien" onclick="selectOption(this)">
                         <span class="emoji">✓✓</span>
                         <span class="label">Très bien</span>
@@ -918,13 +924,17 @@
                         <span class="emoji">❌</span>
                         <span class="label">Non fait</span>
                     </div>
+                    <div class="opt-btn ne-btn" data-critere="travail" data-value="ne" onclick="selectOption(this)">
+                        <span class="emoji">➖</span>
+                        <span class="label">NE</span>
+                    </div>
                 </div>
             </div>
             
-            <!-- ORAL (5 niveaux) -->
+            <!-- ORAL (5 niveaux + NE) -->
             <div class="section-saisie" id="sectionOral">
                 <h3>🗣️ Participation orale</h3>
-                <div class="options-grid cols-5">
+                <div class="options-grid cols-6">
                     <div class="opt-btn" data-critere="oral" data-value="0" onclick="selectOption(this)">
                         <span class="emoji">0</span>
                         <span class="label">Aucune</span>
@@ -945,13 +955,17 @@
                         <span class="emoji">4</span>
                         <span class="label">Excellente</span>
                     </div>
+                    <div class="opt-btn ne-btn" data-critere="oral" data-value="ne" onclick="selectOption(this)">
+                        <span class="emoji">➖</span>
+                        <span class="label">NE</span>
+                    </div>
                 </div>
             </div>
             
             <!-- ATTENTION -->
             <div class="section-saisie" id="sectionAttention">
                 <h3>🧠 Attention / Concentration</h3>
-                <div class="options-grid cols-3">
+                <div class="options-grid cols-4">
                     <div class="opt-btn" data-critere="attention" data-value="bonne" onclick="selectOption(this)">
                         <span class="emoji">😊</span>
                         <span class="label">Bonne</span>
@@ -963,6 +977,10 @@
                     <div class="opt-btn" data-critere="attention" data-value="insuffisante" onclick="selectOption(this)">
                         <span class="emoji">😕</span>
                         <span class="label">Insuffisante</span>
+                    </div>
+                    <div class="opt-btn ne-btn" data-critere="attention" data-value="ne" onclick="selectOption(this)">
+                        <span class="emoji">➖</span>
+                        <span class="label">NE</span>
                     </div>
                 </div>
             </div>
@@ -1081,7 +1099,7 @@
             <!-- BAVARDAGE -->
             <div class="section-saisie" id="sectionBavardage">
                 <h3>💬 Bavardage <span style="font-weight: 400; font-size: 0.75em; color: #dc2626;">(plafonne la note)</span></h3>
-                <div class="options-grid cols-5">
+                <div class="options-grid cols-6">
                     <div class="opt-btn good" data-critere="bavardage" data-value="aucun" onclick="selectOption(this)">
                         <span class="emoji">😊</span>
                         <span class="label">Aucun</span>
@@ -1102,13 +1120,17 @@
                         <span class="emoji">🚨</span>
                         <span class="label">Retenu</span>
                     </div>
+                    <div class="opt-btn ne-btn" data-critere="bavardage" data-value="ne" onclick="selectOption(this)">
+                        <span class="emoji">➖</span>
+                        <span class="label">NE</span>
+                    </div>
                 </div>
             </div>
             
             <!-- TÉLÉPHONE -->
             <div class="section-saisie" id="sectionTelephone">
                 <h3>📱 Téléphone <span style="font-weight: 400; font-size: 0.75em; color: #f59e0b;">(malus)</span></h3>
-                <div class="options-grid cols-5">
+                <div class="options-grid cols-6">
                     <div class="opt-btn good" data-critere="telephone" data-value="ok" onclick="selectOption(this)">
                         <span class="emoji">✅</span>
                         <span class="label">OK</span>
@@ -1128,6 +1150,10 @@
                     <div class="opt-btn danger-max" data-critere="telephone" data-value="confisque" onclick="selectOption(this)">
                         <span class="emoji">🚫</span>
                         <span class="label">Confisqué</span>
+                    </div>
+                    <div class="opt-btn ne-btn" data-critere="telephone" data-value="ne" onclick="selectOption(this)">
+                        <span class="emoji">➖</span>
+                        <span class="label">NE</span>
                     </div>
                 </div>
             </div>
@@ -1986,20 +2012,23 @@
             // Convertir en note /20
             let noteBase = maxPoints > 0 ? Math.round((points / maxPoints) * 20 * 10) / 10 : 0;
             
-            // Appliquer le PLAFOND bavardage
+            // Appliquer le PLAFOND bavardage (si NE = pas de plafond)
             const bavardage = saisieData.bavardage || 'aucun';
-            const plafond = PLAFOND_BAVARDAGE[bavardage] || 20;
+            const plafond = (bavardage === 'ne') ? 20 : (PLAFOND_BAVARDAGE[bavardage] || 20);
             let notePlafonnee = Math.min(noteBase, plafond);
             
-            // Appliquer le MALUS téléphone
+            // Appliquer le MALUS téléphone (si NE = pas de malus)
             const telephone = saisieData.telephone || 'ok';
-            const malus = MALUS_TELEPHONE[telephone] || 0;
+            const malus = (telephone === 'ne') ? 0 : (MALUS_TELEPHONE[telephone] || 0);
             let noteFinale = Math.max(0, notePlafonnee - malus);
             
-            // Bonus objectif atteint (+0.5 si pas de bavardage ni téléphone)
+            // Bonus objectif atteint (+0.5 si pas de problème bavardage/téléphone)
+            // NE compte comme OK pour le bonus
             let bonusObjectif = 0;
             const objectifValidation = document.querySelector('input[name="objectifValidation"]:checked');
-            if (objectifValidation && objectifValidation.value === 'atteint' && bavardage === 'aucun' && telephone === 'ok') {
+            const bavardageOk = (bavardage === 'aucun' || bavardage === 'ne');
+            const telephoneOk = (telephone === 'ok' || telephone === 'ne');
+            if (objectifValidation && objectifValidation.value === 'atteint' && bavardageOk && telephoneOk) {
                 bonusObjectif = 0.5;
                 noteFinale = Math.min(20, noteFinale + bonusObjectif);
             }
