@@ -3,8 +3,11 @@
    ✅ Ce fichier est RGPD compliant
    🔒 Il contient uniquement : userCode + classe (pas de données personnelles)
    
-   📅 Mise à jour : 26 janvier 2026
+   📅 Mise à jour : 28 janvier 2026
    👥 Total : 150 élèves
+   
+   ⚠️ PAS DE REGROUPEMENT : chaque classe est indépendante
+      BTAGO1 ≠ BTAGO2 (pas de "BTAGO groupé")
 */
 
 window.BDD_ELEVES = [
@@ -197,9 +200,76 @@ window.BDD_ELEVES = [
     { userCode: "CN05", classe: "C2VAN" }
 ];
 
-// Fonction helper pour rechercher un élève par code
+// ═══════════════════════════════════════════════════════════════════════
+// FONCTIONS HELPER - SANS REGROUPEMENT
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Rechercher un élève par code
+ */
 window.trouverEleve = function(userCode) {
     return window.BDD_ELEVES.find(e => e.userCode === userCode.toUpperCase());
 };
 
+/**
+ * Obtenir la liste des classes pour l'affichage (menu déroulant)
+ * ⚠️ PAS DE REGROUPEMENT - Retourne toutes les classes individuellement
+ */
+window.getListeClassesPourAffichage = function() {
+    const classesSet = new Set();
+    window.BDD_ELEVES.forEach(e => classesSet.add(e.classe));
+    
+    // Trier les classes
+    const classesList = Array.from(classesSet).sort();
+    
+    // Retourner au format { id, label }
+    return classesList.map(c => ({
+        id: c,
+        label: c
+    }));
+};
+
+/**
+ * Obtenir les classes d'un groupe
+ * ⚠️ PAS DE REGROUPEMENT - Retourne simplement la classe elle-même
+ */
+window.getClassesFromGroupe = function(classeId) {
+    // Pas de regroupement : une classe = elle-même
+    return [classeId];
+};
+
+/**
+ * Obtenir les élèves d'une classe
+ */
+window.getElevesDeClasse = function(classeId) {
+    return window.BDD_ELEVES.filter(e => e.classe === classeId);
+};
+
+/**
+ * Compter les élèves d'une classe
+ */
+window.getNbElevesClasse = function(classeId) {
+    return window.BDD_ELEVES.filter(e => e.classe === classeId).length;
+};
+
+/**
+ * Obtenir toutes les classes uniques
+ */
+window.getToutesLesClasses = function() {
+    const classesSet = new Set();
+    window.BDD_ELEVES.forEach(e => classesSet.add(e.classe));
+    return Array.from(classesSet).sort();
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// SREDACTEDSTIQUES
+// ═══════════════════════════════════════════════════════════════════════
+
+const stats = {};
+window.BDD_ELEVES.forEach(e => {
+    stats[e.classe] = (stats[e.classe] || 0) + 1;
+});
+
 console.log("✅ BDD Élèves chargée :", window.BDD_ELEVES.length, "élèves (RGPD compliant)");
+console.log("📊 Classes :", Object.keys(stats).length);
+console.log("📋 Détail :", stats);
