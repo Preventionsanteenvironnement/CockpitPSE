@@ -459,7 +459,10 @@
                 </div>
                 <div class="filter-group">
                     <label>Date</label>
-                    <input type="date" id="filterDate" onchange="chargerHistorique()">
+                    <div style="display: flex; gap: 5px;">
+                        <input type="date" id="filterDate" onchange="chargerHistorique()" style="flex: 1;">
+                        <button onclick="document.getElementById('filterDate').value=''; chargerHistorique();" style="padding: 8px 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.9em;" title="Toutes les dates">✖️</button>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>Élève</label>
@@ -490,6 +493,17 @@
                 <div class="stat-value" id="statMoyenne">--</div>
                 <div class="stat-label">Moyenne</div>
             </div>
+        </div>
+        
+        <!-- ALERTE DOUBLONS -->
+        <div id="doublonsAlert" style="display: none; background: linear-gradient(135deg, #fef3c7, #fde68a); border: 2px solid #f59e0b; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <div style="font-weight: 700; color: #92400e;">⚠️ Doublons détectés</div>
+                <div style="font-size: 0.9em; color: #a16207;" id="doublonsInfo">-- entrées en double</div>
+            </div>
+            <button onclick="nettoyerDoublons()" style="background: #f59e0b; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                🧹 Nettoyer les doublons
+            </button>
         </div>
         
         <!-- BOUTON COMPLÉTER LA SÉANCE -->
@@ -800,8 +814,8 @@
             select.appendChild(opt);
         });
         
-        // Date par défaut : aujourd'hui
-        document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
+        // Date par défaut : vide (permet de chercher toutes les dates)
+        // document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
     }
     
     window.chargerHistorique = async function() {
@@ -885,6 +899,29 @@
         document.getElementById('statAbsents').textContent = absents.length;
         document.getElementById('statMoyenne').textContent = moyenne;
         
+        // 🔍 DÉTECTION DES DOUBLONS
+        const doublonsMap = {};
+        window.allSuivis.forEach((s, idx) => {
+            const key = `${s.eleveCode}_${s.date}_${s.module}`;
+            if (!doublonsMap[key]) {
+                doublonsMap[key] = [];
+            }
+            doublonsMap[key].push(idx);
+        });
+        
+        // Marquer les doublons (si plus d'une entrée avec la même clé)
+        const doublonsIndices = new Set();
+        Object.values(doublonsMap).forEach(indices => {
+            if (indices.length > 1) {
+                indices.forEach(idx => doublonsIndices.add(idx));
+            }
+        });
+        
+        // Compter les doublons
+        if (doublonsIndices.size > 0) {
+            console.warn(`⚠️ ${doublonsIndices.size} entrées en doublon détectées !`);
+        }
+        
         if (window.allSuivis.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -902,6 +939,10 @@
         tbody.innerHTML = window.allSuivis.map((s, idx) => {
             const noteClass = s.absent ? 'absent' : getNoteClass(s.noteSur20);
             const noteDisplay = s.absent ? '🚫 ABS' : `${s.noteSur20}/20`;
+            
+            // Vérifier si c'est un doublon
+            const isDoublon = doublonsIndices.has(idx);
+            const rowStyle = isDoublon ? 'background: linear-gradient(135deg, #fef3c7, #fde68a); border-left: 4px solid #f59e0b;' : '';
             
             // Construire l'affichage du cours
             let coursDisplay = '-';
@@ -946,8 +987,8 @@
             }
             
             return `
-                <tr>
-                    <td>${formatDate(s.date)} ${s.heure || ''}</td>
+                <tr style="${rowStyle}">
+                    <td>${formatDate(s.date)} ${s.heure || ''} ${isDoublon ? '<span title="Doublon détecté" style="color: #f59e0b;">⚠️</span>' : ''}</td>
                     <td><span class="code-badge">${s.eleveCode}</span></td>
                     <td><span class="classe-badge">${s.classe || '--'}</span></td>
                     <td>${s.module || '--'}</td>
@@ -962,6 +1003,16 @@
                 </tr>
             `;
         }).join('');
+        
+        // Afficher l'alerte doublons si nécessaire
+        window.doublonsData = doublonsMap; // Stocker pour le nettoyage
+        const doublonsAlert = document.getElementById('doublonsAlert');
+        if (doublonsIndices.size > 0) {
+            doublonsAlert.style.display = 'flex';
+            document.getElementById('doublonsInfo').textContent = `${doublonsIndices.size} entrées en double (${Object.values(doublonsMap).filter(v => v.length > 1).length} groupes)`;
+        } else {
+            doublonsAlert.style.display = 'none';
+        }
         
         // Vérifier si on peut afficher le bouton "Compléter la séance"
         verifierSeanceACompleter();
@@ -1052,6 +1103,65 @@
         
         // Ouvrir suivi.html avec les paramètres
         window.location.href = 'suivi.html?' + params.toString();
+    };
+    
+    // 🧹 NETTOYAGE DES DOUBLONS
+    window.nettoyerDoublons = async function() {
+        if (!window.doublonsData) {
+            alert("Aucun doublon à nettoyer.");
+            return;
+        }
+        
+        // Trouver les groupes de doublons
+        const groupesDoublons = Object.entries(window.doublonsData).filter(([key, indices]) => indices.length > 1);
+        
+        if (groupesDoublons.length === 0) {
+            alert("Aucun doublon à nettoyer.");
+            return;
+        }
+        
+        const confirmation = confirm(
+            `⚠️ NETTOYAGE DES DOUBLONS\n\n` +
+            `${groupesDoublons.length} groupe(s) de doublons détectés.\n\n` +
+            `Pour chaque groupe, l'entrée la plus ANCIENNE sera supprimée et la plus RÉCENTE sera conservée.\n\n` +
+            `Cette action est irréversible. Continuer ?`
+        );
+        
+        if (!confirmation) return;
+        
+        let supprimés = 0;
+        let erreurs = 0;
+        
+        for (const [key, indices] of groupesDoublons) {
+            // Récupérer les saisies de ce groupe
+            const saisies = indices.map(idx => window.allSuivis[idx]);
+            
+            // Trier par date de création (la plus récente en premier)
+            saisies.sort((a, b) => {
+                const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+                const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+                return dateB - dateA;
+            });
+            
+            // Garder la première (plus récente), supprimer les autres
+            for (let i = 1; i < saisies.length; i++) {
+                const s = saisies[i];
+                try {
+                    const ref = doc(db, "resultats", s.eleveCode, "suivi", s.id);
+                    await deleteDoc(ref);
+                    supprimés++;
+                    console.log(`🗑️ Doublon supprimé: ${s.eleveCode} - ${s.date} - ${s.module} (ID: ${s.id})`);
+                } catch (err) {
+                    console.error("Erreur suppression doublon:", err);
+                    erreurs++;
+                }
+            }
+        }
+        
+        alert(`✅ Nettoyage terminé !\n\n${supprimés} doublons supprimés.\n${erreurs > 0 ? erreurs + ' erreurs.' : ''}`);
+        
+        // Recharger l'historique
+        chargerHistorique();
     };
     
     function getNoteClass(note) {
