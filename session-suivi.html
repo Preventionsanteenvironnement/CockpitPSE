@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sessions de Suivi - Cockpit PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --primary: #6366f1;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --border: #e2e8f0;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        
+        /* === HEADER === */
+        .header {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.3em; margin-bottom: 5px; }
+        .header .subtitle { font-size: 0.85em; opacity: 0.9; }
+        .header-nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .header-nav a, .header-nav button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85em;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+        }
+        .header-nav a:hover, .header-nav button:hover { background: rgba(255,255,255,0.3); }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        
+        /* === CARDS === */
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* === BOUTONS === */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
+        .btn-success { background: linear-gradient(135deg, #16a34a, #15803d); color: white; }
+        .btn-secondary { background: #e2e8f0; color: var(--text); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn-block { width: 100%; }
+        .btn-sm { padding: 8px 14px; font-size: 0.85em; }
+        
+        /* === LOGIN === */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            padding: 20px;
+        }
+        .login-icon { font-size: 4em; margin-bottom: 20px; }
+        .btn-google {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #4285f4, #3367d6);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        /* === LISTE SESSIONS === */
+        .session-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f8fafc;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .session-item:hover { border-color: var(--primary); background: #eff6ff; }
+        .session-item.incomplete { border-left: 4px solid var(--warning); }
+        .session-item.complete { border-left: 4px solid var(--success); }
+        .session-info .title { font-weight: 700; font-size: 1em; }
+        .session-info .meta { font-size: 0.85em; color: var(--muted); }
+        .session-stats { text-align: right; }
+        .session-stats .count { font-weight: 700; font-size: 1.1em; }
+        .session-stats .count.incomplete { color: var(--warning); }
+        .session-stats .count.complete { color: var(--success); }
+        .session-stats .label { font-size: 0.75em; color: var(--muted); }
+        
+        /* === FORMULAIRE === */
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            font-size: 0.8em;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 1em;
+            font-family: inherit;
+        }
+        .form-group select:focus, .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* === CRITÈRES === */
+        .criteres-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .critere-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .critere-item:has(input:checked) { background: #eff6ff; border-color: var(--primary); }
+        .critere-item input { width: 18px; height: 18px; }
+        
+        /* === TABLEAU ÉLÈVES === */
+        .eleves-table { width: 100%; border-collapse: collapse; }
+        .eleves-table th {
+            text-align: left;
+            padding: 12px;
+            background: #f1f5f9;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .eleves-table td { padding: 12px; border-bottom: 1px solid var(--border); }
+        .eleves-table tr:hover { background: #f8fafc; }
+        .eleves-table tr.pending { background: #fef3c7; }
+        .eleves-table tr.absent { background: #fee2e2; opacity: 0.7; }
+        
+        .eleve-name { font-weight: 600; }
+        .eleve-code { font-size: 0.85em; color: var(--muted); }
+        
+        .note-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        .note-badge.excellent { background: #dcfce7; color: #166534; }
+        .note-badge.good { background: #dbeafe; color: #1e40af; }
+        .note-badge.average { background: #fef3c7; color: #92400e; }
+        .note-badge.poor { background: #fee2e2; color: #991b1b; }
+        .note-badge.absent { background: #f3f4f6; color: #6b7280; }
+        .note-badge.pending { background: #e2e8f0; color: #64748b; }
+        
+        /* === PROGRESSION === */
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transition: width 0.3s;
+        }
+        
+        /* === MODAL === */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+        .modal-header h2 { font-size: 1.2em; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--muted);
+        }
+        .modal-body { padding: 20px; }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            position: sticky;
+            bottom: 0;
+            background: white;
+        }
+        
+        /* === OPTIONS (BOUTONS CRITÈRES) === */
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .options-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .options-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
+        .options-grid.cols-6 { grid-template-columns: repeat(6, 1fr); }
+        
+        .opt-btn {
+            padding: 10px 6px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        .opt-btn .emoji { font-size: 1.3em; display: block; margin-bottom: 2px; }
+        .opt-btn .label { font-size: 0.65em; font-weight: 600; color: var(--muted); }
+        .opt-btn.selected { border-color: var(--success); background: #f0fdf4; }
+        .opt-btn.selected .label { color: var(--success); }
+        
+        /* Couleurs options */
+        .opt-btn.good.selected { border-color: #22c55e; background: #dcfce7; }
+        .opt-btn.warning.selected { border-color: #f59e0b; background: #fef3c7; }
+        .opt-btn.danger.selected { border-color: #ef4444; background: #fee2e2; }
+        .opt-btn.danger-max.selected { border-color: #dc2626; background: #dc2626; color: white; }
+        
+        .section-saisie { margin-bottom: 18px; }
+        .section-saisie h3 {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        /* === NOTE BOX === */
+        .note-box {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+        .note-box .value { font-size: 2em; font-weight: 800; color: var(--success); }
+        
+        /* === COURS CHECKBOXES === */
+        .cours-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .cours-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .cours-checkbox:has(input:checked) { border-color: var(--primary); background: #dbeafe; }
+        .cours-checkbox input { display: none; }
+        
+        /* === ÉCRANS === */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* === TOAST === */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 16px 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        
+        /* === RESPONSIVE === */
+        @media (max-width: 600px) {
+            .options-grid.cols-5, .options-grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
+            .criteres-grid { grid-template-columns: 1fr; }
+            .eleves-table th, .eleves-table td { padding: 8px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ÉCRAN 0 : CONNEXION -->
+<div id="screenLogin" class="screen active">
+    <div class="header">
+        <h1>📋 Sessions de Suivi PSE</h1>
+        <div class="subtitle">Gestion centralisée des évaluations</div>
+    </div>
+    <div class="login-screen">
+        <div class="login-icon">🔐</div>
+        <h2 style="margin-bottom: 10px;">Accès Professeur</h2>
+        <p style="color: var(--muted); margin-bottom: 20px;">Connectez-vous pour gérer vos sessions</p>
+        <button class="btn-google" onclick="connexionGoogle()">Connexion avec Google</button>
+    </div>
+</div>
+
+<!-- ÉCRAN 1 : LISTE DES SESSIONS -->
+<div id="screenSessions" class="screen">
+    <div class="header">
+        <h1>📋 Mes Sessions</h1>
+        <div class="subtitle" id="userEmail">--</div>
+        <div class="header-nav">
+            <a href="index.html">🏠 Cockpit</a>
+            <button onclick="deconnexion()">🚪 Déconnexion</button>
+        </div>
+    </div>
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn btn-success" onclick="showNouvelleSession()" style="font-size: 1.1em; padding: 15px 30px;">
+                ➕ Nouvelle session
+            </button>
+        </div>
+        
+        <div class="card">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                <select id="filterClasse" onchange="loadSessions()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px; flex: 1; min-width: 150px;">
+                    <option value="">Toutes les classes</option>
+                </select>
+                <input type="date" id="filterDate" onchange="loadSessions()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px;">
+                <button onclick="document.getElementById('filterDate').value=''; loadSessions();" style="padding: 10px 15px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer;">✖️</button>
+            </div>
+        </div>
+        
+        <div class="card" style="display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 2em; font-weight: 800; color: var(--primary);" id="statTotal">0</div>
+                <div style="font-size: 0.8em; color: var(--muted);">Sessions</div>
+            </div>
+            <div>
+                <div style="font-size: 2em; font-weight: 800; color: var(--warning);" id="statIncomplete">0</div>
+                <div style="font-size: 0.8em; color: var(--muted);">Incomplètes</div>
+            </div>
+            <div>
+                <div style="font-size: 2em; font-weight: 800; color: var(--success);" id="statComplete">0</div>
+                <div style="font-size: 0.8em; color: var(--muted);">Complètes</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">📅 Sessions récentes</div>
+            <div id="sessionsList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ÉCRAN 2 : NOUVELLE SESSION -->
+<div id="screenNouvelle" class="screen">
+    <div class="header">
+        <h1>➕ Nouvelle Session</h1>
+        <div class="header-nav">
+            <a href="#" onclick="showListeSessions()">← Retour</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div class="card-title">⚙️ Configuration</div>
+            
+            <div class="form-group">
+                <label>📅 Date</label>
+                <input type="date" id="newDate">
+            </div>
+            
+            <div class="form-group">
+                <label>🏫 Classe / Groupe</label>
+                <select id="newClasse" onchange="onClasseChange()">
+                    <option value="">-- Sélectionner --</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>📚 Module</label>
+                <select id="newModule">
+                    <option value="">-- Sélectionner d'abord une classe --</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>📝 Critères à évaluer</label>
+                <div class="criteres-grid">
+                    <label class="critere-item"><input type="checkbox" id="cTravail" checked><span>📝 Travail</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cOral" checked><span>🗣️ Oral</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cAttention" checked><span>🧠 Attention</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cPorteVue"><span>📁 Porte-vue</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cCoursAJour"><span>📋 Cours à jour</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cAutonomie"><span>🎯 Autonomie</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cInitiative"><span>💡 Initiative</span></label>
+                    <label class="critere-item"><input type="checkbox" id="cSecurite"><span>⚠️ Sécurité</span></label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>📄 Cours distribués par défaut</label>
+                <div class="cours-grid">
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance1">📄 S1</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance2">📄 S2</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance3">📄 S3</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="seance4">📄 S4</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="complet">📚 Complet</label>
+                    <label class="cours-checkbox"><input type="checkbox" name="defCours" value="correction">✏️ Correction</label>
+                </div>
+            </div>
+            
+            <button class="btn btn-success btn-block" onclick="createSession()">🚀 Créer et commencer</button>
+        </div>
+    </div>
+</div>
+
+<!-- ÉCRAN 3 : VUE SESSION -->
+<div id="screenSession" class="screen">
+    <div class="header">
+        <h1 id="sessionTitle">--</h1>
+        <div class="subtitle" id="sessionSubtitle">--</div>
+        <div class="header-nav">
+            <a href="#" onclick="showListeSessions()">← Sessions</a>
+            <a href="index.html">🏠 Cockpit</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight: 600;">Progression</span>
+                <span id="progressText">0/0</span>
+            </div>
+            <div class="progress-bar">
+                <div class="fill" id="progressBar" style="width: 0%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-around; margin-top: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 1.5em; font-weight: 700; color: var(--success);" id="nbNotes">0</div>
+                    <div style="font-size: 0.75em; color: var(--muted);">Notés</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5em; font-weight: 700; color: var(--warning);" id="nbManquants">0</div>
+                    <div style="font-size: 0.75em; color: var(--muted);">Manquants</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5em; font-weight: 700; color: var(--muted);" id="nbAbsents">0</div>
+                    <div style="font-size: 0.75em; color: var(--muted);">Absents</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5em; font-weight: 700; color: var(--primary);" id="moyenneSession">--</div>
+                    <div style="font-size: 0.75em; color: var(--muted);">Moyenne</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">👥 Élèves</div>
+            <div style="overflow-x: auto;">
+                <table class="eleves-table">
+                    <thead>
+                        <tr>
+                            <th>Élève</th>
+                            <th>Note</th>
+                            <th>💬</th>
+                            <th>📱</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="elevesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL NOTATION -->
+<div class="modal-overlay" id="modalNotation">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>📝 <span id="modalEleve">--</span></h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+            <button class="btn btn-warning" onclick="markAbsent()">🚫 Absent</button>
+            <button class="btn btn-success" onclick="saveNote()">✅ Valider</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast">✅ Enregistré !</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, getDocs, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.appspot.com",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    
+    let user = null;
+    let sessions = [];
+    let currentSession = null;
+    let currentEleve = null;
+    let saisie = {};
+    
+    const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
+    const MALUS = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
+    
+    // AUTH
+    window.connexionGoogle = () => signInWithPopup(auth, new GoogleAuthProvider());
+    window.deconnexion = () => signOut(auth);
+    
+    onAuthStateChanged(auth, u => {
+        user = u;
+        if (u) {
+            document.getElementById('userEmail').textContent = '✅ ' + u.email;
+            showListeSessions();
+        } else {
+            showScreen('screenLogin');
+        }
+    });
+    
+    // NAVIGATION
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+    
+    window.showListeSessions = function() {
+        showScreen('screenSessions');
+        initFilters();
+        loadSessions();
+    };
+    
+    window.showNouvelleSession = function() {
+        showScreen('screenNouvelle');
+        document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
+        
+        const sel = document.getElementById('newClasse');
+        sel.innerHTML = '<option value="">-- Sélectionner --</option>';
+        const list = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        list.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id;
+            o.textContent = c.label;
+            sel.appendChild(o);
+        });
+    };
+    
+    function initFilters() {
+        const sel = document.getElementById('filterClasse');
+        if (sel.options.length <= 1) {
+            const list = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+            list.forEach(c => {
+                const o = document.createElement('option');
+                o.value = c.id;
+                o.textContent = c.label;
+                sel.appendChild(o);
+            });
+        }
+    }
+    
+    // CHARGER SESSIONS
+    window.loadSessions = async function() {
+        const filterClasse = document.getElementById('filterClasse').value;
+        const filterDate = document.getElementById('filterDate').value;
+        
+        const snap = await getDocs(collection(db, "sessions"));
+        sessions = [];
+        
+        for (const d of snap.docs) {
+            const data = d.data();
+            if (filterClasse && data.classe !== filterClasse) continue;
+            if (filterDate && data.date !== filterDate) continue;
+            
+            // Compter notes
+            const notesSnap = await getDocs(collection(db, "sessions", d.id, "notes"));
+            let nbNotes = 0, nbAbsents = 0;
+            notesSnap.forEach(n => n.data().absent ? nbAbsents++ : nbNotes++);
+            
+            // Total élèves
+            const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(data.classe) : [data.classe];
+            let nbTotal = 0;
+            classes.forEach(cl => nbTotal += (window.BDD_ELEVES || []).filter(e => e.classe === cl).length);
+            
+            sessions.push({ id: d.id, ...data, nbNotes, nbAbsents, nbTotal, nbManquants: nbTotal - nbNotes - nbAbsents });
+        }
+        
+        sessions.sort((a, b) => b.date.localeCompare(a.date));
+        renderSessions();
+    };
+    
+    function renderSessions() {
+        const c = document.getElementById('sessionsList');
+        const inc = sessions.filter(s => s.nbManquants > 0).length;
+        const comp = sessions.filter(s => s.nbManquants === 0).length;
+        
+        document.getElementById('statTotal').textContent = sessions.length;
+        document.getElementById('statIncomplete').textContent = inc;
+        document.getElementById('statComplete').textContent = comp;
+        
+        if (!sessions.length) {
+            c.innerHTML = '<p style="text-align:center;color:var(--muted);padding:30px;">Aucune session. Créez-en une !</p>';
+            return;
+        }
+        
+        c.innerHTML = sessions.map(s => {
+            const [y, m, d] = s.date.split('-');
+            const done = s.nbNotes + s.nbAbsents;
+            const isComp = s.nbManquants === 0;
+            return `
+                <div class="session-item ${isComp ? 'complete' : 'incomplete'}" onclick="openSession('${s.id}')">
+                    <div class="session-info">
+                        <div class="title">${d}/${m} - ${s.module}</div>
+                        <div class="meta">${s.classe}</div>
+                    </div>
+                    <div class="session-stats">
+                        <div class="count ${isComp ? 'complete' : 'incomplete'}">${done}/${s.nbTotal}</div>
+                        <div class="label">${isComp ? '✅ Complète' : `⏳ ${s.nbManquants} manquant${s.nbManquants > 1 ? 's' : ''}`}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // CRÉER SESSION
+    window.onClasseChange = function() {
+        const classe = document.getElementById('newClasse').value;
+        const sel = document.getElementById('newModule');
+        sel.innerHTML = '<option value="">-- Sélectionner --</option>';
+        if (!classe) return;
+        
+        const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(classe) : [classe];
+        const modules = window.getModulesForClasse ? window.getModulesForClasse(classes[0]) : [];
+        modules.forEach(m => {
+            const o = document.createElement('option');
+            o.value = m.id;
+            o.textContent = `${m.id} - ${m.titre}`;
+            sel.appendChild(o);
+        });
+    };
+    
+    window.createSession = async function() {
+        const date = document.getElementById('newDate').value;
+        const classe = document.getElementById('newClasse').value;
+        const module = document.getElementById('newModule').value;
+        
+        if (!date || !classe || !module) return alert("Remplissez tous les champs !");
+        
+        const criteres = {
+            travail: document.getElementById('cTravail').checked,
+            oral: document.getElementById('cOral').checked,
+            attention: document.getElementById('cAttention').checked,
+            porteVue: document.getElementById('cPorteVue').checked,
+            coursAJour: document.getElementById('cCoursAJour').checked,
+            autonomie: document.getElementById('cAutonomie').checked,
+            initiative: document.getElementById('cInitiative').checked,
+            securite: document.getElementById('cSecurite').checked
+        };
+        
+        const coursDefaut = Array.from(document.querySelectorAll('input[name="defCours"]:checked')).map(c => c.value);
+        const id = `${date}_${classe}_${module}`;
+        
+        const existing = await getDoc(doc(db, "sessions", id));
+        if (existing.exists()) {
+            if (confirm("Session existante. L'ouvrir ?")) {
+                await loadSessions();
+                openSession(id);
+            }
+            return;
+        }
+        
+        await setDoc(doc(db, "sessions", id), {
+            date, classe, module, criteres, coursDefaut,
+            createdAt: serverTimestamp(),
+            createdBy: user?.email
+        });
+        
+        toast("✅ Session créée !");
+        await loadSessions();
+        openSession(id);
+    };
+    
+    // OUVRIR SESSION
+    window.openSession = async function(id) {
+        currentSession = sessions.find(s => s.id === id);
+        if (!currentSession) {
+            const d = await getDoc(doc(db, "sessions", id));
+            if (d.exists()) currentSession = { id, ...d.data() };
+        }
+        if (!currentSession) return;
+        
+        const [y, m, day] = currentSession.date.split('-');
+        document.getElementById('sessionTitle').textContent = `${day}/${m} - ${currentSession.module}`;
+        document.getElementById('sessionSubtitle').textContent = currentSession.classe;
+        
+        await loadEleves();
+        showScreen('screenSession');
+    };
+    
+    // CHARGER ÉLÈVES
+    async function loadEleves() {
+        const classes = window.getClassesFromGroupe ? window.getClassesFromGroupe(currentSession.classe) : [currentSession.classe];
+        let eleves = [];
+        classes.forEach(cl => {
+            (window.BDD_ELEVES || []).filter(e => e.classe === cl).forEach(e => {
+                eleves.push({ code: e.userCode, prenom: e.prenom, nom: e.nom, classe: e.classe });
+            });
+        });
+        
+        const notesSnap = await getDocs(collection(db, "sessions", currentSession.id, "notes"));
+        const notesMap = {};
+        notesSnap.forEach(d => notesMap[d.id] = d.data());
+        
+        eleves = eleves.map(e => ({ ...e, note: notesMap[e.code] || null }));
+        eleves.sort((a, b) => {
+            if (!a.note && b.note) return -1;
+            if (a.note && !b.note) return 1;
+            return (a.prenom + a.nom).localeCompare(b.prenom + b.nom);
+        });
+        
+        currentSession.eleves = eleves;
+        renderEleves();
+    }
+    
+    function renderEleves() {
+        const eleves = currentSession.eleves || [];
+        const notes = eleves.filter(e => e.note && !e.note.absent);
+        const absents = eleves.filter(e => e.note?.absent);
+        const manquants = eleves.filter(e => !e.note);
+        
+        document.getElementById('nbNotes').textContent = notes.length;
+        document.getElementById('nbAbsents').textContent = absents.length;
+        document.getElementById('nbManquants').textContent = manquants.length;
+        
+        const moy = notes.length ? (notes.reduce((a, e) => a + (e.note.noteSur20 || 0), 0) / notes.length).toFixed(1) : '--';
+        document.getElementById('moyenneSession').textContent = moy;
+        
+        const total = eleves.length;
+        const done = notes.length + absents.length;
+        document.getElementById('progressText').textContent = `${done}/${total}`;
+        document.getElementById('progressBar').style.width = total ? `${(done/total)*100}%` : '0%';
+        
+        const tbody = document.getElementById('elevesBody');
+        tbody.innerHTML = eleves.map(e => {
+            let noteD, noteC, bavD, telD, btn;
+            
+            if (!e.note) {
+                noteD = '--'; noteC = 'pending'; bavD = '-'; telD = '-';
+                btn = `<button class="btn btn-primary btn-sm" onclick="openModal('${e.code}')">📝 Noter</button>`;
+            } else if (e.note.absent) {
+                noteD = 'ABS'; noteC = 'absent'; bavD = '-'; telD = '-';
+                btn = `<button class="btn btn-secondary btn-sm" onclick="openModal('${e.code}')">✏️</button>`;
+            } else {
+                const n = e.note.noteSur20;
+                noteD = n + '/20';
+                noteC = n >= 16 ? 'excellent' : n >= 12 ? 'good' : n >= 8 ? 'average' : 'poor';
+                const bavL = { 'aucun': '-', 'rappel1': '1️⃣', 'rappel2': '2️⃣', 'rappel3': '3️⃣', 'retenu': '🚨' };
+                const telL = { 'ok': '-', 'rappel1': '1️⃣', 'rappel2': '2️⃣', 'rappel3': '3️⃣', 'confisque': '🚫' };
+                bavD = bavL[e.note.bavardage] || '-';
+                telD = telL[e.note.telephone] || '-';
+                btn = `<button class="btn btn-secondary btn-sm" onclick="openModal('${e.code}')">✏️</button>`;
+            }
+            
+            return `
+                <tr class="${!e.note ? 'pending' : e.note.absent ? 'absent' : ''}">
+                    <td><div class="eleve-name">${e.prenom} ${e.nom}</div><div class="eleve-code">${e.code}</div></td>
+                    <td><span class="note-badge ${noteC}">${noteD}</span></td>
+                    <td>${bavD}</td>
+                    <td>${telD}</td>
+                    <td>${btn}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    // MODAL
+    window.openModal = function(code) {
+        currentEleve = currentSession.eleves.find(e => e.code === code);
+        if (!currentEleve) return;
+        
+        document.getElementById('modalEleve').textContent = `${currentEleve.prenom} ${currentEleve.nom} (${code})`;
+        
+        saisie = { travail: null, oral: null, attention: null, porteVue: null, coursAJour: null, autonomie: null, initiative: null, securite: null, bavardage: 'aucun', telephone: 'ok' };
+        if (currentEleve.note && !currentEleve.note.absent) saisie = { ...currentEleve.note };
+        
+        document.getElementById('modalBody').innerHTML = buildForm();
+        
+        // Sélections
+        Object.entries(saisie).forEach(([k, v]) => {
+            if (v !== null && v !== undefined) {
+                const btn = document.querySelector(`.opt-btn[data-c="${k}"][data-v="${v}"]`);
+                if (btn) btn.classList.add('selected');
+            }
+        });
+        
+        // Cours
+        if (currentEleve.note?.coursDistrib) {
+            (Array.isArray(currentEleve.note.coursDistrib) ? currentEleve.note.coursDistrib : [currentEleve.note.coursDistrib]).forEach(c => {
+                const cb = document.querySelector(`input[name="mCours"][value="${c}"]`);
+                if (cb) cb.checked = true;
+            });
+        } else if (currentSession.coursDefaut) {
+            currentSession.coursDefaut.forEach(c => {
+                const cb = document.querySelector(`input[name="mCours"][value="${c}"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+        
+        updatePreview();
+        document.getElementById('modalNotation').classList.add('active');
+    };
+    
+    window.closeModal = () => document.getElementById('modalNotation').classList.remove('active');
+    
+    function buildForm() {
+        const c = currentSession.criteres || {};
+        let h = `<div class="note-box"><div style="font-size:0.85em;color:var(--muted);">Note calculée</div><div class="value" id="preview">--</div></div>`;
+        
+        if (c.travail) h += section('Travail', 'travail', [['tresbien','✓✓','Très bien'],['fait','✓','Fait'],['partiel','⚠️','Partiel'],['insuffisant','❌','Non fait'],['ne','➖','NE']], 5);
+        if (c.oral) h += section('Oral', 'oral', [['0','0','Aucune'],['1','1','Faible'],['2','2','Correcte'],['3','3','Bonne'],['4','4','Excellente'],['ne','➖','NE']], 6);
+        if (c.attention) h += section('Attention', 'attention', [['bonne','😊','Bonne'],['moyenne','😐','Moyenne'],['insuffisante','😕','Insuffisante'],['ne','➖','NE']]);
+        if (c.porteVue) h += section('Porte-vue', 'porteVue', [['ok','✅','OK'],['oubli','❌','Oublié'],['ne','➖','NE']], 3);
+        if (c.coursAJour) h += section('Cours à jour', 'coursAJour', [['a_jour','✅','À jour'],['incomplet','⚠️','Incomplet'],['pas_a_jour','❌','Pas à jour'],['ne','➖','NE']]);
+        if (c.autonomie) h += section('Autonomie', 'autonomie', [['bonne','😊','Bonne'],['moyenne','😐','Moyenne'],['insuffisante','😕','Insuffisante'],['ne','➖','NE']]);
+        if (c.initiative) h += section('Initiative', 'initiative', [['oui','😊','Oui'],['parfois','😐','Parfois'],['non','😕','Non'],['ne','➖','NE']]);
+        if (c.securite) h += section('Sécurité', 'securite', [['oui','✅','Oui'],['partiel','⚠️','Partiel'],['non','❌','Non'],['ne','➖','NE']]);
+        
+        h += `<div class="section-saisie"><h3>💬 Bavardage <span style="color:#dc2626;font-weight:400;font-size:0.8em">(plafonne)</span></h3><div class="options-grid cols-5">
+            <div class="opt-btn good" data-c="bavardage" data-v="aucun" onclick="sel(this)"><span class="emoji">😊</span><span class="label">Aucun</span></div>
+            <div class="opt-btn warning" data-c="bavardage" data-v="rappel1" onclick="sel(this)"><span class="emoji">1️⃣</span><span class="label">Rappel 1</span></div>
+            <div class="opt-btn warning" data-c="bavardage" data-v="rappel2" onclick="sel(this)"><span class="emoji">2️⃣</span><span class="label">Rappel 2</span></div>
+            <div class="opt-btn danger" data-c="bavardage" data-v="rappel3" onclick="sel(this)"><span class="emoji">3️⃣</span><span class="label">Rappel 3</span></div>
+            <div class="opt-btn danger-max" data-c="bavardage" data-v="retenu" onclick="sel(this)"><span class="emoji">🚨</span><span class="label">Retenu</span></div>
+        </div></div>`;
+        
+        h += `<div class="section-saisie"><h3>📱 Téléphone <span style="color:#f59e0b;font-weight:400;font-size:0.8em">(malus)</span></h3><div class="options-grid cols-5">
+            <div class="opt-btn good" data-c="telephone" data-v="ok" onclick="sel(this)"><span class="emoji">✅</span><span class="label">OK</span></div>
+            <div class="opt-btn warning" data-c="telephone" data-v="rappel1" onclick="sel(this)"><span class="emoji">1️⃣</span><span class="label">Rappel 1</span></div>
+            <div class="opt-btn warning" data-c="telephone" data-v="rappel2" onclick="sel(this)"><span class="emoji">2️⃣</span><span class="label">Rappel 2</span></div>
+            <div class="opt-btn danger" data-c="telephone" data-v="rappel3" onclick="sel(this)"><span class="emoji">3️⃣</span><span class="label">Rappel 3</span></div>
+            <div class="opt-btn danger-max" data-c="telephone" data-v="confisque" onclick="sel(this)"><span class="emoji">🚫</span><span class="label">Confisqué</span></div>
+        </div></div>`;
+        
+        h += `<div class="section-saisie"><h3>📄 Cours distribués</h3><div class="cours-grid">
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="seance1">📄 S1</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="seance2">📄 S2</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="seance3">📄 S3</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="seance4">📄 S4</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="complet">📚 Complet</label>
+            <label class="cours-checkbox"><input type="checkbox" name="mCours" value="correction">✏️ Correction</label>
+        </div></div>`;
+        
+        h += `<div class="section-saisie"><h3>💬 Commentaire</h3><textarea id="mComment" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;min-height:50px;font-family:inherit;">${currentEleve.note?.commentaire || ''}</textarea></div>`;
+        
+        return h;
+    }
+    
+    function section(title, key, opts, cols = 4) {
+        const emoji = {'Travail':'📝','Oral':'🗣️','Attention':'🧠','Porte-vue':'📁','Cours à jour':'📋','Autonomie':'🎯','Initiative':'💡','Sécurité':'⚠️'}[title] || '';
+        let h = `<div class="section-saisie"><h3>${emoji} ${title}</h3><div class="options-grid cols-${cols}">`;
+        opts.forEach(([v, e, l]) => h += `<div class="opt-btn" data-c="${key}" data-v="${v}" onclick="sel(this)"><span class="emoji">${e}</span><span class="label">${l}</span></div>`);
+        h += '</div></div>';
+        return h;
+    }
+    
+    window.sel = function(btn) {
+        const c = btn.dataset.c, v = btn.dataset.v;
+        document.querySelectorAll(`.opt-btn[data-c="${c}"]`).forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        saisie[c] = (c === 'oral' && v !== 'ne') ? parseInt(v) : v;
+        updatePreview();
+    };
+    
+    function calcNote() {
+        const c = currentSession.criteres || {};
+        let pts = 0, max = 0;
+        
+        if (c.travail && saisie.travail && saisie.travail !== 'ne') { max += 4; if (saisie.travail === 'tresbien') pts += 4; else if (saisie.travail === 'fait') pts += 3; else if (saisie.travail === 'partiel') pts += 1.5; }
+        if (c.oral && saisie.oral !== null && saisie.oral !== undefined && saisie.oral !== 'ne') { max += 4; pts += parseInt(saisie.oral) || 0; }
+        if (c.attention && saisie.attention && saisie.attention !== 'ne') { max += 3; if (saisie.attention === 'bonne') pts += 3; else if (saisie.attention === 'moyenne') pts += 1.5; }
+        if (c.porteVue && saisie.porteVue && saisie.porteVue !== 'ne') { max += 1; if (saisie.porteVue === 'ok') pts += 1; }
+        if (c.coursAJour && saisie.coursAJour && saisie.coursAJour !== 'ne') { max += 2; if (saisie.coursAJour === 'a_jour') pts += 2; else if (saisie.coursAJour === 'incomplet') pts += 1; }
+        if (c.autonomie && saisie.autonomie && saisie.autonomie !== 'ne') { max += 2; if (saisie.autonomie === 'bonne') pts += 2; else if (saisie.autonomie === 'moyenne') pts += 1; }
+        if (c.initiative && saisie.initiative && saisie.initiative !== 'ne') { max += 2; if (saisie.initiative === 'oui') pts += 2; else if (saisie.initiative === 'parfois') pts += 1; }
+        if (c.securite && saisie.securite && saisie.securite !== 'ne') { max += 2; if (saisie.securite === 'oui') pts += 2; else if (saisie.securite === 'partiel') pts += 1; }
+        
+        let base = max > 0 ? Math.round((pts / max) * 20 * 10) / 10 : 0;
+        let plafond = PLAFOND[saisie.bavardage || 'aucun'] || 20;
+        let malus = MALUS[saisie.telephone || 'ok'] || 0;
+        let note = Math.max(0, Math.min(base, plafond) - malus);
+        note = Math.round(note * 2) / 2;
+        
+        return { pts, max, base, plafond, malus, note };
+    }
+    
+    function updatePreview() {
+        const r = calcNote();
+        const el = document.getElementById('preview');
+        if (el) {
+            el.textContent = r.note + '/20';
+            el.style.color = r.note >= 12 ? '#16a34a' : r.note >= 8 ? '#f59e0b' : '#dc2626';
+        }
+    }
+    
+    // SAVE
+    window.saveNote = async function() {
+        if (!currentEleve) return;
+        const r = calcNote();
+        const cours = Array.from(document.querySelectorAll('input[name="mCours"]:checked')).map(c => c.value);
+        const comment = document.getElementById('mComment')?.value.trim() || null;
+        
+        const data = { ...saisie, noteSur20: r.note, noteBase: r.base, plafond: r.plafond, malus: r.malus, points: r.pts, maxPoints: r.max, coursDistrib: cours, commentaire: comment, absent: false, heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), updatedAt: serverTimestamp(), updatedBy: user?.email };
+        
+        await setDoc(doc(db, "sessions", currentSession.id, "notes", currentEleve.code), data);
+        await setDoc(doc(db, "resultats", currentEleve.code, "suivi", `${currentSession.date}_${currentSession.module}`), { ...data, date: currentSession.date, classe: currentSession.classe, module: currentSession.module, createdAt: serverTimestamp(), createdBy: user?.email });
+        
+        toast(`✅ ${currentEleve.prenom} - ${r.note}/20`);
+        closeModal();
+        loadEleves();
+    };
+    
+    window.markAbsent = async function() {
+        if (!currentEleve) return;
+        const cours = Array.from(document.querySelectorAll('input[name="mCours"]:checked')).map(c => c.value);
+        const data = { absent: true, noteSur20: null, coursDistrib: cours, heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), updatedAt: serverTimestamp(), updatedBy: user?.email };
+        
+        await setDoc(doc(db, "sessions", currentSession.id, "notes", currentEleve.code), data);
+        await setDoc(doc(db, "resultats", currentEleve.code, "suivi", `${currentSession.date}_${currentSession.module}`), { ...data, date: currentSession.date, classe: currentSession.classe, module: currentSession.module, createdAt: serverTimestamp(), createdBy: user?.email });
+        
+        toast(`🚫 ${currentEleve.prenom} - Absent`);
+        closeModal();
+        loadEleves();
+    };
+    
+    function toast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+    
+    console.log("✅ Sessions Suivi PSE chargé");
+</script>
+</body>
+</html>
