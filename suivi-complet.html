@@ -311,7 +311,7 @@
                     <div class="stat-card"><div class="stat-value warning" id="sManquants">0</div><div class="stat-label">⏳ Manquants</div></div>
                     <div class="stat-card"><div class="stat-value" id="sMoyenne">--</div><div class="stat-label">Moyenne</div></div>
                 </div>
-                <div style="overflow-x:auto"><table class="eleves-table"><thead><tr><th>Élève</th><th>Statut</th><th>Note</th><th>💬</th><th>📱</th><th>Cours</th><th>Action</th></tr></thead><tbody id="elevesBody"></tbody></table></div>
+                <div style="overflow-x:auto"><table class="eleves-table"><thead><tr><th>Élève</th><th>Statut</th><th>Note</th><th>💬</th><th>📱</th><th>Cours</th><th>👁️</th><th>Action</th></tr></thead><tbody id="elevesBody"></tbody></table></div>
             </div>
         </div>
     </main>
@@ -373,6 +373,7 @@
         let currentEleve = null;
         let saisie = {};
         let objectifEleve = null;
+        let consultationsData = {}; // Pour stocker les dernières consultations des élèves
         
         const CLE_NOMS = 'cockpit_noms_eleves';
         const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
@@ -385,6 +386,7 @@
                 document.getElementById('userStatus').textContent = '✅ ' + u.email;
                 chargerNomsLocaux();
                 initFiltres();
+                await chargerConsultations(); // Charger les consultations
                 await chargerSessions();
             } else {
                 document.getElementById('userStatus').innerHTML = '<button class="header-btn" onclick="connexion()">🔐 Connexion</button>';
@@ -403,6 +405,29 @@
         }
         
         function getNom(code) { return nomsEleves[code] || ''; }
+        
+        // Charger les consultations des élèves
+        async function chargerConsultations() {
+            try {
+                const snap = await getDocs(collection(db, "consultations"));
+                snap.forEach(docSnap => {
+                    consultationsData[docSnap.id] = docSnap.data();
+                });
+                console.log("👁️ Consultations chargées:", Object.keys(consultationsData).length);
+            } catch(e) { console.warn("Erreur chargement consultations:", e); }
+        }
+        
+        // Vérifier si l'élève a vu sa note
+        function aVuSaNote(eleveCode, noteCreatedAt) {
+            const consult = consultationsData[eleveCode];
+            if (!consult || !consult.derniereConsultation) return false;
+            if (!noteCreatedAt) return false;
+            
+            const dateConsult = new Date(consult.derniereConsultation);
+            const dateNote = noteCreatedAt.toDate ? noteCreatedAt.toDate() : new Date(noteCreatedAt);
+            
+            return dateConsult > dateNote;
+        }
         
         window.openRgpdModal = () => { document.getElementById('modalRgpd').classList.add('active'); chargerNomsLocaux(); };
         window.fermerRgpd = () => document.getElementById('modalRgpd').classList.remove('active');
@@ -667,7 +692,15 @@
                     if (cours && cours.length) coursD = cours.map(c => c === 'seance1' ? 'S1' : c === 'seance2' ? 'S2' : c === 'seance3' ? 'S3' : c === 'seance4' ? 'S4' : c === 'complet' ? '📚' : c === 'correction' ? '✏️' : c === 'evaluation' ? '📝' : c).join(' ');
                 }
                 const statusB = e.statut === 'fait' ? '<span class="status-badge fait">✅ Noté</span>' : e.statut === 'absent' ? '<span class="status-badge absent">🚫 Absent</span>' : '<span class="status-badge manquant">⏳ Manquant</span>';
-                return '<tr class="' + e.statut + '"><td><span class="eleve-code" onclick="ouvrirNotation(\'' + e.code + '\')">' + e.code + '</span> ' + nomD + '</td><td>' + statusB + '</td><td><span class="note-badge ' + noteC + '">' + noteD + '</span></td><td>' + bavD + '</td><td>' + telD + '</td><td>' + coursD + '</td><td><button class="btn btn-sm btn-primary" onclick="ouvrirNotation(\'' + e.code + '\')">✏️</button></td></tr>';
+                
+                // Colonne Vue - vérifier si l'élève a consulté après la création de la note
+                let vueD = '-';
+                if (e.note && e.note.createdAt) {
+                    const vu = aVuSaNote(e.code, e.note.createdAt);
+                    vueD = vu ? '<span title="Consulté">👁️</span>' : '<span title="Pas encore consulté" style="opacity:0.3">👁️</span>';
+                }
+                
+                return '<tr class="' + e.statut + '"><td><span class="eleve-code" onclick="ouvrirNotation(\'' + e.code + '\')">' + e.code + '</span> ' + nomD + '</td><td>' + statusB + '</td><td><span class="note-badge ' + noteC + '">' + noteD + '</span></td><td>' + bavD + '</td><td>' + telD + '</td><td>' + coursD + '</td><td>' + vueD + '</td><td><button class="btn btn-sm btn-primary" onclick="ouvrirNotation(\'' + e.code + '\')">✏️</button></td></tr>';
             }).join('');
         }
         
