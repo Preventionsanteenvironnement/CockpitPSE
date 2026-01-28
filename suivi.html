@@ -869,54 +869,32 @@
             
             <!-- OBJECTIF -->
             <div class="objectif-box" id="sectionObjectif" style="display: none;">
-                <h4>🎯 Objectif personnel</h4>
-                <div class="objectif-precedent" id="objectifPrecedentBox" style="display: none;">
-                    <div class="texte" id="objectifPrecedentTexte">--</div>
-                    <div class="validation">
-                        <label>
+                <h4>🎯 Objectif de l'élève</h4>
+                
+                <!-- Objectif fixé par l'élève -->
+                <div id="objectifExistant" style="display: none;">
+                    <div class="objectif-texte" id="objectifTexte" style="background: white; padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; font-weight: 600; color: #1e293b;">
+                        --
+                    </div>
+                    <div class="validation" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #dcfce7; border-radius: 8px; cursor: pointer;">
                             <input type="radio" name="objectifValidation" value="atteint">
                             ✅ Atteint
                         </label>
-                        <label class="non-atteint">
+                        <label style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; cursor: pointer;">
                             <input type="radio" name="objectifValidation" value="non_atteint">
                             ❌ Non atteint
                         </label>
-                        <label>
+                        <label style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fef3c7; border-radius: 8px; cursor: pointer;">
                             <input type="radio" name="objectifValidation" value="en_cours">
                             ⏳ En cours
                         </label>
                     </div>
                 </div>
-                <div class="objectif-nouveau">
-                    <select id="selectObjectif" onchange="onObjectifChange()">
-                        <option value="">-- Choisir un nouvel objectif --</option>
-                        <optgroup label="📚 Travail / Autonomie">
-                            <option value="commencer_seul">Commencer la tâche seul sans attendre</option>
-                            <option value="finir_tache">Finir la tâche sans me disperser</option>
-                            <option value="rester_activite">Rester en activité pendant X minutes</option>
-                            <option value="demander_aide">Demander de l'aide si je bloque</option>
-                            <option value="cours_a_jour">Avoir mon cours à jour</option>
-                        </optgroup>
-                        <optgroup label="🗣️ Participation / Communication">
-                            <option value="participation_oral">Faire X participation(s) à l'oral</option>
-                            <option value="ecoute_silence">J'écoute en silence quand quelqu'un parle</option>
-                            <option value="lever_main">Lever la main avant de parler</option>
-                        </optgroup>
-                        <optgroup label="🧠 Concentration">
-                            <option value="rester_concentre">Rester concentré pendant X minutes</option>
-                            <option value="pas_disperser">Ne pas me disperser pendant la tâche</option>
-                        </optgroup>
-                        <optgroup label="📁 Matériel">
-                            <option value="avoir_materiel">Avoir mon porte-vue/cours à chaque séance</option>
-                        </optgroup>
-                        <option value="autre">✏️ Autre (personnalisé)</option>
-                    </select>
-                    <div id="objectifDureeBox" class="objectif-duree" style="display: none;">
-                        <span>Durée/Nombre :</span>
-                        <input type="number" id="objectifDuree" min="1" max="60" value="10">
-                        <span id="objectifDureeUnite">minutes</span>
-                    </div>
-                    <input type="text" id="objectifAutre" placeholder="Décris ton objectif personnalisé..." style="display: none;">
+                
+                <!-- Pas d'objectif fixé -->
+                <div id="objectifAucun" style="display: none; text-align: center; padding: 15px; color: #64748b; font-style: italic;">
+                    <p>Cet élève n'a pas fixé d'objectif pour cette séance.</p>
                 </div>
             </div>
             
@@ -1252,7 +1230,7 @@
         console.log("🔄 Chargement du module Firebase...");
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         
         console.log("✅ Imports Firebase OK");
@@ -1504,57 +1482,7 @@
         // ═══════════════════════════════════════════════════════════════
         // OBJECTIF - Gestion
         // ═══════════════════════════════════════════════════════════════
-        window.onObjectifChange = function() {
-            const select = document.getElementById('selectObjectif');
-            const dureeBox = document.getElementById('objectifDureeBox');
-            const autreInput = document.getElementById('objectifAutre');
-            const uniteLabel = document.getElementById('objectifDureeUnite');
-            
-            const val = select.value;
-            
-            // Objectifs avec durée/nombre
-            const objectifsAvecDuree = ['rester_activite', 'rester_concentre'];
-            const objectifsAvecNombre = ['participation_oral'];
-            
-            if (objectifsAvecDuree.includes(val)) {
-                dureeBox.style.display = 'flex';
-                uniteLabel.textContent = 'minutes';
-                document.getElementById('objectifDuree').value = 15;
-            } else if (objectifsAvecNombre.includes(val)) {
-                dureeBox.style.display = 'flex';
-                uniteLabel.textContent = 'fois';
-                document.getElementById('objectifDuree').value = 2;
-            } else {
-                dureeBox.style.display = 'none';
-            }
-            
-            // Objectif personnalisé
-            if (val === 'autre') {
-                autreInput.style.display = 'block';
-            } else {
-                autreInput.style.display = 'none';
-            }
-        };
-        
-        function getObjectifTexte() {
-            const select = document.getElementById('selectObjectif');
-            const val = select.value;
-            if (!val) return null;
-            
-            if (val === 'autre') {
-                return document.getElementById('objectifAutre').value || null;
-            }
-            
-            let texte = select.options[select.selectedIndex].text;
-            
-            // Remplacer X par la valeur
-            if (texte.includes('X')) {
-                const duree = document.getElementById('objectifDuree').value;
-                texte = texte.replace('X', duree);
-            }
-            
-            return texte;
-        }
+        // Fonctions objectif retirées - l'élève choisit son objectif dans resultats.html
         
         // ═══════════════════════════════════════════════════════════════
         // DISTRIBUTION COURS (CHECKBOXES MULTIPLES)
@@ -1767,12 +1695,7 @@
             document.getElementById('noteFinaleManuelle').value = '';
             document.getElementById('justificationAjustement').value = '';
             
-            // Reset objectif
-            document.getElementById('selectObjectif').value = '';
-            document.getElementById('objectifDureeBox').style.display = 'none';
-            document.getElementById('objectifAutre').style.display = 'none';
-            document.getElementById('objectifAutre').value = '';
-            document.getElementById('objectifPrecedentBox').style.display = 'none';
+            // Reset objectif (validation seulement)
             document.querySelectorAll('input[name="objectifValidation"]').forEach(r => r.checked = false);
             
             // Appliquer le cours par défaut
@@ -1807,15 +1730,24 @@
                 const objectifRef = doc(db, "resultats", code, "objectifs", "current");
                 const objectifSnap = await getDoc(objectifRef);
                 
+                document.getElementById('sectionObjectif').style.display = 'block';
+                
                 if (objectifSnap.exists()) {
                     objectifPrecedent = objectifSnap.data();
-                    document.getElementById('objectifPrecedentBox').style.display = 'block';
-                    document.getElementById('objectifPrecedentTexte').textContent = '🎯 ' + objectifPrecedent.texte;
+                    document.getElementById('objectifExistant').style.display = 'block';
+                    document.getElementById('objectifAucun').style.display = 'none';
+                    document.getElementById('objectifTexte').textContent = '🎯 ' + objectifPrecedent.texte;
+                    // Reset les radios
+                    document.querySelectorAll('input[name="objectifValidation"]').forEach(r => r.checked = false);
                 } else {
-                    document.getElementById('objectifPrecedentBox').style.display = 'none';
+                    objectifPrecedent = null;
+                    document.getElementById('objectifExistant').style.display = 'none';
+                    document.getElementById('objectifAucun').style.display = 'block';
                 }
             } catch (error) {
-                console.log("Pas d'objectif précédent:", error);
+                console.log("Pas d'objectif:", error);
+                document.getElementById('objectifExistant').style.display = 'none';
+                document.getElementById('objectifAucun').style.display = 'block';
             }
         }
         
@@ -2167,9 +2099,8 @@
                 }
             }
             
-            // Objectif
+            // Objectif - validation uniquement (l'élève fixe son objectif, le prof valide)
             const objectifValidation = document.querySelector('input[name="objectifValidation"]:checked');
-            const nouvelObjectif = getObjectifTexte();
             
             const data = {
                 date: new Date().toISOString().split('T')[0],
@@ -2206,12 +2137,11 @@
                 noteSur20: noteFinale,
                 ajustementManuel: ajustementManuel,
                 justificationAjustement: justification || null,
-                // Objectif
-                objectifPrecedent: objectifPrecedent ? {
+                // Objectif (validation par le prof)
+                objectifValide: objectifPrecedent ? {
                     texte: objectifPrecedent.texte,
                     statut: objectifValidation ? objectifValidation.value : 'en_cours'
                 } : null,
-                nouvelObjectif: nouvelObjectif,
                 // Meta
                 absent: false,
                 createdAt: serverTimestamp(),
@@ -2223,23 +2153,22 @@
                 const docId = `${data.date}_${seanceConfig.module}_${Date.now()}`;
                 await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
                 
-                // Enregistrer nouvel objectif
-                if (nouvelObjectif) {
-                    await setDoc(doc(db, "resultats", currentEleve, "objectifs", "current"), {
-                        texte: nouvelObjectif,
-                        dateCreation: new Date().toISOString(),
-                        statut: 'en_cours'
-                    });
-                }
-                
-                // Archiver objectif précédent si validé
+                // Archiver et supprimer l'objectif si validé (atteint ou non_atteint)
                 if (objectifPrecedent && objectifValidation) {
+                    const statut = objectifValidation.value;
+                    
+                    // Archiver l'objectif
                     const archiveId = `${new Date().toISOString()}_${objectifPrecedent.texte.substring(0, 20)}`;
                     await setDoc(doc(db, "resultats", currentEleve, "objectifs", archiveId), {
                         texte: objectifPrecedent.texte,
-                        statut: objectifValidation.value,
+                        statut: statut,
                         dateValidation: new Date().toISOString()
                     });
+                    
+                    // Supprimer l'objectif courant si atteint ou non_atteint (pas si "en_cours")
+                    if (statut === 'atteint' || statut === 'non_atteint') {
+                        await deleteDoc(doc(db, "resultats", currentEleve, "objectifs", "current"));
+                    }
                 }
                 
                 // Mettre à jour stats
