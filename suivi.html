@@ -873,6 +873,21 @@
                 </div>
             </div>
             
+            <!-- BOUTON RETOUR CONFIG -->
+            <div style="margin-bottom: 15px; text-align: center;">
+                <button onclick="retourConfig()" style="
+                    background: linear-gradient(135deg, #6366f1, #4f46e5);
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    font-size: 0.9em;
+                    cursor: pointer;
+                    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+                ">⚙️ Modifier la configuration (cours, critères...)</button>
+            </div>
+            
             <!-- OBJECTIF -->
             <div class="objectif-box" id="sectionObjectif" style="display: none;">
                 <h4>🎯 Objectif de l'élève</h4>
@@ -1422,10 +1437,12 @@
                 
                 const classe = params.get('classe');
                 const module = params.get('module');
+                const dateSeance = params.get('date'); // 📅 RÉCUPÉRER LA DATE ORIGINALE
                 const elevesNotesStr = params.get('elevesNotes') || '';
                 const elevesNotes = elevesNotesStr ? elevesNotesStr.split(',') : [];
                 
                 window.elevesDejaNotes = elevesNotes;
+                window.dateSeanceOriginale = dateSeance; // 📅 STOCKER LA DATE ORIGINALE
                 
                 if (classe) {
                     const selectClasse = document.getElementById('selectClasse');
@@ -1440,7 +1457,7 @@
                     }, 100);
                 }
                 
-                showToast("📋 Reprise de séance - " + elevesNotes.length + " élève(s) déjà noté(s)", 3000);
+                showToast("📋 Reprise séance du " + (dateSeance || "?") + " - " + elevesNotes.length + " élève(s) déjà noté(s)", 3000);
                 return;
             }
             
@@ -1602,7 +1619,9 @@
                     securite: document.getElementById('checkSecurite').checked,
                     commentaire: document.getElementById('checkCommentaire').checked
                 },
-                dateDebut: new Date()
+                dateDebut: new Date(),
+                // 📅 UTILISER LA DATE ORIGINALE SI ON REPREND UNE SÉANCE
+                date: window.dateSeanceOriginale || new Date().toISOString().split('T')[0]
             };
             
             // Afficher/masquer sections
@@ -1741,8 +1760,8 @@
             // Charger l'objectif précédent de l'élève
             await chargerObjectifEleve(code);
             
-            // Si élève déjà noté précédemment, charger ses données
-            if (eleveObj && eleveObj.dejaNotePrecedemment) {
+            // Si élève déjà noté (dans cette séance OU précédemment), charger ses données
+            if (eleveObj && (eleveObj.done || eleveObj.dejaNotePrecedemment)) {
                 console.log("📂 Chargement données existantes pour", code);
                 await chargerDonneesEleve(code);
             }
@@ -2132,7 +2151,7 @@
             const objectifValidation = document.querySelector('input[name="objectifValidation"]:checked');
             
             const data = {
-                date: new Date().toISOString().split('T')[0],
+                date: seanceConfig.date, // 📅 Utiliser la date de la séance (pas forcément aujourd'hui)
                 heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
                 classe: seanceConfig.classe,
                 module: seanceConfig.module,
@@ -2178,8 +2197,8 @@
             };
             
             try {
-                // Enregistrer suivi
-                const docId = `${data.date}_${seanceConfig.module}_${Date.now()}`;
+                // Enregistrer suivi (ID fixe = date + module, pour permettre la mise à jour)
+                const docId = `${data.date}_${seanceConfig.module}`;
                 await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
                 
                 // Archiver et supprimer l'objectif si validé (atteint ou non_atteint)
@@ -2242,7 +2261,7 @@
             const coursDistrib = getCoursDistrib();
             
             const data = {
-                date: new Date().toISOString().split('T')[0],
+                date: seanceConfig.date, // 📅 Utiliser la date de la séance (pas forcément aujourd'hui)
                 heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
                 classe: seanceConfig.classe,
                 module: seanceConfig.module,
@@ -2257,7 +2276,7 @@
             };
             
             try {
-                const docId = `${data.date}_${seanceConfig.module}_${Date.now()}`;
+                const docId = `${data.date}_${seanceConfig.module}`;
                 await setDoc(doc(db, "resultats", currentEleve, "suivi", docId), data);
                 
                 await updateStatsAbsence(currentEleve);
