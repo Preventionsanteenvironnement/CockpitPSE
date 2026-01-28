@@ -754,6 +754,11 @@
             <div class="card">
                 <div class="card-title">⚙️ Configuration</div>
                 
+                <!-- 📅 DATE DE SÉANCE MODIFIABLE -->
+                <label class="field-label">📅 Date de la séance</label>
+                <input type="date" id="dateSeanceInput" style="width: 100%; padding: 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 1em; font-family: inherit; margin-bottom: 15px; background: white;">
+                <p style="font-size: 0.8em; color: var(--muted); margin-top: -10px; margin-bottom: 15px;">💡 Vous pouvez noter une séance passée en changeant la date</p>
+                
                 <label class="field-label">Classe / Groupe</label>
                 <select id="selectClasse" onchange="onClasseChange()">
                     <option value="">-- Sélectionner --</option>
@@ -1395,8 +1400,26 @@
         // ═══════════════════════════════════════════════════════════════
         window.addEventListener('DOMContentLoaded', () => {
             const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            
+            // Initialiser le champ de date avec aujourd'hui
+            document.getElementById('dateSeanceInput').value = todayStr;
+            
+            // Afficher la date formatée
             document.getElementById('dateJour').textContent = now.toLocaleDateString('fr-FR', {
                 weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+            });
+            
+            // Mettre à jour l'affichage quand la date change
+            document.getElementById('dateSeanceInput').addEventListener('change', function() {
+                const selectedDate = new Date(this.value + 'T12:00:00');
+                document.getElementById('dateJour').textContent = selectedDate.toLocaleDateString('fr-FR', {
+                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                });
+                // Ajouter un indicateur si ce n'est pas aujourd'hui
+                if (this.value !== todayStr) {
+                    document.getElementById('dateJour').innerHTML += ' <span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; margin-left: 10px;">📅 Date modifiée</span>';
+                }
             });
             
             const select = document.getElementById('selectClasse');
@@ -1446,6 +1469,9 @@
                 
                 // 📅 METTRE À JOUR L'AFFICHAGE DE LA DATE EN HAUT
                 if (dateSeance) {
+                    // Mettre à jour le champ de date input
+                    document.getElementById('dateSeanceInput').value = dateSeance;
+                    
                     const [year, month, day] = dateSeance.split('-');
                     const dateObj = new Date(year, month - 1, day);
                     document.getElementById('dateJour').textContent = dateObj.toLocaleDateString('fr-FR', {
@@ -1457,32 +1483,13 @@
                 
                 if (classe) {
                     const selectClasse = document.getElementById('selectClasse');
-                    // Essayer d'abord la valeur exacte
                     selectClasse.value = classe;
-                    // Si pas trouvé, chercher une option qui contient la classe
-                    if (!selectClasse.value) {
-                        for (let opt of selectClasse.options) {
-                            if (opt.value === classe || opt.value.includes(classe.split(',')[0])) {
-                                selectClasse.value = opt.value;
-                                break;
-                            }
-                        }
-                    }
                     onClasseChange();
                     
                     setTimeout(() => {
                         if (module) {
                             const selectModule = document.getElementById('selectModule');
                             selectModule.value = module;
-                            // Si pas trouvé, chercher une option qui commence par le module
-                            if (!selectModule.value) {
-                                for (let opt of selectModule.options) {
-                                    if (opt.value.startsWith(module)) {
-                                        selectModule.value = opt.value;
-                                        break;
-                                    }
-                                }
-                            }
                         }
                     }, 100);
                 }
@@ -1650,8 +1657,8 @@
                     commentaire: document.getElementById('checkCommentaire').checked
                 },
                 dateDebut: new Date(),
-                // 📅 UTILISER LA DATE ORIGINALE SI ON REPREND UNE SÉANCE
-                date: window.dateSeanceOriginale || new Date().toISOString().split('T')[0]
+                // 📅 UTILISER LA DATE DU CHAMP INPUT (ou date originale si reprise)
+                date: window.dateSeanceOriginale || document.getElementById('dateSeanceInput').value || new Date().toISOString().split('T')[0]
             };
             
             // Afficher/masquer sections
