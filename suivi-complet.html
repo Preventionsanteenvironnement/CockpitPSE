@@ -450,9 +450,17 @@
                 chargerNomsLocaux();
                 initFiltres();
                 await chargerConsultations();
-                // NE PAS charger automatiquement - afficher message d'attente
-                document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Prêt à rechercher</h3><p>Sélectionnez une classe ou un mois, puis cliquez sur 🔍 Rechercher</p><p style="margin-top:10px;color:#64748b;font-size:0.9em">💡 Ou cliquez directement sur 🔍 pour voir toutes les sessions</p></div>';
-                document.getElementById('searchHint').style.display = 'block';
+                
+                // Vérifier si on arrive depuis un scan QR (paramètres URL)
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('session') || urlParams.get('creer')) {
+                    // On arrive depuis un scan QR - gérer les paramètres
+                    await gererParametresURL();
+                } else {
+                    // Affichage normal - message d'attente
+                    document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Prêt à rechercher</h3><p>Sélectionnez une classe ou un mois, puis cliquez sur 🔍 Rechercher</p><p style="margin-top:10px;color:#64748b;font-size:0.9em">💡 Ou cliquez directement sur 🔍 pour voir toutes les sessions</p></div>';
+                    document.getElementById('searchHint').style.display = 'block';
+                }
             } else {
                 document.getElementById('userStatus').innerHTML = '<button class="header-btn" onclick="connexion()">🔐 Connexion</button>';
             }
@@ -1226,14 +1234,6 @@
                 window.history.replaceState({}, '', window.location.pathname);
             }
         }
-        
-        // Appeler après l'authentification
-        window.addEventListener('load', () => {
-            // Attendre que l'auth soit prête avant de gérer les paramètres
-            setTimeout(() => {
-                if (user) gererParametresURL();
-            }, 1000);
-        });
         
         console.log("✅ Suivi Complet PSE - Version avec scan QR");
     </script>
