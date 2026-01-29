@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📱 Scan Élève - Cockpit PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="data_eleves.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            background: linear-gradient(135deg, #6366f1, #4f46e5); 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding: 20px;
+        }
+        .container { 
+            background: white; 
+            border-radius: 24px; 
+            padding: 30px; 
+            max-width: 400px; 
+            width: 100%; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .icon { font-size: 4em; margin-bottom: 15px; }
+        h1 { font-size: 1.4em; color: #1e293b; margin-bottom: 10px; }
+        .subtitle { color: #64748b; font-size: 0.95em; margin-bottom: 25px; }
+        
+        .eleve-card {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            border: 2px solid #3b82f6;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .eleve-code { font-size: 2em; font-weight: 800; color: #1e40af; }
+        .eleve-nom { font-size: 1.1em; color: #3b82f6; margin-top: 5px; }
+        .eleve-classe { 
+            display: inline-block;
+            background: #3b82f6; 
+            color: white; 
+            padding: 5px 15px; 
+            border-radius: 20px; 
+            font-size: 0.9em; 
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .status { padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95em; }
+        .status.loading { background: #fef3c7; color: #92400e; }
+        .status.success { background: #dcfce7; color: #166534; }
+        .status.warning { background: #fee2e2; color: #991b1b; }
+        .status.info { background: #dbeafe; color: #1e40af; }
+        
+        .sessions-list { text-align: left; margin-bottom: 20px; }
+        .session-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .session-option:hover { border-color: #6366f1; background: #f0f0ff; }
+        .session-option.today { border-color: #22c55e; background: #f0fdf4; }
+        .session-option .emoji { font-size: 1.5em; }
+        .session-option .info { flex: 1; }
+        .session-option .module { font-weight: 700; color: #1e293b; }
+        .session-option .meta { font-size: 0.85em; color: #64748b; }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
+        .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,0,0,0.2); }
+        
+        .create-session {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .create-session h3 { font-size: 1em; color: #1e293b; margin-bottom: 15px; }
+        .create-session select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        
+        .error-container { text-align: center; }
+        .error-container .icon { color: #dc2626; }
+        
+        .footer-links {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer-links a {
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="content">
+            <div class="icon">📱</div>
+            <h1>Scan Élève</h1>
+            <div class="status loading" id="status">⏳ Connexion en cours...</div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.appspot.com",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // Récupérer le code élève depuis l'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeEleve = urlParams.get('code')?.toUpperCase();
+        
+        // Date du jour (format YYYY-MM-DD)
+        const aujourdhui = new Date().toISOString().split('T')[0];
+        const [annee, mois, jour] = aujourdhui.split('-');
+        const dateAffichage = `${jour}/${mois}/${annee}`;
+        
+        // Noms locaux (CSV)
+        const CLE_NOMS = 'cockpit_noms_eleves';
+        let nomsEleves = {};
+        try { nomsEleves = JSON.parse(localStorage.getItem(CLE_NOMS) || '{}'); } catch(e) {}
+        
+        function getNom(code) { return nomsEleves[code] || ''; }
+        
+        // Trouver l'élève dans BDD_ELEVES
+        function getEleve(code) {
+            return (window.BDD_ELEVES || []).find(e => e.userCode === code);
+        }
+        
+        // Modules PSE
+        const MODULES_PSE = [
+            { id: "MA1", titre: "Monde professionnel" },
+            { id: "MA2", titre: "Parcours professionnel" },
+            { id: "MA3", titre: "Fonctionnement de l'organisme" },
+            { id: "MA4", titre: "Alimentation & santé" },
+            { id: "MB1", titre: "Environnement économique" },
+            { id: "MB2", titre: "Consommation responsable" },
+            { id: "MC1", titre: "Risques professionnels" },
+            { id: "MC2", titre: "Risques liés à l'activité" },
+            { id: "MD1", titre: "Budget" },
+            { id: "MD2", titre: "Crédit & assurance" },
+            { id: "C1", titre: "Cadre règlementaire" },
+            { id: "C2", titre: "Situation de travail" },
+            { id: "C11", titre: "Analyse situation travail" },
+            { id: "SST", titre: "Sauveteur secouriste" },
+            { id: "EVAL", titre: "Évaluation" },
+            { id: "SEANCE", titre: "Séance standard" }
+        ];
+        
+        // Afficher erreur
+        function afficherErreur(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="error-container">
+                    <div class="icon">❌</div>
+                    <h1>Erreur</h1>
+                    <div class="status warning">${message}</div>
+                    <div class="footer-links">
+                        <a href="suivi-complet.html">← Retour au suivi</a>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Afficher la page élève avec les sessions disponibles
+        function afficherEleve(eleve, sessionsAujourdhui) {
+            const nom = getNom(eleve.userCode);
+            
+            let sessionsHtml = '';
+            if (sessionsAujourdhui.length > 0) {
+                sessionsHtml = `
+                    <div class="status success">✅ ${sessionsAujourdhui.length} session(s) trouvée(s) aujourd'hui (${dateAffichage})</div>
+                    <div class="sessions-list">
+                        ${sessionsAujourdhui.map(s => `
+                            <div class="session-option today" onclick="ouvrirSession('${s.date}', '${s.module}', '${eleve.userCode}')">
+                                <span class="emoji">📋</span>
+                                <div class="info">
+                                    <div class="module">${s.module}</div>
+                                    <div class="meta">Aujourd'hui • ${s.nbNotes} noté(s)</div>
+                                </div>
+                                <span>→</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                sessionsHtml = `
+                    <div class="status info">ℹ️ Pas de session aujourd'hui (${dateAffichage}) pour ${eleve.classe}</div>
+                    <div class="create-session">
+                        <h3>🆕 Créer une session maintenant</h3>
+                        <select id="selectModule">
+                            <option value="">-- Choisir un module --</option>
+                            ${MODULES_PSE.map(m => `<option value="${m.id}">${m.id} - ${m.titre}</option>`).join('')}
+                        </select>
+                        <button class="btn btn-success" onclick="creerEtOuvrir('${eleve.classe}', '${eleve.userCode}')">
+                            🚀 Créer et noter cet élève
+                        </button>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('content').innerHTML = `
+                <div class="icon">👤</div>
+                <div class="eleve-card">
+                    <div class="eleve-code">${eleve.userCode}</div>
+                    ${nom ? `<div class="eleve-nom">${nom}</div>` : ''}
+                    <div class="eleve-classe">${eleve.classe}</div>
+                </div>
+                ${sessionsHtml}
+                <div class="footer-links">
+                    <a href="suivi-complet.html">← Retour au suivi complet</a>
+                </div>
+            `;
+        }
+        
+        // Ouvrir une session existante et aller sur l'élève
+        window.ouvrirSession = function(date, module, codeEleve) {
+            // Rediriger vers suivi-complet avec les paramètres
+            const params = new URLSearchParams();
+            params.set('session', `${date}_${module}`);
+            params.set('eleve', codeEleve);
+            window.location.href = `suivi-complet.html?${params.toString()}`;
+        };
+        
+        // Créer une session et ouvrir
+        window.creerEtOuvrir = async function(classe, codeEleve) {
+            const module = document.getElementById('selectModule').value;
+            if (!module) {
+                alert('Sélectionnez un module');
+                return;
+            }
+            
+            // Rediriger vers suivi-complet avec paramètres de création
+            const params = new URLSearchParams();
+            params.set('creer', 'true');
+            params.set('date', aujourdhui);
+            params.set('classe', classe);
+            params.set('module', module);
+            params.set('eleve', codeEleve);
+            window.location.href = `suivi-complet.html?${params.toString()}`;
+        };
+        
+        // Chercher les sessions du jour pour une classe
+        async function chercherSessionsAujourdhui(classe) {
+            const sessionsMap = {};
+            const eleves = (window.BDD_ELEVES || []).filter(e => e.classe === classe);
+            
+            for (const eleve of eleves) {
+                try {
+                    const snap = await getDocs(collection(db, "resultats", eleve.userCode, "suivi"));
+                    snap.forEach(docSnap => {
+                        const data = docSnap.data();
+                        // ⚠️ SEULEMENT les sessions d'AUJOURD'HUI
+                        if (data.date === aujourdhui) {
+                            const key = `${data.date}_${data.module}`;
+                            if (!sessionsMap[key]) {
+                                sessionsMap[key] = {
+                                    date: data.date,
+                                    module: data.module,
+                                    nbNotes: 0
+                                };
+                            }
+                            if (!data.absent && data.noteSur20 !== null) {
+                                sessionsMap[key].nbNotes++;
+                            }
+                        }
+                    });
+                } catch(e) {
+                    console.error("Erreur lecture:", e);
+                }
+            }
+            
+            return Object.values(sessionsMap);
+        }
+        
+        // Initialisation
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                document.getElementById('content').innerHTML = `
+                    <div class="icon">🔐</div>
+                    <h1>Connexion requise</h1>
+                    <div class="status warning">Vous devez être connecté pour utiliser le scan.</div>
+                    <button class="btn btn-primary" onclick="connexion()">🔐 Se connecter avec Google</button>
+                    <div class="footer-links">
+                        <a href="suivi-complet.html">← Retour au suivi</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Vérifier le code élève
+            if (!codeEleve) {
+                afficherErreur("Aucun code élève dans l'URL.<br><br>Format attendu: <code>?code=ABC123</code>");
+                return;
+            }
+            
+            // Chercher l'élève
+            const eleve = getEleve(codeEleve);
+            if (!eleve) {
+                afficherErreur(`Élève <strong>${codeEleve}</strong> non trouvé dans la base.<br><br>Vérifiez le code ou mettez à jour votre fichier data_eleves.js`);
+                return;
+            }
+            
+            document.getElementById('status').textContent = `🔍 Recherche des sessions du jour pour ${eleve.classe}...`;
+            
+            // Chercher les sessions d'aujourd'hui
+            const sessions = await chercherSessionsAujourdhui(eleve.classe);
+            
+            // Afficher
+            afficherEleve(eleve, sessions);
+        });
+        
+        window.connexion = () => signInWithPopup(auth, new GoogleAuthProvider());
+    </script>
+</body>
+</html>
