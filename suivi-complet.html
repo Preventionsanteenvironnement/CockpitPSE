@@ -1171,7 +1171,71 @@
             setTimeout(() => t.classList.remove('show'), 2500);
         }
         
-        console.log("✅ Suivi Complet PSE - Version avec suppression de session");
+        // ═══════════════════════════════════════════════════════════════════════
+        // GESTION DES PARAMÈTRES URL (pour scan QR)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        async function gererParametresURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Paramètre "creer" : créer une nouvelle session et ouvrir la notation
+            if (urlParams.get('creer') === 'true') {
+                const date = urlParams.get('date');
+                const classe = urlParams.get('classe');
+                const module = urlParams.get('module');
+                const eleve = urlParams.get('eleve');
+                
+                if (date && classe && module) {
+                    toast('🚀 Création de session...');
+                    currentSession = {
+                        id: `${date}_${classe}_${module}`,
+                        date,
+                        classe,
+                        module,
+                        criteres: { travail: true, oral: true, attention: true, porteVue: false, coursAJour: false, autonomie: false, initiative: false, securite: false },
+                        coursDefaut: [],
+                        eleves: []
+                    };
+                    
+                    await afficherSession(currentSession);
+                    
+                    // Si un élève est spécifié, ouvrir sa notation
+                    if (eleve) {
+                        setTimeout(() => ouvrirNotation(eleve), 500);
+                    }
+                    
+                    // Nettoyer l'URL
+                    window.history.replaceState({}, '', window.location.pathname);
+                }
+            }
+            
+            // Paramètre "session" : ouvrir une session existante
+            else if (urlParams.get('session')) {
+                const sessionId = urlParams.get('session');
+                const eleve = urlParams.get('eleve');
+                
+                toast('📋 Chargement de la session...');
+                await ouvrirSession(sessionId);
+                
+                // Si un élève est spécifié, ouvrir sa notation
+                if (eleve) {
+                    setTimeout(() => ouvrirNotation(eleve), 500);
+                }
+                
+                // Nettoyer l'URL
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+        }
+        
+        // Appeler après l'authentification
+        window.addEventListener('load', () => {
+            // Attendre que l'auth soit prête avant de gérer les paramètres
+            setTimeout(() => {
+                if (user) gererParametresURL();
+            }, 1000);
+        });
+        
+        console.log("✅ Suivi Complet PSE - Version avec scan QR");
     </script>
 </body>
 </html>
