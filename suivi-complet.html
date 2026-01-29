@@ -71,11 +71,15 @@
         .session-item:hover { transform: translateX(5px); box-shadow: var(--shadow); }
         .session-item.complete { border-left-color: var(--success); }
         .session-item.incomplete { border-left-color: var(--warning); }
+        .session-info { flex: 1; }
         .session-info h3 { font-size: 1em; font-weight: 600; margin-bottom: 4px; }
         .session-info .meta { font-size: 0.85em; color: var(--muted); display: flex; gap: 15px; flex-wrap: wrap; }
         .session-stats { display: flex; gap: 10px; align-items: center; }
         .session-progress { width: 100px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
         .session-progress-bar { height: 100%; background: var(--success); }
+        .session-actions { display: flex; gap: 8px; align-items: center; margin-left: 15px; }
+        .btn-delete { background: var(--danger-light); color: var(--danger); border: none; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 1em; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .btn-delete:hover { background: var(--danger); color: white; }
         
         .eleves-table { width: 100%; border-collapse: collapse; }
         .eleves-table th { text-align: left; padding: 12px 15px; font-size: 0.8em; font-weight: 600; color: var(--muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
@@ -182,6 +186,12 @@
         .comment-tag.encouragement { background: #dbeafe; color: #1e40af; }
         .comment-tag.alerte { background: #fee2e2; color: #991b1b; }
         
+        /* Modal confirmation suppression */
+        .modal-delete { max-width: 400px; }
+        .modal-delete .modal-body { text-align: center; padding: 30px 20px; }
+        .modal-delete .delete-icon { font-size: 3em; margin-bottom: 15px; }
+        .modal-delete .delete-warning { background: var(--danger-light); color: var(--danger); padding: 15px; border-radius: 10px; margin: 15px 0; font-size: 0.9em; }
+        
         @media (max-width: 768px) {
             .header-content { flex-direction: column; text-align: center; }
             .container { padding: 15px; }
@@ -189,6 +199,7 @@
             .filters { flex-direction: column; }
             .filter-control { width: 100%; }
             .session-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .session-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
             .options-grid.cols-5, .options-grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
         }
     </style>
@@ -333,11 +344,32 @@
         </div>
     </div>
     
+    <!-- NOUVEAU: Modal confirmation suppression -->
+    <div class="modal-overlay" id="modalDelete">
+        <div class="modal modal-delete">
+            <div class="modal-header"><h2>🗑️ Supprimer la session</h2><button class="modal-close" onclick="fermerModalDelete()">×</button></div>
+            <div class="modal-body">
+                <div class="delete-icon">⚠️</div>
+                <h3 id="deleteSessionInfo">--</h3>
+                <div class="delete-warning">
+                    <strong>Attention !</strong> Cette action va supprimer :<br>
+                    • Toutes les notes des élèves pour cette séance<br>
+                    • Cette action est <strong>irréversible</strong>
+                </div>
+                <p id="deleteElevesCount" style="color:var(--muted);font-size:0.9em">--</p>
+            </div>
+            <div class="modal-footer" style="justify-content:center">
+                <button class="btn btn-secondary" onclick="fermerModalDelete()">Annuler</button>
+                <button class="btn btn-danger" onclick="confirmerSuppression()">🗑️ Supprimer définitivement</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="toast" id="toast">✅ OK</div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         
         const firebaseConfig = {
@@ -356,19 +388,17 @@
         let user = null;
         let nomsEleves = {};
         let allSuivis = [];
+        let allSessionsData = []; // Pour stocker les sessions avec leurs élèves
         let currentSession = null;
         let currentEleve = null;
         let saisie = {};
         let objectifEleve = null;
         let consultationsData = {};
+        let sessionToDelete = null; // Session à supprimer
         
         const CLE_NOMS = 'cockpit_noms_eleves';
         const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
         const MALUS = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
-        
-        // ═══════════════════════════════════════════════════════════════════════
-        // FONCTIONS SIMPLIFIÉES - PAS DE REGROUPEMENT
-        // ═══════════════════════════════════════════════════════════════════════
         
         function getListeClasses() {
             const classes = new Set();
@@ -509,7 +539,7 @@
             document.getElementById('newDate').value = new Date().toISOString().slice(0,10);
         };
         
-        // FILTRES - SIMPLIFIÉ
+        // FILTRES
         function initFiltres() {
             const classes = getListeClasses();
             ['filterClasse', 'newClasse'].forEach(id => {
@@ -547,7 +577,7 @@
             });
         };
         
-        // CHARGER SESSIONS - SIMPLIFIÉ
+        // CHARGER SESSIONS
         window.chargerSessions = async function() {
             const fClasse = document.getElementById('filterClasse').value;
             const fDate = document.getElementById('filterDate').value;
@@ -566,12 +596,13 @@
                         
                         allSuivis.push({ id: docSnap.id, eleveCode: eleve.userCode, eleveClasse: eleve.classe, ...data });
                         
-                        // ⭐ CLÉ = date + classe RÉELLE de l'élève + module
                         const key = data.date + '_' + eleve.classe + '_' + data.module;
                         if (!sessionsMap[key]) {
-                            sessionsMap[key] = { id: key, date: data.date, classe: eleve.classe, module: data.module, eleves: [], nbNotes: 0, nbAbsents: 0, totalNotes: 0 };
+                            sessionsMap[key] = { id: key, date: data.date, classe: eleve.classe, module: data.module, eleves: [], elevesWithData: [], nbNotes: 0, nbAbsents: 0, totalNotes: 0 };
                         }
                         sessionsMap[key].eleves.push({ code: eleve.userCode, ...data });
+                        // Stocker les élèves qui ont des données (pour suppression)
+                        sessionsMap[key].elevesWithData.push({ code: eleve.userCode, docId: docSnap.id });
                         if (data.absent) sessionsMap[key].nbAbsents++;
                         else if (data.noteSur20 !== null && data.noteSur20 !== undefined) {
                             sessionsMap[key].nbNotes++;
@@ -590,6 +621,7 @@
                     s.moyenne = s.nbNotes > 0 ? Math.round(s.totalNotes / s.nbNotes * 10) / 10 : null;
                 });
                 
+                allSessionsData = sessions; // Stocker pour suppression
                 afficherSessions(sessions);
             } catch (error) {
                 console.error("Erreur:", error);
@@ -623,9 +655,72 @@
                 const [y, m, d] = s.date.split('-');
                 const prog = s.nbTotal > 0 ? Math.round((s.nbNotes + s.nbAbsents) / s.nbTotal * 100) : 0;
                 const cls = s.nbManquants === 0 ? 'complete' : 'incomplete';
-                return '<div class="session-item ' + cls + '" onclick="ouvrirSession(\'' + s.id + '\')"><div class="session-info"><h3>📅 ' + d + '/' + m + ' - ' + s.module + '</h3><div class="meta"><span>🏫 ' + s.classe + '</span><span>✅ ' + s.nbNotes + '</span><span>🚫 ' + s.nbAbsents + '</span>' + (s.nbManquants > 0 ? '<span style="color:var(--warning)">⏳ ' + s.nbManquants + '</span>' : '') + (s.moyenne ? '<span>📊 ' + s.moyenne + '/20</span>' : '') + '</div></div><div class="session-stats"><div class="session-progress"><div class="session-progress-bar" style="width:' + prog + '%"></div></div><span>' + prog + '%</span></div></div>';
+                return `<div class="session-item ${cls}">
+                    <div class="session-info" onclick="ouvrirSession('${s.id}')">
+                        <h3>📅 ${d}/${m} - ${s.module}</h3>
+                        <div class="meta">
+                            <span>🏫 ${s.classe}</span>
+                            <span>✅ ${s.nbNotes}</span>
+                            <span>🚫 ${s.nbAbsents}</span>
+                            ${s.nbManquants > 0 ? `<span style="color:var(--warning)">⏳ ${s.nbManquants}</span>` : ''}
+                            ${s.moyenne ? `<span>📊 ${s.moyenne}/20</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="session-stats" onclick="ouvrirSession('${s.id}')">
+                        <div class="session-progress"><div class="session-progress-bar" style="width:${prog}%"></div></div>
+                        <span>${prog}%</span>
+                    </div>
+                    <div class="session-actions">
+                        <button class="btn-delete" onclick="event.stopPropagation(); demanderSuppression('${s.id}')" title="Supprimer cette session">🗑️</button>
+                    </div>
+                </div>`;
             }).join('');
         }
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // SUPPRESSION DE SESSION
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        window.demanderSuppression = function(sessionId) {
+            sessionToDelete = allSessionsData.find(s => s.id === sessionId);
+            if (!sessionToDelete) return;
+            
+            const [y, m, d] = sessionToDelete.date.split('-');
+            document.getElementById('deleteSessionInfo').textContent = `${d}/${m}/${y} - ${sessionToDelete.module} (${sessionToDelete.classe})`;
+            document.getElementById('deleteElevesCount').textContent = `${sessionToDelete.elevesWithData.length} élève(s) seront affectés`;
+            
+            document.getElementById('modalDelete').classList.add('active');
+        };
+        
+        window.fermerModalDelete = function() {
+            document.getElementById('modalDelete').classList.remove('active');
+            sessionToDelete = null;
+        };
+        
+        window.confirmerSuppression = async function() {
+            if (!sessionToDelete) return;
+            
+            try {
+                toast('⏳ Suppression en cours...');
+                
+                // Supprimer les documents de suivi pour chaque élève
+                const promises = sessionToDelete.elevesWithData.map(eleve => {
+                    return deleteDoc(doc(db, "resultats", eleve.code, "suivi", eleve.docId));
+                });
+                
+                await Promise.all(promises);
+                
+                toast(`✅ Session supprimée (${sessionToDelete.elevesWithData.length} notes)`);
+                fermerModalDelete();
+                
+                // Recharger la liste
+                await chargerSessions();
+                
+            } catch (error) {
+                console.error("Erreur suppression:", error);
+                toast("❌ Erreur lors de la suppression");
+            }
+        };
         
         // CRÉER SESSION
         window.creerSession = async function() {
@@ -670,7 +765,6 @@
             document.getElementById('sessionTitre').textContent = '📅 ' + d + '/' + m + '/' + y + ' - ' + session.module;
             document.getElementById('sessionMeta').textContent = '🏫 ' + session.classe;
             
-            // ⭐ SIMPLIFIÉ : élèves de la classe uniquement
             const elevesClasse = getElevesDeClasse(session.classe);
             let eleves = elevesClasse.map(e => ({ code: e.userCode, classe: e.classe, nom: getNom(e.userCode), note: null, absent: false, statut: 'manquant' }));
             
@@ -1030,7 +1124,7 @@
             setTimeout(() => t.classList.remove('show'), 2500);
         }
         
-        console.log("✅ Suivi Complet PSE - Version simplifiée (sans regroupement)");
+        console.log("✅ Suivi Complet PSE - Version avec suppression de session");
     </script>
 </body>
 </html>
