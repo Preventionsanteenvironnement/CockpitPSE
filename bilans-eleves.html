@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 Bilans Élèves - Cockpit PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="data_eleves.js"></script>
+    
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #6366f1;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --border: #e2e8f0;
+            --pink: #ec4899;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        
+        /* === HEADER === */
+        .header {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.4em; margin-bottom: 5px; }
+        .header .subtitle { font-size: 0.85em; opacity: 0.9; }
+        .header-nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .header-nav a {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .header-nav a:hover { background: rgba(255,255,255,0.3); }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* === CARDS === */
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* === FILTRES === */
+        .filters {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-size: 0.8em;
+            font-weight: 600;
+            color: var(--muted);
+        }
+        .filter-select {
+            padding: 10px 15px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95em;
+            font-weight: 500;
+            min-width: 180px;
+            cursor: pointer;
+        }
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* === STATS OVERVIEW === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary);
+        }
+        .stat-card.pink { border-left-color: var(--pink); }
+        .stat-card.blue { border-left-color: var(--secondary); }
+        .stat-card.orange { border-left-color: var(--warning); }
+        .stat-value {
+            font-size: 2em;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .stat-card.pink .stat-value { color: var(--pink); }
+        .stat-card.blue .stat-value { color: var(--secondary); }
+        .stat-card.orange .stat-value { color: var(--warning); }
+        .stat-label {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-top: 5px;
+        }
+        
+        /* === TABLEAU BILANS === */
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 0.85em;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:hover { background: #f8fafc; }
+        .eleve-code {
+            font-weight: 700;
+            color: var(--text);
+        }
+        .eleve-classe {
+            font-size: 0.85em;
+            color: var(--muted);
+        }
+        
+        /* === BADGES SCORE === */
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        .score-1 { background: #fee2e2; color: #991b1b; }
+        .score-2 { background: #fed7aa; color: #c2410c; }
+        .score-3 { background: #fef3c7; color: #92400e; }
+        .score-4 { background: #d1fae5; color: #065f46; }
+        .score-5 { background: #a7f3d0; color: #047857; }
+        
+        /* === ÉMOTIONS === */
+        .emotion-badge {
+            font-size: 1.5em;
+        }
+        
+        /* === GLOBAL BADGE === */
+        .global-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+        .global-super { background: #dcfce7; color: #166534; }
+        .global-bien { background: #dbeafe; color: #1e40af; }
+        .global-moyen { background: #fef3c7; color: #92400e; }
+        .global-difficile { background: #fee2e2; color: #991b1b; }
+        
+        /* === GRAPHIQUES === */
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .chart-title {
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--text);
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+        
+        /* === DÉTAIL ÉLÈVE === */
+        .detail-panel {
+            display: none;
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+            border: 2px solid var(--primary);
+        }
+        .detail-panel.visible { display: block; }
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .detail-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #065f46;
+        }
+        .detail-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--muted);
+        }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .detail-item-label {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-bottom: 5px;
+        }
+        .detail-item-value {
+            font-weight: 700;
+            font-size: 1.2em;
+        }
+        .detail-fierte {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid var(--warning);
+        }
+        .detail-fierte-label {
+            font-weight: 600;
+            color: var(--warning);
+            margin-bottom: 8px;
+        }
+        .detail-fierte-text {
+            font-style: italic;
+            color: var(--text);
+            line-height: 1.5;
+        }
+        
+        /* === ÉMOTIONS OVERVIEW === */
+        .emotions-week {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .emotion-day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .emotion-day-emoji {
+            font-size: 1.8em;
+        }
+        .emotion-day-count {
+            font-size: 0.7em;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+        
+        /* === VIDE === */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+        }
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        /* === LOADING === */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 30px;
+            color: var(--muted);
+        }
+        .spinner {
+            width: 25px;
+            height: 25px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* === BTN === */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn-secondary:hover { background: #cbd5e1; }
+        
+        /* Onglets */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            background: #f8fafc;
+            padding: 5px;
+            border-radius: 12px;
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            color: var(--muted);
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: var(--primary);
+            color: white;
+        }
+        .tab:hover:not(.active) {
+            background: #e2e8f0;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-select {
+                width: 100%;
+            }
+            th, td {
+                padding: 8px 10px;
+                font-size: 0.85em;
+            }
+            .score-badge {
+                width: 30px;
+                height: 30px;
+                font-size: 0.8em;
+            }
+            .tabs {
+                flex-wrap: wrap;
+            }
+            .tab {
+                flex: 1 1 45%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Bilans des Élèves</h1>
+        <p class="subtitle">Auto-évaluations hebdomadaires & Émotions quotidiennes</p>
+        <div class="header-nav">
+            <a href="indexcockpit.html">🏠 Cockpit</a>
+            <a href="session-suivi.html">📊 Suivi Séances</a>
+            <a href="devoirs.html">📝 Devoirs</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- FILTRES -->
+        <div class="card">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>📚 Classe</label>
+                    <select class="filter-select" id="classeSelect" onchange="chargerBilans()">
+                        <option value="">Toutes les classes</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>📅 Semaine</label>
+                    <select class="filter-select" id="semaineSelect" onchange="chargerBilans()">
+                        <option value="">Semaine actuelle</option>
+                    </select>
+                </div>
+                <div class="filter-group" style="margin-left: auto;">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-primary" onclick="chargerBilans()">🔄 Actualiser</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- STATS OVERVIEW -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotalBilans">0</div>
+                <div class="stat-label">Bilans cette semaine</div>
+            </div>
+            <div class="stat-card pink">
+                <div class="stat-value" id="statEmotionsJour">0</div>
+                <div class="stat-label">Émotions aujourd'hui</div>
+            </div>
+            <div class="stat-card blue">
+                <div class="stat-value" id="statMoyenneGlobale">--</div>
+                <div class="stat-label">Score moyen</div>
+            </div>
+            <div class="stat-card orange">
+                <div class="stat-value" id="statAlertes">0</div>
+                <div class="stat-label">⚠️ À surveiller</div>
+            </div>
+        </div>
+        
+        <!-- ONGLETS -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('bilans')">📋 Bilans Semaine</button>
+            <button class="tab" onclick="switchTab('emotions')">😊 Émotions</button>
+            <button class="tab" onclick="switchTab('tendances')">📈 Tendances</button>
+        </div>
+        
+        <!-- CONTENU BILANS -->
+        <div class="tab-content active" id="tabBilans">
+            <div class="card">
+                <div class="card-title">📋 Bilans de la semaine</div>
+                
+                <div id="bilansLoading" class="loading">
+                    <div class="spinner"></div>
+                    <span>Chargement des bilans...</span>
+                </div>
+                
+                <div id="bilansContent" style="display: none;">
+                    <div class="table-container">
+                        <table id="bilansTable">
+                            <thead>
+                                <tr>
+                                    <th>Élève</th>
+                                    <th>🎯</th>
+                                    <th>💪</th>
+                                    <th>❤️</th>
+                                    <th>🤝</th>
+                                    <th>📊 Global</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bilansTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="bilansEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">📋</div>
+                    <p>Aucun bilan pour cette période</p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">Les élèves peuvent remplir leur bilan dans "Mes Résultats" → "En classe"</p>
+                </div>
+            </div>
+            
+            <!-- DÉTAIL ÉLÈVE -->
+            <div class="detail-panel" id="detailPanel">
+                <div class="detail-header">
+                    <div class="detail-title" id="detailTitle">Détail du bilan</div>
+                    <button class="detail-close" onclick="fermerDetail()">×</button>
+                </div>
+                <div class="detail-grid" id="detailGrid"></div>
+                <div class="detail-fierte" id="detailFierte" style="display: none;">
+                    <div class="detail-fierte-label">⭐ Fierté de la semaine</div>
+                    <div class="detail-fierte-text" id="detailFierteText"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CONTENU ÉMOTIONS -->
+        <div class="tab-content" id="tabEmotions">
+            <div class="card">
+                <div class="card-title">😊 Émotions du jour - Vue d'ensemble</div>
+                
+                <div id="emotionsLoading" class="loading">
+                    <div class="spinner"></div>
+                    <span>Chargement des émotions...</span>
+                </div>
+                
+                <div id="emotionsContent" style="display: none;">
+                    <div style="margin-bottom: 25px;">
+                        <h4 style="color: var(--muted); margin-bottom: 15px;">📅 Aujourd'hui</h4>
+                        <div class="emotions-week" id="emotionsTodaySummary"></div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Élève</th>
+                                    <th>Lun</th>
+                                    <th>Mar</th>
+                                    <th>Mer</th>
+                                    <th>Jeu</th>
+                                    <th>Ven</th>
+                                    <th>Tendance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="emotionsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="emotionsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">😊</div>
+                    <p>Aucune émotion enregistrée</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CONTENU TENDANCES -->
+        <div class="tab-content" id="tabTendances">
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-title">📊 Répartition des ressentis globaux</div>
+                    <div class="chart-container">
+                        <canvas id="chartGlobal"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">📈 Scores moyens par critère</div>
+                    <div class="chart-container">
+                        <canvas id="chartCriteres"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">😊 Répartition des émotions (7 derniers jours)</div>
+                <div class="chart-container" style="max-width: 400px; margin: 0 auto;">
+                    <canvas id="chartEmotions"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.appspot.com",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        let allBilans = [];
+        let allEmotions = [];
+        let chartGlobal, chartCriteres, chartEmotions;
+        
+        // ═══════════════════════════════════════════════════════════════
+        // INITIALISATION
+        // ═══════════════════════════════════════════════════════════════
+        window.addEventListener('DOMContentLoaded', () => {
+            initClasses();
+            initSemaines();
+            chargerBilans();
+        });
+        
+        function initClasses() {
+            const select = document.getElementById('classeSelect');
+            const classes = [...new Set(window.BDD_ELEVES?.map(e => e.classe) || [])].sort();
+            classes.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                select.appendChild(opt);
+            });
+        }
+        
+        function initSemaines() {
+            const select = document.getElementById('semaineSelect');
+            const today = new Date();
+            
+            for (let i = 0; i < 8; i++) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - (i * 7));
+                const monday = getMonday(d);
+                const sunday = new Date(monday);
+                sunday.setDate(monday.getDate() + 6);
+                
+                const opt = document.createElement('option');
+                opt.value = monday.toISOString().split('T')[0];
+                opt.textContent = i === 0 ? 'Cette semaine' : 
+                    `Semaine du ${monday.toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})}`;
+                select.appendChild(opt);
+            }
+        }
+        
+        function getMonday(d) {
+            const date = new Date(d);
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(date.setDate(diff));
+        }
+        
+        function getSemaineActuelle() {
+            const monday = getMonday(new Date());
+            return monday.toISOString().split('T')[0];
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // CHARGEMENT DES DONNÉES
+        // ═══════════════════════════════════════════════════════════════
+        window.chargerBilans = async function() {
+            const classeFilter = document.getElementById('classeSelect').value;
+            const semaineFilter = document.getElementById('semaineSelect').value || getSemaineActuelle();
+            
+            document.getElementById('bilansLoading').style.display = 'flex';
+            document.getElementById('bilansContent').style.display = 'none';
+            document.getElementById('bilansEmpty').style.display = 'none';
+            document.getElementById('emotionsLoading').style.display = 'flex';
+            document.getElementById('emotionsContent').style.display = 'none';
+            
+            try {
+                let eleves = window.BDD_ELEVES || [];
+                if (classeFilter) {
+                    eleves = eleves.filter(e => e.classe === classeFilter);
+                }
+                
+                allBilans = [];
+                allEmotions = [];
+                
+                for (const eleve of eleves) {
+                    try {
+                        // Bilan de la semaine
+                        const bilanRef = doc(db, 'resultats', eleve.userCode, 'bilans', semaineFilter);
+                        const bilanSnap = await getDoc(bilanRef);
+                        
+                        if (bilanSnap.exists()) {
+                            allBilans.push({
+                                ...bilanSnap.data(),
+                                eleveCode: eleve.userCode,
+                                classe: eleve.classe
+                            });
+                        }
+                        
+                        // Émotions de la semaine
+                        const emotionsRef = collection(db, 'resultats', eleve.userCode, 'emotions');
+                        const emotionsSnap = await getDocs(emotionsRef);
+                        emotionsSnap.forEach(d => {
+                            const data = d.data();
+                            if (data.date >= semaineFilter) {
+                                allEmotions.push({
+                                    ...data,
+                                    eleveCode: eleve.userCode,
+                                    classe: eleve.classe
+                                });
+                            }
+                        });
+                    } catch (e) {
+                        // Pas de données
+                    }
+                }
+                
+                afficherBilans();
+                afficherEmotions();
+                updateStats();
+                updateCharts();
+                
+            } catch (error) {
+                console.error('Erreur chargement bilans:', error);
+            }
+            
+            document.getElementById('bilansLoading').style.display = 'none';
+            document.getElementById('emotionsLoading').style.display = 'none';
+        };
+        
+        // ═══════════════════════════════════════════════════════════════
+        // AFFICHAGE BILANS
+        // ═══════════════════════════════════════════════════════════════
+        function afficherBilans() {
+            const tbody = document.getElementById('bilansTableBody');
+            tbody.innerHTML = '';
+            
+            if (allBilans.length === 0) {
+                document.getElementById('bilansEmpty').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('bilansContent').style.display = 'block';
+            
+            const globalEmojis = { 'super': '🤩', 'bien': '😊', 'moyen': '😐', 'difficile': '😔' };
+            const globalClasses = { 'super': 'global-super', 'bien': 'global-bien', 'moyen': 'global-moyen', 'difficile': 'global-difficile' };
+            
+            allBilans.forEach((bilan, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="eleve-code">${bilan.eleveCode}</div>
+                        <div class="eleve-classe">${bilan.classe || ''}</div>
+                    </td>
+                    <td><span class="score-badge score-${bilan.concentration}">${bilan.concentration}</span></td>
+                    <td><span class="score-badge score-${bilan.engagement}">${bilan.engagement}</span></td>
+                    <td><span class="score-badge score-${bilan.emotions}">${bilan.emotions}</span></td>
+                    <td><span class="score-badge score-${bilan.relations}">${bilan.relations}</span></td>
+                    <td><span class="global-badge ${globalClasses[bilan.global] || ''}">${globalEmojis[bilan.global] || '?'} ${bilan.global || '--'}</span></td>
+                    <td><button class="btn btn-small btn-secondary" onclick="voirDetail(${index})">👁️</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        window.voirDetail = function(index) {
+            const bilan = allBilans[index];
+            if (!bilan) return;
+            
+            const panel = document.getElementById('detailPanel');
+            const grid = document.getElementById('detailGrid');
+            const fierte = document.getElementById('detailFierte');
+            const fierteText = document.getElementById('detailFierteText');
+            
+            document.getElementById('detailTitle').textContent = `📋 Bilan de ${bilan.eleveCode} - ${bilan.semaineDisplay || bilan.semaine}`;
+            
+            const gestionLabels = { 'oui': '✅ Oui', 'un_peu': '🤏 Un peu', 'non': '❌ Non', 'pas_eu': '🤷 Pas eu' };
+            const conflitLabels = { 'resolu': '✅ Résolu', 'en_cours': '⏳ En cours', 'non_resolu': '❌ Non résolu', 'pas_eu': '🤷 Pas eu' };
+            const emojis = ['', '😢', '😔', '😐', '🙂', '😄'];
+            
+            grid.innerHTML = `
+                <div class="detail-item">
+                    <div class="detail-item-label">🎯 Concentration</div>
+                    <div class="detail-item-value">${emojis[bilan.concentration]} ${bilan.concentration}/5</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-item-label">💪 Engagement</div>
+                    <div class="detail-item-value">${emojis[bilan.engagement]} ${bilan.engagement}/5</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-item-label">❤️ Identifier émotions</div>
+                    <div class="detail-item-value">${emojis[bilan.emotions]} ${bilan.emotions}/5</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-item-label">🤝 Relations</div>
+                    <div class="detail-item-value">${emojis[bilan.relations]} ${bilan.relations}/5</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-item-label">🔥 Gestion difficulté</div>
+                    <div class="detail-item-value">${gestionLabels[bilan.gestion] || '--'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-item-label">⚡ Conflit</div>
+                    <div class="detail-item-value">${conflitLabels[bilan.conflit] || '--'}</div>
+                </div>
+            `;
+            
+            if (bilan.fierte && bilan.fierte.trim()) {
+                fierte.style.display = 'block';
+                fierteText.textContent = bilan.fierte;
+            } else {
+                fierte.style.display = 'none';
+            }
+            
+            panel.classList.add('visible');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+        
+        window.fermerDetail = function() {
+            document.getElementById('detailPanel').classList.remove('visible');
+        };
+        
+        // ═══════════════════════════════════════════════════════════════
+        // AFFICHAGE ÉMOTIONS
+        // ═══════════════════════════════════════════════════════════════
+        function afficherEmotions() {
+            if (allEmotions.length === 0) {
+                document.getElementById('emotionsEmpty').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('emotionsContent').style.display = 'block';
+            
+            // Résumé aujourd'hui
+            const today = new Date().toISOString().split('T')[0];
+            const todayEmotions = allEmotions.filter(e => e.date === today);
+            
+            const emotionCounts = {};
+            todayEmotions.forEach(e => {
+                emotionCounts[e.emoji] = (emotionCounts[e.emoji] || 0) + 1;
+            });
+            
+            const summaryEl = document.getElementById('emotionsTodaySummary');
+            summaryEl.innerHTML = '';
+            
+            if (Object.keys(emotionCounts).length > 0) {
+                Object.entries(emotionCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([emoji, count]) => {
+                        summaryEl.innerHTML += `
+                            <div class="emotion-day">
+                                <span class="emotion-day-emoji">${emoji}</span>
+                                <span class="emotion-day-count">${count} élève${count > 1 ? 's' : ''}</span>
+                            </div>
+                        `;
+                    });
+            } else {
+                summaryEl.innerHTML = '<p style="color: var(--muted);">Pas encore d\'émotions aujourd\'hui</p>';
+            }
+            
+            // Tableau par élève
+            const tbody = document.getElementById('emotionsTableBody');
+            tbody.innerHTML = '';
+            
+            const emotionsByEleve = {};
+            allEmotions.forEach(e => {
+                if (!emotionsByEleve[e.eleveCode]) {
+                    emotionsByEleve[e.eleveCode] = { classe: e.classe, days: {} };
+                }
+                const dayOfWeek = new Date(e.date).getDay();
+                emotionsByEleve[e.eleveCode].days[dayOfWeek] = e.emoji;
+            });
+            
+            Object.entries(emotionsByEleve).forEach(([code, data]) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="eleve-code">${code}</div>
+                        <div class="eleve-classe">${data.classe || ''}</div>
+                    </td>
+                    <td class="emotion-badge">${data.days[1] || '-'}</td>
+                    <td class="emotion-badge">${data.days[2] || '-'}</td>
+                    <td class="emotion-badge">${data.days[3] || '-'}</td>
+                    <td class="emotion-badge">${data.days[4] || '-'}</td>
+                    <td class="emotion-badge">${data.days[5] || '-'}</td>
+                    <td>${calculerTendance(data.days)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function calculerTendance(days) {
+            const emotionValues = { '🤩': 5, '😊': 4, '😐': 3, '😔': 2, '😢': 1 };
+            const values = Object.values(days).map(e => emotionValues[e] || 0).filter(v => v > 0);
+            
+            if (values.length < 2) return '-';
+            
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const lastValue = values[values.length - 1];
+            
+            if (lastValue > avg + 0.5) return '<span style="color: var(--success);">📈</span>';
+            if (lastValue < avg - 0.5) return '<span style="color: var(--danger);">📉</span>';
+            return '<span style="color: var(--muted);">➡️</span>';
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STATS
+        // ═══════════════════════════════════════════════════════════════
+        function updateStats() {
+            document.getElementById('statTotalBilans').textContent = allBilans.length;
+            
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('statEmotionsJour').textContent = allEmotions.filter(e => e.date === today).length;
+            
+            if (allBilans.length > 0) {
+                const avgScore = allBilans.reduce((sum, b) => {
+                    return sum + (b.concentration + b.engagement + b.emotions + b.relations) / 4;
+                }, 0) / allBilans.length;
+                document.getElementById('statMoyenneGlobale').textContent = avgScore.toFixed(1) + '/5';
+            } else {
+                document.getElementById('statMoyenneGlobale').textContent = '--';
+            }
+            
+            const alertes = allBilans.filter(b => {
+                const avg = (b.concentration + b.engagement + b.emotions + b.relations) / 4;
+                return b.global === 'difficile' || avg < 2.5;
+            }).length;
+            document.getElementById('statAlertes').textContent = alertes;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // GRAPHIQUES
+        // ═══════════════════════════════════════════════════════════════
+        function updateCharts() {
+            // Graphique répartition globale
+            const globalCounts = { 'super': 0, 'bien': 0, 'moyen': 0, 'difficile': 0 };
+            allBilans.forEach(b => {
+                if (b.global && globalCounts.hasOwnProperty(b.global)) {
+                    globalCounts[b.global]++;
+                }
+            });
+            
+            if (chartGlobal) chartGlobal.destroy();
+            chartGlobal = new Chart(document.getElementById('chartGlobal'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['🤩 Super', '😊 Bien', '😐 Moyen', '😔 Difficile'],
+                    datasets: [{
+                        data: [globalCounts.super, globalCounts.bien, globalCounts.moyen, globalCounts.difficile],
+                        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+            
+            // Graphique scores par critère
+            const avgConc = allBilans.length ? (allBilans.reduce((s, b) => s + b.concentration, 0) / allBilans.length).toFixed(1) : 0;
+            const avgEng = allBilans.length ? (allBilans.reduce((s, b) => s + b.engagement, 0) / allBilans.length).toFixed(1) : 0;
+            const avgEmo = allBilans.length ? (allBilans.reduce((s, b) => s + b.emotions, 0) / allBilans.length).toFixed(1) : 0;
+            const avgRel = allBilans.length ? (allBilans.reduce((s, b) => s + b.relations, 0) / allBilans.length).toFixed(1) : 0;
+            
+            if (chartCriteres) chartCriteres.destroy();
+            chartCriteres = new Chart(document.getElementById('chartCriteres'), {
+                type: 'bar',
+                data: {
+                    labels: ['🎯 Concentration', '💪 Engagement', '❤️ Émotions', '🤝 Relations'],
+                    datasets: [{
+                        label: 'Score moyen',
+                        data: [avgConc, avgEng, avgEmo, avgRel],
+                        backgroundColor: ['#6366f1', '#10b981', '#ec4899', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { min: 0, max: 5 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+            
+            // Graphique émotions
+            const emotionCounts = {};
+            allEmotions.forEach(e => {
+                emotionCounts[e.emoji] = (emotionCounts[e.emoji] || 0) + 1;
+            });
+            
+            if (chartEmotions) chartEmotions.destroy();
+            chartEmotions = new Chart(document.getElementById('chartEmotions'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(emotionCounts),
+                    datasets: [{
+                        data: Object.values(emotionCounts),
+                        backgroundColor: ['#22c55e', '#84cc16', '#fbbf24', '#f97316', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // NAVIGATION ONGLETS
+        // ═══════════════════════════════════════════════════════════════
+        window.switchTab = function(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
+        };
+    </script>
+</body>
+</html>
