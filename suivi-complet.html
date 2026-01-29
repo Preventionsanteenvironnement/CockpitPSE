@@ -240,10 +240,15 @@
             <div class="card">
                 <div class="filters">
                     <div class="filter-group"><span class="filter-label">Classe</span><select class="filter-control" id="filterClasse"><option value="">Toutes</option></select></div>
-                    <div class="filter-group"><span class="filter-label">Date</span><input type="date" class="filter-control" id="filterDate"></div>
+                    <div class="filter-group"><span class="filter-label">Mois</span><input type="month" class="filter-control" id="filterMois"></div>
+                    <div class="filter-group"><span class="filter-label">Date exacte</span><input type="date" class="filter-control" id="filterDate"></div>
+                    <div class="filter-group" style="flex:1;min-width:200px;"><span class="filter-label">🔍 Élève (code ou nom)</span><input type="text" class="filter-control" id="filterEleve" placeholder="Ex: ABC123 ou Dupont..." oninput="filtrerResultats()"></div>
                     <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖️</button>
-                    <button class="btn btn-primary btn-sm" onclick="chargerSessions()">🔍</button>
+                    <button class="btn btn-primary btn-sm" onclick="chargerSessions()">🔍 Rechercher</button>
                     <button class="btn btn-success" onclick="showNewSession()">➕ Nouvelle session</button>
+                </div>
+                <div id="searchHint" style="display:none;margin-top:10px;padding:10px;background:#dbeafe;border-radius:8px;font-size:0.85em;color:#1e40af;">
+                    💡 <strong>Astuce :</strong> Sélectionnez une classe ou un mois, puis cliquez sur 🔍 Rechercher. Vous pouvez ensuite filtrer par élève.
                 </div>
             </div>
             
@@ -445,7 +450,9 @@
                 chargerNomsLocaux();
                 initFiltres();
                 await chargerConsultations();
-                await chargerSessions();
+                // NE PAS charger automatiquement - afficher message d'attente
+                document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Prêt à rechercher</h3><p>Sélectionnez une classe ou un mois, puis cliquez sur 🔍 Rechercher</p><p style="margin-top:10px;color:#64748b;font-size:0.9em">💡 Ou cliquez directement sur 🔍 pour voir toutes les sessions</p></div>';
+                document.getElementById('searchHint').style.display = 'block';
             } else {
                 document.getElementById('userStatus').innerHTML = '<button class="header-btn" onclick="connexion()">🔐 Connexion</button>';
             }
@@ -561,7 +568,11 @@
         window.clearFilters = function() {
             document.getElementById('filterClasse').value = '';
             document.getElementById('filterDate').value = '';
-            chargerSessions();
+            document.getElementById('filterMois').value = '';
+            document.getElementById('filterEleve').value = '';
+            // Afficher message d'attente au lieu de charger
+            document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Sélectionnez vos filtres</h3><p>Choisissez une classe, un mois ou une date, puis cliquez sur 🔍 Rechercher</p></div>';
+            document.getElementById('searchHint').style.display = 'block';
         };
         
         window.onClasseChange = function() {
@@ -581,6 +592,15 @@
         window.chargerSessions = async function() {
             const fClasse = document.getElementById('filterClasse').value;
             const fDate = document.getElementById('filterDate').value;
+            const fMois = document.getElementById('filterMois').value; // Format: YYYY-MM
+            const container = document.getElementById('sessionsList');
+            
+            // Cacher l'astuce
+            document.getElementById('searchHint').style.display = 'none';
+            
+            // Afficher chargement
+            container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><h3>Chargement...</h3></div>';
+            
             allSuivis = [];
             const sessionsMap = {};
             
@@ -592,7 +612,12 @@
                     const snap = await getDocs(collection(db, "resultats", eleve.userCode, "suivi"));
                     snap.forEach(docSnap => {
                         const data = docSnap.data();
+                        
+                        // Filtre par date exacte
                         if (fDate && data.date !== fDate) return;
+                        
+                        // Filtre par mois (YYYY-MM)
+                        if (fMois && !data.date.startsWith(fMois)) return;
                         
                         allSuivis.push({ id: docSnap.id, eleveCode: eleve.userCode, eleveClasse: eleve.classe, ...data });
                         
@@ -621,12 +646,34 @@
                     s.moyenne = s.nbNotes > 0 ? Math.round(s.totalNotes / s.nbNotes * 10) / 10 : null;
                 });
                 
-                allSessionsData = sessions; // Stocker pour suppression
+                allSessionsData = sessions; // Stocker pour suppression et filtrage
                 afficherSessions(sessions);
             } catch (error) {
                 console.error("Erreur:", error);
                 toast("❌ Erreur");
             }
+        };
+        
+        // FILTRER PAR ÉLÈVE (recherche locale, sans recharger Firebase)
+        window.filtrerResultats = function() {
+            const recherche = document.getElementById('filterEleve').value.trim().toLowerCase();
+            
+            if (!recherche) {
+                // Si pas de recherche, afficher toutes les sessions
+                afficherSessions(allSessionsData);
+                return;
+            }
+            
+            // Filtrer les sessions qui contiennent cet élève
+            const sessionsFiltrees = allSessionsData.filter(session => {
+                return session.eleves.some(eleve => {
+                    const code = eleve.code.toLowerCase();
+                    const nom = getNom(eleve.code).toLowerCase();
+                    return code.includes(recherche) || nom.includes(recherche);
+                });
+            });
+            
+            afficherSessions(sessionsFiltrees);
         };
         
         function afficherSessions(sessions) {
