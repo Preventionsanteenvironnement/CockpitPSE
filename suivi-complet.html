@@ -241,15 +241,14 @@
             <div class="card">
                 <div class="filters">
                     <div class="filter-group"><span class="filter-label">Classe</span><select class="filter-control" id="filterClasse"><option value="">Toutes</option></select></div>
-                    <div class="filter-group"><span class="filter-label">Mois</span><input type="month" class="filter-control" id="filterMois"></div>
-                    <div class="filter-group"><span class="filter-label">Date exacte</span><input type="date" class="filter-control" id="filterDate"></div>
+                    <div class="filter-group"><span class="filter-label">Mois</span><select class="filter-control" id="filterMois"><option value="">Tous</option></select></div>
                     <div class="filter-group" style="flex:1;min-width:200px;"><span class="filter-label">🔍 Élève (code ou nom)</span><input type="text" class="filter-control" id="filterEleve" placeholder="Ex: ABC123 ou Dupont..." oninput="filtrerResultats()"></div>
                     <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✖️</button>
                     <button class="btn btn-primary btn-sm" onclick="chargerSessions()">🔍 Rechercher</button>
                     <button class="btn btn-success" onclick="showNewSession()">➕ Nouvelle session</button>
                 </div>
                 <div id="searchHint" style="display:none;margin-top:10px;padding:10px;background:#dbeafe;border-radius:8px;font-size:0.85em;color:#1e40af;">
-                    💡 <strong>Astuce :</strong> Sélectionnez une classe ou un mois, puis cliquez sur 🔍 Rechercher. Vous pouvez ensuite filtrer par élève.
+                    💡 <strong>Astuce :</strong> Sélectionnez une classe et/ou un mois, puis cliquez sur 🔍 Rechercher.
                 </div>
             </div>
             
@@ -571,16 +570,66 @@
                     sel.appendChild(o);
                 });
             });
+            
+            // Initialiser la liste des mois (année scolaire)
+            const selMois = document.getElementById('filterMois');
+            if (selMois) {
+                const moisNoms = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+                const now = new Date();
+                const annee = now.getFullYear();
+                const moisActuel = now.getMonth(); // 0-11
+                
+                // Année scolaire : Sept année N-1 à Juillet année N
+                // Si on est entre sept et déc → année scolaire = annee/annee+1
+                // Si on est entre janv et juillet → année scolaire = annee-1/annee
+                let anneeScolaire1, anneeScolaire2;
+                if (moisActuel >= 8) { // Sept-Déc
+                    anneeScolaire1 = annee;
+                    anneeScolaire2 = annee + 1;
+                } else { // Janv-Août
+                    anneeScolaire1 = annee - 1;
+                    anneeScolaire2 = annee;
+                }
+                
+                // Générer les mois de l'année scolaire (Sept à Juillet)
+                const moisAnneeScolaire = [
+                    { mois: 9, annee: anneeScolaire1 },  // Septembre
+                    { mois: 10, annee: anneeScolaire1 }, // Octobre
+                    { mois: 11, annee: anneeScolaire1 }, // Novembre
+                    { mois: 12, annee: anneeScolaire1 }, // Décembre
+                    { mois: 1, annee: anneeScolaire2 },  // Janvier
+                    { mois: 2, annee: anneeScolaire2 },  // Février
+                    { mois: 3, annee: anneeScolaire2 },  // Mars
+                    { mois: 4, annee: anneeScolaire2 },  // Avril
+                    { mois: 5, annee: anneeScolaire2 },  // Mai
+                    { mois: 6, annee: anneeScolaire2 },  // Juin
+                    { mois: 7, annee: anneeScolaire2 }   // Juillet
+                ];
+                
+                moisAnneeScolaire.forEach(m => {
+                    const o = document.createElement('option');
+                    const moisStr = String(m.mois).padStart(2, '0');
+                    o.value = `${m.annee}-${moisStr}`; // Format YYYY-MM
+                    o.textContent = `${moisNoms[m.mois - 1]} ${m.annee}`;
+                    selMois.appendChild(o);
+                });
+                
+                // Pré-sélectionner le mois actuel si dans l'année scolaire
+                const moisActuelValue = `${annee}-${String(moisActuel + 1).padStart(2, '0')}`;
+                if (selMois.querySelector(`option[value="${moisActuelValue}"]`)) {
+                    selMois.value = moisActuelValue;
+                }
+            }
+            
             console.log("✅ Filtres:", classes.length, "classes");
         }
         
         window.clearFilters = function() {
             document.getElementById('filterClasse').value = '';
-            document.getElementById('filterDate').value = '';
             document.getElementById('filterMois').value = '';
             document.getElementById('filterEleve').value = '';
             // Afficher message d'attente au lieu de charger
-            document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Sélectionnez vos filtres</h3><p>Choisissez une classe, un mois ou une date, puis cliquez sur 🔍 Rechercher</p></div>';
+            document.getElementById('sessionsList').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Sélectionnez vos filtres</h3><p>Choisissez une classe et/ou un mois, puis cliquez sur 🔍 Rechercher</p></div>';
             document.getElementById('searchHint').style.display = 'block';
         };
         
@@ -603,7 +652,6 @@
         // CHARGER SESSIONS
         window.chargerSessions = async function() {
             const fClasse = document.getElementById('filterClasse').value;
-            const fDate = document.getElementById('filterDate').value;
             const fMois = document.getElementById('filterMois').value; // Format: YYYY-MM
             const container = document.getElementById('sessionsList');
             
@@ -624,9 +672,6 @@
                     const snap = await getDocs(collection(db, "resultats", eleve.userCode, "suivi"));
                     snap.forEach(docSnap => {
                         const data = docSnap.data();
-                        
-                        // Filtre par date exacte
-                        if (fDate && data.date !== fDate) return;
                         
                         // Filtre par mois (YYYY-MM)
                         if (fMois && !data.date.startsWith(fMois)) return;
