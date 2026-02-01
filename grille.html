@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Grille PSE - V16 (Bug Fix)</title>
+    <title>Grille PSE - V17 (Confort Correction + Snapshot)</title>
 
     <script src="data_eleves.js"></script>
     <script src="data_commentaires_competences.js"></script>
@@ -18,7 +18,7 @@
         .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
         .action-btn.save-btn:hover { background: #bbf7d0; }
         .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
-        
+
         #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #16a34a; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.85em; opacity: 0; transition: opacity 0.5s; font-weight: bold; }
 
         .status-banner { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; }
@@ -57,8 +57,14 @@
         .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
         .total-note { font-weight: 900; font-size: 1.4em; color: #d9534f; display: block; line-height: 1.2; }
 
-        .rep-eleve-box { background:#f0f9ff; padding:5px; border-radius:4px; border-left:3px solid #3498db; margin-bottom:3px; color:#0f172a; text-align: left; font-size: 0.9em; }
+        .rep-eleve-box { background:#f0f9ff; padding:8px; border-radius:6px; border-left:3px solid #3498db; margin-bottom:6px; color:#0f172a; text-align: left; font-size: 0.9em; }
         .rep-prof-box { color:#166534; font-size:0.85em; padding:2px; font-style:italic; text-align: left; border-top: 1px dashed #ccc; margin-top:2px; }
+
+        .q-meta { text-align:left; font-size:0.78em; color:#475569; margin-bottom:6px; line-height:1.25; }
+        .q-meta .pill { display:inline-block; padding:2px 6px; border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; margin-right:6px; }
+        .q-text { text-align:left; font-weight:700; color:#0f172a; margin:4px 0 6px 0; }
+        .q-corrige { text-align:left; font-size:0.85em; color:#166534; margin-top:6px; padding-top:6px; border-top:1px dashed #cbd5e1; }
+        .muted { color:#64748b; font-style:italic; }
 
         .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.7em; padding: 3px 6px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #aaa; transition:0.2s; }
         .level-btn:hover { background: #eee; color:#333; }
@@ -195,7 +201,7 @@
                 <th class="correction-th" onclick="sortTable(0)" style="width:40px;">Q° ⇅</th>
                 <th class="correction-th" onclick="sortTable(1)" style="width:40px;">C ⇅</th>
                 <th class="correction-th" onclick="sortTable(2)" style="width:100px;">Niveau ⇅</th>
-                <th class="correction-th">Réponse Élève / Corrigé</th>
+                <th class="correction-th">Question / Réponse Élève / Corrigé</th>
                 <th class="correction-th" style="width:30%;">Commentaires</th>
             </tr>
         </thead>
@@ -204,7 +210,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -220,7 +226,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
     const googleProvider = new GoogleAuthProvider();
-    
+
     let currentUser = null;
     let CURRENT_TARGET_DIV = null;
     let CURRENT_BLUEPRINT = null;
@@ -229,7 +235,11 @@
     let CURRENT_COPY = null;
     let CURRENT_EVALUATION = null;
     let IS_SAVED = true;
+
     const comps = ['C1','C2','C3','C4','C5','C6'];
+
+    // Stocke un snapshot lisible par qid (question, contexte, réponses décodées...)
+    let CURRENT_QMETA = {};
 
     window.autoResize = autoResize;
     window.openAppreciationBank = openAppreciationBank;
@@ -244,7 +254,6 @@
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
         updateAuthButton();
-        if (user) console.log("✅ Prof connecté:", user.email);
     });
 
     function updateAuthButton() {
@@ -266,12 +275,9 @@
         try {
             const result = await signInWithPopup(auth, googleProvider);
             currentUser = result.user;
-            console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
-            alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
             updateAuthButton();
             updateStatusBanner();
         } catch (error) {
-            console.error("❌ Erreur:", error);
             alert("Erreur: " + error.message);
         }
     }
@@ -284,7 +290,7 @@
         const text = document.getElementById('statusText');
         const dateEl = document.getElementById('statusDate');
         banner.classList.remove('saved', 'not-saved', 'auth-required');
-        
+
         if (!currentUser) {
             banner.classList.add('auth-required');
             text.innerHTML = '🔐 Connectez-vous pour enregistrer';
@@ -304,14 +310,6 @@
         }
     }
 
-    function showSaveMessage(success = true) {
-        const msg = document.getElementById('saveMessage');
-        msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
-        msg.style.background = success ? '#16a34a' : '#dc2626';
-        msg.style.opacity = 1;
-        setTimeout(() => msg.style.opacity = 0, 2000);
-    }
-
     function extractQuestionsFromBlueprint(blueprint) {
         if (Array.isArray(blueprint?.questions)) return blueprint.questions;
         const questions = [];
@@ -326,6 +324,140 @@
         return questions;
     }
 
+    function escapeHtml(str) {
+        return String(str ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function normalizeOptions(q) {
+        const raw = q?.options || q?.choices || q?.propositions || q?.items || null;
+        if (!raw) return [];
+        if (Array.isArray(raw)) {
+            return raw.map((it, i) => {
+                if (it && typeof it === "object") {
+                    const v = it.value ?? it.valeur ?? it.id ?? it.key ?? i;
+                    const l = it.label ?? it.texte ?? it.text ?? it.titre ?? String(v);
+                    return { value: String(v), label: String(l) };
+                }
+                return { value: String(it), label: String(it) };
+            });
+        }
+        if (typeof raw === "object") {
+            // format {value:label}
+            return Object.entries(raw).map(([k,v]) => ({ value: String(k), label: String(v) }));
+        }
+        return [];
+    }
+
+    function optionLabelFromValue(options, value) {
+        const v = String(value);
+        const hit = options.find(o => String(o.value) === v);
+        return hit ? hit.label : null;
+    }
+
+    function decodeVF(val) {
+        if (val === true || val === "true" || val === 1 || val === "1" || val === "V" || val === "v" || val === "vrai" || val === "Vrai") return "Vrai";
+        if (val === false || val === "false" || val === 0 || val === "0" || val === "F" || val === "f" || val === "faux" || val === "Faux") return "Faux";
+        return null;
+    }
+
+    function decodeValue(q, val) {
+        if (val === undefined || val === null || val === "") return null;
+
+        // Tableaux (multi)
+        if (Array.isArray(val)) {
+            const decoded = val.map(v => decodeValue(q, v)).filter(x => x);
+            return decoded.length ? decoded.join("\n• ") : null;
+        }
+
+        // Bool VF
+        const vf = decodeVF(val);
+        const type = String(q?.type || q?.kind || "").toLowerCase();
+        if (vf && (type.includes("vf") || type.includes("vrai") || type.includes("truefalse"))) return vf;
+
+        // Options
+        const options = normalizeOptions(q);
+        if (options.length) {
+            // si val est index numérique
+            if (typeof val === "number") {
+                const o = options[val];
+                if (o) return o.label;
+            }
+            const lbl = optionLabelFromValue(options, val);
+            if (lbl) return lbl;
+        }
+
+        // Objet {value,label}
+        if (typeof val === "object") {
+            const v = val.value ?? val.valeur ?? val.id ?? null;
+            const l = val.label ?? val.texte ?? val.text ?? null;
+            if (l) return String(l);
+            if (v !== null) return String(v);
+        }
+
+        // Texte brut
+        return String(val);
+    }
+
+    function getReponseEleveVal(reponses, q, idx) {
+        if (!reponses) return null;
+        const qid = q?.qid;
+        const label = q?.label || ("Q" + (idx + 1));
+
+        if (qid && reponses[qid] !== undefined) return reponses[qid];
+        if (label && reponses[label] !== undefined) return reponses[label];
+        if (label && reponses["Q" + label] !== undefined) return reponses["Q" + label];
+        return null;
+    }
+
+    function getQuestionText(q, idx) {
+        return q?.questionText || q?.enonce || q?.question || q?.texte || q?.titre || ("Question " + (idx + 1));
+    }
+
+    function getContextText(q) {
+        return q?.contexte || q?.context || q?.section || q?.bloc || q?.phase || q?.source || "";
+    }
+
+    function getCorrigeTexte(q) {
+        return q?.corrigeTexte || q?.explication || q?.corrige || q?.solution || "";
+    }
+
+    function decodeExpected(q) {
+        const expected = q?.reponseAttendue ?? q?.attendu ?? q?.expected ?? null;
+        if (expected === null || expected === undefined || expected === "") return null;
+        return decodeValue(q, expected);
+    }
+
+    function buildMeta(q, idx, competence, label, qid, bareme, repRaw) {
+        const qText = getQuestionText(q, idx);
+        const ctx = getContextText(q);
+        const type = String(q?.type || q?.kind || "").toLowerCase();
+        const repLabel = decodeValue(q, repRaw);
+        const expLabel = decodeExpected(q);
+        const corrigeTexte = getCorrigeTexte(q);
+        const options = normalizeOptions(q);
+
+        return {
+            qid,
+            label,
+            competence,
+            bareme,
+            type: type || "",
+            context: ctx || "",
+            questionText: qText || "",
+            options: options,
+            reponseEleveRaw: repRaw ?? null,
+            reponseEleveLabel: repLabel ?? null,
+            reponseAttendueRaw: (q?.reponseAttendue ?? q?.attendu ?? q?.expected ?? null),
+            reponseAttendueLabel: expLabel ?? null,
+            corrigeTexte: corrigeTexte || ""
+        };
+    }
+
     function collecterDonneesCorrection() {
         const data = {
             savedAt: new Date().toISOString(),
@@ -338,7 +470,8 @@
             copyDocId: CURRENT_DOC_ID,
             appreciation: document.getElementById('appreciationArea').value || "",
             competences: {},
-            questions: {}
+            questions: {},
+            snapshotVersion: 1
         };
 
         comps.forEach(c => {
@@ -355,9 +488,24 @@
         document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
             const qid = row.dataset.qid || `q_${idx}`;
             const commentDiv = row.querySelector('.editable-div');
-            data.questions[qid] = { 
-                level: row.dataset.level || "", 
-                comment: commentDiv ? commentDiv.innerText.trim() : "" 
+            const meta = CURRENT_QMETA?.[qid] || null;
+
+            data.questions[qid] = {
+                level: row.dataset.level || "",
+                comment: commentDiv ? commentDiv.innerText.trim() : "",
+
+                // snapshot lisible (sans casser l'ancien format)
+                context: meta?.context || "",
+                questionText: meta?.questionText || "",
+                label: meta?.label || row.cells?.[0]?.innerText || "",
+                competence: meta?.competence || row.dataset.comp || "",
+                bareme: meta?.bareme ?? null,
+                type: meta?.type || "",
+                reponseEleveRaw: meta?.reponseEleveRaw ?? null,
+                reponseEleveLabel: meta?.reponseEleveLabel ?? null,
+                reponseAttendueRaw: meta?.reponseAttendueRaw ?? null,
+                reponseAttendueLabel: meta?.reponseAttendueLabel ?? null,
+                corrigeTexte: meta?.corrigeTexte || ""
             };
         });
 
@@ -365,17 +513,8 @@
     }
 
     window.sauvegarderBrouillon = async function() {
-        if (!currentUser) {
-            alert("🔐 Connectez-vous d'abord !");
-            connexionProf();
-            return;
-        }
-        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
-            alert("Erreur : Code élève manquant.");
-            return;
-        }
-
-        console.log("💾 Sauvegarde brouillon... Élève:", CURRENT_ELEVE_CODE);
+        if (!currentUser) { connexionProf(); return; }
+        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
 
         try {
             const brouillon = collecterDonneesCorrection();
@@ -389,28 +528,15 @@
             CURRENT_EVALUATION = brouillon;
             IS_SAVED = true;
             updateStatusBanner();
-            
-            afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
-            
-            console.log("✅ Brouillon sauvegardé!", `resultats/${CURRENT_ELEVE_CODE}/brouillons/${brouillonDocId}`);
-
+            afficherConfirmation("💾", "Brouillon sauvegardé !", "Enregistré. L'élève ne voit pas encore la correction.", "#0369a1");
         } catch (e) {
-            console.error("❌ Erreur:", e);
-            showSaveMessage(false);
             alert("Erreur:\n\n" + e.message);
         }
     }
 
     window.publierCorrection = async function() {
-        if (!currentUser) {
-            alert("🔐 Connectez-vous d'abord !");
-            connexionProf();
-            return;
-        }
-        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
-            alert("Erreur : Code élève manquant.");
-            return;
-        }
+        if (!currentUser) { connexionProf(); return; }
+        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
 
         const typePublication = document.getElementById('publishType').value;
         let noteFinale, statut, messageConfirm, iconConfirm, couleur;
@@ -426,34 +552,29 @@
             case "nn":
                 noteFinale = "NN";
                 statut = "non_noté";
-                messageConfirm = "Copie publiée comme 'Non noté'";
+                messageConfirm = "Copie publiée comme Non noté";
                 iconConfirm = "⚠️";
                 couleur = "#b45309";
                 break;
             case "absent":
                 noteFinale = "ABS";
                 statut = "absent";
-                messageConfirm = "Copie marquée comme 'Absent'";
+                messageConfirm = "Copie marquée comme Absent";
                 iconConfirm = "🚫";
                 couleur = "#dc2626";
                 break;
         }
 
-        if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) {
-            return;
-        }
-
-        console.log("✅ Publication... Élève:", CURRENT_ELEVE_CODE, "Type:", typePublication);
+        if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) return;
 
         try {
             const evaluation = collecterDonneesCorrection();
             evaluation.note_finale = noteFinale;
             evaluation.statut = statut;
             evaluation.publie = true;
-            
-            if (typePublication === "nn") {
-                evaluation.nonNote = true;
-            } else if (typePublication === "absent") {
+
+            if (typePublication === "nn") evaluation.nonNote = true;
+            if (typePublication === "absent") {
                 evaluation.absent = true;
                 evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
             }
@@ -461,9 +582,7 @@
             const evalDocId = evaluation.devoirId + "_eval";
             await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
 
-            if (typePublication === "note") {
-                document.getElementById('finalNote').style.color = "#d9534f";
-            } else if (typePublication === "nn") {
+            if (typePublication === "nn") {
                 document.getElementById('finalNote').innerText = "Non noté";
                 document.getElementById('finalNote').style.color = "#b45309";
             } else if (typePublication === "absent") {
@@ -474,14 +593,8 @@
             CURRENT_EVALUATION = evaluation;
             IS_SAVED = true;
             updateStatusBanner();
-            
-            afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
-            
-            console.log("✅ Publié!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
-
+            afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir une correction lisible.`, couleur);
         } catch (e) {
-            console.error("❌ Erreur:", e);
-            showSaveMessage(false);
             alert("Erreur:\n\n" + e.message);
         }
     }
@@ -500,44 +613,45 @@
 
     function loadExistingCorrection(correction) {
         if (!correction) return;
-        
+
         if (correction.nonNote || correction.note_finale === "NN") {
             document.getElementById('finalNote').innerText = "Non noté";
             document.getElementById('finalNote').style.color = "#b45309";
         }
-        
+
         if (correction.appreciation) {
             const area = document.getElementById('appreciationArea');
             area.value = correction.appreciation;
             autoResize(area);
         }
+
         if (correction.competences) {
             for (const c in correction.competences) {
                 const ptsEl = document.getElementById(`pts_${c}`);
                 if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
             }
         }
+
         if (correction.questions) {
             document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
                 const qid = row.dataset.qid || `q_${idx}`;
                 const qData = correction.questions[qid];
-                if (qData) {
-                    if (qData.level) {
-                        row.dataset.level = qData.level;
-                        const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
-                        if (btn) btn.classList.add('active');
-                    }
-                    if (qData.comment) {
-                        const commentDiv = row.querySelector('.editable-div');
-                        if (commentDiv) commentDiv.innerText = qData.comment;
-                    }
+                if (!qData) return;
+
+                if (qData.level) {
+                    row.dataset.level = qData.level;
+                    const btn = row.querySelector(`.level-btn.${String(qData.level).toLowerCase()}`);
+                    if (btn) btn.classList.add('active');
+                }
+                if (qData.comment) {
+                    const commentDiv = row.querySelector('.editable-div');
+                    if (commentDiv) commentDiv.innerText = qData.comment;
                 }
             });
         }
+
         comps.forEach(c => updateCounters(c));
-        if (!correction.nonNote && correction.note_finale !== "NN") {
-            calculateTotal();
-        }
+        if (!correction.nonNote && correction.note_finale !== "NN") calculateTotal();
         IS_SAVED = true;
     }
 
@@ -567,56 +681,14 @@
         setTimeout(calculateTotal, 100);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // ⭐ FONCTION CORRIGÉE - V16 - Recherche des réponses par qid EXACT
-    // ═══════════════════════════════════════════════════════════════════
-    function getReponseEleve(reponses, q) {
-        if (!reponses) return "<i>Non répondu</i>";
-        
-        const qid = q?.qid;    // Le VRAI qid du blueprint (ex: "q_6" pour François)
-        const label = q?.label;
-        
-        // 1. PRIORITÉ : Chercher avec le qid EXACT du blueprint
-        if (qid && reponses[qid] !== undefined) {
-            const val = reponses[qid];
-            if (Array.isArray(val)) {
-                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
-            }
-            return String(val);
-        }
-        
-        // 2. Fallback : Chercher avec le label (anciens formats)
-        if (label && reponses[label] !== undefined) {
-            const val = reponses[label];
-            if (Array.isArray(val)) {
-                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
-            }
-            return String(val);
-        }
-        
-        // 3. Fallback : "Q" + label
-        if (label && reponses["Q" + label] !== undefined) {
-            const val = reponses["Q" + label];
-            if (Array.isArray(val)) {
-                return val.map(v => String(v).trim()).filter(v => v).join('<br>• ');
-            }
-            return String(val);
-        }
-        
-        // 4. PAS TROUVÉ = Non répondu (PAS de fallback dangereux !)
-        return "<i>Non répondu</i>";
-    }
-
     function renderCorrection(blueprint, reponses) {
+        CURRENT_QMETA = {};
         const tbody = document.getElementById('correctionTable').querySelector('tbody');
         tbody.innerHTML = "";
         let maxMap = {}, qMap = {}, activeComps = [];
 
         const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
-        
-        console.log("📋 Blueprint questions:", list.length);
-        console.log("📦 Réponses reçues:", Object.keys(reponses || {}));
-        
+
         list.forEach((q, idx) => {
             const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
             const bareme = Number(q?.bareme) || 0;
@@ -628,19 +700,26 @@
             qMap[competence] = qMap[competence] || [];
             qMap[competence].push(label);
 
+            const repRaw = getReponseEleveVal(reponses, q, idx);
+            const meta = buildMeta(q, idx, competence, label, qid, bareme, repRaw);
+            CURRENT_QMETA[qid] = meta;
+
+            const ctxHtml = meta.context ? `<span class="pill">📌 ${escapeHtml(meta.context)}</span>` : "";
+            const typeHtml = meta.type ? `<span class="pill">Type: ${escapeHtml(meta.type)}</span>` : `<span class="pill">Type: n/a</span>`;
+            const barHtml = (meta.bareme !== null) ? `<span class="pill">Barème: ${escapeHtml(meta.bareme)}</span>` : "";
+
+            const qTextHtml = escapeHtml(meta.questionText || "");
+            const repEleve = meta.reponseEleveLabel ? escapeHtml(meta.reponseEleveLabel).replaceAll("\n", "<br>• ") : `<span class="muted">Non répondu</span>`;
+            const attendu = meta.reponseAttendueLabel ? escapeHtml(meta.reponseAttendueLabel).replaceAll("\n", "<br>• ") : `<span class="muted">N/A</span>`;
+            const corrigeTxt = meta.corrigeTexte ? escapeHtml(meta.corrigeTexte) : "";
+
             const row = tbody.insertRow();
             row.dataset.comp = competence;
             row.dataset.level = "";
             row.dataset.qid = qid;
 
-            // ⭐ CORRECTION V16 : Utiliser la nouvelle fonction
-            const repEleve = getReponseEleve(reponses, q);
-            
-            // Debug
-            console.log(`Q${label} (${qid}):`, reponses?.[qid] ? "✅ Trouvé" : "❌ Non trouvé");
-
             row.innerHTML = `
-                <td style="font-weight:bold">${label}</td>
+                <td style="font-weight:bold">${escapeHtml(label)}</td>
                 <td><span class="badge ${competence.toLowerCase()}">${competence}</span></td>
                 <td>
                     <div style="display:flex; gap:2px; justify-content:center;">
@@ -651,8 +730,23 @@
                     </div>
                 </td>
                 <td style="text-align:left">
-                    <div class="rep-eleve-box"><strong>👤 Élève :</strong> ${repEleve}</div>
-                    <div class="rep-prof-box">🎯 ${q?.reponseAttendue || "N/A"}</div>
+                    <div class="q-meta">
+                        ${ctxHtml}
+                        <span class="pill">QID: ${escapeHtml(qid)}</span>
+                        ${typeHtml}
+                        ${barHtml}
+                    </div>
+                    <div class="q-text">❓ ${qTextHtml}</div>
+
+                    <div class="rep-eleve-box">
+                        <strong>👤 Réponse élève :</strong><br>${repEleve}
+                    </div>
+
+                    <div class="rep-prof-box">
+                        🎯 Attendu : ${attendu}
+                    </div>
+
+                    ${corrigeTxt ? `<div class="q-corrige">🧾 Explication : ${corrigeTxt}</div>` : ``}
                 </td>
                 <td><div class="editable-div" contenteditable="true" placeholder="💡 Commentaire..." oninput="markUnsaved()"></div></td>
             `;
@@ -756,7 +850,7 @@
                     phrases.forEach(txt => {
                         const d = document.createElement('div');
                         d.className = "comment-item";
-                        d.innerHTML = `<strong>(${comp})</strong> ${txt}`;
+                        d.innerHTML = `<strong>(${comp})</strong> ${escapeHtml(txt)}`;
                         d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
                         list.appendChild(d);
                     });
@@ -790,13 +884,12 @@
         rows.forEach(r => table.appendChild(r));
     }
 
-    function resetNewStudent() { 
+    function resetNewStudent() {
         if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
         window.close();
     }
 
     async function init() {
-        console.log("🚀 Grille V16 (Bug Fix) - Démarrage...");
         initSummary([], {});
 
         const rawData = localStorage.getItem("cockpit_transfert");
@@ -811,21 +904,17 @@
             const copyFromStorage = JSON.parse(rawData);
             CURRENT_DOC_ID = copyFromStorage.id;
             CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
-            
+
             if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
                 const parts = copyFromStorage.path.split('/');
                 if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
             }
 
-            console.log("📄 ID:", CURRENT_DOC_ID, "| Élève:", CURRENT_ELEVE_CODE);
-
             let docSnap = null;
             if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
-                console.log("🔄 Nouvelle structure:", copyFromStorage.path);
                 docSnap = await getDoc(doc(db, copyFromStorage.path));
             }
             if (!docSnap || !docSnap.exists()) {
-                console.log("🔄 Fallback devoirs_rendus");
                 docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -851,15 +940,9 @@
 
             CURRENT_BLUEPRINT = await resp.json();
             document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
-            
-            // ⭐ Debug : Afficher le mapping qid → label
-            console.log("📋 Mapping Blueprint:");
-            extractQuestionsFromBlueprint(CURRENT_BLUEPRINT).forEach(q => {
-                console.log(`  ${q.qid} → label "${q.label}"`);
-            });
-            console.log("📦 Clés réponses élève:", Object.keys(CURRENT_COPY.reponses || {}));
-            
-            renderCorrection({ questions: extractQuestionsFromBlueprint(CURRENT_BLUEPRINT) }, CURRENT_COPY.reponses || {});
+
+            const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
+            renderCorrection({ questions }, CURRENT_COPY.reponses || {});
 
             if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
                 try {
@@ -873,16 +956,15 @@
                         loadExistingCorrection(CURRENT_COPY.correction);
                         IS_SAVED = true;
                     }
-                } catch(e) { IS_SAVED = false; }
+                } catch(e) {
+                    IS_SAVED = false;
+                }
             }
-            
-            updateStatusBanner();
-            console.log("✅ Grille V16 prête !");
 
+            updateStatusBanner();
         } catch (e) {
             document.getElementById('statusText').innerHTML = "❌ " + e.message;
             document.getElementById('statusBanner').classList.add('not-saved');
-            console.error("❌", e);
             alert("Erreur:\n\n" + e.message);
         }
     }
