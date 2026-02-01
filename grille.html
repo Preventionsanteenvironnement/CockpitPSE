@@ -1,235 +1,500 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Grille PSE - V16 (Confort correction)</title>
+  <meta charset="UTF-8" />
+  <title>Grille PSE - V17 (Confort correction)</title>
 
-    <script src="data_eleves.js"></script>
-    <script src="data_commentaires_competences.js"></script>
-    <script src="data_appreciation.js"></script>
+  <script src="data_eleves.js"></script>
+  <script src="data_commentaires_competences.js"></script>
+  <script src="data_appreciation.js"></script>
 
-    <style>
-        @page { size: A4; margin: 8mm; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 210mm; margin: 0 auto; padding: 10px 15px; background-color: #fff; color: #333; font-size: 0.9em; }
+  <style>
+    @page { size: A4; margin: 8mm; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 10px 15px;
+      background-color: #fff;
+      color: #333;
+      font-size: 0.9em;
+    }
 
-        .tools-container { position: fixed; top: 10px; right: 10px; z-index: 1000; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; max-width: 70vw; }
-        .action-btn { background: rgba(255, 255, 255, 0.9); border: 1px solid #ccc; font-size: 1.05em; cursor: pointer; padding: 5px 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .action-btn:hover { background: #f0f0f0; }
-        .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
-        .action-btn.save-btn:hover { background: #bbf7d0; }
-        .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+    .tools-container {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 95vw;
+    }
 
-        #saveMessage { position: fixed; bottom: 10px; right: 10px; background: #16a34a; color: white; padding: 8px 15px; border-radius: 6px; font-size: 0.85em; opacity: 0; transition: opacity 0.5s; font-weight: bold; }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #ccc;
+      font-size: 1.05em;
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+      user-select: none;
+      white-space: nowrap;
+    }
+    .action-btn:hover { background: #f0f0f0; }
 
-        .status-banner { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; }
-        .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
-        .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
-        .status-banner.auth-required { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+    .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
+    .action-btn.save-btn:hover { background: #bbf7d0; }
+    .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+    .action-btn.toggle-btn { background: #fff7ed; border-color: #fb923c; color: #9a3412; }
+    .action-btn.toggle-btn.active { background: #ffedd5; border-color: #f97316; color: #7c2d12; }
 
-        h1 { text-align: center; color: #d9534f; margin: 0 0 5px 0; border-bottom: 2px solid #d9534f; padding-bottom: 5px; font-size: 1.4em; }
+    #saveMessage {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: #16a34a;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 6px;
+      font-size: 0.85em;
+      opacity: 0;
+      transition: opacity 0.5s;
+      font-weight: bold;
+      z-index: 3000;
+    }
 
-        .header-row { display: flex; gap: 10px; margin-bottom: 10px; background-color: #f8f9fa; padding: 5px 10px; border-radius: 6px; border: 1px solid #ddd; }
-        .input-group { display: flex; flex-direction: column; flex-grow: 1; }
-        .input-group label { font-size: 0.75em; color: #666; font-weight: bold; }
-        .input-group input { padding: 3px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95em; font-weight: bold; color: #0f172a; }
+    .status-banner {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      color: #92400e;
+      padding: 8px 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85em;
+    }
+    .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
+    .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+    .status-banner.auth-required { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
 
-        .appreciation-box { margin-bottom: 10px; position: relative; }
-        .appreciation-box label { font-weight: bold; color: #2e7bb6; cursor: pointer; text-decoration: underline; font-size: 0.85em; display:flex; align-items:center; gap:5px; margin-bottom: 3px;}
-        .appreciation-box textarea { width: 100%; min-height: 50px; padding: 8px; border: 2px solid #2e7bb6; border-radius: 4px; background-color: #f0f8ff; resize: none; font-family: inherit; font-size: 0.9em; overflow-y: hidden; box-sizing: border-box; }
+    h1 {
+      text-align: center;
+      color: #d9534f;
+      margin: 0 0 5px 0;
+      border-bottom: 2px solid #d9534f;
+      padding-bottom: 5px;
+      font-size: 1.4em;
+    }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-        th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; vertical-align: middle; }
-        .thead-dark { background-color: #333; color: white; }
-        .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.8em; }
-        .correction-th { background-color: #d9534f; color: white; cursor: pointer; user-select: none; font-size: 0.85em; }
+    .header-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      background-color: #f8f9fa;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+    }
+    .input-group { display: flex; flex-direction: column; flex-grow: 1; }
+    .input-group label { font-size: 0.75em; color: #666; font-weight: bold; }
+    .input-group input {
+      padding: 3px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.95em;
+      font-weight: bold;
+      color: #0f172a;
+    }
 
-        .badge { display: inline-block; color: white; padding: 2px 0; width: 25px; text-align: center; border-radius: 4px; font-weight: bold; font-size: 0.8em; }
-        .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; }
-        .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
+    .appreciation-box { margin-bottom: 10px; position: relative; }
+    .appreciation-box label {
+      font-weight: bold;
+      color: #2e7bb6;
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 0.85em;
+      display:flex;
+      align-items:center;
+      gap:5px;
+      margin-bottom: 3px;
+    }
+    .appreciation-box textarea {
+      width: 100%;
+      min-height: 50px;
+      padding: 8px;
+      border: 2px solid #2e7bb6;
+      border-radius: 6px;
+      background-color: #f0f8ff;
+      resize: none;
+      font-family: inherit;
+      font-size: 0.9em;
+      overflow-y: hidden;
+      box-sizing: border-box;
+    }
 
-        .stat-counters { font-size: 0.75em; color: #666; margin-top: 3px; display: flex; justify-content: center; gap: 8px; background: #f9f9f9; padding: 2px; border-radius: 4px; }
-        .score-input { width: 40px; text-align: center; font-weight: bold; border: 1px solid #ccc; padding: 2px; border-radius: 3px; font-size: 1em; background: #fff; }
-        .max-input { width: 35px; text-align: center; border: none; font-weight:bold; color: #666; font-size: 0.9em; background: transparent; }
-        input[type="radio"] { transform: scale(1.1); cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+    th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; vertical-align: middle; }
 
-        tfoot { border-top: 2px solid #333; background-color: #fffef0; }
-        .total-label { text-align: right; font-weight: bold; font-size: 1.1em; padding-right: 15px; }
-        .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
-        .total-note { font-weight: 900; font-size: 1.4em; color: #d9534f; display: block; line-height: 1.2; }
+    .thead-dark { background-color: #333; color: white; }
+    .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.8em; }
+    .correction-th { background-color: #d9534f; color: white; cursor: pointer; user-select: none; font-size: 0.85em; }
 
-        .rep-eleve-box { background:#f0f9ff; padding:8px; border-radius:8px; border-left:3px solid #3498db; margin:6px 0 6px 0; color:#0f172a; text-align: left; font-size: 0.92em; }
-        .rep-prof-box { color:#166534; font-size:0.9em; padding:8px; font-style:italic; text-align: left; border:1px dashed #cbd5e1; border-radius:8px; margin:6px 0 0 0; background:#f8fafc; }
+    .badge {
+      display: inline-block;
+      color: white;
+      padding: 2px 0;
+      width: 25px;
+      text-align: center;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8em;
+    }
+    .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; }
+    .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
 
-        .level-btn { border: 1px solid #ddd; background: #f9f9f9; font-size: 0.7em; padding: 3px 6px; cursor: pointer; border-radius: 3px; font-weight: bold; color: #aaa; transition:0.2s; }
-        .level-btn:hover { background: #eee; color:#333; }
-        .level-btn.active { border: 2px solid #333; color: #fff; transform: scale(1.1); }
-        .level-btn.active.nt { background: #7f8c8d; border-color: #7f8c8d; }
-        .level-btn.active.i { background: #d9534f; border-color: #d9534f; }
-        .level-btn.active.a { background: #f0c05a; border-color: #f0c05a; }
-        .level-btn.active.m { background: #5cb85c; border-color: #5cb85c; }
+    .stat-counters {
+      font-size: 0.75em;
+      color: #666;
+      margin-top: 3px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      background: #f9f9f9;
+      padding: 2px;
+      border-radius: 4px;
+    }
 
-        .editable-div { min-height: 25px; text-align: left; outline: none; padding: 6px; font-size: 0.9em; border: 1px dashed #ccc; cursor: text; background: #fff; border-radius: 8px; }
-        .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
-        .editable-div:empty::before { content: attr(placeholder); color: #ccc; font-style: italic; }
+    .score-input {
+      width: 46px;
+      text-align: center;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      padding: 2px;
+      border-radius: 4px;
+      font-size: 1em;
+      background: #fff;
+    }
+    .max-input {
+      width: 42px;
+      text-align: center;
+      border: none;
+      font-weight:bold;
+      color: #666;
+      font-size: 0.9em;
+      background: transparent;
+    }
 
-        .bottom-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; gap: 10px; }
-        .legend-box { font-size: 0.75em; color: #555; font-style: italic; }
+    input[type="radio"] { transform: scale(1.1); cursor: pointer; }
 
-        .revision-box { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; padding: 5px 10px; }
-        .revision-text { font-size: 0.75em; color: #475569; text-align: right; line-height: 1.2; }
-        .qr-img { height: 40px; width: 40px; mix-blend-mode: multiply; }
+    tfoot { border-top: 2px solid #333; background-color: #fffef0; }
+    .total-label { text-align: right; font-weight: bold; font-size: 1.1em; padding-right: 15px; }
+    .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
+    .total-note { font-weight: 900; font-size: 1.4em; color: #d9534f; display: block; line-height: 1.2; }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-box { background: white; width: 650px; max-width: 95%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column; max-height: 85vh; }
-        .modal-header { padding: 10px 15px; border-bottom: 1px solid #eee; background: #f8f9fa; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #2e7bb6; }
-        .modal-body { padding: 0; overflow-y: auto; }
-        .bank-title { background: #f1f5f9; padding: 5px 15px; font-size: 0.8em; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #eee; }
-        .comment-item { padding: 8px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.9em; transition: background 0.1s; }
-        .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
+    .level-btn {
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      font-size: 0.7em;
+      padding: 3px 6px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-weight: bold;
+      color: #aaa;
+      transition: 0.15s;
+      user-select: none;
+    }
+    .level-btn:hover { background: #eee; color:#333; }
+    .level-btn.active { border: 2px solid #333; color: #fff; transform: scale(1.06); }
+    .level-btn.active.nt { background: #7f8c8d; border-color: #7f8c8d; }
+    .level-btn.active.i  { background: #d9534f; border-color: #d9534f; }
+    .level-btn.active.a  { background: #f0c05a; border-color: #f0c05a; }
+    .level-btn.active.m  { background: #5cb85c; border-color: #5cb85c; }
 
-        /* ===== PATCH CONFORT : Contexte question ===== */
-        .q-context{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:8px 10px;margin-bottom:6px}
-        .q-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:.78em;color:#7c2d12;margin-bottom:6px}
-        .q-pill{background:#fed7aa;border:1px solid #fb923c;border-radius:999px;padding:2px 8px;font-weight:700}
-        .q-text{font-size:.95em;color:#111827;font-weight:800;line-height:1.25}
-        .q-subtext{font-size:.85em;color:#374151;margin-top:4px;line-height:1.25}
-        .hide-attendus .rep-prof-box{display:none !important}
-        .hide_meta .q-meta{display:none !important}
+    .editable-div {
+      min-height: 25px;
+      text-align: left;
+      outline: none;
+      padding: 6px;
+      font-size: 0.9em;
+      border: 1px dashed #ccc;
+      cursor: text;
+      background: #fff;
+      border-radius: 6px;
+      line-height: 1.25;
+      white-space: pre-wrap;
+    }
+    .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
+    .editable-div:empty::before { content: attr(placeholder); color: #ccc; font-style: italic; }
 
-        @media print {
-            .no-print { display: none !important; }
-            body { padding: 0; margin: 0; background: white; }
-            .status-banner { display: none !important; }
-            .rep-prof-box { display: none; }
-            .header-row, .revision-box { border: 1px solid #eee; }
-            .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
-            textarea { border: 1px solid #333 !important; background: transparent !important; }
-            .editable-div { border: none; }
-            .score-input, .max-input { border: none; text-align: right; width: auto; font-weight: bold; }
-            tr[style*="display: none"] { display: none !important; }
-            .q-context{background:#fff;border:1px solid #ddd}
-        }
-    </style>
+    .bottom-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .legend-box { font-size: 0.75em; color: #555; font-style: italic; }
+
+    .revision-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 5px 10px;
+    }
+    .revision-text { font-size: 0.75em; color: #475569; text-align: right; line-height: 1.2; }
+    .qr-img { height: 40px; width: 40px; mix-blend-mode: multiply; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-box {
+      background: white;
+      width: 650px;
+      max-width: 95%;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      max-height: 85vh;
+    }
+    .modal-header {
+      padding: 10px 15px;
+      border-bottom: 1px solid #eee;
+      background: #f8f9fa;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      color: #2e7bb6;
+    }
+    .modal-body { padding: 0; overflow-y: auto; }
+    .bank-title {
+      background: #f1f5f9;
+      padding: 5px 15px;
+      font-size: 0.8em;
+      font-weight: bold;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-top: 1px solid #eee;
+    }
+    .comment-item {
+      padding: 8px 15px;
+      border-bottom: 1px solid #f9f9f9;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: background 0.1s;
+      line-height: 1.25;
+      white-space: pre-wrap;
+    }
+    .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
+
+    .qa-stack { text-align: left; }
+    .qa-block {
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      line-height: 1.25;
+      white-space: normal;
+    }
+    .qa-title {
+      font-weight: 800;
+      margin: 0 0 6px 0;
+      font-size: 0.95em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75em;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .pill.q { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+    .pill.e { background: #ecfeff; border-color: #67e8f9; color: #155e75; }
+    .pill.a { background: #f0fdf4; border-color: #86efac; color: #166534; }
+
+    .qa-question { background: #fff7ed; border: 1px solid #fdba74; }
+    .qa-student  { background: #f0f9ff; border: 1px solid #93c5fd; }
+    .qa-expected { background: #f0fdf4; border: 1px dashed #86efac; }
+
+    .qa-content { white-space: pre-wrap; }
+    .qa-content ul { margin: 6px 0 0 18px; padding: 0; }
+    .qa-content li { margin: 2px 0; }
+
+    .hidden { display: none !important; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0; margin: 0; background: white; }
+      .status-banner { display: none !important; }
+      .rep-prof-box { display: none; }
+      .header-row, .revision-box { border: 1px solid #eee; }
+      .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
+      textarea { border: 1px solid #333 !important; background: transparent !important; }
+      .editable-div { border: none; }
+      .score-input, .max-input { border: none; text-align: right; width: auto; font-weight: bold; }
+      tr[style*="display: none"] { display: none !important; }
+      .qa-block { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
 </head>
+
 <body>
 
-    <div class="tools-container no-print">
-        <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
+  <div class="tools-container no-print">
+    <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
 
-        <button class="action-btn" onclick="toggleAttendus()" style="background:#fff7ed; border-color:#fb923c; color:#7c2d12;">👁️ Attendus</button>
-        <button class="action-btn" onclick="toggleMeta()" style="background:#fff7ed; border-color:#fb923c; color:#7c2d12;">🏷️ Meta</button>
+    <button id="toggleQuestionBtn" class="action-btn toggle-btn active" onclick="toggleShowQuestion()">👁️ Question</button>
+    <button id="toggleExpectedBtn" class="action-btn toggle-btn active" onclick="toggleShowExpected()">🎯 Attendu</button>
 
-        <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
+    <button class="action-btn" onclick="scrollToNextUnrated()">➡️ Non notées</button>
 
-        <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:6px; border:1px solid #16a34a;">
-            <select id="publishType" style="padding:5px; border-radius:4px; border:1px solid #ccc; font-size:0.95em;">
-                <option value="note">📊 Noté</option>
-                <option value="nn">⚠️ Non noté</option>
-                <option value="absent">🚫 Absent</option>
-            </select>
-            <button class="action-btn save-btn" onclick="publierCorrection()">✅ Publier</button>
-        </div>
+    <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
 
-        <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
-        <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
+    <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:8px; border:1px solid #16a34a;">
+      <select id="publishType" style="padding:5px; border-radius:6px; border:1px solid #ccc; font-size:0.95em;">
+        <option value="note">📊 Noté</option>
+        <option value="nn">⚠️ Non noté</option>
+        <option value="absent">🚫 Absent</option>
+      </select>
+      <button class="action-btn save-btn" onclick="publierCorrection()">✅ Publier</button>
     </div>
 
-    <div id="saveMessage">✅ Correction enregistrée !</div>
+    <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
+    <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
+  </div>
 
-    <div id="confirmModal" class="modal-overlay no-print">
-        <div class="modal-box" style="width:400px; text-align:center;">
-            <div class="modal-header"><span>✅ Confirmation</span><span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span></div>
-            <div style="padding:20px;">
-                <div id="confirmIcon" style="font-size:3em; margin-bottom:10px;">✅</div>
-                <div id="confirmMessage" style="font-size:1.1em; color:#166534; margin-bottom:15px;">Correction publiée !</div>
-                <div id="confirmDetails" style="font-size:0.9em; color:#64748b;"></div>
-                <button onclick="fermerConfirmModal()" style="margin-top:15px; padding:8px 20px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer; font-size:1em;">OK</button>
-            </div>
-        </div>
+  <div id="saveMessage">✅ Correction enregistrée !</div>
+
+  <div id="confirmModal" class="modal-overlay no-print">
+    <div class="modal-box" style="width:400px; text-align:center;">
+      <div class="modal-header">
+        <span>✅ Confirmation</span>
+        <span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span>
+      </div>
+      <div style="padding:20px;">
+        <div id="confirmIcon" style="font-size:3em; margin-bottom:10px;">✅</div>
+        <div id="confirmMessage" style="font-size:1.1em; color:#166534; margin-bottom:15px;">Correction publiée !</div>
+        <div id="confirmDetails" style="font-size:0.9em; color:#64748b;"></div>
+        <button onclick="fermerConfirmModal()" style="margin-top:15px; padding:8px 20px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-size:1em;">OK</button>
+      </div>
     </div>
+  </div>
 
-    <div id="statusBanner" class="status-banner no-print">
-        <span id="statusText">⏳ Chargement...</span>
-        <span id="statusDate"></span>
+  <div id="statusBanner" class="status-banner no-print">
+    <span id="statusText">⏳ Chargement...</span>
+    <span id="statusDate"></span>
+  </div>
+
+  <div id="commentModal" class="modal-overlay no-print">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span id="modalTitle">Banque</span>
+        <span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span>
+      </div>
+      <div id="modalList" class="modal-body"></div>
     </div>
+  </div>
 
-    <div id="commentModal" class="modal-overlay no-print">
-        <div class="modal-box">
-            <div class="modal-header"><span id="modalTitle">Banque</span><span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span></div>
-            <div id="modalList" class="modal-body"></div>
-        </div>
+  <h1 id="docTitle">Correction</h1>
+
+  <div class="header-row">
+    <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
+    <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
+    <div class="input-group" style="width:80px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
+    <div class="input-group" style="width:110px;"><label>Date :</label><input type="date" id="inputDate"></div>
+  </div>
+
+  <div class="appreciation-box">
+    <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
+    <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved();"></textarea>
+  </div>
+
+  <table id="summaryTable">
+    <thead>
+      <tr class="thead-dark">
+        <th rowspan="2" style="width:30px;">C</th>
+        <th rowspan="2">Compétences évaluées</th>
+        <th colspan="4" class="thead-light">Niveau</th>
+        <th rowspan="2" style="width:120px; background:#fff; color:#333;">Pts / Max</th>
+      </tr>
+      <tr class="thead-light">
+        <th style="width:25px;">NT</th><th style="width:25px;">I</th><th style="width:25px;">A</th><th style="width:25px;">M</th>
+      </tr>
+    </thead>
+    <tbody id="gradingBody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6" class="total-label">NOTE :</td>
+        <td class="total-points"><span id="finalNote" class="total-note">-- / 20</span></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="bottom-container">
+    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé</div>
+    <div class="revision-box">
+      <div class="revision-text">Pour réviser :<br><b>preventionsanteenvironnement.github.io/PSE/</b></div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
     </div>
+  </div>
 
-    <h1 id="docTitle">Correction</h1>
+  <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
 
-    <div class="header-row">
-        <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
-        <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
-        <div class="input-group" style="width:80px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
-        <div class="input-group" style="width:110px;"><label>Date :</label><input type="date" id="inputDate"></div>
-    </div>
+  <table id="correctionTable">
+    <thead>
+      <tr>
+        <th class="correction-th" onclick="sortTable(0)" style="width:60px;">Q° ⇅</th>
+        <th class="correction-th" onclick="sortTable(1)" style="width:40px;">C ⇅</th>
+        <th class="correction-th" onclick="sortTable(2)" style="width:110px;">Niveau ⇅</th>
+        <th class="correction-th">Question / Réponse élève / Attendu</th>
+        <th class="correction-th" style="width:30%;">Commentaires</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-    <div class="appreciation-box">
-        <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
-        <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved();"></textarea>
-    </div>
-
-    <table id="summaryTable">
-        <thead>
-            <tr class="thead-dark">
-                <th rowspan="2" style="width:30px;">C</th>
-                <th rowspan="2">Compétences évaluées</th>
-                <th colspan="4" class="thead-light">Niveau</th>
-                <th rowspan="2" style="width:120px; background:#fff; color:#333;">Pts / Max</th>
-            </tr>
-            <tr class="thead-light">
-                <th style="width:25px;">NT</th><th style="width:25px;">I</th><th style="width:25px;">A</th><th style="width:25px;">M</th>
-            </tr>
-        </thead>
-        <tbody id="gradingBody"></tbody>
-        <tfoot>
-            <tr>
-                <td colspan="6" class="total-label">NOTE :</td>
-                <td class="total-points"><span id="finalNote" class="total-note">-- / 20</span></td>
-            </tr>
-        </tfoot>
-    </table>
-
-    <div class="bottom-container">
-        <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé</div>
-        <div class="revision-box">
-            <div class="revision-text">Pour réviser :<br><b>preventionsanteenvironnement.github.io/PSE/</b></div>
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
-        </div>
-    </div>
-
-    <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
-
-    <table id="correctionTable">
-        <thead>
-            <tr>
-                <th class="correction-th" onclick="sortTable(0)" style="width:55px;">Q° ⇅</th>
-                <th class="correction-th" onclick="sortTable(1)" style="width:45px;">C ⇅</th>
-                <th class="correction-th" onclick="sortTable(2)" style="width:110px;">Niveau ⇅</th>
-                <th class="correction-th">Question / Réponse Élève / Attendu</th>
-                <th class="correction-th" style="width:30%;">Commentaires</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-
-<script type="module">
+  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
     const firebaseConfig = {
-        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-        authDomain: "devoirs-pse.firebaseapp.com",
-        projectId: "devoirs-pse",
-        storageBucket: "devoirs-pse.appspot.com",
-        messagingSenderId: "614730413904",
-        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+      authDomain: "devoirs-pse.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.appspot.com",
+      messagingSenderId: "614730413904",
+      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -245,7 +510,11 @@
     let CURRENT_COPY = null;
     let CURRENT_EVALUATION = null;
     let IS_SAVED = true;
+
     const comps = ['C1','C2','C3','C4','C5','C6'];
+
+    let SHOW_QUESTION = true;
+    let SHOW_EXPECTED = true;
 
     window.autoResize = autoResize;
     window.openAppreciationBank = openAppreciationBank;
@@ -256,708 +525,725 @@
     window.setNoteVisual = setNoteVisual;
     window.calculateTotal = calculateTotal;
     window.connexionProf = connexionProf;
-    window.toggleAttendus = toggleAttendus;
-    window.toggleMeta = toggleMeta;
+
+    window.toggleShowQuestion = toggleShowQuestion;
+    window.toggleShowExpected = toggleShowExpected;
+    window.scrollToNextUnrated = scrollToNextUnrated;
 
     onAuthStateChanged(auth, (user) => {
-        currentUser = user;
-        updateAuthButton();
-        updateStatusBanner();
-        if (user) console.log("✅ Prof connecté:", user.email);
+      currentUser = user;
+      updateAuthButton();
+      updateStatusBanner();
+      if (user) console.log("✅ Prof connecté:", user.email);
     });
 
     function updateAuthButton() {
-        const btn = document.getElementById('authBtn');
-        if (currentUser) {
-            btn.textContent = "✅ " + currentUser.email.split('@')[0];
-            btn.style.background = "#dcfce7";
-            btn.style.color = "#166534";
-            btn.style.borderColor = "#16a34a";
-        } else {
-            btn.textContent = "🔐 Connexion";
-            btn.style.background = "#dbeafe";
-            btn.style.color = "#1d4ed8";
-            btn.style.borderColor = "#3b82f6";
-        }
+      const btn = document.getElementById('authBtn');
+      if (currentUser) {
+        btn.textContent = "✅ " + currentUser.email.split('@')[0];
+        btn.style.background = "#dcfce7";
+        btn.style.color = "#166534";
+        btn.style.borderColor = "#16a34a";
+      } else {
+        btn.textContent = "🔐 Connexion";
+        btn.style.background = "#dbeafe";
+        btn.style.color = "#1d4ed8";
+        btn.style.borderColor = "#3b82f6";
+      }
     }
 
     async function connexionProf() {
-        try {
-            const result = await signInWithPopup(auth, googleProvider);
-            currentUser = result.user;
-            console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
-            alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
-            updateAuthButton();
-            updateStatusBanner();
-        } catch (error) {
-            console.error("❌ Erreur:", error);
-            alert("Erreur: " + error.message);
-        }
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        currentUser = result.user;
+        console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
+        alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
+        updateAuthButton();
+        updateStatusBanner();
+      } catch (error) {
+        console.error("❌ Erreur:", error);
+        alert("Erreur: " + error.message);
+      }
     }
 
     function autoResize(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
     function markUnsaved() { IS_SAVED = false; updateStatusBanner(); }
 
     function updateStatusBanner() {
-        const banner = document.getElementById('statusBanner');
-        const text = document.getElementById('statusText');
-        const dateEl = document.getElementById('statusDate');
-        banner.classList.remove('saved', 'not-saved', 'auth-required');
+      const banner = document.getElementById('statusBanner');
+      const text = document.getElementById('statusText');
+      const dateEl = document.getElementById('statusDate');
+      banner.classList.remove('saved', 'not-saved', 'auth-required');
 
-        if (!currentUser) {
-            banner.classList.add('auth-required');
-            text.innerHTML = '🔐 Connectez-vous pour enregistrer';
-            dateEl.textContent = '';
-        } else if (IS_SAVED && CURRENT_EVALUATION?.savedAt) {
-            banner.classList.add('saved');
-            text.innerHTML = '✅ Correction enregistrée';
-            const d = new Date(CURRENT_EVALUATION.savedAt);
-            dateEl.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-        } else if (!IS_SAVED) {
-            banner.classList.add('not-saved');
-            text.innerHTML = '⚠️ Modifications non enregistrées';
-            dateEl.textContent = '';
-        } else {
-            text.innerHTML = '📝 Nouvelle correction';
-            dateEl.textContent = '';
-        }
+      if (!currentUser) {
+        banner.classList.add('auth-required');
+        text.innerHTML = '🔐 Connectez-vous pour enregistrer';
+        dateEl.textContent = '';
+      } else if (IS_SAVED && CURRENT_EVALUATION?.savedAt) {
+        banner.classList.add('saved');
+        text.innerHTML = '✅ Correction enregistrée';
+        const d = new Date(CURRENT_EVALUATION.savedAt);
+        dateEl.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+      } else if (!IS_SAVED) {
+        banner.classList.add('not-saved');
+        text.innerHTML = '⚠️ Modifications non enregistrées';
+        dateEl.textContent = '';
+      } else {
+        text.innerHTML = '📝 Nouvelle correction';
+        dateEl.textContent = '';
+      }
     }
 
     function showSaveMessage(success = true) {
-        const msg = document.getElementById('saveMessage');
-        msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
-        msg.style.background = success ? '#16a34a' : '#dc2626';
-        msg.style.opacity = 1;
-        setTimeout(() => msg.style.opacity = 0, 2000);
+      const msg = document.getElementById('saveMessage');
+      msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
+      msg.style.background = success ? '#16a34a' : '#dc2626';
+      msg.style.opacity = 1;
+      setTimeout(() => msg.style.opacity = 0, 2000);
+    }
+
+    function loadPreferences() {
+      try {
+        const s = JSON.parse(localStorage.getItem("grille_pref_v17") || "{}");
+        SHOW_QUESTION = (s.SHOW_QUESTION !== undefined) ? !!s.SHOW_QUESTION : true;
+        SHOW_EXPECTED = (s.SHOW_EXPECTED !== undefined) ? !!s.SHOW_EXPECTED : true;
+      } catch(e) {}
+      syncToggleButtons();
+    }
+
+    function savePreferences() {
+      localStorage.setItem("grille_pref_v17", JSON.stringify({
+        SHOW_QUESTION,
+        SHOW_EXPECTED
+      }));
+    }
+
+    function syncToggleButtons() {
+      const qBtn = document.getElementById('toggleQuestionBtn');
+      const eBtn = document.getElementById('toggleExpectedBtn');
+      if (qBtn) qBtn.classList.toggle('active', SHOW_QUESTION);
+      if (eBtn) eBtn.classList.toggle('active', SHOW_EXPECTED);
+
+      document.querySelectorAll('.qa-question').forEach(el => el.classList.toggle('hidden', !SHOW_QUESTION));
+      document.querySelectorAll('.qa-expected').forEach(el => el.classList.toggle('hidden', !SHOW_EXPECTED));
+    }
+
+    function toggleShowQuestion() {
+      SHOW_QUESTION = !SHOW_QUESTION;
+      savePreferences();
+      syncToggleButtons();
+    }
+
+    function toggleShowExpected() {
+      SHOW_EXPECTED = !SHOW_EXPECTED;
+      savePreferences();
+      syncToggleButtons();
+    }
+
+    function scrollToNextUnrated() {
+      const rows = Array.from(document.querySelectorAll('#correctionTable tbody tr'));
+      const target = rows.find(r => !r.dataset.level);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      else alert("✅ Toutes les questions ont un niveau.");
     }
 
     function extractQuestionsFromBlueprint(blueprint) {
-        if (Array.isArray(blueprint?.questions)) return blueprint.questions;
-        const questions = [];
-        function walk(blocks) {
-            if (!Array.isArray(blocks)) return;
-            blocks.forEach(b => {
-                if (b && b.type === "question") questions.push(b);
-                if (b && b.content) walk(b.content);
-            });
-        }
-        walk(blueprint?.content);
-        return questions;
+      if (Array.isArray(blueprint?.questions)) return blueprint.questions;
+      const questions = [];
+      function walk(blocks) {
+        if (!Array.isArray(blocks)) return;
+        blocks.forEach(b => {
+          if (b && b.type === "question") questions.push(b);
+          if (b && b.content) walk(b.content);
+        });
+      }
+      walk(blueprint?.content);
+      return questions;
     }
 
-    /* ===== PATCH CONFORT : toggles ===== */
-    function toggleAttendus(){
-        document.body.classList.toggle("hide-attendus");
-        localStorage.setItem("hide_attendus", document.body.classList.contains("hide-attendus") ? "1" : "0");
-    }
-    function toggleMeta(){
-        document.body.classList.toggle("hide_meta");
-        localStorage.setItem("hide_meta", document.body.classList.contains("hide_meta") ? "1" : "0");
-    }
-    (function restoreToggles(){
-        try{
-            if (localStorage.getItem("hide_attendus") === "1") document.body.classList.add("hide-attendus");
-            if (localStorage.getItem("hide_meta") === "1") document.body.classList.add("hide_meta");
-        }catch(e){}
-    })();
-
-    /* ===== PATCH CONFORT : helpers affichage ===== */
-    function escapeHtml(s){
-        return String(s ?? "")
-            .replaceAll("&","&amp;")
-            .replaceAll("<","&lt;")
-            .replaceAll(">","&gt;")
-            .replaceAll('"',"&quot;")
-            .replaceAll("'","&#039;");
+    function escapeHTML(str) {
+      return String(str ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
     }
 
-    function formatAttendu(q){
-        const a = q?.reponseAttendue;
-        if (a === null || a === undefined || a === "") return "À compléter dans le blueprint";
-        if (Array.isArray(a)) return a.map(x=>escapeHtml(x)).join("<br>• ");
-        if (typeof a === "object") return escapeHtml(JSON.stringify(a));
-        return escapeHtml(a);
+    function splitToBullets(text) {
+      const raw = String(text ?? "").trim();
+      if (!raw) return [];
+      let t = raw.replace(/\r/g, "");
+      t = t.replace(/•/g, "\n• ");
+      t = t.replace(/\s*-\s+/g, "\n- ");
+      t = t.replace(/\s*;\s*/g, "\n");
+      const lines = t.split("\n").map(l => l.trim()).filter(l => l && l !== "-" && l !== "•");
+      return lines;
     }
 
-    function formatReponseAvecContexte(q, val){
-        if (val === null || val === undefined || val === "") return "<i>Non répondu</i>";
+    function formatMaybeBullets(value) {
+      if (value === null || value === undefined) return "<i>Non répondu</i>";
 
-        if (typeof val === "boolean") return val ? "Vrai" : "Faux";
+      if (Array.isArray(value)) {
+        const items = value.map(v => String(v).trim()).filter(Boolean);
+        if (!items.length) return "<i>Non répondu</i>";
+        if (items.length === 1) return escapeHTML(items[0]);
+        return "<ul>" + items.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
+      }
 
-        if (Array.isArray(val)){
-            const items = val.map(v=>String(v).trim()).filter(Boolean);
-            return items.length ? items.map(x=>escapeHtml(x)).join("<br>• ") : "<i>Non répondu</i>";
-        }
+      if (typeof value === "object") {
+        const entries = Object.entries(value);
+        if (!entries.length) return "<i>Non répondu</i>";
+        return "<ul>" + entries.map(([k,v]) => "<li><b>" + escapeHTML(k) + "</b> : " + escapeHTML(v) + "</li>").join("") + "</ul>";
+      }
 
-        if (typeof val === "object"){
-            const display = val.display ?? val.label ?? val.texte ?? "";
-            const brut = val.value ?? val.val ?? "";
-            if (display) return escapeHtml(display);
-            if (brut) return escapeHtml(brut);
-            return escapeHtml(JSON.stringify(val));
-        }
+      const s = String(value ?? "").trim();
+      if (!s) return "<i>Non répondu</i>";
 
-        const s = String(val).trim();
-        return s ? escapeHtml(s) : "<i>Non répondu</i>";
+      const bullets = splitToBullets(s);
+      if (bullets.length >= 2) {
+        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
+      }
+      return escapeHTML(s);
     }
 
-    function buildQuestionContextHTML(q, label, competence){
-        const qid = q?.qid || "";
-        const type = q?.type || "question";
-        const bareme = (q?.bareme !== undefined && q?.bareme !== null) ? q.bareme : "";
-        const qt = q?.questionText || q?.titre || q?.enonce || "";
+    function renderQuestionHTML(q, label, competence) {
+      const qt = q?.questionText || q?.question || q?.enonce || q?.texte || "";
+      const txt = String(qt ?? "").trim();
+      const safe = txt ? escapeHTML(txt) : "<i>Question non fournie</i>";
+      const compPill = competence ? `<span class="pill e">${escapeHTML(competence)}</span>` : "";
+      const labPill = label ? `<span class="pill q">${escapeHTML(label)}</span>` : "";
+      return `
+        <div class="qa-block qa-question">
+          <div class="qa-title">${labPill}${compPill}<span class="pill q">Question</span></div>
+          <div class="qa-content">${safe.replaceAll("\n","<br>")}</div>
+        </div>
+      `;
+    }
 
-        const metaParts = [];
-        if (qid) metaParts.push(`<span class="q-pill">QID: ${escapeHtml(qid)}</span>`);
-        metaParts.push(`<span class="q-pill">Type: ${escapeHtml(type)}</span>`);
-        if (bareme !== "") metaParts.push(`<span class="q-pill">Barème: ${escapeHtml(bareme)}</span>`);
-        if (competence) metaParts.push(`<span class="q-pill">${escapeHtml(competence)}</span>`);
-        if (label) metaParts.push(`<span class="q-pill">Q° ${escapeHtml(label)}</span>`);
+    function getReponseEleve(reponses, q) {
+      if (!reponses) return "<i>Non répondu</i>";
+      const qid = q?.qid;
+      const label = q?.label;
 
-        return `
-            <div class="q-context">
-                <div class="q-meta">${metaParts.join("")}</div>
-                <div class="q-text">${escapeHtml(qt || "Question")}</div>
-                ${q?.consigne ? `<div class="q-subtext">${escapeHtml(q.consigne)}</div>` : ""}
-            </div>
-        `;
+      if (qid && reponses[qid] !== undefined) return formatMaybeBullets(reponses[qid]);
+      if (label && reponses[label] !== undefined) return formatMaybeBullets(reponses[label]);
+      if (label && reponses["Q" + label] !== undefined) return formatMaybeBullets(reponses["Q" + label]);
+      return "<i>Non répondu</i>";
+    }
+
+    function formatExpected(q) {
+      const att = q?.reponseAttendue ?? q?.attendu ?? q?.corrige ?? "";
+      const s = String(att ?? "").trim();
+      if (!s) return "<i>Non renseigné</i>";
+      const bullets = splitToBullets(s);
+      if (bullets.length >= 2) {
+        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
+      }
+      return escapeHTML(s).replaceAll("\n","<br>");
     }
 
     function collecterDonneesCorrection() {
-        const data = {
-            savedAt: new Date().toISOString(),
-            savedBy: currentUser?.email || "anonyme",
-            profUid: currentUser?.uid || "",
-            eleveCode: CURRENT_ELEVE_CODE,
-            classe: document.getElementById('inputClasse').value || "",
-            devoirId: CURRENT_COPY?.devoirId || "unknown",
-            titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
-            copyDocId: CURRENT_DOC_ID,
-            appreciation: document.getElementById('appreciationArea').value || "",
-            competences: {},
-            questions: {}
+      const data = {
+        savedAt: new Date().toISOString(),
+        savedBy: currentUser?.email || "anonyme",
+        profUid: currentUser?.uid || "",
+        eleveCode: CURRENT_ELEVE_CODE,
+        classe: document.getElementById('inputClasse').value || "",
+        devoirId: CURRENT_COPY?.devoirId || "unknown",
+        titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
+        copyDocId: CURRENT_DOC_ID,
+        appreciation: document.getElementById('appreciationArea').value || "",
+        competences: {},
+        questions: {}
+      };
+
+      comps.forEach(c => {
+        const ptsEl = document.getElementById(`pts_${c}`);
+        const maxEl = document.getElementById(`max_${c}`);
+        if (ptsEl && maxEl) {
+          data.competences[c] = {
+            pts: parseFloat(ptsEl.value) || 0,
+            max: parseFloat(maxEl.value) || 0
+          };
+        }
+      });
+
+      document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
+        const qid = row.dataset.qid || `q_${idx}`;
+        const commentDiv = row.querySelector('.editable-div');
+        data.questions[qid] = {
+          level: row.dataset.level || "",
+          comment: commentDiv ? commentDiv.innerText.trim() : ""
         };
+      });
 
-        comps.forEach(c => {
-            const ptsEl = document.getElementById(`pts_${c}`);
-            const maxEl = document.getElementById(`max_${c}`);
-            if (ptsEl && maxEl) {
-                data.competences[c] = {
-                    pts: parseFloat(ptsEl.value) || 0,
-                    max: parseFloat(maxEl.value) || 0
-                };
-            }
-        });
-
-        document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-            const qid = row.dataset.qid || `q_${idx}`;
-            const commentDiv = row.querySelector('.editable-div');
-            data.questions[qid] = {
-                level: row.dataset.level || "",
-                comment: commentDiv ? commentDiv.innerText.trim() : ""
-            };
-        });
-
-        return data;
+      return data;
     }
 
     window.sauvegarderBrouillon = async function() {
-        if (!currentUser) {
-            alert("🔐 Connectez-vous d'abord !");
-            connexionProf();
-            return;
-        }
-        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
-            alert("Erreur : Code élève manquant.");
-            return;
-        }
+      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
+      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
 
-        console.log("💾 Sauvegarde brouillon... Élève:", CURRENT_ELEVE_CODE);
+      try {
+        const brouillon = collecterDonneesCorrection();
+        brouillon.statut = "brouillon";
+        brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
+        brouillon.publie = false;
 
-        try {
-            const brouillon = collecterDonneesCorrection();
-            brouillon.statut = "brouillon";
-            brouillon.note_finale = parseFloat(document.getElementById('finalNote').textContent) || 0;
-            brouillon.publie = false;
+        const brouillonDocId = brouillon.devoirId + "_brouillon";
+        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
 
-            const brouillonDocId = brouillon.devoirId + "_brouillon";
-            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
+        CURRENT_EVALUATION = brouillon;
+        IS_SAVED = true;
+        updateStatusBanner();
 
-            CURRENT_EVALUATION = brouillon;
-            IS_SAVED = true;
-            updateStatusBanner();
-
-            afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
-
-            console.log("✅ Brouillon sauvegardé!", `resultats/${CURRENT_ELEVE_CODE}/brouillons/${brouillonDocId}`);
-
-        } catch (e) {
-            console.error("❌ Erreur:", e);
-            showSaveMessage(false);
-            alert("Erreur:\n\n" + e.message);
-        }
-    };
+        afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
+      } catch (e) {
+        console.error("❌ Erreur:", e);
+        showSaveMessage(false);
+        alert("Erreur:\n\n" + e.message);
+      }
+    }
 
     window.publierCorrection = async function() {
-        if (!currentUser) {
-            alert("🔐 Connectez-vous d'abord !");
-            connexionProf();
-            return;
+      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
+      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
+
+      const typePublication = document.getElementById('publishType').value;
+      let noteFinale, statut, messageConfirm, iconConfirm, couleur;
+
+      switch(typePublication) {
+        case "note":
+          noteFinale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
+          statut = "noté";
+          messageConfirm = `Correction publiée avec la note ${noteFinale}/20`;
+          iconConfirm = "✅";
+          couleur = "#16a34a";
+          break;
+        case "nn":
+          noteFinale = "NN";
+          statut = "non_noté";
+          messageConfirm = "Copie publiée comme 'Non noté'";
+          iconConfirm = "⚠️";
+          couleur = "#b45309";
+          break;
+        case "absent":
+          noteFinale = "ABS";
+          statut = "absent";
+          messageConfirm = "Copie marquée comme 'Absent'";
+          iconConfirm = "🚫";
+          couleur = "#dc2626";
+          break;
+      }
+
+      if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) return;
+
+      try {
+        const evaluation = collecterDonneesCorrection();
+        evaluation.note_finale = noteFinale;
+        evaluation.statut = statut;
+        evaluation.publie = true;
+
+        if (typePublication === "nn") {
+          evaluation.nonNote = true;
+        } else if (typePublication === "absent") {
+          evaluation.absent = true;
+          evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
         }
-        if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") {
-            alert("Erreur : Code élève manquant.");
-            return;
+
+        const evalDocId = evaluation.devoirId + "_eval";
+        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
+
+        if (typePublication === "note") {
+          document.getElementById('finalNote').style.color = "#d9534f";
+        } else if (typePublication === "nn") {
+          document.getElementById('finalNote').innerText = "Non noté";
+          document.getElementById('finalNote').style.color = "#b45309";
+        } else if (typePublication === "absent") {
+          document.getElementById('finalNote').innerText = "Absent";
+          document.getElementById('finalNote').style.color = "#dc2626";
         }
 
-        const typePublication = document.getElementById('publishType').value;
-        let noteFinale, statut, messageConfirm, iconConfirm, couleur;
+        CURRENT_EVALUATION = evaluation;
+        IS_SAVED = true;
+        updateStatusBanner();
 
-        switch(typePublication) {
-            case "note":
-                noteFinale = parseFloat(document.getElementById('finalNote').textContent) || 0;
-                statut = "noté";
-                messageConfirm = `Correction publiée avec la note ${noteFinale}/20`;
-                iconConfirm = "✅";
-                couleur = "#16a34a";
-                break;
-            case "nn":
-                noteFinale = "NN";
-                statut = "non_noté";
-                messageConfirm = "Copie publiée comme 'Non noté'";
-                iconConfirm = "⚠️";
-                couleur = "#b45309";
-                break;
-            case "absent":
-                noteFinale = "ABS";
-                statut = "absent";
-                messageConfirm = "Copie marquée comme 'Absent'";
-                iconConfirm = "🚫";
-                couleur = "#dc2626";
-                break;
-        }
-
-        if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) {
-            return;
-        }
-
-        const publishBtn = document.querySelector('.save-btn');
-        if (publishBtn) { publishBtn.disabled = true; publishBtn.style.opacity = 0.6; }
-
-        console.log("✅ Publication... Élève:", CURRENT_ELEVE_CODE, "Type:", typePublication);
-
-        try {
-            const evaluation = collecterDonneesCorrection();
-            evaluation.note_finale = noteFinale;
-            evaluation.statut = statut;
-            evaluation.publie = true;
-
-            if (typePublication === "nn") {
-                evaluation.nonNote = true;
-            } else if (typePublication === "absent") {
-                evaluation.absent = true;
-                evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
-            }
-
-            const evalDocId = evaluation.devoirId + "_eval";
-            await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
-
-            if (typePublication === "note") {
-                document.getElementById('finalNote').style.color = "#d9534f";
-            } else if (typePublication === "nn") {
-                document.getElementById('finalNote').innerText = "Non noté";
-                document.getElementById('finalNote').style.color = "#b45309";
-            } else if (typePublication === "absent") {
-                document.getElementById('finalNote').innerText = "Absent";
-                document.getElementById('finalNote').style.color = "#dc2626";
-            }
-
-            CURRENT_EVALUATION = evaluation;
-            IS_SAVED = true;
-            updateStatusBanner();
-
-            afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
-
-            console.log("✅ Publié!", `resultats/${CURRENT_ELEVE_CODE}/evaluations/${evalDocId}`);
-
-        } catch (e) {
-            console.error("❌ Erreur:", e);
-            showSaveMessage(false);
-            alert("Erreur:\n\n" + e.message);
-        } finally {
-            if (publishBtn) { publishBtn.disabled = false; publishBtn.style.opacity = 1; }
-        }
-    };
+        afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
+      } catch (e) {
+        console.error("❌ Erreur:", e);
+        showSaveMessage(false);
+        alert("Erreur:\n\n" + e.message);
+      }
+    }
 
     function afficherConfirmation(icon, message, details, couleur) {
-        document.getElementById('confirmIcon').textContent = icon;
-        document.getElementById('confirmMessage').textContent = message;
-        document.getElementById('confirmMessage').style.color = couleur;
-        document.getElementById('confirmDetails').textContent = details;
-        document.getElementById('confirmModal').style.display = 'flex';
+      document.getElementById('confirmIcon').textContent = icon;
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmMessage').style.color = couleur;
+      document.getElementById('confirmDetails').textContent = details;
+      document.getElementById('confirmModal').style.display = 'flex';
     }
 
     window.fermerConfirmModal = function() {
-        document.getElementById('confirmModal').style.display = 'none';
-    };
+      document.getElementById('confirmModal').style.display = 'none';
+    }
 
     function loadExistingCorrection(correction) {
-        if (!correction) return;
+      if (!correction) return;
 
-        if (correction.nonNote || correction.note_finale === "NN") {
-            document.getElementById('finalNote').innerText = "Non noté";
-            document.getElementById('finalNote').style.color = "#b45309";
-        }
+      if (correction.nonNote || correction.note_finale === "NN") {
+        document.getElementById('finalNote').innerText = "Non noté";
+        document.getElementById('finalNote').style.color = "#b45309";
+      }
 
-        if (correction.appreciation) {
-            const area = document.getElementById('appreciationArea');
-            area.value = correction.appreciation;
-            autoResize(area);
+      if (correction.appreciation) {
+        const area = document.getElementById('appreciationArea');
+        area.value = correction.appreciation;
+        autoResize(area);
+      }
+
+      if (correction.competences) {
+        for (const c in correction.competences) {
+          const ptsEl = document.getElementById(`pts_${c}`);
+          if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
         }
-        if (correction.competences) {
-            for (const c in correction.competences) {
-                const ptsEl = document.getElementById(`pts_${c}`);
-                if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
+      }
+
+      if (correction.questions) {
+        document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
+          const qid = row.dataset.qid || `q_${idx}`;
+          const qData = correction.questions[qid];
+          if (qData) {
+            if (qData.level) {
+              row.dataset.level = qData.level;
+              const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
+              if (btn) btn.classList.add('active');
             }
-        }
-        if (correction.questions) {
-            document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-                const qid = row.dataset.qid || `q_${idx}`;
-                const qData = correction.questions[qid];
-                if (qData) {
-                    if (qData.level) {
-                        row.dataset.level = qData.level;
-                        const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
-                        if (btn) btn.classList.add('active');
-                    }
-                    if (qData.comment) {
-                        const commentDiv = row.querySelector('.editable-div');
-                        if (commentDiv) commentDiv.innerText = qData.comment;
-                    }
-                }
-            });
-        }
-        comps.forEach(c => updateCounters(c));
-        if (!correction.nonNote && correction.note_finale !== "NN") {
-            calculateTotal();
-        }
-        IS_SAVED = true;
-        updateStatusBanner();
+            if (qData.comment) {
+              const commentDiv = row.querySelector('.editable-div');
+              if (commentDiv) commentDiv.innerText = qData.comment;
+            }
+          }
+        });
+      }
+
+      comps.forEach(c => updateCounters(c));
+      if (!correction.nonNote && correction.note_finale !== "NN") calculateTotal();
+      IS_SAVED = true;
     }
 
     function initSummary(activeComps, maxMap) {
-        const tbody = document.getElementById('gradingBody');
-        tbody.innerHTML = "";
-        comps.forEach((c) => {
-            const isVisible = activeComps.includes(c) || c === 'C6';
-            const displayStyle = isVisible ? "" : "display:none;";
-            const initialMax = maxMap[c] || 0;
-            tbody.innerHTML += `<tr id="row_${c}" style="${displayStyle}">
-                <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
-                <td>
-                    <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
-                    <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
-                </td>
-                <td><input type="radio" name="r_${c}" value="NT"></td>
-                <td><input type="radio" name="r_${c}" value="I"></td>
-                <td><input type="radio" name="r_${c}" value="A"></td>
-                <td><input type="radio" name="r_${c}" value="M"></td>
-                <td style="white-space:nowrap;">
-                    <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); markUnsaved();"> /
-                    <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
-                </td>
-            </tr>`;
-        });
-        setTimeout(calculateTotal, 100);
-    }
-
-    /* ===== Récupération réponses (qid prioritaire) + affichage enrichi ===== */
-    function getReponseEleve(reponses, q) {
-        if (!reponses) return "<i>Non répondu</i>";
-
-        const qid = q?.qid;
-        const label = q?.label;
-
-        let val;
-        if (qid && reponses[qid] !== undefined) val = reponses[qid];
-        else if (label && reponses[label] !== undefined) val = reponses[label];
-        else if (label && reponses["Q" + label] !== undefined) val = reponses["Q" + label];
-        else return "<i>Non répondu</i>";
-
-        return formatReponseAvecContexte(q, val);
+      const tbody = document.getElementById('gradingBody');
+      tbody.innerHTML = "";
+      comps.forEach((c) => {
+        const isVisible = activeComps.includes(c) || c === 'C6';
+        const displayStyle = isVisible ? "" : "display:none;";
+        const initialMax = maxMap[c] || 0;
+        tbody.innerHTML += `<tr id="row_${c}" style="${displayStyle}">
+          <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
+          <td>
+            <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
+            <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
+          </td>
+          <td><input type="radio" name="r_${c}" value="NT"></td>
+          <td><input type="radio" name="r_${c}" value="I"></td>
+          <td><input type="radio" name="r_${c}" value="A"></td>
+          <td><input type="radio" name="r_${c}" value="M"></td>
+          <td style="white-space:nowrap;">
+            <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); markUnsaved();"> /
+            <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
+          </td>
+        </tr>`;
+      });
+      setTimeout(calculateTotal, 100);
     }
 
     function renderCorrection(blueprint, reponses) {
-        const tbody = document.getElementById('correctionTable').querySelector('tbody');
-        tbody.innerHTML = "";
-        let maxMap = {}, qMap = {}, activeComps = [];
+      const tbody = document.getElementById('correctionTable').querySelector('tbody');
+      tbody.innerHTML = "";
+      let maxMap = {}, qMap = {}, activeComps = [];
 
-        const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
+      const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
 
-        console.log("📋 Blueprint questions:", list.length);
-        console.log("📦 Réponses reçues:", Object.keys(reponses || {}));
+      list.forEach((q, idx) => {
+        const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
+        const bareme = Number(q?.bareme) || 0;
+        const label = q?.label || ("Q" + (idx + 1));
+        const qid = q?.qid || `q_${idx}`;
 
-        list.forEach((q, idx) => {
-            const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
-            const bareme = Number(q?.bareme) || 0;
-            const label = q?.label || (idx + 1);
-            const qid = q?.qid || `q_${idx}`;
+        if(!activeComps.includes(competence)) activeComps.push(competence);
+        maxMap[competence] = (maxMap[competence] || 0) + bareme;
+        qMap[competence] = qMap[competence] || [];
+        qMap[competence].push(label);
 
-            if(!activeComps.includes(competence)) activeComps.push(competence);
-            maxMap[competence] = (maxMap[competence] || 0) + bareme;
-            qMap[competence] = qMap[competence] || [];
-            qMap[competence].push(label);
+        const row = tbody.insertRow();
+        row.dataset.comp = competence;
+        row.dataset.level = "";
+        row.dataset.qid = qid;
 
-            const row = tbody.insertRow();
-            row.dataset.comp = competence;
-            row.dataset.level = "";
-            row.dataset.qid = qid;
+        const repEleve = getReponseEleve(reponses, q);
+        const attendu = formatExpected(q);
+        const questionHtml = renderQuestionHTML(q, label, competence);
 
-            const repEleve = getReponseEleve(reponses, q);
+        row.innerHTML = `
+          <td style="font-weight:bold">${escapeHTML(label)}</td>
+          <td><span class="badge ${competence.toLowerCase()}">${competence}</span></td>
+          <td>
+            <div style="display:flex; gap:2px; justify-content:center;">
+              <span class="level-btn nt" onclick="setNoteVisual(this, 'NT')">NT</span>
+              <span class="level-btn i"  onclick="setNoteVisual(this, 'I')">I</span>
+              <span class="level-btn a"  onclick="setNoteVisual(this, 'A')">A</span>
+              <span class="level-btn m"  onclick="setNoteVisual(this, 'M')">M</span>
+            </div>
+          </td>
+          <td class="qa-stack">
+            ${questionHtml}
+            <div class="qa-block qa-student">
+              <div class="qa-title"><span class="pill e">Réponse élève</span></div>
+              <div class="qa-content">${repEleve}</div>
+            </div>
+            <div class="qa-block qa-expected">
+              <div class="qa-title"><span class="pill a">Attendu</span></div>
+              <div class="qa-content">${attendu}</div>
+            </div>
+          </td>
+          <td>
+            <div class="editable-div" contenteditable="true" placeholder="💡 Commentaire..." oninput="markUnsaved()"></div>
+          </td>
+        `;
+      });
 
-            row.innerHTML = `
-                <td style="font-weight:bold">${escapeHtml(label)}</td>
-                <td><span class="badge ${competence.toLowerCase()}">${escapeHtml(competence)}</span></td>
-                <td>
-                    <div style="display:flex; gap:2px; justify-content:center;">
-                        <span class="level-btn nt" onclick="setNoteVisual(this, 'NT')">NT</span>
-                        <span class="level-btn i" onclick="setNoteVisual(this, 'I')">I</span>
-                        <span class="level-btn a" onclick="setNoteVisual(this, 'A')">A</span>
-                        <span class="level-btn m" onclick="setNoteVisual(this, 'M')">M</span>
-                    </div>
-                </td>
-                <td style="text-align:left">
-                    ${buildQuestionContextHTML(q, label, competence)}
-                    <div class="rep-eleve-box"><strong>👤 Réponse élève :</strong><br>${repEleve}</div>
-                    <div class="rep-prof-box">🎯 Attendu :<br>${formatAttendu(q)}</div>
-                </td>
-                <td><div class="editable-div" contenteditable="true" placeholder="💡 Commentaire..." oninput="markUnsaved()"></div></td>
-            `;
-        });
+      if(!maxMap['C6']) maxMap['C6'] = 2;
+      initSummary(activeComps, maxMap);
+      for(let c in qMap) {
+        const el = document.getElementById(`q_list_${c}`);
+        if(el) el.value = qMap[c].join(", ");
+      }
 
-        if(!maxMap['C6']) maxMap['C6'] = 2;
-        initSummary(activeComps, maxMap);
-        for(let c in qMap) {
-            const el = document.getElementById(`q_list_${c}`);
-            if(el) el.value = qMap[c].join(", ");
-        }
+      syncToggleButtons();
     }
 
     function setNoteVisual(btn, level) {
-        const row = btn.closest('tr');
-        Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        row.dataset.level = level;
-        updateCounters(row.dataset.comp);
-        markUnsaved();
-        openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
+      const row = btn.closest('tr');
+      Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      row.dataset.level = level;
+      updateCounters(row.dataset.comp);
+      markUnsaved();
+      openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
     }
 
     function updateCounters(comp) {
-        let counts = { NT:0, I:0, A:0, M:0 };
-        document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-            if(r.dataset.comp === comp && r.dataset.level) counts[r.dataset.level]++;
-        });
-        const statBox = document.getElementById(`stats_${comp}`);
-        if(statBox) statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
+      let counts = { NT:0, I:0, A:0, M:0 };
+      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+        if(r.dataset.comp === comp && r.dataset.level) counts[r.dataset.level]++;
+      });
+      const statBox = document.getElementById(`stats_${comp}`);
+      if(statBox) statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
     }
 
     function calculateTotal() {
-        let totalPts = 0;
-        comps.forEach(c => {
-            const row = document.getElementById(`row_${c}`);
-            if(row && row.style.display !== 'none') {
-                totalPts += parseFloat(document.getElementById(`pts_${c}`).value) || 0;
-            }
-        });
-        const elNote = document.getElementById('finalNote');
-        elNote.innerText = totalPts.toFixed(1) + " / 20";
-        elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
+      let totalPts = 0;
+      comps.forEach(c => {
+        const row = document.getElementById(`row_${c}`);
+        if(row && row.style.display !== 'none') {
+          const v = document.getElementById(`pts_${c}`)?.value;
+          totalPts += parseFloat(String(v ?? "0").replace(",", ".")) || 0;
+        }
+      });
+      const elNote = document.getElementById('finalNote');
+      elNote.innerText = totalPts.toFixed(1) + " / 20";
+      elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
     }
 
     function openCommentBank(comp, level, target) {
-        CURRENT_TARGET_DIV = target;
-        const list = document.getElementById('modalList');
-        list.innerHTML = "";
-        document.getElementById('modalTitle').innerText = `Banque ${comp} (${level})`;
-        const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
-        if (!compData) {
-            list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
-        } else {
-            for (const [catName, levelsObj] of Object.entries(compData)) {
-                const phrases = levelsObj[level];
-                if (phrases && phrases.length > 0) {
-                    const h = document.createElement("div");
-                    h.className = "bank-title";
-                    h.innerText = catName;
-                    list.appendChild(h);
-                    phrases.forEach(txt => {
-                        const d = document.createElement('div');
-                        d.className = "comment-item";
-                        d.innerText = txt;
-                        d.onclick = () => {
-                            let prev = CURRENT_TARGET_DIV.innerText;
-                            if(prev && !prev.includes("Commentaire")) CURRENT_TARGET_DIV.innerText += " " + txt;
-                            else CURRENT_TARGET_DIV.innerText = txt;
-                            closeModal(); markUnsaved();
-                        };
-                        list.appendChild(d);
-                    });
-                }
-            }
-        }
-        document.getElementById('commentModal').style.display = "flex";
-    }
+      CURRENT_TARGET_DIV = target;
+      const list = document.getElementById('modalList');
+      list.innerHTML = "";
+      document.getElementById('modalTitle').innerText = `Banque ${comp} (${level})`;
 
-    function openAppreciationBank() {
-        CURRENT_TARGET_DIV = document.getElementById('appreciationArea');
-        const list = document.getElementById('modalList');
-        list.innerHTML = "";
-        document.getElementById('modalTitle').innerText = "Appréciations";
-        const apprData = window.DATA_APPRECIATION || {};
-        for (const [catName, data] of Object.entries(apprData)) {
+      const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
+      if (!compData) {
+        list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
+      } else {
+        for (const [catName, levelsObj] of Object.entries(compData)) {
+          const phrases = levelsObj[level];
+          if (phrases && phrases.length > 0) {
             const h = document.createElement("div");
             h.className = "bank-title";
             h.innerText = catName;
             list.appendChild(h);
-            if(Array.isArray(data)) {
-                data.forEach(txt => {
-                    const d = document.createElement('div');
-                    d.className = "comment-item";
-                    d.innerText = txt;
-                    d.onclick = () => { insertText(txt, true); };
-                    list.appendChild(d);
-                });
-            } else if (typeof data === 'object') {
-                for (const [comp, phrases] of Object.entries(data)) {
-                    phrases.forEach(txt => {
-                        const d = document.createElement('div');
-                        d.className = "comment-item";
-                        d.innerHTML = `<strong>(${comp})</strong> ${escapeHtml(txt)}`;
-                        d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
-                        list.appendChild(d);
-                    });
-                }
-            }
+            phrases.forEach(txt => {
+              const d = document.createElement('div');
+              d.className = "comment-item";
+              d.innerText = txt;
+              d.onclick = () => {
+                const prev = CURRENT_TARGET_DIV.innerText.trim();
+                CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
+                closeModal();
+                markUnsaved();
+              };
+              list.appendChild(d);
+            });
+          }
         }
-        document.getElementById('commentModal').style.display = "flex";
+      }
+      document.getElementById('commentModal').style.display = "flex";
+    }
+
+    function openAppreciationBank() {
+      CURRENT_TARGET_DIV = document.getElementById('appreciationArea');
+      const list = document.getElementById('modalList');
+      list.innerHTML = "";
+      document.getElementById('modalTitle').innerText = "Appréciations";
+
+      const apprData = window.DATA_APPRECIATION || {};
+      for (const [catName, data] of Object.entries(apprData)) {
+        const h = document.createElement("div");
+        h.className = "bank-title";
+        h.innerText = catName;
+        list.appendChild(h);
+
+        if(Array.isArray(data)) {
+          data.forEach(txt => {
+            const d = document.createElement('div');
+            d.className = "comment-item";
+            d.innerText = txt;
+            d.onclick = () => { insertText(txt, true); };
+            list.appendChild(d);
+          });
+        } else if (typeof data === 'object') {
+          for (const [comp, phrases] of Object.entries(data)) {
+            phrases.forEach(txt => {
+              const d = document.createElement('div');
+              d.className = "comment-item";
+              d.innerHTML = `<strong>(${escapeHTML(comp)})</strong> ${escapeHTML(txt)}`;
+              d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
+              list.appendChild(d);
+            });
+          }
+        }
+      }
+      document.getElementById('commentModal').style.display = "flex";
     }
 
     function insertText(text, newLine) {
-        if(CURRENT_TARGET_DIV) {
-            const sep = (CURRENT_TARGET_DIV.value.length > 0 && newLine) ? "\n" : " ";
-            CURRENT_TARGET_DIV.value += sep + text;
-            autoResize(CURRENT_TARGET_DIV);
-        }
-        closeModal();
-        markUnsaved();
+      if(CURRENT_TARGET_DIV) {
+        const sep = (CURRENT_TARGET_DIV.value.length > 0 && newLine) ? "\n" : " ";
+        CURRENT_TARGET_DIV.value += sep + text;
+        autoResize(CURRENT_TARGET_DIV);
+      }
+      closeModal();
+      markUnsaved();
     }
 
     function closeModal() { document.getElementById('commentModal').style.display = "none"; }
 
     function sortTable(n) {
-        const table = document.getElementById("correctionTable");
-        let rows = Array.from(table.rows).slice(1);
-        rows.sort((a, b) => {
-            let t1 = a.cells[n].innerText.toLowerCase();
-            let t2 = b.cells[n].innerText.toLowerCase();
-            if(n===0) return parseFloat(t1)-parseFloat(t2);
-            return t1.localeCompare(t2);
-        });
-        rows.forEach(r => table.appendChild(r));
+      const table = document.getElementById("correctionTable");
+      let rows = Array.from(table.rows).slice(1);
+      rows.sort((a, b) => {
+        let t1 = a.cells[n].innerText.toLowerCase();
+        let t2 = b.cells[n].innerText.toLowerCase();
+        if(n===0) return (parseFloat(t1) || 0) - (parseFloat(t2) || 0);
+        return t1.localeCompare(t2);
+      });
+      rows.forEach(r => table.appendChild(r));
     }
 
     function resetNewStudent() {
-        if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
-        window.close();
+      if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
+      window.close();
     }
 
     async function init() {
-        console.log("🚀 Grille V16 (Confort correction) - Démarrage...");
-        initSummary([], {});
+      console.log("🚀 Grille V17 - Démarrage...");
+      loadPreferences();
+      initSummary([], {});
+      updateStatusBanner();
 
-        const rawData = localStorage.getItem("cockpit_transfert");
-        if (!rawData) {
-            document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
-            document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
-            return;
+      const rawData = localStorage.getItem("cockpit_transfert");
+      if (!rawData) {
+        document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
+        document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
+        return;
+      }
+      localStorage.removeItem("cockpit_transfert");
+
+      try {
+        const copyFromStorage = JSON.parse(rawData);
+        CURRENT_DOC_ID = copyFromStorage.id;
+        CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
+
+        if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
+          const parts = copyFromStorage.path.split('/');
+          if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
         }
-        localStorage.removeItem("cockpit_transfert");
 
-        try {
-            const copyFromStorage = JSON.parse(rawData);
-            CURRENT_DOC_ID = copyFromStorage.id;
-            CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
-
-            if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
-                const parts = copyFromStorage.path.split('/');
-                if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
-            }
-
-            console.log("📄 ID:", CURRENT_DOC_ID, "| Élève:", CURRENT_ELEVE_CODE);
-
-            let docSnap = null;
-            if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
-                console.log("🔄 Nouvelle structure:", copyFromStorage.path);
-                docSnap = await getDoc(doc(db, copyFromStorage.path));
-            }
-            if (!docSnap || !docSnap.exists()) {
-                console.log("🔄 Fallback devoirs_rendus");
-                docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    CURRENT_ELEVE_CODE = CURRENT_ELEVE_CODE || data.eleve?.userCode || data.userCode || data.eleveCode;
-                }
-            }
-            if (!docSnap || !docSnap.exists()) throw new Error("Document non trouvé");
-
-            CURRENT_COPY = docSnap.data();
-            CURRENT_COPY.id = CURRENT_DOC_ID;
-            if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
-
-            document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
-            document.getElementById('inputPrenom').value = "";
-            document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
-            document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
-
-            const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
-            if (!devoirId) throw new Error("devoirId invalide");
-
-            const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
-            if (!resp.ok) throw new Error("Blueprint non trouvé: " + devoirId);
-
-            CURRENT_BLUEPRINT = await resp.json();
-            document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
-
-            renderCorrection({ questions: extractQuestionsFromBlueprint(CURRENT_BLUEPRINT) }, CURRENT_COPY.reponses || {});
-
-            if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
-                try {
-                    const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
-                    if (evalSnap.exists()) {
-                        CURRENT_EVALUATION = evalSnap.data();
-                        loadExistingCorrection(CURRENT_EVALUATION);
-                        IS_SAVED = true;
-                    } else if (CURRENT_COPY.correction) {
-                        CURRENT_EVALUATION = CURRENT_COPY.correction;
-                        loadExistingCorrection(CURRENT_COPY.correction);
-                        IS_SAVED = true;
-                    }
-                } catch(e) { IS_SAVED = false; }
-            }
-
-            updateStatusBanner();
-            console.log("✅ Grille prête !");
-
-        } catch (e) {
-            document.getElementById('statusText').innerHTML = "❌ " + e.message;
-            document.getElementById('statusBanner').classList.add('not-saved');
-            console.error("❌", e);
-            alert("Erreur:\n\n" + e.message);
+        let docSnap = null;
+        if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
+          docSnap = await getDoc(doc(db, copyFromStorage.path));
         }
+        if (!docSnap || !docSnap.exists()) {
+          docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            CURRENT_ELEVE_CODE = CURRENT_ELEVE_CODE || data.eleve?.userCode || data.userCode || data.eleveCode;
+          }
+        }
+        if (!docSnap || !docSnap.exists()) throw new Error("Document non trouvé");
+
+        CURRENT_COPY = docSnap.data();
+        CURRENT_COPY.id = CURRENT_DOC_ID;
+        if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
+
+        document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
+        document.getElementById('inputPrenom').value = "";
+        document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
+        document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
+
+        const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+        if (!devoirId) throw new Error("devoirId invalide");
+
+        const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!resp.ok) throw new Error("Blueprint non trouvé: " + devoirId);
+
+        CURRENT_BLUEPRINT = await resp.json();
+        document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
+
+        const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
+        renderCorrection({ questions }, CURRENT_COPY.reponses || {});
+
+        if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
+          try {
+            const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
+            if (evalSnap.exists()) {
+              CURRENT_EVALUATION = evalSnap.data();
+              loadExistingCorrection(CURRENT_EVALUATION);
+              IS_SAVED = true;
+            } else if (CURRENT_COPY.correction) {
+              CURRENT_EVALUATION = CURRENT_COPY.correction;
+              loadExistingCorrection(CURRENT_COPY.correction);
+              IS_SAVED = true;
+            }
+          } catch(e) {
+            IS_SAVED = false;
+          }
+        }
+
+        updateStatusBanner();
+        console.log("✅ Grille V17 prête !");
+      } catch (e) {
+        document.getElementById('statusText').innerHTML = "❌ " + e.message;
+        document.getElementById('statusBanner').classList.add('not-saved');
+        console.error("❌", e);
+        alert("Erreur:\n\n" + e.message);
+      }
     }
 
     window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
     init();
-</script>
+  </script>
 </body>
 </html>
