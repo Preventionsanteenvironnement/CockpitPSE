@@ -2,11 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Grille PSE - V17 (Confort correction)</title>
+  <title>Grille PSE - V18 (Audit complet — 21 fixes)</title>
 
-  <script src="data_eleves.js"></script>
-  <script src="data_commentaires_competences.js"></script>
-  <script src="data_appreciation.js"></script>
+  <!-- FIX #22 : Chargement fichiers externes avec fallback si manquants -->
+  <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
+  <script src="data_commentaires_competences.js" onerror="console.warn('⚠️ data_commentaires_competences.js non trouvé — banque commentaires vide'); window.DATA_COMMENTAIRES_COMPETENCES=window.DATA_COMMENTAIRES_COMPETENCES||{};"></script>
+  <script src="data_appreciation.js" onerror="console.warn('⚠️ data_appreciation.js non trouvé — banque appréciations vide'); window.DATA_APPRECIATION=window.DATA_APPRECIATION||{};"></script>
 
   <style>
     @page { size: A4; margin: 8mm; }
@@ -217,6 +218,8 @@
 
     .editable-div {
       min-height: 25px;
+      max-height: 150px; /* FIX #18 : limiter la hauteur */
+      overflow-y: auto;  /* FIX #18 : scroll si trop long */
       text-align: left;
       outline: none;
       padding: 6px;
@@ -378,6 +381,9 @@
 
     <button class="action-btn" onclick="scrollToNextUnrated()">➡️ Non notées</button>
 
+    <!-- FIX #16 : Bouton aperçu copie intégré -->
+    <button class="action-btn" onclick="ouvrirApercuCopie()" style="background:#f0f9ff; color:#0369a1; border:1px solid #93c5fd;">👁️ Copie</button>
+
     <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
 
     <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:8px; border:1px solid #16a34a;">
@@ -425,6 +431,17 @@
     </div>
   </div>
 
+  <!-- FIX #16 : Modal aperçu copie intégré -->
+  <div id="copyPreviewModal" class="modal-overlay no-print">
+    <div class="modal-box" style="width:750px;">
+      <div class="modal-header" style="background:#f0f9ff;">
+        <span>👁️ Aperçu copie élève</span>
+        <span style="cursor:pointer; font-size:1.5em;" onclick="document.getElementById('copyPreviewModal').style.display='none'">×</span>
+      </div>
+      <div id="copyPreviewBody" class="modal-body" style="padding:15px; max-height:75vh; overflow-y:auto;"></div>
+    </div>
+  </div>
+
   <h1 id="docTitle">Correction</h1>
 
   <div class="header-row">
@@ -436,7 +453,9 @@
 
   <div class="appreciation-box">
     <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
-    <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved();"></textarea>
+    <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved(); updateCharCount();"></textarea>
+    <!-- FIX #15 : Compteur de caractères -->
+    <div id="charCount" style="text-align:right; font-size:0.75em; color:#94a3b8; margin-top:2px;">0 caractères</div>
   </div>
 
   <table id="summaryTable">
@@ -461,7 +480,7 @@
   </table>
 
   <div class="bottom-container">
-    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé</div>
+    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé &nbsp; | &nbsp; ⌨️ <b>Raccourcis :</b> 1=NT 2=I 3=A 4=M, Tab=suivante</div>
     <div class="revision-box">
       <div class="revision-text">Pour réviser :<br><b>preventionsanteenvironnement.github.io/PSE/</b></div>
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
@@ -469,6 +488,15 @@
   </div>
 
   <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
+
+  <!-- FIX #12 : Barre de progression -->
+  <div id="progressBar" class="no-print" style="background:#f1f5f9; border-radius:8px; padding:6px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; font-size:0.85em;">
+    <span id="progressText" style="font-weight:bold; color:#475569;">0 / 0 questions notées</span>
+    <div style="flex:1; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
+      <div id="progressFill" style="width:0%; height:100%; background:#16a34a; border-radius:4px; transition:width 0.3s;"></div>
+    </div>
+    <span id="progressPct" style="font-weight:bold; color:#16a34a;">0%</span>
+  </div>
 
   <table id="correctionTable">
     <thead>
@@ -488,6 +516,14 @@
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
+    // FIX #19 : La config Firebase côté client est normale (clé API publique).
+    // ⚠️ La SÉCURITÉ repose sur les Firestore Security Rules côté serveur.
+    // Vérifier que les règles limitent l'écriture dans "resultats/{eleveCode}" aux profs authentifiés.
+    // Exemple de règle recommandée :
+    //   match /resultats/{code}/evaluations/{evalId} {
+    //     allow read: if true;
+    //     allow write: if request.auth != null && request.auth.token.email_verified;
+    //   }
     const firebaseConfig = {
       apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
       authDomain: "devoirs-pse.firebaseapp.com",
@@ -513,6 +549,25 @@
 
     const comps = ['C1','C2','C3','C4','C5','C6'];
 
+    // FIX #20 : Helper pour les erreurs Firebase avec détection quota/permission
+    function handleFirebaseError(e, context) {
+      const code = e?.code || '';
+      const msg = e?.message || String(e);
+      if (code === 'resource-exhausted' || msg.includes('quota')) {
+        alert(`⚠️ Quota Firebase dépassé (${context}).\n\nLes lectures/écritures sont temporairement limitées.\nRéessayez dans quelques minutes.`);
+        console.error(`🔥 QUOTA Firebase (${context}):`, e);
+      } else if (code === 'permission-denied' || msg.includes('permission')) {
+        alert(`🔒 Permission refusée (${context}).\n\nVérifiez que vous êtes bien connecté et que les règles Firestore sont correctes.`);
+        console.error(`🔒 PERMISSION Firebase (${context}):`, e);
+      } else if (code === 'unavailable' || msg.includes('offline') || msg.includes('network')) {
+        alert(`📡 Connexion perdue (${context}).\n\nVérifiez votre connexion internet et réessayez.`);
+        console.error(`📡 RÉSEAU Firebase (${context}):`, e);
+      } else {
+        alert(`❌ Erreur (${context}) :\n\n${msg}`);
+        console.error(`❌ Firebase (${context}):`, e);
+      }
+    }
+
     let SHOW_QUESTION = true;
     let SHOW_EXPECTED = true;
 
@@ -521,6 +576,8 @@
     window.closeModal = closeModal;
     window.sortTable = sortTable;
     window.markUnsaved = markUnsaved;
+    window.ouvrirApercuCopie = ouvrirApercuCopie;
+    window.setGlobalLevel = setGlobalLevel;
     window.resetNewStudent = resetNewStudent;
     window.setNoteVisual = setNoteVisual;
     window.calculateTotal = calculateTotal;
@@ -566,7 +623,26 @@
       }
     }
 
-    function autoResize(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
+    // FIX #21 : autoResize avec debounce (évite recalcul à chaque frappe)
+    let _resizeTimer = null;
+    function autoResize(el) {
+      if (_resizeTimer) clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => {
+        el.style.height = 'auto';
+        el.style.height = (el.scrollHeight) + 'px';
+        _resizeTimer = null;
+      }, 50);
+    }
+    // FIX #15 : Compteur de caractères
+    function updateCharCount() {
+      const area = document.getElementById('appreciationArea');
+      const counter = document.getElementById('charCount');
+      if (area && counter) {
+        const len = area.value.length;
+        counter.textContent = len + ' caractère' + (len > 1 ? 's' : '');
+        counter.style.color = len > 500 ? '#d9534f' : '#94a3b8';
+      }
+    }
     function markUnsaved() { IS_SAVED = false; updateStatusBanner(); }
 
     function updateStatusBanner() {
@@ -638,6 +714,59 @@
       SHOW_EXPECTED = !SHOW_EXPECTED;
       savePreferences();
       syncToggleButtons();
+    }
+
+    // FIX #16 : Aperçu copie intégré
+    function ouvrirApercuCopie() {
+      if (!CURRENT_COPY || !CURRENT_COPY.reponses) {
+        alert("Aucune copie chargée.");
+        return;
+      }
+      const reponses = CURRENT_COPY.reponses;
+      const meta = CURRENT_COPY.eleve || CURRENT_COPY;
+      let html = `<div style="margin-bottom:10px; padding:8px; background:#f8fafc; border-radius:8px; font-size:0.85em; color:#475569;">
+        <b>Code :</b> ${escapeHTML(CURRENT_ELEVE_CODE)} &nbsp;|&nbsp;
+        <b>Classe :</b> ${escapeHTML(meta.classe || '')} &nbsp;|&nbsp;
+        <b>Date :</b> ${escapeHTML(CURRENT_COPY.submittedAt ? new Date(CURRENT_COPY.submittedAt).toLocaleString('fr-FR') : 'N/A')}
+      </div>`;
+
+      // Stats copier-coller si disponibles
+      if (CURRENT_COPY.pasteStats) {
+        const ps = CURRENT_COPY.pasteStats;
+        const total = ps.totalPastes || 0;
+        if (total > 0) {
+          html += `<div style="background:#fef3c7; border:1px solid #f59e0b; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85em; color:#92400e;">
+            ⚠️ <b>${total}</b> copier-coller détecté${total > 1 ? 's' : ''}
+          </div>`;
+        }
+      }
+
+      // Lister toutes les réponses
+      const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT || {});
+      if (questions.length > 0) {
+        questions.forEach((q, idx) => {
+          const label = q?.label || ("Q" + (idx + 1));
+          const qText = q?.questionText || q?.question || q?.enonce || q?.texte || "";
+          const rep = getReponseEleve(reponses, q);
+          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
+            <div style="font-weight:bold; font-size:0.85em; color:#334155; margin-bottom:4px;">
+              ${escapeHTML(label)} ${qText ? '— ' + escapeHTML(qText).substring(0, 80) + (qText.length > 80 ? '...' : '') : ''}
+            </div>
+            <div style="font-size:0.9em; color:#1e293b; padding-left:8px; border-left:3px solid #93c5fd;">${rep}</div>
+          </div>`;
+        });
+      } else {
+        // Fallback : afficher les clés brutes
+        for (const [key, val] of Object.entries(reponses)) {
+          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
+            <div style="font-weight:bold; font-size:0.85em; color:#334155;">${escapeHTML(key)}</div>
+            <div style="font-size:0.9em; padding-left:8px; border-left:3px solid #93c5fd;">${formatMaybeBullets(val)}</div>
+          </div>`;
+        }
+      }
+
+      document.getElementById('copyPreviewBody').innerHTML = html;
+      document.getElementById('copyPreviewModal').style.display = 'flex';
     }
 
     function scrollToNextUnrated() {
@@ -726,9 +855,42 @@
       const qid = q?.qid;
       const label = q?.label;
 
-      if (qid && reponses[qid] !== undefined) return formatMaybeBullets(reponses[qid]);
-      if (label && reponses[label] !== undefined) return formatMaybeBullets(reponses[label]);
-      if (label && reponses["Q" + label] !== undefined) return formatMaybeBullets(reponses["Q" + label]);
+      // FIX #9 : Mapping intelligent — essayer toutes les variantes de clés
+      const keysToTry = [];
+      if (qid) keysToTry.push(qid);                                    // q_0
+      if (label) keysToTry.push(label);                                 // 1.1
+      if (label) keysToTry.push("Q" + label);                           // Q1.1
+      if (qid) keysToTry.push(qid.replace("q_", "Q"));                 // Q0
+      if (label) keysToTry.push("Q" + label.replace(".", "_"));         // Q1_1
+      if (qid) {
+        // Variantes avec suffixes courants (matrice, gravité, décision, trous)
+        ["_gravite", "_decision", "_matrice", "_trous", "_source"].forEach(suffix => {
+          keysToTry.push(qid + suffix);
+        });
+      }
+
+      for (const key of keysToTry) {
+        if (key && reponses[key] !== undefined) return formatMaybeBullets(reponses[key]);
+      }
+
+      // FIX #9 : Recherche partielle — si qid contient le début d'une clé dans reponses
+      if (qid) {
+        for (const rKey of Object.keys(reponses)) {
+          if (rKey.startsWith(qid + "_") || rKey.startsWith(qid + ".")) {
+            // Grouper toutes les sous-réponses
+            const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
+            if (subKeys.length > 0) {
+              const grouped = {};
+              subKeys.forEach(sk => {
+                const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
+                grouped[suffix || sk] = reponses[sk];
+              });
+              return formatMaybeBullets(grouped);
+            }
+          }
+        }
+      }
+
       return "<i>Non répondu</i>";
     }
 
@@ -802,11 +964,14 @@
       } catch (e) {
         console.error("❌ Erreur:", e);
         showSaveMessage(false);
-        alert("Erreur:\n\n" + e.message);
+        handleFirebaseError(e, "sauvegarde brouillon"); // FIX #20
       }
     }
 
+    let IS_PUBLISHING = false; // FIX #1+#5 : verrou anti-double-clic
+
     window.publierCorrection = async function() {
+      if (IS_PUBLISHING) return; // FIX #1 : ignorer si déjà en cours
       if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
       if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
 
@@ -839,6 +1004,19 @@
 
       if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) return;
 
+      // FIX #11 : Avertissement si la copie est déjà publiée
+      if (CURRENT_EVALUATION && CURRENT_EVALUATION.publie) {
+        if (!confirm("⚠️ Cette copie a DÉJÀ été publiée.\n\nVoulez-vous écraser la correction existante ?")) return;
+      }
+
+      // FIX #5 : désactiver le bouton visuellement pendant l'écriture
+      IS_PUBLISHING = true;
+      const publishBtn = document.querySelector('.save-btn');
+      const originalBtnText = publishBtn.textContent;
+      publishBtn.textContent = "⏳ Envoi...";
+      publishBtn.disabled = true;
+      publishBtn.style.opacity = "0.5";
+
       try {
         const evaluation = collecterDonneesCorrection();
         evaluation.note_finale = noteFinale;
@@ -869,11 +1047,23 @@
         IS_SAVED = true;
         updateStatusBanner();
 
+        // FIX #5 : bouton passe en "Déjà publié" après succès
+        publishBtn.textContent = "✅ Publié";
+        publishBtn.style.opacity = "1";
+        publishBtn.style.background = "#bbf7d0";
+
         afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
       } catch (e) {
         console.error("❌ Erreur:", e);
         showSaveMessage(false);
-        alert("Erreur:\n\n" + e.message);
+        handleFirebaseError(e, "publication correction"); // FIX #20
+        publishBtn.textContent = originalBtnText;
+        publishBtn.disabled = false;
+        publishBtn.style.opacity = "1";
+      } finally {
+        IS_PUBLISHING = false;
+        // FIX #5 : réactiver après 3s pour permettre une republication si besoin
+        setTimeout(() => { publishBtn.disabled = false; }, 3000);
       }
     }
 
@@ -946,12 +1136,12 @@
             <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
             <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
           </td>
-          <td><input type="radio" name="r_${c}" value="NT"></td>
-          <td><input type="radio" name="r_${c}" value="I"></td>
-          <td><input type="radio" name="r_${c}" value="A"></td>
-          <td><input type="radio" name="r_${c}" value="M"></td>
+          <td><input type="radio" name="r_${c}" value="NT" onclick="setGlobalLevel('${c}','NT')"></td>
+          <td><input type="radio" name="r_${c}" value="I" onclick="setGlobalLevel('${c}','I')"></td>
+          <td><input type="radio" name="r_${c}" value="A" onclick="setGlobalLevel('${c}','A')"></td>
+          <td><input type="radio" name="r_${c}" value="M" onclick="setGlobalLevel('${c}','M')"></td>
           <td style="white-space:nowrap;">
-            <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="calculateTotal(); markUnsaved();"> /
+            <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="MANUAL_OVERRIDE['${c}']=true; this.style.color='#333'; this.title='Mode manuel'; calculateTotal(); markUnsaved();"> /
             <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
           </td>
         </tr>`;
@@ -981,6 +1171,7 @@
         row.dataset.comp = competence;
         row.dataset.level = "";
         row.dataset.qid = qid;
+        row.dataset.bareme = bareme; // FIX #6 : stocker le barème pour calcul semi-auto
 
         const repEleve = getReponseEleve(reponses, q);
         const attendu = formatExpected(q);
@@ -1024,14 +1215,81 @@
       syncToggleButtons();
     }
 
+    // FIX #6 : Ratios barème semi-auto (modifiable par le prof)
+    const LEVEL_RATIO = { M: 1.0, A: 0.66, I: 0.33, NT: 0 };
+    // FIX #6 : Tracker les compétences en mode manuel (modifiées à la main)
+    const MANUAL_OVERRIDE = {};
+
     function setNoteVisual(btn, level) {
       const row = btn.closest('tr');
       Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       row.dataset.level = level;
       updateCounters(row.dataset.comp);
+      autoCalculatePoints(row.dataset.comp); // FIX #6 : recalcul semi-auto
+      updateDominantLevel(row.dataset.comp); // FIX #7 : niveau dominant
       markUnsaved();
       openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
+    }
+
+    // FIX #6 : Calcul semi-auto des points par compétence
+    function autoCalculatePoints(comp) {
+      if (MANUAL_OVERRIDE[comp]) return; // Ne pas écraser si le prof a modifié manuellement
+      let totalPts = 0;
+      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+        if (r.dataset.comp === comp && r.dataset.level) {
+          const bareme = parseFloat(r.dataset.bareme) || 0;
+          const ratio = LEVEL_RATIO[r.dataset.level] ?? 0;
+          totalPts += bareme * ratio;
+        }
+      });
+      const ptsEl = document.getElementById(`pts_${comp}`);
+      if (ptsEl) {
+        ptsEl.value = Math.round(totalPts * 4) / 4; // Arrondi au 0.25
+        ptsEl.style.color = "#2e7bb6"; // Bleu = auto
+        ptsEl.title = "Calculé automatiquement (modifiable)";
+      }
+      calculateTotal();
+    }
+
+    // FIX #7 : Calcul et affichage du niveau dominant par compétence
+    function updateDominantLevel(comp) {
+      let counts = { NT: 0, I: 0, A: 0, M: 0 };
+      let total = 0;
+      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+        if (r.dataset.comp === comp && r.dataset.level) {
+          counts[r.dataset.level]++;
+          total++;
+        }
+      });
+      if (total === 0) return;
+      // Niveau dominant = celui qui apparaît le plus
+      const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      const levelColors = { M: '#5cb85c', A: '#f0c05a', I: '#d9534f', NT: '#7f8c8d' };
+      const levelEmoji = { M: '🟢', A: '🔵', I: '🟠', NT: '🔴' };
+      const display = document.getElementById(`dominant_${comp}`);
+      if (display) {
+        display.textContent = `${levelEmoji[dominant]} ${dominant}`;
+        display.style.color = levelColors[dominant];
+        display.style.fontWeight = 'bold';
+      }
+    }
+
+    // FIX #7 : Les radios du récapitulatif mettent TOUTES les questions d'une compétence au même niveau
+    function setGlobalLevel(comp, level) {
+      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+        if (r.dataset.comp === comp) {
+          r.dataset.level = level;
+          const btns = r.querySelectorAll('.level-btn');
+          btns.forEach(b => b.classList.remove('active'));
+          const target = r.querySelector(`.level-btn.${level.toLowerCase()}`);
+          if (target) target.classList.add('active');
+        }
+      });
+      updateCounters(comp);
+      autoCalculatePoints(comp);
+      updateDominantLevel(comp);
+      markUnsaved();
     }
 
     function updateCounters(comp) {
@@ -1041,6 +1299,25 @@
       });
       const statBox = document.getElementById(`stats_${comp}`);
       if(statBox) statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
+      updateProgress(); // FIX #12
+    }
+
+    // FIX #12 : Mise à jour de la barre de progression
+    function updateProgress() {
+      const rows = document.querySelectorAll('#correctionTable tbody tr');
+      const total = rows.length;
+      let noted = 0;
+      rows.forEach(r => { if (r.dataset.level) noted++; });
+      const pct = total > 0 ? Math.round((noted / total) * 100) : 0;
+      const textEl = document.getElementById('progressText');
+      const fillEl = document.getElementById('progressFill');
+      const pctEl = document.getElementById('progressPct');
+      if (textEl) textEl.textContent = `${noted} / ${total} questions notées`;
+      if (fillEl) fillEl.style.width = pct + '%';
+      if (pctEl) {
+        pctEl.textContent = pct + '%';
+        pctEl.style.color = pct === 100 ? '#16a34a' : pct > 50 ? '#2e7bb6' : '#d9534f';
+      }
     }
 
     function calculateTotal() {
@@ -1057,39 +1334,199 @@
       elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
     }
 
+    // FIX #8 : Banque de commentaires dynamique
+    // — Ajout de commentaires personnalisés
+    // — Compteur de fréquence d'utilisation (tri par usage)
+    // — Persistance localStorage
+    const COMMENT_STATS_KEY = "grille_comment_stats";
+    const CUSTOM_COMMENTS_KEY = "grille_custom_comments";
+
+    function loadCommentStats() {
+      try { return JSON.parse(localStorage.getItem(COMMENT_STATS_KEY) || "{}"); } catch(e) { return {}; }
+    }
+    function saveCommentStats(stats) {
+      try { localStorage.setItem(COMMENT_STATS_KEY, JSON.stringify(stats)); } catch(e) {}
+    }
+    function loadCustomComments() {
+      try { return JSON.parse(localStorage.getItem(CUSTOM_COMMENTS_KEY) || "{}"); } catch(e) { return {}; }
+    }
+    function saveCustomComments(custom) {
+      try { localStorage.setItem(CUSTOM_COMMENTS_KEY, JSON.stringify(custom)); } catch(e) {}
+    }
+
+    function incrementCommentUsage(comp, level, txt) {
+      const stats = loadCommentStats();
+      const key = `${comp}_${level}`;
+      if (!stats[key]) stats[key] = {};
+      stats[key][txt] = (stats[key][txt] || 0) + 1;
+      saveCommentStats(stats);
+    }
+
+    function getCommentUsage(comp, level, txt) {
+      const stats = loadCommentStats();
+      const key = `${comp}_${level}`;
+      return stats[key]?.[txt] || 0;
+    }
+
     function openCommentBank(comp, level, target) {
       CURRENT_TARGET_DIV = target;
       const list = document.getElementById('modalList');
       list.innerHTML = "";
       document.getElementById('modalTitle').innerText = `Banque ${comp} (${level})`;
 
+      // Collecter tous les commentaires (statiques + perso)
+      const allPhrases = [];
       const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
-      if (!compData) {
-        list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
-      } else {
+      if (compData) {
         for (const [catName, levelsObj] of Object.entries(compData)) {
           const phrases = levelsObj[level];
           if (phrases && phrases.length > 0) {
-            const h = document.createElement("div");
-            h.className = "bank-title";
-            h.innerText = catName;
-            list.appendChild(h);
-            phrases.forEach(txt => {
-              const d = document.createElement('div');
-              d.className = "comment-item";
-              d.innerText = txt;
-              d.onclick = () => {
-                const prev = CURRENT_TARGET_DIV.innerText.trim();
-                CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
-                closeModal();
-                markUnsaved();
-              };
-              list.appendChild(d);
-            });
+            phrases.forEach(txt => allPhrases.push({ txt, cat: catName, custom: false }));
           }
         }
       }
+
+      // Commentaires personnalisés
+      const custom = loadCustomComments();
+      const customKey = `${comp}_${level}`;
+      if (custom[customKey] && custom[customKey].length > 0) {
+        custom[customKey].forEach(txt => allPhrases.push({ txt, cat: "✏️ Mes commentaires", custom: true }));
+      }
+
+      if (allPhrases.length === 0 && !compData) {
+        list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
+      } else {
+        // Trier par fréquence d'utilisation (les plus utilisés en premier)
+        allPhrases.sort((a, b) => {
+          const freqA = getCommentUsage(comp, level, a.txt);
+          const freqB = getCommentUsage(comp, level, b.txt);
+          if (freqB !== freqA) return freqB - freqA;
+          return 0; // Garder l'ordre d'origine si même fréquence
+        });
+
+        // Grouper par catégorie
+        const grouped = {};
+        allPhrases.forEach(p => {
+          if (!grouped[p.cat]) grouped[p.cat] = [];
+          grouped[p.cat].push(p);
+        });
+
+        // Section "Fréquents" si au moins un commentaire a été utilisé
+        const stats = loadCommentStats();
+        const statsKey = `${comp}_${level}`;
+        const frequents = allPhrases.filter(p => getCommentUsage(comp, level, p.txt) > 0)
+          .sort((a, b) => getCommentUsage(comp, level, b.txt) - getCommentUsage(comp, level, a.txt))
+          .slice(0, 5);
+
+        if (frequents.length > 0) {
+          const h = document.createElement("div");
+          h.className = "bank-title";
+          h.innerHTML = "⭐ Les plus utilisés";
+          list.appendChild(h);
+          frequents.forEach(p => {
+            const usage = getCommentUsage(comp, level, p.txt);
+            list.appendChild(createCommentItem(p.txt, comp, level, usage));
+          });
+        }
+
+        // Puis les catégories classiques
+        for (const [catName, phrases] of Object.entries(grouped)) {
+          const h = document.createElement("div");
+          h.className = "bank-title";
+          h.innerText = catName;
+          list.appendChild(h);
+          phrases.forEach(p => {
+            const usage = getCommentUsage(comp, level, p.txt);
+            const item = createCommentItem(p.txt, comp, level, usage);
+            // Bouton supprimer pour les commentaires personnalisés
+            if (p.custom) {
+              const delBtn = document.createElement('span');
+              delBtn.textContent = '🗑️';
+              delBtn.style.cssText = 'cursor:pointer; float:right; opacity:0.5; font-size:0.9em;';
+              delBtn.title = 'Supprimer ce commentaire';
+              delBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm("Supprimer ce commentaire personnalisé ?")) {
+                  const c = loadCustomComments();
+                  c[customKey] = (c[customKey] || []).filter(t => t !== p.txt);
+                  saveCustomComments(c);
+                  openCommentBank(comp, level, target); // Recharger
+                }
+              };
+              item.prepend(delBtn);
+            }
+            list.appendChild(item);
+          });
+        }
+      }
+
+      // Barre d'ajout personnalisé en bas
+      const addBar = document.createElement('div');
+      addBar.style.cssText = 'padding:10px 15px; border-top:2px solid #e2e8f0; display:flex; gap:8px; align-items:center; background:#f8fafc;';
+      addBar.innerHTML = `
+        <input type="text" id="customCommentInput" placeholder="✏️ Ajouter un commentaire personnalisé..." 
+          style="flex:1; padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9em;">
+        <button onclick="addCustomComment('${comp}','${level}')" 
+          style="padding:6px 14px; background:#2e7bb6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em;">+ Ajouter</button>
+      `;
+      list.appendChild(addBar);
+
+      // Permettre l'ajout avec Entrée
+      setTimeout(() => {
+        const input = document.getElementById('customCommentInput');
+        if (input) {
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); addCustomComment(comp, level); }
+          });
+        }
+      }, 100);
+
       document.getElementById('commentModal').style.display = "flex";
+    }
+
+    function createCommentItem(txt, comp, level, usage) {
+      const d = document.createElement('div');
+      d.className = "comment-item";
+      d.style.display = 'flex';
+      d.style.justifyContent = 'space-between';
+      d.style.alignItems = 'center';
+      const textSpan = document.createElement('span');
+      textSpan.textContent = txt;
+      textSpan.style.flex = '1';
+      d.appendChild(textSpan);
+      if (usage > 0) {
+        const badge = document.createElement('span');
+        badge.textContent = `×${usage}`;
+        badge.style.cssText = 'font-size:0.7em; background:#e2e8f0; color:#64748b; padding:1px 6px; border-radius:10px; margin-left:8px; white-space:nowrap;';
+        d.appendChild(badge);
+      }
+      d.onclick = () => {
+        const prev = CURRENT_TARGET_DIV.innerText.trim();
+        CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
+        incrementCommentUsage(comp, level, txt);
+        closeModal();
+        markUnsaved();
+      };
+      return d;
+    }
+
+    window.addCustomComment = function(comp, level) {
+      const input = document.getElementById('customCommentInput');
+      if (!input) return;
+      const txt = input.value.trim();
+      if (!txt) { input.focus(); return; }
+      const custom = loadCustomComments();
+      const key = `${comp}_${level}`;
+      if (!custom[key]) custom[key] = [];
+      if (custom[key].includes(txt)) { alert("Ce commentaire existe déjà."); return; }
+      custom[key].push(txt);
+      saveCustomComments(custom);
+      // Insérer directement le commentaire
+      const prev = CURRENT_TARGET_DIV.innerText.trim();
+      CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
+      incrementCommentUsage(comp, level, txt);
+      closeModal();
+      markUnsaved();
     }
 
     function openAppreciationBank() {
@@ -1142,23 +1579,41 @@
 
     function sortTable(n) {
       const table = document.getElementById("correctionTable");
-      let rows = Array.from(table.rows).slice(1);
+      const tbody = table.querySelector('tbody'); // FIX #17 : cibler tbody, pas table
+      let rows = Array.from(tbody.rows);
       rows.sort((a, b) => {
         let t1 = a.cells[n].innerText.toLowerCase();
         let t2 = b.cells[n].innerText.toLowerCase();
         if(n===0) return (parseFloat(t1) || 0) - (parseFloat(t2) || 0);
         return t1.localeCompare(t2);
       });
-      rows.forEach(r => table.appendChild(r));
+      rows.forEach(r => tbody.appendChild(r)); // FIX #17 : append dans tbody
     }
 
     function resetNewStudent() {
       if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
-      window.close();
+      // FIX #4 : Fallback robuste si window.close() échoue (onglet ouvert manuellement)
+      try { window.close(); } catch(e) { /* ignoré */ }
+      // Si la fenêtre est toujours ouverte après 200ms, proposer une alternative
+      setTimeout(() => {
+        if (!window.closed) {
+          if (window.opener) {
+            window.opener.focus();
+          } else if (document.referrer) {
+            window.location.href = document.referrer;
+          } else {
+            // Réinitialiser la page pour une nouvelle copie
+            document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
+            document.getElementById('statusText').innerHTML = "🔄 Retournez au Cockpit pour sélectionner une autre copie.";
+            document.getElementById('statusBanner').className = 'status-banner auth-required';
+            alert("Retournez au Cockpit pour ouvrir une autre copie.");
+          }
+        }
+      }, 200);
     }
 
     async function init() {
-      console.log("🚀 Grille V17 - Démarrage...");
+      console.log("🚀 Grille V18 - Démarrage (audit complet — 21 fixes)...");
       loadPreferences();
       initSummary([], {});
       updateStatusBanner();
@@ -1169,7 +1624,7 @@
         document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
         return;
       }
-      localStorage.removeItem("cockpit_transfert");
+      // FIX #2 : NE PAS supprimer tout de suite — on attend que le chargement réussisse
 
       try {
         const copyFromStorage = JSON.parse(rawData);
@@ -1196,6 +1651,8 @@
 
         CURRENT_COPY = docSnap.data();
         CURRENT_COPY.id = CURRENT_DOC_ID;
+        // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
+        localStorage.removeItem("cockpit_transfert");
         if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
 
         document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
@@ -1228,19 +1685,86 @@
               IS_SAVED = true;
             }
           } catch(e) {
+            // FIX #3 : Signaler l'erreur au lieu de l'avaler silencieusement
+            console.warn("⚠️ Impossible de charger une correction existante:", e.message);
             IS_SAVED = false;
+            const banner = document.getElementById('statusText');
+            if (banner) banner.innerHTML = "⚠️ Correction existante non chargée (vérifiez votre connexion)";
+            document.getElementById('statusBanner').className = 'status-banner not-saved';
           }
         }
 
         updateStatusBanner();
-        console.log("✅ Grille V17 prête !");
+        console.log("✅ Grille V18 prête !");
       } catch (e) {
         document.getElementById('statusText').innerHTML = "❌ " + e.message;
         document.getElementById('statusBanner').classList.add('not-saved');
         console.error("❌", e);
-        alert("Erreur:\n\n" + e.message);
+        handleFirebaseError(e, "chargement copie"); // FIX #20
       }
     }
+
+    // FIX #13 : Raccourcis clavier — cliquer sur une ligne puis 1=NT, 2=I, 3=A, 4=M
+    let FOCUSED_ROW = null;
+    document.addEventListener('click', (e) => {
+      const row = e.target.closest('#correctionTable tbody tr');
+      if (row) {
+        if (FOCUSED_ROW) FOCUSED_ROW.style.outline = '';
+        FOCUSED_ROW = row;
+        row.style.outline = '2px solid #2e7bb6';
+        row.style.outlineOffset = '-2px';
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      // Ne pas intercepter si on est dans un champ de saisie
+      if (e.target.matches('input, textarea, [contenteditable="true"]')) return;
+      if (!FOCUSED_ROW) return;
+      const keyMap = { '1': 'NT', '2': 'I', '3': 'A', '4': 'M', 'Numpad1': 'NT', 'Numpad2': 'I', 'Numpad3': 'A', 'Numpad4': 'M' };
+      const level = keyMap[e.key] || keyMap[e.code];
+      if (level) {
+        e.preventDefault();
+        const btn = FOCUSED_ROW.querySelector(`.level-btn.${level.toLowerCase()}`);
+        if (btn) btn.click();
+        // Passer à la question suivante
+        const next = FOCUSED_ROW.nextElementSibling;
+        if (next && next.matches('tr')) {
+          FOCUSED_ROW.style.outline = '';
+          FOCUSED_ROW = next;
+          next.style.outline = '2px solid #2e7bb6';
+          next.style.outlineOffset = '-2px';
+          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      // Tab = passer à la question suivante sans noter
+      if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        const next = FOCUSED_ROW.nextElementSibling;
+        if (next && next.matches('tr')) {
+          FOCUSED_ROW.style.outline = '';
+          FOCUSED_ROW = next;
+          next.style.outline = '2px solid #2e7bb6';
+          next.style.outlineOffset = '-2px';
+          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    });
+
+    // FIX #14 : Sauvegarde auto du brouillon quand l'onglet perd le focus (mobile + desktop)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && !IS_SAVED && currentUser && CURRENT_ELEVE_CODE && CURRENT_ELEVE_CODE !== 'UNKNOWN') {
+        // Sauvegarde silencieuse en brouillon
+        try {
+          const brouillon = collecterDonneesCorrection();
+          brouillon.statut = "brouillon_auto";
+          brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
+          brouillon.publie = false;
+          const brouillonDocId = brouillon.devoirId + "_brouillon";
+          setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon)
+            .then(() => console.log("💾 Brouillon auto sauvegardé (visibilitychange)"))
+            .catch(err => console.warn("⚠️ Brouillon auto échoué:", err.message));
+        } catch(e) { console.warn("⚠️ Brouillon auto échoué:", e.message); }
+      }
+    });
 
     window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
     init();
