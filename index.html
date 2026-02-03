@@ -6,6 +6,7 @@
   <title>Cockpit Professeur – Pilotage Global</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="annuaire_local.js" onerror="console.warn('annuaire_local.js non disponible');"></script>
 
   <style>
     :root{
@@ -355,7 +356,10 @@
           <div class="widget">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <span><strong>Dernières évaluations reçues</strong></span>
-                <button onclick="chargerDonnees()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="annuaireScoresContainer"></span>
+                    <button onclick="chargerDonnees()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+                </div>
             </div>
 
             <div class="toolbar">
@@ -867,6 +871,43 @@ QN80,Wael HWORI</pre>
         localStorage.removeItem(CLE_ELEVES);
         rafraichirListeEleves();
     };
+
+    // ═══════════════════════════════════════════════════════════
+    // 🔗 PONT : AnnuaireLocal ↔ Système cockpit existant
+    // ═══════════════════════════════════════════════════════════
+    
+    (function initAnnuaireBridge() {
+        if (typeof AnnuaireLocal === 'undefined') return;
+        
+        // Rendre le bouton dans la section Scores
+        const container = document.getElementById('annuaireScoresContainer');
+        if (container) AnnuaireLocal.renderButton(container);
+        
+        // Quand on importe via AnnuaireLocal, synchroniser avec le système cockpit
+        document.addEventListener('annuaire-updated', function(e) {
+            if (typeof AnnuaireLocal === 'undefined') return;
+            const annuaireData = AnnuaireLocal.getAll();
+            if (Object.keys(annuaireData).length > 0) {
+                // Fusionner avec le système cockpit existant
+                const existing = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+                const merged = Object.assign({}, existing, annuaireData);
+                localStorage.setItem(CLE_ELEVES, JSON.stringify(merged));
+                console.log('✅ Annuaire synchronisé avec cockpit :', Object.keys(merged).length, 'élèves');
+                // Rafraîchir l'affichage si le tableau est visible
+                if (typeof chargerDonnees === 'function') chargerDonnees();
+                if (typeof rafraichirListeEleves === 'function') rafraichirListeEleves();
+            }
+        });
+        
+        // Au chargement, si l'annuaire local a des données, les synchroniser
+        if (AnnuaireLocal.isLoaded()) {
+            const annuaireData = AnnuaireLocal.getAll();
+            const existing = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+            const merged = Object.assign({}, existing, annuaireData);
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(merged));
+        }
+    })();
+
 
     // Auto-init au chargement
     setTimeout(rafraichirListeEleves, 100);
