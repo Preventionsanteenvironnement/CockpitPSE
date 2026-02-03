@@ -1367,8 +1367,8 @@ QN80,Wael HWORI</pre>
                 <td style="text-align:center;">${pasteBadge}</td>
                 <td style="text-align:center;">${statutBadge}</td>
                 <td style="display:flex; gap:5px;">
-                    <button onclick='ouvrirCorrection(filteredData[${idx}])' style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">✍️</button>
-                    <button onclick='openMirror(filteredData[${idx}])' style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</button>
+                    <button onclick='ouvrirCorrection(window.filteredData[${idx}])' style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">✍️</button>
+                    <button onclick='openMirror(window.filteredData[${idx}])' style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</button>
                     <button onclick='deleteSubmission("${d.path}", "${d.eleveCode}", "${d.devoirId}", "${d.identifiant}")' style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">🗑️</button>
                 </td>
             </tr>`;
@@ -1377,15 +1377,26 @@ QN80,Wael HWORI</pre>
 
     window.ouvrirCorrection = function(copy) {
         try {
+            if (!copy) { alert("❌ Erreur : données de copie manquantes. Actualisez la page."); return; }
+            console.log("📋 ouvrirCorrection:", copy.eleveCode, copy.devoirId);
             localStorage.setItem("cockpit_transfert", JSON.stringify(copy));
             // Envoyer aussi la liste filtrée pour navigation "Suivant" dans la grille
-            const copyList = filteredData.map(d => ({
+            const copyList = (window.filteredData || []).map(d => ({
                 id: d.id, path: d.path, eleveCode: d.eleveCode,
                 userCode: d.userCode, devoirId: d.devoirId
             }));
             localStorage.setItem("cockpit_copy_list", JSON.stringify(copyList));
-            window.open("grille.html", "_blank");
-        } catch (e) { alert("Erreur: " + e.message); }
+            // Ouvrir la grille — fallback si popup bloqué
+            const w = window.open("grille.html", "_blank");
+            if (!w || w.closed) {
+                // Popup bloqué par le navigateur → ouvrir dans le même onglet
+                console.warn("⚠️ Popup bloqué, ouverture dans le même onglet");
+                window.location.href = "grille.html";
+            }
+        } catch (e) { 
+            console.error("❌ ouvrirCorrection:", e);
+            alert("Erreur: " + e.message); 
+        }
     };
 
     // ═══════════════════════════════════════════════════════════════
