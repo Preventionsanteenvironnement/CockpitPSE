@@ -2,567 +2,929 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Grille PSE - V19 (V18 + Auto-correction — 21 fixes)</title>
-
-  <!-- FIX #22 : Chargement fichiers externes avec fallback si manquants -->
-  <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
-  <script src="data_commentaires_competences.js" onerror="console.warn('⚠️ data_commentaires_competences.js non trouvé — banque commentaires vide'); window.DATA_COMMENTAIRES_COMPETENCES=window.DATA_COMMENTAIRES_COMPETENCES||{};"></script>
-  <script src="data_appreciation.js" onerror="console.warn('⚠️ data_appreciation.js non trouvé — banque appréciations vide'); window.DATA_APPRECIATION=window.DATA_APPRECIATION||{};"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cockpit Professeur – Pilotage Global</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="annuaire_local.js" onerror="console.warn('annuaire_local.js non disponible');"></script>
 
   <style>
-    @page { size: A4; margin: 8mm; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 210mm;
-      margin: 0 auto;
-      padding: 10px 15px;
-      background-color: #fff;
-      color: #333;
-      font-size: 0.9em;
+    :root{
+      --bg-body:#f1f5f9; --bg-sidebar:#0f172a; --text-main:#1e293b; --text-muted:#64748b;
+      --col-pedago:#3b82f6; --col-eval:#f59e0b; --col-class:#10b981; --col-proj:#8b5cf6;
+      --col-admin:#f97316; --col-live-web:#795548; --col-sites:#607d8b;
+      --col-notes:#facc15;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Inter',sans-serif;
+      background-color:var(--bg-body); color:var(--text-main);
+      display:flex; height:100vh; overflow:hidden;
     }
 
-    .tools-container {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      max-width: 95vw;
+    /* SIDEBAR */
+    .sidebar{
+      width:300px; background-color:var(--bg-sidebar); color:#fff;
+      display:flex; flex-direction:column; padding:20px; flex-shrink:0;
+      overflow-y:auto; gap:10px;
+      position: relative;
+    }
+    .brand{ font-size:1.3rem; font-weight:800; margin-bottom:20px; letter-spacing:1px; display:flex; align-items:center; gap:10px; }
+    .nav-category{ font-size:.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#64748b; margin:15px 0 5px; }
+    .nav-item{
+      display:flex; align-items:center; gap:12px; padding:12px 15px; border-radius:8px;
+      cursor:pointer; transition:.2s; font-weight:600; color:#cbd5e1; border-left:4px solid transparent;
+    }
+    .nav-item:hover{background:rgba(255,255,255,.05); color:#fff;}
+    .nav-item.active{background:rgba(255,255,255,.10); color:#fff;}
+    .nav-item[data-theme="pedago"].active{border-left-color:var(--col-pedago);}
+    .nav-item[data-theme="eval"].active{border-left-color:var(--col-eval);}
+    .nav-item[data-theme="class"].active{border-left-color:var(--col-class);}
+    .nav-item[data-theme="proj"].active{border-left-color:var(--col-proj);}
+    .nav-item[data-theme="admin"].active{border-left-color:var(--col-admin);}
+    .nav-item[data-theme="live"].active{border-left-color:var(--col-live-web);}
+    .nav-item[data-theme="sites"].active{border-left-color:var(--col-sites);}
+    .nav-item[data-theme="notes"].active{border-left-color:var(--col-notes);}
+
+    /* MAIN */
+    .main-content{ flex:1; padding:40px; overflow-y:auto; display:flex; flex-direction:column; position:relative; }
+    header{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px; border-bottom:1px solid #e2e8f0; padding-bottom:20px; }
+    h1{margin:0; font-size:2rem; font-weight:800; color:var(--text-main);}
+    .header-infos{text-align:right;}
+    .clock-time{font-size:1.5rem; font-weight:800;}
+    .clock-date{font-size:.9rem; color:var(--text-muted);}
+    .vacation-badge{ margin-top:5px; font-size:.8rem; background:#dbeafe; color:#2563eb; padding:4px 10px; border-radius:20px; border:1px solid #bfdbfe; font-weight:bold; }
+
+    .view-section{display:none; animation:fadeUp .4s ease-out;}
+    .view-section.active{display:block;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+    .quick-actions{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; margin-bottom:30px; }
+    .btn-quick{
+      background:#fff; border:1px solid #e2e8f0; padding:15px; border-radius:12px;
+      text-align:left; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:15px;
+      box-shadow:0 2px 4px rgba(0,0,0,.02); text-decoration:none; color:inherit;
+    }
+    .btn-quick div { display: flex; flex-direction: column; }
+    .btn-quick div strong { font-size: 1em; color: #1e293b; }
+    .btn-quick div span { font-size: 0.8em; color: #64748b; }
+    .btn-quick:hover{ transform:translateY(-2px); box-shadow:0 5px 15px rgba(0,0,0,.05); border-color:var(--col-pedago); }
+
+    .dashboard-grid{display:grid; grid-template-columns:2fr 1fr; gap:25px;}
+    .widget{ background:#fff; border-radius:16px; padding:25px; border:1px solid #e2e8f0; display:flex; flex-direction:column; min-height:320px; }
+    .widget h3{ margin:0 0 15px; padding-bottom:10px; border-bottom:2px solid #f1f5f9; font-size:1.1rem; display:flex; justify-content:space-between; align-items:center; }
+
+    .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .stat-card { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; overflow: hidden; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); border-color: var(--col-pedago); }
+    .stat-card:active { transform: scale(0.98); }
+
+    .stat-icon { width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+    .icon-blue { background: #e0f2fe; color: #0284c7; }
+    .icon-purple { background: #f3e8ff; color: #9333ea; }
+    .icon-green { background: #dcfce7; color: #16a34a; }
+    .stat-info h4 { margin: 0; color: #64748b; font-size: 0.85rem; text-transform: uppercase; }
+    .stat-info p { margin: 5px 0 0; font-size: 1.4rem; font-weight: 800; color: #0f172a; }
+
+    .toolbar {
+      display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+    }
+    .filter-input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; }
+    .filter-select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; min-width: 150px; background: white; }
+
+    .radar-container { height: 320px; display: flex; justify-content: center; margin-bottom: 10px; }
+    .pill { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 2px;}
+    .pill-green { background: #dcfce7; color: #166534; }
+    .pill-orange { background: #ffedd5; color: #9a3412; }
+    .pill-red { background: #fee2e2; color: #991b1b; }
+    .pill-blue { background: #dbeafe; color: #1e40af; }
+    
+    .results-table { width:100%; border-collapse:collapse; min-width:600px; }
+    .results-table thead { background:#f1f5f9; color:#475569; }
+    .results-table th { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; cursor: pointer; user-select: none; }
+    .results-table th:hover { background: #e2e8f0; }
+    .results-table td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:.88rem; }
+    .results-table tr:hover { background:#f8fafc; }
+    .scores-empty { text-align:center; padding: 20px; color: #64748b; }
+
+    .eleve-link { color: #2563eb; font-weight: 700; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: 0.2s; }
+    .eleve-link:hover { text-decoration-color: #2563eb; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; animation: fadeIn 0.3s; }
+    .modal-card { background: #fff; width: 90%; max-width: 900px; max-height: 90vh; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow-y: auto; display: flex; flex-direction: column; }
+    .modal-header { padding: 20px 30px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; position: sticky; top: 0; z-index: 10; }
+    .modal-body { padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+    .stat-box { background: #f1f5f9; padding: 15px; border-radius: 12px; text-align: center; }
+    .stat-val { font-size: 1.8rem; font-weight: 800; color: #0f172a; display: block; }
+    .stat-label { font-size: 0.85rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    @media(max-width: 800px) { .modal-body { grid-template-columns: 1fr; } }
+
+    .detail-modal-content { height: 400px; display: flex; flex-direction: column; width: 100%; }
+    .rank-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; align-items: center; }
+    .rank-item:hover { background-color: #f8fafc; }
+    .rank-pos { font-weight: 800; color: var(--col-pedago); width: 35px; }
+    .rank-name { flex: 1; font-weight: 500; color: #334155; }
+    .rank-val { font-weight: 700; color: #0f172a; background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-size: 0.9rem;}
+
+    .btn-yellow{ display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#fffbeb; color:#b45309; border:1px solid #fcd34d; border-radius:6px; text-decoration:none; font-weight:600; font-size:.85rem; }
+    .btn-blue-outline{ display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; text-decoration:none; font-weight:600; font-size:.85rem; cursor:pointer; }
+    .badge-soon{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; border:1px solid rgba(0,0,0,.05); background:#fef3c7; color:#92400e; }
+    
+    details{ background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+    summary{ padding:15px; font-weight:600; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+    details[open]>summary{background:#f1f5f9; border-bottom:1px solid #e2e8f0;}
+    .content-links{ padding:15px; display:flex; flex-wrap:wrap; gap:10px; }
+    
+    #course-structure>summary{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); }
+    #course-structure .lvl-cap>summary{ background:rgba(37,99,235,.12); border-left:6px solid rgba(37,99,235,.9); font-weight:900; }
+    #course-structure .lvl-bacpro>summary{ background:rgba(22,163,74,.12); border-left:6px solid rgba(22,163,74,.9); font-weight:900; }
+
+    .live-block{ margin-top:12px; border:1px solid rgba(0,0,0,.08); border-radius:14px; overflow:hidden; background:#fff; }
+    .live-summary{ font-weight:900; padding:14px 16px; background:#f1f5f9; }
+    .live-links{padding:14px 12px;}
+    .badge-role{ display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:900; margin-left:8px; border:1px solid rgba(0,0,0,.08); white-space:nowrap; }
+    .role-eleve{background:rgba(245,158,11,.18); color:#a16207;}
+    .role-prof{background:rgba(59,130,246,.18); color:#1d4ed8;}
+
+    .menu-overlay{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(2px); z-index:999; }
+    .menu-btn{ display:none; border:none; background:#0f172a; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; font-weight:900; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,.18); flex-shrink:0; }
+    body.menu-open .sidebar{transform:translateX(0);}
+    body.menu-open .menu-overlay{display:block;}
+    .close-sidebar-btn { display: none; }
+
+    @media(max-width:980px){
+      body{height:auto; overflow:auto; display:block;}
+      .sidebar{ position:fixed; top:0; left:0; bottom:0; height:100vh; width:min(86vw,340px); transform:translateX(-110%); transition:transform .25s ease; z-index:1000; padding:18px; }
+      .main-content{padding:16px; min-height:100vh; overflow:visible;}
+      header{align-items:center; gap:12px; margin-bottom:16px; padding-bottom:14px;}
+      h1{font-size:1.35rem;}
+      .clock-time{font-size:1.15rem;}
+      .menu-btn{display:inline-flex;}
+      .dashboard-grid{grid-template-columns:1fr; gap:14px;}
+      .widget{min-height:auto; padding:16px; border-radius:14px;}
+      .quick-actions{grid-template-columns:1fr;}
+      .btn-quick{padding:14px;}
+      .content-links{padding:12px; gap:8px;}
+      .btn-yellow,.btn-blue-outline{width:100%; justify-content:space-between;}
+      .stats-overview { grid-template-columns: 1fr; }
+      .close-sidebar-btn { display: block; position: absolute; top: 15px; right: 15px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 1002; padding: 5px; }
     }
 
-    .action-btn {
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid #ccc;
-      font-size: 1.05em;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-      user-select: none;
-      white-space: nowrap;
-    }
-    .action-btn:hover { background: #f0f0f0; }
-
-    .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
-    .action-btn.save-btn:hover { background: #bbf7d0; }
-    .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
-    .action-btn.toggle-btn { background: #fff7ed; border-color: #fb923c; color: #9a3412; }
-    .action-btn.toggle-btn.active { background: #ffedd5; border-color: #f97316; color: #7c2d12; }
-
-    #saveMessage {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      background: #16a34a;
-      color: white;
-      padding: 8px 15px;
-      border-radius: 6px;
-      font-size: 0.85em;
-      opacity: 0;
-      transition: opacity 0.5s;
-      font-weight: bold;
-      z-index: 3000;
-    }
-
-    .status-banner {
-      background: #fef3c7;
-      border: 1px solid #f59e0b;
-      color: #92400e;
-      padding: 8px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85em;
-    }
-    .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
-    .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
-    .status-banner.auth-required { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
-
-    /* === AUTO-CORRECTION === */
-    .autocorrect-banner {
-      background: linear-gradient(135deg, #ede9fe, #dbeafe);
-      border: 2px solid #7c3aed;
-      color: #4c1d95;
-      padding: 10px 18px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.9em;
-      font-weight: 600;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .autocorrect-banner .ac-stats {
-      display: flex;
-      gap: 14px;
-      font-size: 0.88em;
-      font-weight: 500;
-    }
-    .autocorrect-banner .ac-stat { display: flex; align-items: center; gap: 4px; }
-    .autocorrect-banner .ac-stat.correct { color: #16a34a; }
-    .autocorrect-banner .ac-stat.incorrect { color: #dc2626; }
-    .autocorrect-banner .ac-stat.unanswered { color: #7f8c8d; }
-    .ac-badge {
-      display: inline-block;
-      font-size: 0.7em;
-      padding: 1px 6px;
-      border-radius: 8px;
-      font-weight: 700;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-    .ac-badge.auto-m { background: #dcfce7; color: #166534; }
-    .ac-badge.auto-i { background: #fee2e2; color: #991b1b; }
-    .ac-badge.auto-nt { background: #f1f5f9; color: #64748b; }
-
-    h1 {
-      text-align: center;
-      color: #d9534f;
-      margin: 0 0 5px 0;
-      border-bottom: 2px solid #d9534f;
-      padding-bottom: 5px;
-      font-size: 1.4em;
-    }
-
-    .header-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-      background-color: #f8f9fa;
-      padding: 5px 10px;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-    }
-    .input-group { display: flex; flex-direction: column; flex-grow: 1; }
-    .input-group label { font-size: 0.75em; color: #666; font-weight: bold; }
-    .input-group input {
-      padding: 3px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95em;
-      font-weight: bold;
-      color: #0f172a;
-    }
-
-    .appreciation-box { margin-bottom: 10px; position: relative; }
-    .appreciation-box label {
-      font-weight: bold;
-      color: #2e7bb6;
-      cursor: pointer;
-      text-decoration: underline;
-      font-size: 0.85em;
-      display:flex;
-      align-items:center;
-      gap:5px;
-      margin-bottom: 3px;
-    }
-    .appreciation-box textarea {
-      width: 100%;
-      min-height: 50px;
-      padding: 8px;
-      border: 2px solid #2e7bb6;
-      border-radius: 6px;
-      background-color: #f0f8ff;
-      resize: none;
-      font-family: inherit;
-      font-size: 0.9em;
-      overflow-y: hidden;
-      box-sizing: border-box;
-    }
-
-    table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-    th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; vertical-align: middle; }
-
-    .thead-dark { background-color: #333; color: white; }
-    .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.8em; }
-    .correction-th { background-color: #d9534f; color: white; cursor: pointer; user-select: none; font-size: 0.85em; }
-
-    .badge {
-      display: inline-block;
-      color: white;
-      padding: 2px 0;
-      width: 25px;
-      text-align: center;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 0.8em;
-    }
-    .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; }
-    .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
-
-    .stat-counters {
-      font-size: 0.75em;
-      color: #666;
-      margin-top: 3px;
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      background: #f9f9f9;
-      padding: 2px;
-      border-radius: 4px;
-    }
-
-    .score-input {
-      width: 46px;
-      text-align: center;
-      font-weight: bold;
-      border: 1px solid #ccc;
-      padding: 2px;
-      border-radius: 4px;
-      font-size: 1em;
-      background: #fff;
-    }
-    .max-input {
-      width: 42px;
-      text-align: center;
-      border: none;
-      font-weight:bold;
-      color: #666;
-      font-size: 0.9em;
-      background: transparent;
-    }
-
-    input[type="radio"] { transform: scale(1.1); cursor: pointer; }
-
-    tfoot { border-top: 2px solid #333; background-color: #fffef0; }
-    .total-label { text-align: right; font-weight: bold; font-size: 1.1em; padding-right: 15px; }
-    .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
-    .total-note { font-weight: 900; font-size: 1.4em; color: #d9534f; display: block; line-height: 1.2; }
-
-    .level-btn {
-      border: 1px solid #ddd;
-      background: #f9f9f9;
-      font-size: 0.7em;
-      padding: 3px 6px;
-      cursor: pointer;
-      border-radius: 4px;
-      font-weight: bold;
-      color: #aaa;
-      transition: 0.15s;
-      user-select: none;
-    }
-    .level-btn:hover { background: #eee; color:#333; }
-    .level-btn.active { border: 2px solid #333; color: #fff; transform: scale(1.06); }
-    .level-btn.active.nt { background: #7f8c8d; border-color: #7f8c8d; }
-    .level-btn.active.i  { background: #d9534f; border-color: #d9534f; }
-    .level-btn.active.a  { background: #f0c05a; border-color: #f0c05a; }
-    .level-btn.active.m  { background: #5cb85c; border-color: #5cb85c; }
-
-    .editable-div {
-      min-height: 25px;
-      max-height: 150px; /* FIX #18 : limiter la hauteur */
-      overflow-y: auto;  /* FIX #18 : scroll si trop long */
-      text-align: left;
-      outline: none;
-      padding: 6px;
-      font-size: 0.9em;
-      border: 1px dashed #ccc;
-      cursor: text;
-      background: #fff;
-      border-radius: 6px;
-      line-height: 1.25;
-      white-space: pre-wrap;
-    }
-    .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
-    .editable-div:empty::before { content: attr(placeholder); color: #ccc; font-style: italic; }
-
-    .bottom-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .legend-box { font-size: 0.75em; color: #555; font-style: italic; }
-
-    .revision-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #f8fafc;
-      border: 1px dashed #94a3b8;
-      border-radius: 8px;
-      padding: 5px 10px;
-    }
-    .revision-text { font-size: 0.75em; color: #475569; text-align: right; line-height: 1.2; }
-    .qr-img { height: 40px; width: 40px; mix-blend-mode: multiply; }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 2000;
-      justify-content: center;
-      align-items: center;
-    }
-    .modal-box {
-      background: white;
-      width: 650px;
-      max-width: 95%;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      display: flex;
-      flex-direction: column;
-      max-height: 85vh;
-    }
-    .modal-header {
-      padding: 10px 15px;
-      border-bottom: 1px solid #eee;
-      background: #f8f9fa;
-      border-radius: 12px 12px 0 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      color: #2e7bb6;
-    }
-    .modal-body { padding: 0; overflow-y: auto; }
-    .bank-title {
-      background: #f1f5f9;
-      padding: 5px 15px;
-      font-size: 0.8em;
-      font-weight: bold;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-top: 1px solid #eee;
-    }
-    .comment-item {
-      padding: 8px 15px;
-      border-bottom: 1px solid #f9f9f9;
-      cursor: pointer;
-      font-size: 0.9em;
-      transition: background 0.1s;
-      line-height: 1.25;
-      white-space: pre-wrap;
-    }
-    .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
-
-    .qa-stack { text-align: left; }
-    .qa-block {
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-      line-height: 1.25;
-      white-space: normal;
-    }
-    .qa-title {
-      font-weight: 800;
-      margin: 0 0 6px 0;
-      font-size: 0.95em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75em;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      user-select: none;
-      white-space: nowrap;
-    }
-    .pill.q { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
-    .pill.e { background: #ecfeff; border-color: #67e8f9; color: #155e75; }
-    .pill.a { background: #f0fdf4; border-color: #86efac; color: #166534; }
-
-    .qa-question { background: #fff7ed; border: 1px solid #fdba74; }
-    .qa-student  { background: #f0f9ff; border: 1px solid #93c5fd; }
-    .qa-expected { background: #f0fdf4; border: 1px dashed #86efac; }
-
-    .qa-content { white-space: pre-wrap; }
-    .qa-content ul { margin: 6px 0 0 18px; padding: 0; }
-    .qa-content li { margin: 2px 0; }
-
-    .hidden { display: none !important; }
-
-    @media print {
-      .no-print { display: none !important; }
-      body { padding: 0; margin: 0; background: white; }
-      .status-banner { display: none !important; }
-      .rep-prof-box { display: none; }
-      .header-row, .revision-box { border: 1px solid #eee; }
-      .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
-      textarea { border: 1px solid #333 !important; background: transparent !important; }
-      .editable-div { border: none; }
-      .score-input, .max-input { border: none; text-align: right; width: auto; font-weight: bold; }
-      tr[style*="display: none"] { display: none !important; }
-      .qa-block { break-inside: avoid; page-break-inside: avoid; }
-    }
+    .col-left { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .col-right { flex: 1; background: #fff; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; height: fit-content; }
+    .grid-acts { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+    .act-btn { padding: 10px; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; font-weight: 600; text-align: center; background: #fff; transition: 0.2s; font-size: 0.9rem; }
+    .act-btn:hover { background: #f8fafc; }
+    .act-btn.active { border-color: #db2777; background: #fff0f6; color: #db2777; }
+    .lib-list { list-style: none; padding: 0; margin: 0; max-height: 400px; overflow-y: auto; }
+    .lib-item { padding: 10px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+    .lib-item:hover { background: #f0f9ff; }
+    .tag { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 800; text-transform: uppercase; margin-right: 8px; letter-spacing: 0.5px; }
+    .tag-poll { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+    .tag-quiz { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .tag-cloud { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .option-row { display: flex; gap: 5px; align-items: center; margin-bottom: 5px; }
   </style>
 </head>
-
 <body>
 
-  <div class="tools-container no-print">
-    <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
-
-    <button id="toggleQuestionBtn" class="action-btn toggle-btn active" onclick="toggleShowQuestion()">👁️ Question</button>
-    <button id="toggleExpectedBtn" class="action-btn toggle-btn active" onclick="toggleShowExpected()">🎯 Attendu</button>
-
-    <button class="action-btn" onclick="scrollToNextUnrated()">➡️ Non notées</button>
-
-    <!-- FIX #16 : Bouton aperçu copie intégré -->
-    <button class="action-btn" onclick="ouvrirApercuCopie()" style="background:#f0f9ff; color:#0369a1; border:1px solid #93c5fd;">👁️ Copie</button>
-
-    <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
-
-    <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:8px; border:1px solid #16a34a;">
-      <select id="publishType" style="padding:5px; border-radius:6px; border:1px solid #ccc; font-size:0.95em;">
-        <option value="note">📊 Noté</option>
-        <option value="nn">⚠️ Non noté</option>
-        <option value="absent">🚫 Absent</option>
-      </select>
-      <button class="action-btn save-btn" onclick="publierCorrection()">✅ Publier</button>
-    </div>
-
-    <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
-    <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
-  </div>
-
-  <div id="saveMessage">✅ Correction enregistrée !</div>
-
-  <div id="confirmModal" class="modal-overlay no-print">
-    <div class="modal-box" style="width:400px; text-align:center;">
+  <div id="modalStudent" class="modal-overlay">
+    <div class="modal-card">
       <div class="modal-header">
-        <span>✅ Confirmation</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span>
+        <div>
+          <h2 id="modal-name" style="margin:0; color:#0f172a;">Élève</h2>
+          <span id="modal-class" style="color:#64748b; font-weight:500;">Classe</span>
+        </div>
+        <button class="close-modal" onclick="closeModal()">×</button>
       </div>
-      <div style="padding:20px;">
-        <div id="confirmIcon" style="font-size:3em; margin-bottom:10px;">✅</div>
-        <div id="confirmMessage" style="font-size:1.1em; color:#166534; margin-bottom:15px;">Correction publiée !</div>
-        <div id="confirmDetails" style="font-size:0.9em; color:#64748b;"></div>
-        <button onclick="fermerConfirmModal()" style="margin-top:15px; padding:8px 20px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-size:1em;">OK</button>
+      <div class="modal-body">
+        <div>
+          <div style="display:flex; gap:15px; margin-bottom:20px;">
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-avg">--/20</span>
+              <span class="stat-label">Moyenne</span>
+            </div>
+            <div class="stat-box" style="flex:1;">
+              <span class="stat-val" id="modal-time">--</span>
+              <span class="stat-label">Temps Moyen</span>
+            </div>
+          </div>
+          <div style="height:300px;">
+            <canvas id="studentRadar"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top:0;">Historique des activités</h3>
+          <table class="results-table">
+            <thead><tr><th>Date</th><th>Exercice</th><th>Note</th></tr></thead>
+            <tbody id="modal-history"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="statusBanner" class="status-banner no-print">
-    <span id="statusText">⏳ Chargement...</span>
-    <span id="statusDate"></span>
-  </div>
-
-  <div id="commentModal" class="modal-overlay no-print">
-    <div class="modal-box">
+  <div id="modalStats" class="modal-overlay" onclick="closeStatModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <span id="modalTitle">Banque</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span>
+        <h2 id="stats-title" style="margin:0;">Détails</h2>
+        <button class="close-modal" onclick="closeStatModal()">×</button>
       </div>
-      <div id="modalList" class="modal-body"></div>
-    </div>
-  </div>
-
-  <!-- FIX #16 : Modal aperçu copie intégré -->
-  <div id="copyPreviewModal" class="modal-overlay no-print">
-    <div class="modal-box" style="width:750px;">
-      <div class="modal-header" style="background:#f0f9ff;">
-        <span>👁️ Aperçu copie élève</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="document.getElementById('copyPreviewModal').style.display='none'">×</span>
+      <div class="modal-body" style="display: block;">
+        <div class="detail-modal-content">
+          <canvas id="statsChart" style="max-height: 300px; display:none;"></canvas>
+          <div id="statsList" style="overflow-y:auto; flex:1;"></div>
+        </div>
       </div>
-      <div id="copyPreviewBody" class="modal-body" style="padding:15px; max-height:75vh; overflow-y:auto;"></div>
     </div>
   </div>
 
-  <h1 id="docTitle">Correction</h1>
+  <nav class="sidebar" id="mySidebar">
+    <button class="close-sidebar-btn" onclick="closeMenu()">✕</button>
+    
+    <div class="brand">🚀 COCKPIT</div>
+    <div class="nav-item active" onclick="showView('dashboard', this)">🏠 Tableau de bord</div>
+    <div class="nav-category">Mes dossiers</div>
+    <div class="nav-item" data-theme="pedago" onclick="showView('view-pedago', this)">🟦 1. Pédagogie & cours</div>
+    <div class="nav-item" data-theme="notes" onclick="showView('view-notes', this)">🟨 2. RÉDACTION / NOTES</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 3. Évaluation & suivi</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 4. Scores exercices</div>
+    <div class="nav-item" data-theme="admin" onclick="showView('view-trafic', this)">🚦 5. Trafic (monitoring)</div>
+    <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 6. Classes & groupes</div>
+    <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 7. Projets & transversal</div>
+    <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 8. Temps & admin</div>
+    <div class="nav-item" data-theme="live" onclick="showView('view-live', this)">🟫 9. Classe en temps réel</div>
+    <div class="nav-category" style="margin-top:15px; color:#db2777;">ANIMATION</div>
+    <div class="nav-item" data-theme="session" onclick="showView('view-sessions', this)" 
+         style="border-left: 4px solid #db2777; color:#fff; background:linear-gradient(90deg, rgba(219,39,119,0.1) 0%, rgba(15,23,42,0) 100%);">
+      📡 8. Sessions & Sondages
+    </div>
+    <div class="nav-item" data-theme="sites" onclick="showView('view-sites', this)">🌐 7. Sites internet</div>
+  </nav>
 
-  <div class="header-row">
-    <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
-    <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
-    <div class="input-group" style="width:80px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
-    <div class="input-group" style="width:110px;"><label>Date :</label><input type="date" id="inputDate"></div>
-  </div>
+  <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
 
-  <div class="appreciation-box">
-    <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
-    <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved(); updateCharCount();"></textarea>
-    <!-- FIX #15 : Compteur de caractères -->
-    <div id="charCount" style="text-align:right; font-size:0.75em; color:#94a3b8; margin-top:2px;">0 caractères</div>
-  </div>
+  <main class="main-content">
+        <header>
+            <button id="menuBtn" class="menu-btn" aria-label="Menu" onclick="toggleMenu()">☰</button>
+            <h1 id="page-title">Tableau de Bord</h1>
+            <div class="header-infos">
+                <div id="authBadge" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:5px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"></div>
+                <div class="clock-time" id="clock">--:--</div>
+                <div class="clock-date" id="date">--</div>
+                <div id="vacation-badge" class="vacation-badge" style="display:none;"></div>
+                <div id="inboxBadge" title="Nouvelles copies" style="display:none;min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:#111827;color:#fff;font-weight:900;font-size:12px;align-items:center;justify-content:center;"></div>
+            </div>
+        </header>
 
-  <table id="summaryTable">
-    <thead>
-      <tr class="thead-dark">
-        <th rowspan="2" style="width:30px;">C</th>
-        <th rowspan="2">Compétences évaluées</th>
-        <th colspan="4" class="thead-light">Niveau</th>
-        <th rowspan="2" style="width:120px; background:#fff; color:#333;">Pts / Max</th>
-      </tr>
-      <tr class="thead-light">
-        <th style="width:25px;">NT</th><th style="width:25px;">I</th><th style="width:25px;">A</th><th style="width:25px;">M</th>
-      </tr>
-    </thead>
-    <tbody id="gradingBody"></tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6" class="total-label">NOTE :</td>
-        <td class="total-points"><span id="finalNote" class="total-note">-- / 20</span></td>
-      </tr>
-    </tfoot>
-  </table>
+        <div id="dashboard" class="view-section active">
+            <div class="quick-actions">
+                <a href="prof_plan.html" target="_blank" class="btn-quick"><span>🪑</span><div><strong>Plan de Classe</strong><span>Piloter les places</span></div></a>
+                <a href="suivi-complet.html" target="_blank" class="btn-quick" style="border-color:#22c55e;"><span>📊</span><div><strong>Suivi Complet</strong><span>Notes, séances & consultations</span></div></a>
+                <a href="bilans-eleves.html" target="_blank" class="btn-quick" style="border-color:#10b981; background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.05));"><span>📋</span><div><strong>Bilans Élèves</strong><span>Auto-évaluations hebdo</span></div></a>
+                <a href="https://www.pronote.index-education.net/" target="_blank" class="btn-quick"><span>🎓</span><div><strong>Pronote Web</strong><span>Accès direct</span></div></a>
+                <button onclick="document.getElementById('memo-input').focus()" class="btn-quick"><span>🧠</span><div><strong>Mémo Ciblé</strong><span>Rappel contextuel</span></div></button>
+                <button onclick="ouvrirModalEleves()" class="btn-quick" style="border-color:#8b5cf6; background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(124,58,237,0.05));">
+                    <span>👤</span>
+                    <div>
+                        <strong>Mes élèves</strong>
+                        <span>Voir les noms (RGPD)</span>
+                    </div>
+                </button>
+            </div>
+            <div class="dashboard-grid">
+                <div class="widget">
+                    <h3>📅 Planning <div style="font-size:0.8rem;"><button onclick="changeDate(-1)">◀</button> <span id="planning-date-label">...</span> <button onclick="changeDate(1)">▶</button> <button onclick="openTimelineDashboard()" title="Timeline" style="margin-left:8px;background:#0f172a;color:white;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;">Timeline</button></div></h3>
+                    <ul class="planning-list" id="planning-list"></ul>
+                </div>
+                <div class="right-stack">
+                    <div class="widget memo-widget">
+                        <h3>💡 Pense-Bête Contextuel</h3>
+                        <div style="display:flex;gap:5px;margin-bottom:15px;">
+                            <select id="memo-target" style="padding:8px;border-radius:6px;border:1px solid #ddd;"></select>
+                            <input id="memo-input" style="flex-grow:1;padding:8px;border-radius:6px;border:1px solid #ddd;" placeholder="Note...">
+                            <button onclick="addMemo()" style="background:#0f172a;color:white;border:none;padding:8px 15px;border-radius:6px;">+</button>
+                        </div>
+                        <ul class="alert-list" id="memo-list"></ul>
+                    </div>
+            
+                    <div class="widget agenda-widget">
+                        <h3>🗓️ Agenda</h3>
+                        <div class="agenda-form">
+                            <select id="agenda-type">
+                                <option value="Réunion">Réunion</option>
+                                <option value="Parents">Parents</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Personnel">Personnel</option>
+                                <option value="Classe">Classe</option>
+                                <option value="Autre">Autre</option>
+                            </select>
+                            <input id="agenda-date" type="date" aria-label="Date">
+                            <input id="agenda-time" type="time" aria-label="Heure">
+                        </div>
+                        <div class="agenda-form">
+                            <input id="agenda-title" class="wide" placeholder="Titre (réunion, rdv...)" aria-label="Titre">
+                            <input id="agenda-place" class="wide" placeholder="Lieu (optionnel)" aria-label="Lieu">
+                            <button onclick="addAgenda()" style="background:#0f172a;color:white;border:none;padding:8px 15px;border-radius:6px;">+</button>
+                        </div>
+                        <ul class="agenda-list" id="agenda-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  <div class="bottom-container">
-    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé &nbsp; | &nbsp; ⌨️ <b>Raccourcis :</b> 1=NT 2=I 3=A 4=M, Tab=suivante</div>
-    <div class="revision-box">
-      <div class="revision-text">Pour réviser :<br><b>preventionsanteenvironnement.github.io/PSE/</b></div>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
+    <section id="view-scores" class="view-section">
+      <h2 style="color:var(--col-eval);">Suivi des Compétences & Notes</h2>
+      
+      <div class="stats-overview">
+        <div class="stat-card" onclick="showStatDetails('views')">
+          <div class="stat-icon icon-blue">👀</div>
+          <div class="stat-info"><h4>Trafic Total</h4><p id="stat-total-views">0</p></div>
+        </div>
+        <div class="stat-card" onclick="showStatDetails('devices')">
+          <div class="stat-icon icon-purple">📱</div>
+          <div class="stat-info"><h4>Supports</h4><p id="stat-device" style="font-size:1rem; font-weight:600;">--</p></div>
+        </div>
+        <div class="stat-card" onclick="showStatDetails('exercices')">
+          <div class="stat-icon icon-green">🏆</div>
+          <div class="stat-info"><h4>Top Exercice</h4><p id="stat-top-page" style="font-size:1rem; font-weight:600;">--</p></div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+          <div class="widget">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span><strong>Dernières évaluations reçues</strong></span>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="annuaireScoresContainer"></span>
+                    <button onclick="chargerDonnees()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+                </div>
+            </div>
+
+            <div class="toolbar">
+              <select id="filter-class" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Toutes les classes</option>
+              </select>
+              <input type="text" id="filter-student" class="filter-input" placeholder="🔍 Chercher un élève..." onkeyup="applyFilters()">
+              <select id="filter-exercice" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Tous les exercices</option>
+              </select>
+              <select id="filter-statut" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Tous les statuts</option>
+                <option value="A_CORRIGER">📝 À corriger</option>
+                <option value="CORRIGES">✅ Corrigés</option>
+                <option value="NON_NOTE">⚠️ Non notés</option>
+              </select>
+            </div>
+
+            <div style="overflow-x:auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortData('date')">Date ↕</th>
+                            <th onclick="sortData('identifiant')">Élève ↕</th>
+                            <th onclick="sortData('classe')">Classe ↕</th>
+                            <th onclick="sortData('exercice_titre')">Exercice ↕</th>
+                            <th onclick="sortData('note_finale')">Note ↕</th>
+                            <th onclick="sortTable('collages')">📋 ↕</th>
+                            <th title="L'élève a-t-il lu sa copie ?">👁️</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-eleves">
+                        <tr><td colspan="8" class="scores-empty">Chargement automatique...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+          </div>
+
+          <div class="widget">
+              <h3>📊 Radar Moyen (Filtré)</h3>
+              <div class="radar-container"><canvas id="radarChart"></canvas></div>
+              <div style="text-align:center; margin-top:15px;">Moyenne : <strong id="moyenne-globale" style="color:#3b82f6; font-size:1.3rem;">--</strong></div>
+          </div>
+      </div>
+    </section>
+
+    <section id="view-trafic" class="view-section">
+      <h2 style="color:var(--col-admin);">Trafic (monitoring)</h2>
+      <div class="widget" style="min-height:auto; text-align:center; padding:60px 40px;">
+        <div style="font-size:4rem; margin-bottom:20px; animation: pulse 2s infinite;">📊</div>
+        <h3 style="border:none; font-size:1.5rem; color:#0f172a; margin-bottom:15px; justify-content:center;">Le suivi du trafic est maintenant sur Google Analytics</h3>
+        <p style="color:#64748b; font-size:1rem; max-width:500px; margin:0 auto 30px; line-height:1.6;">Consultez vos statistiques de visites directement sur Google Analytics.</p>
+        <a href="https://analytics.google.com/analytics/web/#/p518029608/reports/intelligenthome" target="_blank" style="display:inline-flex; align-items:center; gap:12px; padding:16px 32px; background:linear-gradient(135deg, #f97316, #ea580c); color:white; text-decoration:none; border-radius:12px; font-weight:700; font-size:1.1rem; box-shadow:0 4px 15px rgba(249,115,22,0.4);">Ouvrir Google Analytics</a>
+        <p style="margin-top:30px; font-size:0.85rem; color:#94a3b8;">💡 ID de mesure : G-7R9N0JL6GG</p>
+      </div>
+      <style>@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }</style>
+    </section>
+
+    <section id="view-pedago" class="view-section">
+      <h2 style="color:var(--col-pedago);">Pédagogie & cours</h2>
+      <details open>
+        <summary>📁 Séquences CAP</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a>
+          <a href="test_bacpro.html" target="_blank" class="btn-yellow">📄 Test Bac Pro (QQOQCP)</a>
+          <a href="#" class="btn-yellow">📝 Exercices <span class="badge-soon">🚧 Bientôt</span></a>
+        </div>
+      </details>
+      <details>
+        <summary>📁 Séquences BAC PRO</summary>
+        <div class="content-links">
+          <a href="#" class="btn-yellow">📄 Cours <span class="badge-soon">🚧 Bientôt</span></a>
+        </div>
+      </details>
+      <details id="course-structure">
+        <summary>📚 Cours CAP & Bac Pro (structure)</summary>
+        <details class="lvl-cap">
+          <summary>CAP</summary>
+          <details><summary>Thématique A – L'individu et sa santé</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Modules A1-A7</a></div></details>
+          <details><summary>Thématique B – L'environnement</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Modules B1-B4</a></div></details>
+          <details><summary>Thématique C – Milieu professionnel</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Modules C1-C8</a></div></details>
+          <details><summary>Thématique D – Consommateur</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Modules D1-D3</a></div></details>
+        </details>
+        <details class="lvl-bacpro">
+          <summary>Bac Pro</summary>
+          <details><summary>Seconde Bac Pro</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Thématiques A, B, C</a></div></details>
+          <details><summary>Première Bac Pro</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Thématiques A, B, C</a></div></details>
+          <details><summary>Terminale Bac Pro</summary><div class="content-links"><a href="#" class="btn-yellow">📄 Thématiques A, B, C</a></div></details>
+        </details>
+      </details>
+    </section>
+
+    <section id="view-notes" class="view-section" style="height:100%;">
+      <div style="display:flex; flex-direction:column; height:100%;">
+        <h2 style="color:var(--col-notes); border-bottom: 2px solid var(--col-notes); padding-bottom:10px; margin-top:0;">📒 Atelier de Rédaction</h2>
+        <iframe src="notes.html" style="flex:1; width:100%; border:none; border-radius:12px; background:#fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></iframe>
+      </div>
+    </section> 
+
+    <section id="view-eval" class="view-section">
+      <h2 style="color:var(--col-eval);">Évaluation & suivi</h2>
+      <details open><summary>📊 PageProf & suivis</summary><div class="content-links"><a href="pageprof.html" target="_blank" class="btn-yellow">📊 Ouvrir PageProf</a></div></details>
+      <details><summary>📂 Historique & exports</summary><div class="content-links"><a href="#" class="btn-yellow">🗓️ Bilans <span class="badge-soon">Bientôt</span></a></div></details>
+      <details><summary>🧹 Maintenance</summary><div class="content-links"><a href="nettoyage-doublons.html" target="_blank" class="btn-yellow">🧹 Nettoyage doublons</a></div></details>
+    </section>
+
+    <section id="view-class" class="view-section">
+      <h2 style="color:var(--col-class);">Classes & groupes</h2>
+      <details open><summary>🪑 Plans de classe</summary><div class="content-links"><a href="prof_plan.html" target="_blank" class="btn-yellow">🚀 Piloter</a><button class="btn-blue-outline" type="button" onclick="window.open('ecran_plan.html','proj')">📺 Afficher au tableau</button></div></details>
+      <details><summary>📋 Listes d'élèves</summary><div class="content-links"><a href="#" class="btn-yellow">👥 Listes <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-proj" class="view-section">
+      <h2 style="color:var(--col-proj);">Projets & transversal</h2>
+      <details open><summary>🎨 Chef-d'œuvre</summary><div class="content-links"><a href="#" class="btn-yellow">CAP 1re année <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-admin" class="view-section">
+      <h2 style="color:var(--col-admin);">Temps & institution</h2>
+      <details open><summary>📅 Emploi du temps</summary><div class="content-links"><a href="#" class="btn-yellow">Vue semaine <span class="badge-soon">Bientôt</span></a></div></details>
+    </section>
+
+    <section id="view-live" class="view-section">
+      <h2 style="color:var(--col-live-web);">Classe en temps réel</h2>
+      <details class="live-block" open>
+        <summary class="live-summary">🗨️ S'exprimer / Explorer</summary>
+        <div class="content-links live-links">
+          <a href="eleve_nuage.html" class="btn btn-yellow">🌥️ Nuage de mots <span class="badge-role role-eleve">Élèves</span></a>
+          <a href="prof_nuage.html" class="btn btn-yellow">☁️ Nuage <span class="badge-role role-prof">Prof</span></a>
+          <a href="eleve_meteo.html" class="btn btn-yellow">🧠 Ma météo <span class="badge-role role-eleve">Élèves</span></a>
+          <a href="prof_meteo.html" class="btn btn-yellow">🧠 Météo <span class="badge-role role-prof">Prof</span></a>
+          <a href="ecran_classe.html" class="btn btn-blue-outline">📺 Écran Classe <span class="badge-role role-prof">Prof</span></a>
+        </div>
+      </details>
+      <details class="live-block">
+        <summary class="live-summary">🤝 Travail collaboratif</summary>
+        <div class="content-links live-links">
+          <a href="prof_mindmap.html" class="btn btn-yellow">🗣️ Carte mentale collective</a>
+          <a href="prof_qqoqcp.html" class="btn btn-yellow">🗣️ QQOQCP</a>
+          <a href="prof_ishikawa.html" class="btn btn-yellow">🗣️ Ishikawa</a>
+        </div>
+      </details>
+    </section>
+
+    <section id="view-sessions" class="view-section">
+      <h2 style="color:#db2777; border-bottom: 2px solid #db2777; padding-bottom:10px;">📡 Gestionnaire & Bibliothèque</h2>
+      <div class="dashboard-grid">
+        <div class="col-left">
+            <div class="widget">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #f1f5f9; margin-bottom: 15px; padding-bottom: 10px;">
+                    <h3 style="margin:0; border:none; padding:0;">✨ Démarrer une session</h3>
+                    <a href="cafe_wall.html" target="_blank" class="btn-blue-outline" style="text-decoration:none; font-size:0.85rem; padding: 6px 12px;">🖥️ Ouvrir l'Écran Géant</a>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <input type="text" id="session-title-input" placeholder="Titre (ex: Café du 12 Janvier)" style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; font-weight:bold;">
+                    <button onclick="createNewSession()" style="background:#db2777; color:white; border:none; padding:0 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Lancer 🚀</button>
+                </div>
+                <div id="session-info" style="display:none; margin-top:10px; color:#16a34a; font-weight:bold; font-size:0.9rem;">✅ Session active : <span id="current-session-name">...</span></div>
+            </div>
+            <div id="live-panel" style="display:none; background:#fff; border:2px solid #db2777; border-radius:12px; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; color:#db2777;">🔴 EN DIRECT</h3>
+                    <button onclick="stopSession()" style="background:#fff; color:#64748b; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; cursor:pointer;">⏹ Stop</button>
+                </div>
+                <div class="grid-acts">
+                    <div class="act-btn" onclick="setMode('meteo')">😎 Météo</div>
+                    <div class="act-btn" onclick="setMode('nuage')">☁️ Nuage</div>
+                    <div class="act-btn" onclick="setMode('sondage')">📊 Sondage</div>
+                    <div class="act-btn" onclick="setMode('quiz')">🏆 Quiz</div>
+                </div>
+                <div id="config-zone" style="background:#f8fafc; padding:15px; border-radius:8px; min-height:80px; display:flex; align-items:center; justify-content:center;">
+                    <p style="text-align:center; color:#94a3b8; margin:0;">👈 Sélectionnez une activité</p>
+                </div>
+                <div id="quiz-controls" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #db2777;">
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="revealQuiz()" style="flex:1; background:#db2777; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">👀 Révéler</button>
+                        <button onclick="resetQuiz()" style="flex:1; background:white; color:#db2777; border:1px solid #db2777; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">🔄 Re-Voter</button>
+                    </div>
+                </div>
+            </div>
+            <div class="widget"><h3>🗂️ Archives</h3><div id="history-list" style="max-height:150px; overflow-y:auto; font-size:0.85rem;">Chargement...</div></div>
+        </div>
+        <div class="col-right">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#0f172a;">📚 Bibliothèque</h3>
+                <button onclick="toggleCreator()" style="background:#f1f5f9; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.8rem;">+ Créer</button>
+            </div>
+            <div id="creator-panel" style="display:none; background:#f0f9ff; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <input type="hidden" id="edit-id">
+                <label style="font-size:0.75rem; font-weight:bold; color:#0369a1;">TYPE :</label>
+                <select id="create-type" onchange="updateCreatorForm()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; margin-bottom:10px;">
+                    <option value="poll">📊 Sondage</option>
+                    <option value="quiz">🏆 Quiz</option>
+                    <option value="cloud">☁️ Nuage</option>
+                </select>
+                <input type="text" id="create-title" placeholder="Titre" style="width:100%; padding:8px; margin-bottom:10px; border-radius:6px; border:1px solid #cbd5e1; box-sizing:border-box;">
+                <input type="text" id="create-question" placeholder="Question" style="width:100%; padding:8px; margin-bottom:10px; border-radius:6px; border:1px solid #cbd5e1; box-sizing:border-box;">
+                <div id="options-container"></div>
+                <button onclick="addOptionInput()" style="width:100%; margin-bottom:10px; background:white; border:1px dashed #cbd5e1; padding:5px; border-radius:6px; cursor:pointer; color:#64748b;">+ Option</button>
+                <button onclick="saveToLibrary()" style="width:100%; padding:10px; background:#0369a1; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">💾 Enregistrer</button>
+            </div>
+            <ul id="library-list" class="lib-list"><li style="text-align:center; color:#94a3b8; padding:20px;">Chargement...</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-sites" class="view-section">
+      <h2 style="color:var(--col-sites);">Sites internet favoris</h2>
+      <details open><summary>🏢 Administratif</summary><div class="content-links"><a href="https://portail.ac-lyon.fr/" class="btn-yellow" target="_blank">Portail Académie</a><a href="https://eduscol.education.fr/" class="btn-yellow" target="_blank">Eduscol</a><a href="https://cas.ent.auvergnerhonealpes.fr" class="btn-yellow" target="_blank">ENT / Mail pro</a></div></details>
+      <details><summary>📚 Ressources pédagogiques</summary><div class="content-links"><a href="https://www.inrs.fr/" class="btn-yellow" target="_blank">INRS</a><a href="https://www.santepubliquefrance.fr/" class="btn-yellow" target="_blank">Santé Publique France</a></div></details>
+    </section>
+  </main>
+
+  <!-- ⭐⭐⭐ MODALE MES ÉLÈVES ⭐⭐⭐ -->
+  <div id="modalEleves" class="modal-overlay" onclick="if(event.target===this) fermerModalEleves()">
+    <div class="modal-card" style="max-width: 700px;" onclick="event.stopPropagation()">
+      <div class="modal-header" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+        <div>
+          <h2 style="margin:0; color:white;">👤 Mes élèves</h2>
+          <span style="color:rgba(255,255,255,0.8); font-weight:500;" id="nbElevesCharges">0 élèves chargés</span>
+        </div>
+        <button class="close-modal" onclick="fermerModalEleves()" style="color:white;">×</button>
+      </div>
+      <div class="modal-body" style="display: block; padding: 20px;">
+        
+        <!-- Zone si pas d'élèves -->
+        <div id="zoneImportEleves" style="text-align:center; padding: 30px;">
+          <div style="font-size: 4rem; margin-bottom: 20px;">📁</div>
+          <h3 style="margin-bottom: 15px; color: #1e293b;">Aucun fichier élèves chargé</h3>
+          <p style="color: #64748b; margin-bottom: 20px; line-height: 1.6;">
+            Pour voir les noms de tes élèves à côté de leurs codes,<br>
+            importe ton fichier CSV.
+          </p>
+          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left;">
+            <strong>Format attendu :</strong>
+            <pre style="background: #1e293b; color: #22c55e; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 0.85rem;">LX11,Sarah TRABELSI
+HK47,Amelia KAMBEMBA
+QN80,Wael HWORI</pre>
+          </div>
+          <label style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 15px 30px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 1.1rem;">
+            📁 Importer mon fichier
+            <input type="file" id="inputImportEleves" accept=".csv,.txt" style="display:none;" onchange="importerFichierEleves(event)">
+          </label>
+          <p style="margin-top: 15px; font-size: 0.85rem; color: #94a3b8;">
+            🔒 Le fichier reste sur cet appareil uniquement (RGPD)
+          </p>
+        </div>
+        
+        <!-- Zone liste élèves -->
+        <div id="zoneListeEleves" style="display:none;">
+          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <input type="text" id="rechercheEleve" placeholder="🔍 Rechercher un élève..." 
+                   style="flex: 1; min-width: 200px; padding: 10px 15px; border: 1px solid #e2e8f0; border-radius: 8px;"
+                   oninput="filtrerListeEleves()">
+            <button onclick="ajouterEleveManuel()" style="background: #22c55e; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: 600;">➕ Ajouter</button>
+            <button onclick="exporterFichierEleves()" style="background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: 600;">📥 Exporter</button>
+            <label style="background: #f59e0b; color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-block;">
+              📁 Réimporter
+              <input type="file" accept=".csv,.txt" style="display:none;" onchange="importerFichierEleves(event)">
+            </label>
+            <button onclick="if(confirm('Supprimer tous les élèves ?')) supprimerTousEleves()" style="background: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: 600;">🗑️</button>
+          </div>
+          
+          <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead style="background: #f8fafc; position: sticky; top: 0;">
+                <tr>
+                  <th style="padding: 12px 15px; text-align: left; font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0;">CODE</th>
+                  <th style="padding: 12px 15px; text-align: left; font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0;">NOM</th>
+                  <th style="padding: 12px 15px; text-align: center; font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0; width: 80px;">ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyEleves"></tbody>
+            </table>
+          </div>
+          <p style="margin-top: 15px; font-size: 0.85rem; color: #94a3b8; text-align: center;">🔒 Ces données restent uniquement sur cet appareil (RGPD)</p>
+        </div>
+      </div>
     </div>
   </div>
 
-  <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
-
-  <!-- FIX #12 : Barre de progression -->
-  <div id="progressBar" class="no-print" style="background:#f1f5f9; border-radius:8px; padding:6px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; font-size:0.85em;">
-    <span id="progressText" style="font-weight:bold; color:#475569;">0 / 0 questions notées</span>
-    <div style="flex:1; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
-      <div id="progressFill" style="width:0%; height:100%; background:#16a34a; border-radius:4px; transition:width 0.3s;"></div>
+  <!-- MODALE AJOUT ÉLÈVE -->
+  <div id="modalAjoutEleve" class="modal-overlay" style="display:none; z-index: 2100;" onclick="if(event.target===this) this.style.display='none'">
+    <div class="modal-card" style="max-width: 400px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 style="margin:0;">➕ Ajouter un élève</h2>
+        <button class="close-modal" onclick="document.getElementById('modalAjoutEleve').style.display='none'">×</button>
+      </div>
+      <div class="modal-body" style="display: block;">
+        <div style="margin-bottom: 15px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 5px;">Code élève :</label>
+          <input type="text" id="inputNouveauCode" placeholder="Ex: AB12" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1.1rem; text-transform: uppercase;">
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 5px;">Nom complet :</label>
+          <input type="text" id="inputNouveauNom" placeholder="Ex: Dupont Marie" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1.1rem;">
+        </div>
+        <button onclick="sauvegarderNouvelEleve()" style="width: 100%; background: #22c55e; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer;">✅ Enregistrer</button>
+      </div>
     </div>
-    <span id="progressPct" style="font-weight:bold; color:#16a34a;">0%</span>
   </div>
 
-  <table id="correctionTable">
-    <thead>
-      <tr>
-        <th class="correction-th" onclick="sortTable(0)" style="width:60px;">Q° ⇅</th>
-        <th class="correction-th" onclick="sortTable(1)" style="width:40px;">C ⇅</th>
-        <th class="correction-th" onclick="sortTable(2)" style="width:110px;">Niveau ⇅</th>
-        <th class="correction-th">Question / Réponse élève / Attendu</th>
-        <th class="correction-th" style="width:30%;">Commentaires</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <script>
+    // ═══════════════════════════════════════════════════════════════════════
+    // JAVASCRIPT DE BASE (Horloge, Planning, Agenda, Memos, Menu)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    function updateClock(){ const d=new Date(); document.getElementById("clock").innerText=d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0'); document.getElementById("date").innerText=d.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}); }
+    setInterval(updateClock,1000); updateClock();
+    
+    let planningOffset = 0; 
+    const planningData = [ {time:"08h30",label:"CAP – PSE",room:"Salle 12"}, {time:"10h00",label:"Bac Pro – PSE",room:"Salle 14"}, {time:"13h30",label:"Accompagnement perso",room:"CDI"} ];
+    function renderPlanning(){ const list = document.getElementById("planning-list"); const date = new Date(); date.setDate(date.getDate()+planningOffset); document.getElementById("planning-date-label").textContent = date.toLocaleDateString("fr-FR",{weekday:"long",day:"2-digit",month:"2-digit"}); list.innerHTML = ""; planningData.forEach(c=>{ list.innerHTML += `<li class="course-item"><div class="course-time">${c.time}</div><div class="course-details"><strong>${c.label}</strong><br><small>${c.room}</small></div></li>`; }); }
+    function changeDate(delta){planningOffset+=delta;renderPlanning();} 
+    renderPlanning();
+    
+    function save(key,value){localStorage.setItem(key,JSON.stringify(value));} 
+    function load(key,def){try{const v=JSON.parse(localStorage.getItem(key));return v??def;}catch(e){return def;}}
+    
+    let memos = load("cockpit_memos",[]);
+    
+    function fillMemoTarget() {
+        const select = document.getElementById("memo-target");
+        if (!select) return;
+        const sections = [
+            {id: "dashboard", label: "Tableau de bord"},
+            {id: "view-scores", label: "Scores exercices"},
+            {id: "view-trafic", label: "Trafic"},
+            {id: "view-pedago", label: "Pédagogie"},
+            {id: "view-notes", label: "Rédaction"},
+            {id: "view-eval", label: "Évaluation"},
+            {id: "view-class", label: "Classes"},
+            {id: "view-proj", label: "Projets"},
+            {id: "view-admin", label: "Admin"},
+            {id: "view-live", label: "Temps réel"},
+            {id: "view-sessions", label: "Sessions"},
+            {id: "view-sites", label: "Sites"}
+        ];
+        select.innerHTML = '';
+        sections.forEach(section => {
+            const option = document.createElement("option");
+            option.value = section.id;
+            option.textContent = section.label;
+            select.appendChild(option);
+        });
+    }
+    
+    function renderMemos(){ const ul = document.getElementById("memo-list"); ul.innerHTML = ""; const current = document.querySelector(".view-section.active")?.id || "dashboard"; memos.forEach((m,i)=>{ ul.innerHTML += `<li class="alert-item${m.target===current?" context-active":""}"><span>${m.text}<br><small>${m.target}</small></span><button type="button" onclick="deleteMemo(${i})">✕</button></li>`; }); }
+    function addMemo(){ const t=document.getElementById("memo-target").value, v=document.getElementById("memo-input").value.trim(); if(v){ memos.push({target:t,text:v}); save("cockpit_memos",memos); document.getElementById("memo-input").value=""; renderMemos(); } }
+    function deleteMemo(i){ memos.splice(i,1); save("cockpit_memos",memos); renderMemos(); }
+    
+    let agenda = load("cockpit_agenda",[]);
+    function renderAgenda(){ const ul = document.getElementById("agenda-list"); ul.innerHTML=""; const now=new Date(); agenda.sort((a,b)=>new Date(a.when)-new Date(b.when)); agenda.forEach((ev,i)=>{ const d=new Date(ev.when), soon=(d-now)<7*24*3600*1000 && d>now; ul.innerHTML += `<li class="agenda-item${soon?" soon":""}"><div><strong>${ev.title}</strong><div class="agenda-meta">${d.toLocaleDateString("fr-FR")} • ${ev.type}</div></div><button type="button" onclick="deleteAgenda(${i})">✕</button></li>`; }); }
+    function addAgenda(){ const type=document.getElementById("agenda-type").value, date=document.getElementById("agenda-date").value, title=document.getElementById("agenda-title").value.trim(); if(date&&title){ agenda.push({type,title,place:document.getElementById("agenda-place").value,when:new Date(date+"T"+(document.getElementById("agenda-time").value||"08:00"))}); save("cockpit_agenda",agenda); renderAgenda(); } }
+    function deleteAgenda(i){ agenda.splice(i,1); save("cockpit_agenda",agenda); renderAgenda(); }
+    
+    function toggleMenu(){document.body.classList.toggle("menu-open");} 
+    function closeMenu(){document.body.classList.remove("menu-open");}
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    function openTimelineDashboard() { alert("Timeline - Fonctionnalité à venir"); }
+    
+    fillMemoTarget();
+    renderMemos(); 
+    renderAgenda();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⭐⭐⭐ MODULE "MES ÉLÈVES" - Correspondance code → nom (100% RGPD) ⭐⭐⭐
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    const CLE_ELEVES = 'cockpit_eleves_noms';
+
+    window.getNomEleve = function(code) {
+        if (!code) return null;
+        const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+        return eleves[code.toUpperCase()] || null;
+    };
+
+    window.afficherAvecNom = function(code) {
+        if (!code) return code || '';
+        const nom = window.getNomEleve(code);
+        return nom ? `${code} (${nom})` : code;
+    };
+
+    window.hasElevesCharges = function() {
+        return Object.keys(JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}')).length > 0;
+    };
+
+    window.getTousLesEleves = function() {
+        return JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+    };
+
+    window.getNbElevesCharges = function() {
+        return Object.keys(window.getTousLesEleves()).length;
+    };
+
+    window.ouvrirModalEleves = function() {
+        document.getElementById('modalEleves').classList.add('open');
+        rafraichirListeEleves();
+    };
+
+    window.fermerModalEleves = function() {
+        document.getElementById('modalEleves').classList.remove('open');
+    };
+
+    window.rafraichirListeEleves = function() {
+        const eleves = window.getTousLesEleves();
+        const nbEleves = Object.keys(eleves).length;
+        
+        document.getElementById('nbElevesCharges').textContent = nbEleves + ' élève' + (nbEleves > 1 ? 's' : '') + ' chargé' + (nbEleves > 1 ? 's' : '');
+        
+        if (nbEleves === 0) {
+            document.getElementById('zoneImportEleves').style.display = 'block';
+            document.getElementById('zoneListeEleves').style.display = 'none';
+        } else {
+            document.getElementById('zoneImportEleves').style.display = 'none';
+            document.getElementById('zoneListeEleves').style.display = 'block';
+            afficherTableauEleves(eleves);
+        }
+    };
+
+    window.afficherTableauEleves = function(eleves, filtre = '') {
+        const tbody = document.getElementById('tbodyEleves');
+        tbody.innerHTML = '';
+        const entries = Object.entries(eleves).sort((a, b) => a[1].localeCompare(b[1]));
+        const filtreMin = filtre.toLowerCase();
+        
+        entries.forEach(([code, nom]) => {
+            if (filtre && !code.toLowerCase().includes(filtreMin) && !nom.toLowerCase().includes(filtreMin)) return;
+            tbody.innerHTML += `<tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 12px 15px; font-weight: 700; color: #3b82f6;">${code}</td>
+                <td style="padding: 12px 15px;">${nom}</td>
+                <td style="padding: 12px 15px; text-align: center;">
+                    <button onclick="supprimerEleve('${code}')" style="background: #fee2e2; color: #991b1b; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer;">🗑️</button>
+                </td>
+            </tr>`;
+        });
+        if (!tbody.innerHTML) tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 30px; color: #94a3b8;">Aucun élève trouvé</td></tr>';
+    };
+
+    window.filtrerListeEleves = function() {
+        const input = document.getElementById('rechercheEleve');
+        afficherTableauEleves(window.getTousLesEleves(), input ? input.value : '');
+    };
+
+    window.importerFichierEleves = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lignes = e.target.result.split(/\r?\n/);
+            const eleves = window.getTousLesEleves();
+            let nb = 0;
+            lignes.forEach(ligne => {
+                ligne = ligne.trim();
+                if (!ligne) return;
+                const parts = ligne.split(/[,;]/);
+                if (parts.length >= 2) {
+                    const code = parts[0].trim().toUpperCase();
+                    const nom = parts.slice(1).join(' ').trim();
+                    if (code && nom) { eleves[code] = nom; nb++; }
+                }
+            });
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+            rafraichirListeEleves();
+            alert('✅ ' + nb + ' élève(s) importé(s) !');
+        };
+        reader.readAsText(file, 'UTF-8');
+        event.target.value = '';
+    };
+
+    window.exporterFichierEleves = function() {
+        const entries = Object.entries(window.getTousLesEleves()).sort((a, b) => a[1].localeCompare(b[1]));
+        if (!entries.length) { alert('Aucun élève'); return; }
+        let csv = entries.map(([c, n]) => c + ',' + n).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mes_eleves_' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
+    };
+
+    window.ajouterEleveManuel = function() {
+        document.getElementById('inputNouveauCode').value = '';
+        document.getElementById('inputNouveauNom').value = '';
+        document.getElementById('modalAjoutEleve').style.display = 'flex';
+    };
+
+    window.sauvegarderNouvelEleve = function() {
+        const code = document.getElementById('inputNouveauCode').value.trim().toUpperCase();
+        const nom = document.getElementById('inputNouveauNom').value.trim();
+        if (!code || !nom) { alert('Remplir les deux champs'); return; }
+        const eleves = window.getTousLesEleves();
+        eleves[code] = nom;
+        localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+        document.getElementById('modalAjoutEleve').style.display = 'none';
+        rafraichirListeEleves();
+    };
+
+    window.supprimerEleve = function(code) {
+        if (!confirm('Supprimer ' + code + ' ?')) return;
+        const eleves = window.getTousLesEleves();
+        delete eleves[code];
+        localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+        rafraichirListeEleves();
+    };
+
+    window.supprimerTousEleves = function() {
+        localStorage.removeItem(CLE_ELEVES);
+        rafraichirListeEleves();
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // 🔗 PONT : AnnuaireLocal ↔ Système cockpit existant
+    // ═══════════════════════════════════════════════════════════
+    
+    (function initAnnuaireBridge() {
+        if (typeof AnnuaireLocal === 'undefined') return;
+        
+        // Rendre le bouton dans la section Scores
+        const container = document.getElementById('annuaireScoresContainer');
+        if (container) AnnuaireLocal.renderButton(container);
+        
+        // Quand on importe via AnnuaireLocal, synchroniser avec le système cockpit
+        document.addEventListener('annuaire-updated', function(e) {
+            if (typeof AnnuaireLocal === 'undefined') return;
+            const annuaireData = AnnuaireLocal.getAll();
+            if (Object.keys(annuaireData).length > 0) {
+                // Fusionner avec le système cockpit existant
+                const existing = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+                const merged = Object.assign({}, existing, annuaireData);
+                localStorage.setItem(CLE_ELEVES, JSON.stringify(merged));
+                console.log('✅ Annuaire synchronisé avec cockpit :', Object.keys(merged).length, 'élèves');
+                // Rafraîchir l'affichage si le tableau est visible
+                if (typeof chargerDonnees === 'function') chargerDonnees();
+                if (typeof rafraichirListeEleves === 'function') rafraichirListeEleves();
+            }
+        });
+        
+        // Au chargement, si l'annuaire local a des données, les synchroniser
+        if (AnnuaireLocal.isLoaded()) {
+            const annuaireData = AnnuaireLocal.getAll();
+            const existing = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+            const merged = Object.assign({}, existing, annuaireData);
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(merged));
+        }
+    })();
+
+
+    // Auto-init au chargement
+    setTimeout(rafraichirListeEleves, 100);
+    console.log('✅ Module "Mes élèves" chargé (' + window.getNbElevesCharges() + ' en mémoire)');
+  </script>
 
   <script type="module">
+    // Import Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-    // FIX #19 : La config Firebase côté client est normale (clé API publique).
-    // ⚠️ La SÉCURITÉ repose sur les Firestore Security Rules côté serveur.
-    // Vérifier que les règles limitent l'écriture dans "resultats/{eleveCode}" aux profs authentifiés.
-    // Exemple de règle recommandée :
-    //   match /resultats/{code}/evaluations/{evalId} {
-    //     allow read: if true;
-    //     allow write: if request.auth != null && request.auth.token.email_verified;
-    //   }
+    import {
+      getFirestore, collection, collectionGroup, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, doc,
+      onSnapshot, query, orderBy, where, limit, Timestamp, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { 
+      getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    
     const firebaseConfig = {
       apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
       authDomain: "devoirs-pse.firebaseapp.com",
@@ -576,1432 +938,390 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
     const googleProvider = new GoogleAuthProvider();
-
     let currentUser = null;
-    let CURRENT_TARGET_DIV = null;
-    let CURRENT_BLUEPRINT = null;
-    let CURRENT_DOC_ID = null;
-    let CURRENT_ELEVE_CODE = null;
-    let CURRENT_COPY = null;
-    let CURRENT_EVALUATION = null;
-    let IS_SAVED = true;
-
-    const comps = ['C1','C2','C3','C4','C5','C6'];
-
-    // FIX #20 : Helper pour les erreurs Firebase avec détection quota/permission
-    function handleFirebaseError(e, context) {
-      const code = e?.code || '';
-      const msg = e?.message || String(e);
-      if (code === 'resource-exhausted' || msg.includes('quota')) {
-        alert(`⚠️ Quota Firebase dépassé (${context}).\n\nLes lectures/écritures sont temporairement limitées.\nRéessayez dans quelques minutes.`);
-        console.error(`🔥 QUOTA Firebase (${context}):`, e);
-      } else if (code === 'permission-denied' || msg.includes('permission')) {
-        alert(`🔒 Permission refusée (${context}).\n\nVérifiez que vous êtes bien connecté et que les règles Firestore sont correctes.`);
-        console.error(`🔒 PERMISSION Firebase (${context}):`, e);
-      } else if (code === 'unavailable' || msg.includes('offline') || msg.includes('network')) {
-        alert(`📡 Connexion perdue (${context}).\n\nVérifiez votre connexion internet et réessayez.`);
-        console.error(`📡 RÉSEAU Firebase (${context}):`, e);
-      } else {
-        alert(`❌ Erreur (${context}) :\n\n${msg}`);
-        console.error(`❌ Firebase (${context}):`, e);
-      }
-    }
-
-    let SHOW_QUESTION = true;
-    let SHOW_EXPECTED = true;
-
-    window.autoResize = autoResize;
-    window.openAppreciationBank = openAppreciationBank;
-    window.closeModal = closeModal;
-    window.sortTable = sortTable;
-    window.markUnsaved = markUnsaved;
-    window.ouvrirApercuCopie = ouvrirApercuCopie;
-    window.setGlobalLevel = setGlobalLevel;
-    window.resetNewStudent = resetNewStudent;
-    window.setNoteVisual = setNoteVisual;
-    window.calculateTotal = calculateTotal;
-    window.connexionProf = connexionProf;
-
-    window.toggleShowQuestion = toggleShowQuestion;
-    window.toggleShowExpected = toggleShowExpected;
-    window.scrollToNextUnrated = scrollToNextUnrated;
-
-    onAuthStateChanged(auth, (user) => {
-      currentUser = user;
-      updateAuthButton();
-      updateStatusBanner();
-      if (user) console.log("✅ Prof connecté:", user.email);
-    });
-
-    function updateAuthButton() {
-      const btn = document.getElementById('authBtn');
-      if (currentUser) {
-        btn.textContent = "✅ " + currentUser.email.split('@')[0];
-        btn.style.background = "#dcfce7";
-        btn.style.color = "#166534";
-        btn.style.borderColor = "#16a34a";
-      } else {
-        btn.textContent = "🔐 Connexion";
-        btn.style.background = "#dbeafe";
-        btn.style.color = "#1d4ed8";
-        btn.style.borderColor = "#3b82f6";
-      }
-    }
-
-    async function connexionProf() {
+    
+    // Connexion Google
+    window.connexionProf = async function() {
       try {
-        const result = await signInWithPopup(auth, googleProvider);
-        currentUser = result.user;
-        console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
-        alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
-        updateAuthButton();
-        updateStatusBanner();
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          await signInWithRedirect(auth, googleProvider);
+        } else {
+          const result = await signInWithPopup(auth, googleProvider);
+          currentUser = result.user;
+          alert("✅ Connecté: " + currentUser.email);
+          updateAuthUI();
+        }
       } catch (error) {
-        console.error("❌ Erreur:", error);
+        console.error("Erreur connexion:", error);
         alert("Erreur: " + error.message);
       }
-    }
-
-    // FIX #21 : autoResize avec debounce (évite recalcul à chaque frappe)
-    let _resizeTimer = null;
-    function autoResize(el) {
-      if (_resizeTimer) clearTimeout(_resizeTimer);
-      _resizeTimer = setTimeout(() => {
-        el.style.height = 'auto';
-        el.style.height = (el.scrollHeight) + 'px';
-        _resizeTimer = null;
-      }, 50);
-    }
-    // FIX #15 : Compteur de caractères
-    function updateCharCount() {
-      const area = document.getElementById('appreciationArea');
-      const counter = document.getElementById('charCount');
-      if (area && counter) {
-        const len = area.value.length;
-        counter.textContent = len + ' caractère' + (len > 1 ? 's' : '');
-        counter.style.color = len > 500 ? '#d9534f' : '#94a3b8';
-      }
-    }
-    function markUnsaved() { IS_SAVED = false; updateStatusBanner(); }
-
-    function updateStatusBanner() {
-      const banner = document.getElementById('statusBanner');
-      const text = document.getElementById('statusText');
-      const dateEl = document.getElementById('statusDate');
-      banner.classList.remove('saved', 'not-saved', 'auth-required');
-
-      if (!currentUser) {
-        banner.classList.add('auth-required');
-        text.innerHTML = '🔐 Connectez-vous pour enregistrer';
-        dateEl.textContent = '';
-      } else if (IS_SAVED && CURRENT_EVALUATION?.savedAt) {
-        banner.classList.add('saved');
-        text.innerHTML = '✅ Correction enregistrée';
-        const d = new Date(CURRENT_EVALUATION.savedAt);
-        dateEl.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-      } else if (!IS_SAVED) {
-        banner.classList.add('not-saved');
-        text.innerHTML = '⚠️ Modifications non enregistrées';
-        dateEl.textContent = '';
-      } else {
-        text.innerHTML = '📝 Nouvelle correction';
-        dateEl.textContent = '';
-      }
-    }
-
-    function showSaveMessage(success = true) {
-      const msg = document.getElementById('saveMessage');
-      msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
-      msg.style.background = success ? '#16a34a' : '#dc2626';
-      msg.style.opacity = 1;
-      setTimeout(() => msg.style.opacity = 0, 2000);
-    }
-
-    function loadPreferences() {
-      try {
-        const s = JSON.parse(localStorage.getItem("grille_pref_v17") || "{}");
-        SHOW_QUESTION = (s.SHOW_QUESTION !== undefined) ? !!s.SHOW_QUESTION : true;
-        SHOW_EXPECTED = (s.SHOW_EXPECTED !== undefined) ? !!s.SHOW_EXPECTED : true;
-      } catch(e) {}
-      syncToggleButtons();
-    }
-
-    function savePreferences() {
-      localStorage.setItem("grille_pref_v17", JSON.stringify({
-        SHOW_QUESTION,
-        SHOW_EXPECTED
-      }));
-    }
-
-    function syncToggleButtons() {
-      const qBtn = document.getElementById('toggleQuestionBtn');
-      const eBtn = document.getElementById('toggleExpectedBtn');
-      if (qBtn) qBtn.classList.toggle('active', SHOW_QUESTION);
-      if (eBtn) eBtn.classList.toggle('active', SHOW_EXPECTED);
-
-      document.querySelectorAll('.qa-question').forEach(el => el.classList.toggle('hidden', !SHOW_QUESTION));
-      document.querySelectorAll('.qa-expected').forEach(el => el.classList.toggle('hidden', !SHOW_EXPECTED));
-    }
-
-    function toggleShowQuestion() {
-      SHOW_QUESTION = !SHOW_QUESTION;
-      savePreferences();
-      syncToggleButtons();
-    }
-
-    function toggleShowExpected() {
-      SHOW_EXPECTED = !SHOW_EXPECTED;
-      savePreferences();
-      syncToggleButtons();
-    }
-
-    // FIX #16 : Aperçu copie intégré
-    function ouvrirApercuCopie() {
-      if (!CURRENT_COPY || !CURRENT_COPY.reponses) {
-        alert("Aucune copie chargée.");
-        return;
-      }
-      const reponses = CURRENT_COPY.reponses;
-      const meta = CURRENT_COPY.eleve || CURRENT_COPY;
-      let html = `<div style="margin-bottom:10px; padding:8px; background:#f8fafc; border-radius:8px; font-size:0.85em; color:#475569;">
-        <b>Code :</b> ${escapeHTML(CURRENT_ELEVE_CODE)} &nbsp;|&nbsp;
-        <b>Classe :</b> ${escapeHTML(meta.classe || '')} &nbsp;|&nbsp;
-        <b>Date :</b> ${escapeHTML(CURRENT_COPY.submittedAt ? new Date(CURRENT_COPY.submittedAt).toLocaleString('fr-FR') : 'N/A')}
-      </div>`;
-
-      // Stats copier-coller si disponibles
-      if (CURRENT_COPY.pasteStats) {
-        const ps = CURRENT_COPY.pasteStats;
-        const total = ps.totalPastes || 0;
-        if (total > 0) {
-          html += `<div style="background:#fef3c7; border:1px solid #f59e0b; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85em; color:#92400e;">
-            ⚠️ <b>${total}</b> copier-coller détecté${total > 1 ? 's' : ''}
-          </div>`;
+    };
+    
+    window.deconnexionProf = async function() {
+      await signOut(auth);
+      currentUser = null;
+      updateAuthUI();
+    };
+    
+    function updateAuthUI() {
+      const authBadge = document.getElementById("authBadge");
+      if (authBadge) {
+        if (currentUser) {
+          authBadge.innerHTML = `<span style="color:#16a34a;">✅ ${currentUser.email}</span> <button onclick="deconnexionProf()" style="margin-left:5px;padding:2px 8px;font-size:11px;cursor:pointer;">Déco</button>`;
+        } else {
+          authBadge.innerHTML = `<button onclick="connexionProf()" style="background:#4285f4;color:white;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:12px;">🔐 Connexion Prof</button>`;
         }
+        authBadge.style.display = "flex";
       }
+    }
+    
+    onAuthStateChanged(auth, (user) => { currentUser = user; updateAuthUI(); });
+    getRedirectResult(auth).then((result) => { if (result?.user) { currentUser = result.user; updateAuthUI(); } }).catch(() => {});
 
-      // Lister toutes les réponses
-      const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT || {});
-      if (questions.length > 0) {
-        questions.forEach((q, idx) => {
-          const label = q?.label || ("Q" + (idx + 1));
-          const qText = q?.questionText || q?.question || q?.enonce || q?.texte || "";
-          const rep = getReponseEleve(reponses, q);
-          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
-            <div style="font-weight:bold; font-size:0.85em; color:#334155; margin-bottom:4px;">
-              ${escapeHTML(label)} ${qText ? '— ' + escapeHTML(qText).substring(0, 80) + (qText.length > 80 ? '...' : '') : ''}
-            </div>
-            <div style="font-size:0.9em; color:#1e293b; padding-left:8px; border-left:3px solid #93c5fd;">${rep}</div>
-          </div>`;
-        });
-      } else {
-        // Fallback : afficher les clés brutes
-        for (const [key, val] of Object.entries(reponses)) {
-          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
-            <div style="font-weight:bold; font-size:0.85em; color:#334155;">${escapeHTML(key)}</div>
-            <div style="font-size:0.9em; padding-left:8px; border-left:3px solid #93c5fd;">${formatMaybeBullets(val)}</div>
-          </div>`;
-        }
-      }
+    // Variables globales
+    let currentSessionId = null; 
+    let allData = []; 
+    let filteredData = [];
+    let statsDetails = { hourly: new Array(24).fill(0), devices: { Mobile: 0, Desktop: 0 }, pages: [] };
+    let currentSort = { col: 'date', dir: 'desc' };
+    let libraryData = [];
 
-      document.getElementById('copyPreviewBody').innerHTML = html;
-      document.getElementById('copyPreviewModal').style.display = 'flex';
+    // showView
+    window.showView = function(viewId, navEl) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const target = document.getElementById(viewId);
+        if (target) target.classList.add('active');
+        if (navEl) navEl.classList.add('active');
+        const pageTitle = document.getElementById("page-title");
+        if (pageTitle && navEl) pageTitle.textContent = navEl.textContent.replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, '').trim();
+        if (viewId === 'view-sessions' && typeof loadHistory === 'function') loadHistory();
+        if (window.innerWidth <= 980) document.body.classList.remove('menu-open');
+        if (typeof renderMemos === 'function') renderMemos();
+    };
+
+    // Badge collages
+    function getPasteBadge(pasteStats) {
+        if (!pasteStats) return '<span style="color:#9ca3af;">-</span>';
+        const external = pasteStats.external || 0;
+        if (external === 0) return '<span style="color:#10b981;">✓</span>';
+        if (external <= 2) return `<span style="color:#f59e0b; font-weight:bold;">⚠️ ${external}</span>`;
+        return `<span style="color:#ef4444; font-weight:bold;">🚨 ${external}</span>`;
     }
 
-    function scrollToNextUnrated() {
-      const rows = Array.from(document.querySelectorAll('#correctionTable tbody tr'));
-      const target = rows.find(r => !r.dataset.level);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else alert("✅ Toutes les questions ont un niveau.");
-    }
-
-    function extractQuestionsFromBlueprint(blueprint) {
-      if (Array.isArray(blueprint?.questions)) return blueprint.questions;
-      const questions = [];
-      function walk(blocks) {
-        if (!Array.isArray(blocks)) return;
-        blocks.forEach(b => {
-          if (b && b.type === "question") questions.push(b);
-          if (b && b.content) walk(b.content);
-        });
-      }
-      walk(blueprint?.content);
-      return questions;
-    }
-
-    function escapeHTML(str) {
-      return String(str ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-
-    function splitToBullets(text) {
-      const raw = String(text ?? "").trim();
-      if (!raw) return [];
-      let t = raw.replace(/\r/g, "");
-      t = t.replace(/•/g, "\n• ");
-      t = t.replace(/\s*-\s+/g, "\n- ");
-      t = t.replace(/\s*;\s*/g, "\n");
-      const lines = t.split("\n").map(l => l.trim()).filter(l => l && l !== "-" && l !== "•");
-      return lines;
-    }
-
-    function formatMaybeBullets(value) {
-      if (value === null || value === undefined) return "<i>Non répondu</i>";
-
-      if (Array.isArray(value)) {
-        const items = value.map(v => String(v).trim()).filter(Boolean);
-        if (!items.length) return "<i>Non répondu</i>";
-        if (items.length === 1) return escapeHTML(items[0]);
-        return "<ul>" + items.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
-      }
-
-      if (typeof value === "object") {
-        const entries = Object.entries(value);
-        if (!entries.length) return "<i>Non répondu</i>";
-        return "<ul>" + entries.map(([k,v]) => "<li><b>" + escapeHTML(k) + "</b> : " + escapeHTML(v) + "</li>").join("") + "</ul>";
-      }
-
-      const s = String(value ?? "").trim();
-      if (!s) return "<i>Non répondu</i>";
-
-      const bullets = splitToBullets(s);
-      if (bullets.length >= 2) {
-        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
-      }
-      return escapeHTML(s);
-    }
-
-    function renderQuestionHTML(q, label, competence) {
-      const qt = q?.questionText || q?.question || q?.enonce || q?.texte || "";
-      const txt = String(qt ?? "").trim();
-      const safe = txt ? escapeHTML(txt) : "<i>Question non fournie</i>";
-      const compPill = competence ? `<span class="pill e">${escapeHTML(competence)}</span>` : "";
-      const labPill = label ? `<span class="pill q">${escapeHTML(label)}</span>` : "";
-      return `
-        <div class="qa-block qa-question">
-          <div class="qa-title">${labPill}${compPill}<span class="pill q">Question</span></div>
-          <div class="qa-content">${safe.replaceAll("\n","<br>")}</div>
-        </div>
-      `;
-    }
-
-    function getReponseEleve(reponses, q) {
-      if (!reponses) return "<i>Non répondu</i>";
-      const qid = q?.qid;
-      const label = q?.label;
-
-      // FIX #9 : Mapping intelligent — essayer toutes les variantes de clés
-      const keysToTry = [];
-      if (qid) keysToTry.push(qid);                                    // q_0
-      if (label) keysToTry.push(label);                                 // 1.1
-      if (label) keysToTry.push("Q" + label);                           // Q1.1
-      if (qid) keysToTry.push(qid.replace("q_", "Q"));                 // Q0
-      if (label) keysToTry.push("Q" + label.replace(".", "_"));         // Q1_1
-      if (qid) {
-        // Variantes avec suffixes courants (matrice, gravité, décision, trous)
-        ["_gravite", "_decision", "_matrice", "_trous", "_source"].forEach(suffix => {
-          keysToTry.push(qid + suffix);
-        });
-      }
-
-      for (const key of keysToTry) {
-        if (key && reponses[key] !== undefined) return formatMaybeBullets(reponses[key]);
-      }
-
-      // FIX #9 : Recherche partielle — si qid contient le début d'une clé dans reponses
-      if (qid) {
-        for (const rKey of Object.keys(reponses)) {
-          if (rKey.startsWith(qid + "_") || rKey.startsWith(qid + ".")) {
-            // Grouper toutes les sous-réponses
-            const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
-            if (subKeys.length > 0) {
-              const grouped = {};
-              subKeys.forEach(sk => {
-                const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
-                grouped[suffix || sk] = reponses[sk];
-              });
-              return formatMaybeBullets(grouped);
+    // Charger données
+    window.chargerDonnees = async function() {
+        console.log("🚀 Chargement des données...");
+        
+        function extractNote20(d){
+            const candidates = [d?.note_finale, d?.resultat_auto?.score, d?.meta?.score, d?.score, d?.note];
+            for (const c of candidates){
+                if (c === 0) return 0;
+                if (c === null || c === undefined) continue;
+                if (typeof c === "number" && !isNaN(c)) return c;
+                if (typeof c === "string"){ const m = c.match(/(\d+(?:[.,]\d+)?)/); if (m) return parseFloat(m[1].replace(",", ".")); }
             }
-          }
+            return null;
         }
-      }
-
-      return "<i>Non répondu</i>";
-    }
-
-    function formatExpected(q) {
-      const att = q?.reponseAttendue ?? q?.attendu ?? q?.corrige ?? "";
-      const s = String(att ?? "").trim();
-      if (!s) return "<i>Non renseigné</i>";
-      const bullets = splitToBullets(s);
-      if (bullets.length >= 2) {
-        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
-      }
-      return escapeHTML(s).replaceAll("\n","<br>");
-    }
-
-    function collecterDonneesCorrection() {
-      const data = {
-        savedAt: new Date().toISOString(),
-        savedBy: currentUser?.email || "anonyme",
-        profUid: currentUser?.uid || "",
-        eleveCode: CURRENT_ELEVE_CODE,
-        classe: document.getElementById('inputClasse').value || "",
-        devoirId: CURRENT_COPY?.devoirId || "unknown",
-        titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
-        copyDocId: CURRENT_DOC_ID,
-        appreciation: document.getElementById('appreciationArea').value || "",
-        autocorrected: CURRENT_BLUEPRINT?.autocorrect === true,
-        competences: {},
-        questions: {}
-      };
-
-      comps.forEach(c => {
-        const ptsEl = document.getElementById(`pts_${c}`);
-        const maxEl = document.getElementById(`max_${c}`);
-        if (ptsEl && maxEl) {
-          data.competences[c] = {
-            pts: parseFloat(ptsEl.value) || 0,
-            max: parseFloat(maxEl.value) || 0
-          };
-        }
-      });
-
-      document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-        const qid = row.dataset.qid || `q_${idx}`;
-        const commentDiv = row.querySelector('.editable-div');
-        data.questions[qid] = {
-          level: row.dataset.level || "",
-          comment: commentDiv ? commentDiv.innerText.trim() : ""
-        };
-      });
-
-      return data;
-    }
-
-    window.sauvegarderBrouillon = async function() {
-      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
-      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
-
-      try {
-        const brouillon = collecterDonneesCorrection();
-        brouillon.statut = "brouillon";
-        brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-        brouillon.publie = false;
-
-        const brouillonDocId = brouillon.devoirId + "_brouillon";
-        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
-
-        CURRENT_EVALUATION = brouillon;
-        IS_SAVED = true;
-        updateStatusBanner();
-
-        afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
-      } catch (e) {
-        console.error("❌ Erreur:", e);
-        showSaveMessage(false);
-        handleFirebaseError(e, "sauvegarde brouillon"); // FIX #20
-      }
-    }
-
-    let IS_PUBLISHING = false; // FIX #1+#5 : verrou anti-double-clic
-
-    window.publierCorrection = async function() {
-      if (IS_PUBLISHING) return; // FIX #1 : ignorer si déjà en cours
-      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
-      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
-
-      const typePublication = document.getElementById('publishType').value;
-      let noteFinale, statut, messageConfirm, iconConfirm, couleur;
-
-      switch(typePublication) {
-        case "note":
-          noteFinale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-          statut = "noté";
-          messageConfirm = `Correction publiée avec la note ${noteFinale}/20`;
-          iconConfirm = "✅";
-          couleur = "#16a34a";
-          break;
-        case "nn":
-          noteFinale = "NN";
-          statut = "non_noté";
-          messageConfirm = "Copie publiée comme 'Non noté'";
-          iconConfirm = "⚠️";
-          couleur = "#b45309";
-          break;
-        case "absent":
-          noteFinale = "ABS";
-          statut = "absent";
-          messageConfirm = "Copie marquée comme 'Absent'";
-          iconConfirm = "🚫";
-          couleur = "#dc2626";
-          break;
-      }
-
-      if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) return;
-
-      // FIX #11 : Avertissement si la copie est déjà publiée
-      if (CURRENT_EVALUATION && CURRENT_EVALUATION.publie) {
-        if (!confirm("⚠️ Cette copie a DÉJÀ été publiée.\n\nVoulez-vous écraser la correction existante ?")) return;
-      }
-
-      // FIX #5 : désactiver le bouton visuellement pendant l'écriture
-      IS_PUBLISHING = true;
-      const publishBtn = document.querySelector('.save-btn');
-      const originalBtnText = publishBtn.textContent;
-      publishBtn.textContent = "⏳ Envoi...";
-      publishBtn.disabled = true;
-      publishBtn.style.opacity = "0.5";
-
-      try {
-        const evaluation = collecterDonneesCorrection();
-        evaluation.note_finale = noteFinale;
-        evaluation.statut = statut;
-        evaluation.publie = true;
-
-        if (typePublication === "nn") {
-          evaluation.nonNote = true;
-        } else if (typePublication === "absent") {
-          evaluation.absent = true;
-          evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
-        }
-
-        const evalDocId = evaluation.devoirId + "_eval";
-        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
-
-        if (typePublication === "note") {
-          document.getElementById('finalNote').style.color = "#d9534f";
-        } else if (typePublication === "nn") {
-          document.getElementById('finalNote').innerText = "Non noté";
-          document.getElementById('finalNote').style.color = "#b45309";
-        } else if (typePublication === "absent") {
-          document.getElementById('finalNote').innerText = "Absent";
-          document.getElementById('finalNote').style.color = "#dc2626";
-        }
-
-        CURRENT_EVALUATION = evaluation;
-        IS_SAVED = true;
-        updateStatusBanner();
-
-        // FIX #5 : bouton passe en "Déjà publié" après succès
-        publishBtn.textContent = "✅ Publié";
-        publishBtn.style.opacity = "1";
-        publishBtn.style.background = "#bbf7d0";
-
-        afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
-      } catch (e) {
-        console.error("❌ Erreur:", e);
-        showSaveMessage(false);
-        handleFirebaseError(e, "publication correction"); // FIX #20
-        publishBtn.textContent = originalBtnText;
-        publishBtn.disabled = false;
-        publishBtn.style.opacity = "1";
-      } finally {
-        IS_PUBLISHING = false;
-        // FIX #5 : réactiver après 3s pour permettre une republication si besoin
-        setTimeout(() => { publishBtn.disabled = false; }, 3000);
-      }
-    }
-
-    function afficherConfirmation(icon, message, details, couleur) {
-      document.getElementById('confirmIcon').textContent = icon;
-      document.getElementById('confirmMessage').textContent = message;
-      document.getElementById('confirmMessage').style.color = couleur;
-      document.getElementById('confirmDetails').textContent = details;
-      document.getElementById('confirmModal').style.display = 'flex';
-    }
-
-    window.fermerConfirmModal = function() {
-      document.getElementById('confirmModal').style.display = 'none';
-    }
-
-    function loadExistingCorrection(correction) {
-      if (!correction) return;
-
-      if (correction.nonNote || correction.note_finale === "NN") {
-        document.getElementById('finalNote').innerText = "Non noté";
-        document.getElementById('finalNote').style.color = "#b45309";
-      }
-
-      if (correction.appreciation) {
-        const area = document.getElementById('appreciationArea');
-        area.value = correction.appreciation;
-        autoResize(area);
-      }
-
-      if (correction.competences) {
-        for (const c in correction.competences) {
-          const ptsEl = document.getElementById(`pts_${c}`);
-          if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
-        }
-      }
-
-      if (correction.questions) {
-        document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-          const qid = row.dataset.qid || `q_${idx}`;
-          const qData = correction.questions[qid];
-          if (qData) {
-            if (qData.level) {
-              row.dataset.level = qData.level;
-              const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
-              if (btn) btn.classList.add('active');
-            }
-            if (qData.comment) {
-              const commentDiv = row.querySelector('.editable-div');
-              if (commentDiv) commentDiv.innerText = qData.comment;
-            }
-          }
-        });
-      }
-
-      comps.forEach(c => updateCounters(c));
-      if (!correction.nonNote && correction.note_finale !== "NN") calculateTotal();
-      IS_SAVED = true;
-    }
-
-    function initSummary(activeComps, maxMap) {
-      const tbody = document.getElementById('gradingBody');
-      tbody.innerHTML = "";
-      comps.forEach((c) => {
-        const isVisible = activeComps.includes(c) || c === 'C6';
-        const displayStyle = isVisible ? "" : "display:none;";
-        const initialMax = maxMap[c] || 0;
-        tbody.innerHTML += `<tr id="row_${c}" style="${displayStyle}">
-          <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
-          <td>
-            <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
-            <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
-          </td>
-          <td><input type="radio" name="r_${c}" value="NT" onclick="setGlobalLevel('${c}','NT')"></td>
-          <td><input type="radio" name="r_${c}" value="I" onclick="setGlobalLevel('${c}','I')"></td>
-          <td><input type="radio" name="r_${c}" value="A" onclick="setGlobalLevel('${c}','A')"></td>
-          <td><input type="radio" name="r_${c}" value="M" onclick="setGlobalLevel('${c}','M')"></td>
-          <td style="white-space:nowrap;">
-            <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="MANUAL_OVERRIDE['${c}']=true; this.style.color='#333'; this.title='Mode manuel'; calculateTotal(); markUnsaved();"> /
-            <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
-          </td>
-        </tr>`;
-      });
-      setTimeout(calculateTotal, 100);
-    }
-
-    function renderCorrection(blueprint, reponses) {
-      const tbody = document.getElementById('correctionTable').querySelector('tbody');
-      tbody.innerHTML = "";
-      let maxMap = {}, qMap = {}, activeComps = [];
-
-      const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
-
-      list.forEach((q, idx) => {
-        const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
-        const bareme = Number(q?.bareme) || 0;
-        const label = q?.label || ("Q" + (idx + 1));
-        const qid = q?.qid || `q_${idx}`;
-
-        if(!activeComps.includes(competence)) activeComps.push(competence);
-        maxMap[competence] = (maxMap[competence] || 0) + bareme;
-        qMap[competence] = qMap[competence] || [];
-        qMap[competence].push(label);
-
-        const row = tbody.insertRow();
-        row.dataset.comp = competence;
-        row.dataset.level = "";
-        row.dataset.qid = qid;
-        row.dataset.bareme = bareme; // FIX #6 : stocker le barème pour calcul semi-auto
-
-        const repEleve = getReponseEleve(reponses, q);
-        const attendu = formatExpected(q);
-        const questionHtml = renderQuestionHTML(q, label, competence);
-
-        row.innerHTML = `
-          <td style="font-weight:bold">${escapeHTML(label)}</td>
-          <td><span class="badge ${competence.toLowerCase()}">${competence}</span></td>
-          <td>
-            <div style="display:flex; gap:2px; justify-content:center;">
-              <span class="level-btn nt" onclick="setNoteVisual(this, 'NT')">NT</span>
-              <span class="level-btn i"  onclick="setNoteVisual(this, 'I')">I</span>
-              <span class="level-btn a"  onclick="setNoteVisual(this, 'A')">A</span>
-              <span class="level-btn m"  onclick="setNoteVisual(this, 'M')">M</span>
-            </div>
-          </td>
-          <td class="qa-stack">
-            ${questionHtml}
-            <div class="qa-block qa-student">
-              <div class="qa-title"><span class="pill e">Réponse élève</span></div>
-              <div class="qa-content">${repEleve}</div>
-            </div>
-            <div class="qa-block qa-expected">
-              <div class="qa-title"><span class="pill a">Attendu</span></div>
-              <div class="qa-content">${attendu}</div>
-            </div>
-          </td>
-          <td>
-            <div class="editable-div" contenteditable="true" placeholder="💡 Commentaire..." oninput="markUnsaved()"></div>
-          </td>
-        `;
-      });
-
-      if(!maxMap['C6']) maxMap['C6'] = 2;
-      initSummary(activeComps, maxMap);
-      for(let c in qMap) {
-        const el = document.getElementById(`q_list_${c}`);
-        if(el) el.value = qMap[c].join(", ");
-      }
-
-      syncToggleButtons();
-    }
-
-    // FIX #6 : Ratios barème semi-auto (modifiable par le prof)
-    const LEVEL_RATIO = { M: 1.0, A: 0.66, I: 0.33, NT: 0 };
-    // FIX #6 : Tracker les compétences en mode manuel (modifiées à la main)
-    const MANUAL_OVERRIDE = {};
-
-    function setNoteVisual(btn, level) {
-      const row = btn.closest('tr');
-      Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      row.dataset.level = level;
-      updateCounters(row.dataset.comp);
-      autoCalculatePoints(row.dataset.comp); // FIX #6 : recalcul semi-auto
-      updateDominantLevel(row.dataset.comp); // FIX #7 : niveau dominant
-      markUnsaved();
-      openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
-    }
-
-    // FIX #6 : Calcul semi-auto des points par compétence
-    function autoCalculatePoints(comp) {
-      if (MANUAL_OVERRIDE[comp]) return; // Ne pas écraser si le prof a modifié manuellement
-      let totalPts = 0;
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp === comp && r.dataset.level) {
-          const bareme = parseFloat(r.dataset.bareme) || 0;
-          const ratio = LEVEL_RATIO[r.dataset.level] ?? 0;
-          totalPts += bareme * ratio;
-        }
-      });
-      const ptsEl = document.getElementById(`pts_${comp}`);
-      if (ptsEl) {
-        ptsEl.value = Math.round(totalPts * 4) / 4; // Arrondi au 0.25
-        ptsEl.style.color = "#2e7bb6"; // Bleu = auto
-        ptsEl.title = "Calculé automatiquement (modifiable)";
-      }
-      calculateTotal();
-    }
-
-    // FIX #7 : Calcul et affichage du niveau dominant par compétence
-    function updateDominantLevel(comp) {
-      let counts = { NT: 0, I: 0, A: 0, M: 0 };
-      let total = 0;
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp === comp && r.dataset.level) {
-          counts[r.dataset.level]++;
-          total++;
-        }
-      });
-      if (total === 0) return;
-      // Niveau dominant = celui qui apparaît le plus
-      const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-      const levelColors = { M: '#5cb85c', A: '#f0c05a', I: '#d9534f', NT: '#7f8c8d' };
-      const levelEmoji = { M: '🟢', A: '🔵', I: '🟠', NT: '🔴' };
-      const display = document.getElementById(`dominant_${comp}`);
-      if (display) {
-        display.textContent = `${levelEmoji[dominant]} ${dominant}`;
-        display.style.color = levelColors[dominant];
-        display.style.fontWeight = 'bold';
-      }
-    }
-
-    // FIX #7 : Les radios du récapitulatif mettent TOUTES les questions d'une compétence au même niveau
-    function setGlobalLevel(comp, level) {
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp === comp) {
-          r.dataset.level = level;
-          const btns = r.querySelectorAll('.level-btn');
-          btns.forEach(b => b.classList.remove('active'));
-          const target = r.querySelector(`.level-btn.${level.toLowerCase()}`);
-          if (target) target.classList.add('active');
-        }
-      });
-      updateCounters(comp);
-      autoCalculatePoints(comp);
-      updateDominantLevel(comp);
-      markUnsaved();
-    }
-
-    function updateCounters(comp) {
-      let counts = { NT:0, I:0, A:0, M:0 };
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if(r.dataset.comp === comp && r.dataset.level) counts[r.dataset.level]++;
-      });
-      const statBox = document.getElementById(`stats_${comp}`);
-      if(statBox) statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
-      updateProgress(); // FIX #12
-    }
-
-    // FIX #12 : Mise à jour de la barre de progression
-    function updateProgress() {
-      const rows = document.querySelectorAll('#correctionTable tbody tr');
-      const total = rows.length;
-      let noted = 0;
-      rows.forEach(r => { if (r.dataset.level) noted++; });
-      const pct = total > 0 ? Math.round((noted / total) * 100) : 0;
-      const textEl = document.getElementById('progressText');
-      const fillEl = document.getElementById('progressFill');
-      const pctEl = document.getElementById('progressPct');
-      if (textEl) textEl.textContent = `${noted} / ${total} questions notées`;
-      if (fillEl) fillEl.style.width = pct + '%';
-      if (pctEl) {
-        pctEl.textContent = pct + '%';
-        pctEl.style.color = pct === 100 ? '#16a34a' : pct > 50 ? '#2e7bb6' : '#d9534f';
-      }
-    }
-
-    function calculateTotal() {
-      let totalPts = 0;
-      comps.forEach(c => {
-        const row = document.getElementById(`row_${c}`);
-        if(row && row.style.display !== 'none') {
-          const v = document.getElementById(`pts_${c}`)?.value;
-          totalPts += parseFloat(String(v ?? "0").replace(",", ".")) || 0;
-        }
-      });
-      const elNote = document.getElementById('finalNote');
-      elNote.innerText = totalPts.toFixed(1) + " / 20";
-      elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
-    }
-
-    // FIX #8 : Banque de commentaires dynamique
-    // — Ajout de commentaires personnalisés
-    // — Compteur de fréquence d'utilisation (tri par usage)
-    // — Persistance localStorage
-    const COMMENT_STATS_KEY = "grille_comment_stats";
-    const CUSTOM_COMMENTS_KEY = "grille_custom_comments";
-
-    function loadCommentStats() {
-      try { return JSON.parse(localStorage.getItem(COMMENT_STATS_KEY) || "{}"); } catch(e) { return {}; }
-    }
-    function saveCommentStats(stats) {
-      try { localStorage.setItem(COMMENT_STATS_KEY, JSON.stringify(stats)); } catch(e) {}
-    }
-    function loadCustomComments() {
-      try { return JSON.parse(localStorage.getItem(CUSTOM_COMMENTS_KEY) || "{}"); } catch(e) { return {}; }
-    }
-    function saveCustomComments(custom) {
-      try { localStorage.setItem(CUSTOM_COMMENTS_KEY, JSON.stringify(custom)); } catch(e) {}
-    }
-
-    function incrementCommentUsage(comp, level, txt) {
-      const stats = loadCommentStats();
-      const key = `${comp}_${level}`;
-      if (!stats[key]) stats[key] = {};
-      stats[key][txt] = (stats[key][txt] || 0) + 1;
-      saveCommentStats(stats);
-    }
-
-    function getCommentUsage(comp, level, txt) {
-      const stats = loadCommentStats();
-      const key = `${comp}_${level}`;
-      return stats[key]?.[txt] || 0;
-    }
-
-    function openCommentBank(comp, level, target) {
-      CURRENT_TARGET_DIV = target;
-      const list = document.getElementById('modalList');
-      list.innerHTML = "";
-      document.getElementById('modalTitle').innerText = `Banque ${comp} (${level})`;
-
-      // Collecter tous les commentaires (statiques + perso)
-      const allPhrases = [];
-      const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
-      if (compData) {
-        for (const [catName, levelsObj] of Object.entries(compData)) {
-          const phrases = levelsObj[level];
-          if (phrases && phrases.length > 0) {
-            phrases.forEach(txt => allPhrases.push({ txt, cat: catName, custom: false }));
-          }
-        }
-      }
-
-      // Commentaires personnalisés
-      const custom = loadCustomComments();
-      const customKey = `${comp}_${level}`;
-      if (custom[customKey] && custom[customKey].length > 0) {
-        custom[customKey].forEach(txt => allPhrases.push({ txt, cat: "✏️ Mes commentaires", custom: true }));
-      }
-
-      if (allPhrases.length === 0 && !compData) {
-        list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
-      } else {
-        // Trier par fréquence d'utilisation (les plus utilisés en premier)
-        allPhrases.sort((a, b) => {
-          const freqA = getCommentUsage(comp, level, a.txt);
-          const freqB = getCommentUsage(comp, level, b.txt);
-          if (freqB !== freqA) return freqB - freqA;
-          return 0; // Garder l'ordre d'origine si même fréquence
-        });
-
-        // Grouper par catégorie
-        const grouped = {};
-        allPhrases.forEach(p => {
-          if (!grouped[p.cat]) grouped[p.cat] = [];
-          grouped[p.cat].push(p);
-        });
-
-        // Section "Fréquents" si au moins un commentaire a été utilisé
-        const stats = loadCommentStats();
-        const statsKey = `${comp}_${level}`;
-        const frequents = allPhrases.filter(p => getCommentUsage(comp, level, p.txt) > 0)
-          .sort((a, b) => getCommentUsage(comp, level, b.txt) - getCommentUsage(comp, level, a.txt))
-          .slice(0, 5);
-
-        if (frequents.length > 0) {
-          const h = document.createElement("div");
-          h.className = "bank-title";
-          h.innerHTML = "⭐ Les plus utilisés";
-          list.appendChild(h);
-          frequents.forEach(p => {
-            const usage = getCommentUsage(comp, level, p.txt);
-            list.appendChild(createCommentItem(p.txt, comp, level, usage));
-          });
-        }
-
-        // Puis les catégories classiques
-        for (const [catName, phrases] of Object.entries(grouped)) {
-          const h = document.createElement("div");
-          h.className = "bank-title";
-          h.innerText = catName;
-          list.appendChild(h);
-          phrases.forEach(p => {
-            const usage = getCommentUsage(comp, level, p.txt);
-            const item = createCommentItem(p.txt, comp, level, usage);
-            // Bouton supprimer pour les commentaires personnalisés
-            if (p.custom) {
-              const delBtn = document.createElement('span');
-              delBtn.textContent = '🗑️';
-              delBtn.style.cssText = 'cursor:pointer; float:right; opacity:0.5; font-size:0.9em;';
-              delBtn.title = 'Supprimer ce commentaire';
-              delBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm("Supprimer ce commentaire personnalisé ?")) {
-                  const c = loadCustomComments();
-                  c[customKey] = (c[customKey] || []).filter(t => t !== p.txt);
-                  saveCustomComments(c);
-                  openCommentBank(comp, level, target); // Recharger
-                }
-              };
-              item.prepend(delBtn);
-            }
-            list.appendChild(item);
-          });
-        }
-      }
-
-      // Barre d'ajout personnalisé en bas
-      const addBar = document.createElement('div');
-      addBar.style.cssText = 'padding:10px 15px; border-top:2px solid #e2e8f0; display:flex; gap:8px; align-items:center; background:#f8fafc;';
-      addBar.innerHTML = `
-        <input type="text" id="customCommentInput" placeholder="✏️ Ajouter un commentaire personnalisé..." 
-          style="flex:1; padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9em;">
-        <button onclick="addCustomComment('${comp}','${level}')" 
-          style="padding:6px 14px; background:#2e7bb6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em;">+ Ajouter</button>
-      `;
-      list.appendChild(addBar);
-
-      // Permettre l'ajout avec Entrée
-      setTimeout(() => {
-        const input = document.getElementById('customCommentInput');
-        if (input) {
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); addCustomComment(comp, level); }
-          });
-        }
-      }, 100);
-
-      document.getElementById('commentModal').style.display = "flex";
-    }
-
-    function createCommentItem(txt, comp, level, usage) {
-      const d = document.createElement('div');
-      d.className = "comment-item";
-      d.style.display = 'flex';
-      d.style.justifyContent = 'space-between';
-      d.style.alignItems = 'center';
-      const textSpan = document.createElement('span');
-      textSpan.textContent = txt;
-      textSpan.style.flex = '1';
-      d.appendChild(textSpan);
-      if (usage > 0) {
-        const badge = document.createElement('span');
-        badge.textContent = `×${usage}`;
-        badge.style.cssText = 'font-size:0.7em; background:#e2e8f0; color:#64748b; padding:1px 6px; border-radius:10px; margin-left:8px; white-space:nowrap;';
-        d.appendChild(badge);
-      }
-      d.onclick = () => {
-        const prev = CURRENT_TARGET_DIV.innerText.trim();
-        CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
-        incrementCommentUsage(comp, level, txt);
-        closeModal();
-        markUnsaved();
-      };
-      return d;
-    }
-
-    window.addCustomComment = function(comp, level) {
-      const input = document.getElementById('customCommentInput');
-      if (!input) return;
-      const txt = input.value.trim();
-      if (!txt) { input.focus(); return; }
-      const custom = loadCustomComments();
-      const key = `${comp}_${level}`;
-      if (!custom[key]) custom[key] = [];
-      if (custom[key].includes(txt)) { alert("Ce commentaire existe déjà."); return; }
-      custom[key].push(txt);
-      saveCustomComments(custom);
-      // Insérer directement le commentaire
-      const prev = CURRENT_TARGET_DIV.innerText.trim();
-      CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
-      incrementCommentUsage(comp, level, txt);
-      closeModal();
-      markUnsaved();
-    }
-
-    function openAppreciationBank() {
-      CURRENT_TARGET_DIV = document.getElementById('appreciationArea');
-      const list = document.getElementById('modalList');
-      list.innerHTML = "";
-      document.getElementById('modalTitle').innerText = "Appréciations";
-
-      const apprData = window.DATA_APPRECIATION || {};
-      for (const [catName, data] of Object.entries(apprData)) {
-        const h = document.createElement("div");
-        h.className = "bank-title";
-        h.innerText = catName;
-        list.appendChild(h);
-
-        if(Array.isArray(data)) {
-          data.forEach(txt => {
-            const d = document.createElement('div');
-            d.className = "comment-item";
-            d.innerText = txt;
-            d.onclick = () => { insertText(txt, true); };
-            list.appendChild(d);
-          });
-        } else if (typeof data === 'object') {
-          for (const [comp, phrases] of Object.entries(data)) {
-            phrases.forEach(txt => {
-              const d = document.createElement('div');
-              d.className = "comment-item";
-              d.innerHTML = `<strong>(${escapeHTML(comp)})</strong> ${escapeHTML(txt)}`;
-              d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
-              list.appendChild(d);
-            });
-          }
-        }
-      }
-      document.getElementById('commentModal').style.display = "flex";
-    }
-
-    function insertText(text, newLine) {
-      if(CURRENT_TARGET_DIV) {
-        const sep = (CURRENT_TARGET_DIV.value.length > 0 && newLine) ? "\n" : " ";
-        CURRENT_TARGET_DIV.value += sep + text;
-        autoResize(CURRENT_TARGET_DIV);
-      }
-      closeModal();
-      markUnsaved();
-    }
-
-    function closeModal() { document.getElementById('commentModal').style.display = "none"; }
-
-    function sortTable(n) {
-      const table = document.getElementById("correctionTable");
-      const tbody = table.querySelector('tbody'); // FIX #17 : cibler tbody, pas table
-      let rows = Array.from(tbody.rows);
-      rows.sort((a, b) => {
-        let t1 = a.cells[n].innerText.toLowerCase();
-        let t2 = b.cells[n].innerText.toLowerCase();
-        if(n===0) return (parseFloat(t1) || 0) - (parseFloat(t2) || 0);
-        return t1.localeCompare(t2);
-      });
-      rows.forEach(r => tbody.appendChild(r)); // FIX #17 : append dans tbody
-    }
-
-    function resetNewStudent() {
-      if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
-      // FIX #4 : Fallback robuste si window.close() échoue (onglet ouvert manuellement)
-      try { window.close(); } catch(e) { /* ignoré */ }
-      // Si la fenêtre est toujours ouverte après 200ms, proposer une alternative
-      setTimeout(() => {
-        if (!window.closed) {
-          if (window.opener) {
-            window.opener.focus();
-          } else if (document.referrer) {
-            window.location.href = document.referrer;
-          } else {
-            // Réinitialiser la page pour une nouvelle copie
-            document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
-            document.getElementById('statusText').innerHTML = "🔄 Retournez au Cockpit pour sélectionner une autre copie.";
-            document.getElementById('statusBanner').className = 'status-banner auth-required';
-            alert("Retournez au Cockpit pour ouvrir une autre copie.");
-          }
-        }
-      }, 200);
-    }
-
-    // ====================================================================
-    // AUTO-CORRECTION ENGINE
-    // ====================================================================
-
-    /** Normalize string for comparison: trim, lowercase, remove diacritics */
-    function normalizeForComparison(str) {
-      return String(str ?? "").trim().toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    }
-
-    /** Compare student answer vs correct answer based on inputType */
-    function autocorrectQuestion(q, reponses) {
-      const qid = q?.qid;
-      if (!qid || !q.autocorrect) return null; // not auto-correctable
-
-      const raw = reponses?.[qid];
-      const correct = q.reponseCorrecte;
-
-      // Not answered
-      if (raw === undefined || raw === null || raw === "" ||
-          (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: "Non r\u00e9pondu", correct: false };
-      }
-
-      const inputType = (q.inputType || "").toLowerCase();
-      let isCorrect = false;
-
-      switch (inputType) {
-        case "qcm":
-        case "vrai_faux":
-        case "select":
-          // Strict string comparison
-          isCorrect = (String(raw).trim() === String(correct).trim());
-          break;
-
-        case "checkbox": {
-          // Both must be arrays, sorted, identical
-          // Handle case where raw might be a single string (Firestore edge case)
-          let studentArr = Array.isArray(raw) ? raw : [raw];
-          studentArr = studentArr.map(v => String(v).trim()).filter(Boolean).sort();
-          const correctArr = (Array.isArray(correct) ? correct : [correct])
-            .map(v => String(v).trim()).filter(Boolean).sort();
-          isCorrect = (studentArr.length === correctArr.length) &&
-                      studentArr.every((v, i) => v === correctArr[i]);
-          break;
-        }
-
-        case "tableau_classement": {
-          // reponseCorrecte is an object { subKey: expectedValue, ... }
-          // Student answers stored as reponses[qid_subKey] or as object reponses[qid]
-          if (typeof correct === "object" && correct !== null && !Array.isArray(correct)) {
-            let allMatch = true;
-            let anyFound = false;
-            for (const [subKey, expectedVal] of Object.entries(correct)) {
-              // Try qid_subKey in reponses
-              const studentVal = reponses?.[qid + "_" + subKey] ??
-                                 (typeof raw === "object" ? raw?.[subKey] : undefined);
-              if (studentVal === undefined || studentVal === null || studentVal === "") {
-                allMatch = false;
-              } else {
-                anyFound = true;
-                if (String(studentVal).trim() !== String(expectedVal).trim()) {
-                  allMatch = false;
-                }
-              }
-            }
-            if (!anyFound) {
-              return { level: "NT", comment: "Non r\u00e9pondu", correct: false };
-            }
-            isCorrect = allMatch;
-          }
-          break;
-        }
-
-        case "number": {
-          const studentNum = parseFloat(String(raw).replace(",", "."));
-          const correctNum = parseFloat(correct);
-          const tolerance = parseFloat(q.tolerance ?? 0);
-          if (!isNaN(studentNum) && !isNaN(correctNum)) {
-            isCorrect = Math.abs(studentNum - correctNum) <= tolerance;
-          }
-          break;
-        }
-
-        case "texte_exact": {
-          const studentNorm = normalizeForComparison(raw);
-          if (Array.isArray(correct)) {
-            isCorrect = correct.some(v => normalizeForComparison(v) === studentNorm);
-          } else {
-            isCorrect = normalizeForComparison(correct) === studentNorm;
-          }
-          break;
-        }
-
-        default:
-          // Unknown type, skip
-          return null;
-      }
-
-      if (isCorrect) {
-        return { level: "M", comment: "", correct: true };
-      } else {
-        const attendu = q.reponseAttendue || String(correct);
-        return { level: "I", comment: "Attendu : " + attendu, correct: false };
-      }
-    }
-
-    /** Run auto-correction on all questions and apply to the DOM */
-    function autocorrectCopy(blueprint, reponses) {
-      const questions = extractQuestionsFromBlueprint(blueprint);
-      if (!questions.length) return;
-
-      // Check if blueprint has autocorrect flag
-      const isAutocorrect = blueprint.autocorrect === true ||
-        questions.some(q => q.autocorrect === true);
-      if (!isAutocorrect) return;
-
-      let countCorrect = 0, countIncorrect = 0, countNT = 0;
-      const rows = document.querySelectorAll('#correctionTable tbody tr');
-
-      rows.forEach((row, idx) => {
-        const q = questions[idx];
-        if (!q || !q.autocorrect) return;
-
-        const result = autocorrectQuestion(q, reponses);
-        if (!result) return;
-
-        // Apply level
-        row.dataset.level = result.level;
-        const btn = row.querySelector(`.level-btn.${result.level.toLowerCase()}`);
-        if (btn) {
-          Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        }
-
-        // Apply comment
-        if (result.comment) {
-          const commentDiv = row.querySelector('.editable-div');
-          if (commentDiv) commentDiv.innerText = result.comment;
-        }
-
-        // Add auto-correction badge to the label cell
-        const labelCell = row.cells[0];
-        if (labelCell) {
-          const badge = document.createElement('span');
-          badge.className = 'ac-badge auto-' + result.level.toLowerCase();
-          badge.textContent = result.correct ? '\u2713' : '\u2717';
-          badge.title = result.correct ? 'Correct (auto)' : 'Incorrect (auto)';
-          labelCell.appendChild(badge);
-        }
-
-        // Count stats
-        if (result.level === "M") countCorrect++;
-        else if (result.level === "I") countIncorrect++;
-        else countNT++;
-      });
-
-      // Update all competence counters and points
-      const activeComps = new Set();
-      rows.forEach(r => { if (r.dataset.comp) activeComps.add(r.dataset.comp); });
-      activeComps.forEach(comp => {
-        updateCounters(comp);
-        autoCalculatePoints(comp);
-        updateDominantLevel(comp);
-      });
-
-      // Show autocorrect banner
-      const total = countCorrect + countIncorrect + countNT;
-      const bannerHTML = `
-        <div class="autocorrect-banner" id="autocorrectBanner">
-          <div>\uD83E\uDD16 MODE AUTO-CORRECTION \u2014 ${total} question${total > 1 ? 's' : ''} corrig\u00e9e${total > 1 ? 's' : ''} automatiquement</div>
-          <div class="ac-stats">
-            <span class="ac-stat correct">\u2705 ${countCorrect} correct${countCorrect > 1 ? 's' : ''}</span>
-            <span class="ac-stat incorrect">\u274C ${countIncorrect} incorrect${countIncorrect > 1 ? 's' : ''}</span>
-            ${countNT > 0 ? `<span class="ac-stat unanswered">\u2B1C ${countNT} non r\u00e9pondu${countNT > 1 ? 's' : ''}</span>` : ''}
-          </div>
-        </div>`;
-      const statusBanner = document.getElementById('statusBanner');
-      if (statusBanner) statusBanner.insertAdjacentHTML('afterend', bannerHTML);
-
-      console.log(`\uD83E\uDD16 Auto-correction termin\u00e9e : ${countCorrect} M, ${countIncorrect} I, ${countNT} NT sur ${total} questions`);
-    }
-
-    async function init() {
-      console.log("🚀 Grille V19 (auto-correction) - Démarrage (audit complet — 21 fixes)...");
-      loadPreferences();
-      initSummary([], {});
-      updateStatusBanner();
-
-      const rawData = localStorage.getItem("cockpit_transfert");
-      if (!rawData) {
-        document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
-        document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
-        return;
-      }
-      // FIX #2 : NE PAS supprimer tout de suite — on attend que le chargement réussisse
-
-      try {
-        const copyFromStorage = JSON.parse(rawData);
-        CURRENT_DOC_ID = copyFromStorage.id;
-        CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
-
-        if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
-          const parts = copyFromStorage.path.split('/');
-          if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
-        }
-
-        let docSnap = null;
-        if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
-          docSnap = await getDoc(doc(db, copyFromStorage.path));
-        }
-        if (!docSnap || !docSnap.exists()) {
-          docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            CURRENT_ELEVE_CODE = CURRENT_ELEVE_CODE || data.eleve?.userCode || data.userCode || data.eleveCode;
-          }
-        }
-        if (!docSnap || !docSnap.exists()) throw new Error("Document non trouvé");
-
-        CURRENT_COPY = docSnap.data();
-        CURRENT_COPY.id = CURRENT_DOC_ID;
-        // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
-        localStorage.removeItem("cockpit_transfert");
-        if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
-
-        document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
-        document.getElementById('inputPrenom').value = "";
-        document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
-        document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
-
-        const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
-        if (!devoirId) throw new Error("devoirId invalide");
-
-        const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
-        if (!resp.ok) throw new Error("Blueprint non trouvé: " + devoirId);
-
-        CURRENT_BLUEPRINT = await resp.json();
-        document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
-
-        const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
-        renderCorrection({ questions }, CURRENT_COPY.reponses || {});
-
-        // === AUTO-CORRECTION ENGINE HOOK ===
-        let hasExistingCorrection = false;
-
-        if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
-          try {
-            const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
-            if (evalSnap.exists()) {
-              CURRENT_EVALUATION = evalSnap.data();
-              loadExistingCorrection(CURRENT_EVALUATION);
-              IS_SAVED = true;
-              hasExistingCorrection = true;
-            } else if (CURRENT_COPY.correction) {
-              CURRENT_EVALUATION = CURRENT_COPY.correction;
-              loadExistingCorrection(CURRENT_COPY.correction);
-              IS_SAVED = true;
-              hasExistingCorrection = true;
-            }
-          } catch(e) {
-            // FIX #3 : Signaler l'erreur au lieu de l'avaler silencieusement
-            console.warn("⚠️ Impossible de charger une correction existante:", e.message);
-            IS_SAVED = false;
-            const banner = document.getElementById('statusText');
-            if (banner) banner.innerHTML = "⚠️ Correction existante non chargée (vérifiez votre connexion)";
-            document.getElementById('statusBanner').className = 'status-banner not-saved';
-          }
-        }
-
-        // Run auto-correction ONLY if no existing correction was loaded
-        if (!hasExistingCorrection && CURRENT_BLUEPRINT.autocorrect === true) {
-          autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_COPY.reponses || {});
-          IS_SAVED = false; // Not saved yet, prof needs to validate
-        }
-
-        updateStatusBanner();
-        console.log("✅ Grille V19 prête !");
-      } catch (e) {
-        document.getElementById('statusText').innerHTML = "❌ " + e.message;
-        document.getElementById('statusBanner').classList.add('not-saved');
-        console.error("❌", e);
-        handleFirebaseError(e, "chargement copie"); // FIX #20
-      }
-    }
-
-    // FIX #13 : Raccourcis clavier — cliquer sur une ligne puis 1=NT, 2=I, 3=A, 4=M
-    let FOCUSED_ROW = null;
-    document.addEventListener('click', (e) => {
-      const row = e.target.closest('#correctionTable tbody tr');
-      if (row) {
-        if (FOCUSED_ROW) FOCUSED_ROW.style.outline = '';
-        FOCUSED_ROW = row;
-        row.style.outline = '2px solid #2e7bb6';
-        row.style.outlineOffset = '-2px';
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      // Ne pas intercepter si on est dans un champ de saisie
-      if (e.target.matches('input, textarea, [contenteditable="true"]')) return;
-      if (!FOCUSED_ROW) return;
-      const keyMap = { '1': 'NT', '2': 'I', '3': 'A', '4': 'M', 'Numpad1': 'NT', 'Numpad2': 'I', 'Numpad3': 'A', 'Numpad4': 'M' };
-      const level = keyMap[e.key] || keyMap[e.code];
-      if (level) {
-        e.preventDefault();
-        const btn = FOCUSED_ROW.querySelector(`.level-btn.${level.toLowerCase()}`);
-        if (btn) btn.click();
-        // Passer à la question suivante
-        const next = FOCUSED_ROW.nextElementSibling;
-        if (next && next.matches('tr')) {
-          FOCUSED_ROW.style.outline = '';
-          FOCUSED_ROW = next;
-          next.style.outline = '2px solid #2e7bb6';
-          next.style.outlineOffset = '-2px';
-          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-      // Tab = passer à la question suivante sans noter
-      if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault();
-        const next = FOCUSED_ROW.nextElementSibling;
-        if (next && next.matches('tr')) {
-          FOCUSED_ROW.style.outline = '';
-          FOCUSED_ROW = next;
-          next.style.outline = '2px solid #2e7bb6';
-          next.style.outlineOffset = '-2px';
-          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-    });
-
-    // FIX #14 : Sauvegarde auto du brouillon quand l'onglet perd le focus (mobile + desktop)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && !IS_SAVED && currentUser && CURRENT_ELEVE_CODE && CURRENT_ELEVE_CODE !== 'UNKNOWN') {
-        // Sauvegarde silencieuse en brouillon
+        
         try {
-          const brouillon = collecterDonneesCorrection();
-          brouillon.statut = "brouillon_auto";
-          brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-          brouillon.publie = false;
-          const brouillonDocId = brouillon.devoirId + "_brouillon";
-          setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon)
-            .then(() => console.log("💾 Brouillon auto sauvegardé (visibilitychange)"))
-            .catch(err => console.warn("⚠️ Brouillon auto échoué:", err.message));
-        } catch(e) { console.warn("⚠️ Brouillon auto échoué:", e.message); }
-      }
-    });
+            const qCopies = query(collectionGroup(db, "copies"), limit(100));
+            const snapCopies = await getDocs(qCopies);
+            const copiesMap = new Map();
+            
+            snapCopies.forEach(docSnap => {
+                const d = docSnap.data();
+                const pathParts = docSnap.ref.path.split('/');
+                const userCode = pathParts.length >= 2 ? pathParts[1] : (d.eleve?.userCode || d.userCode || null);
+                const devoirId = d.devoirId || "unknown";
+                copiesMap.set(`${devoirId}_${userCode}`, { docSnap, data: d, eleveCode: userCode, devoirId });
+            });
+            
+            const qEvals = query(collectionGroup(db, "evaluations"), limit(100));
+            const snapEvals = await getDocs(qEvals);
+            const evalsMap = new Map();
+            
+            snapEvals.forEach(docSnap => {
+                const evalData = docSnap.data();
+                const pathParts = docSnap.ref.path.split('/');
+                const userCode = pathParts.length >= 2 ? pathParts[1] : evalData.eleveCode;
+                const devoirId = evalData.devoirId || "unknown";
+                evalsMap.set(`${devoirId}_${userCode}`, evalData);
+            });
+            
+            allData = [];
+            let classes = new Set();
+            let exercices = new Set();
+            
+            copiesMap.forEach((copyObj, key) => {
+                const d = copyObj.data;
+                const docSnap = copyObj.docSnap;
+                const userCode = copyObj.eleveCode;
+                const devoirId = copyObj.devoirId;
+                const evaluation = evalsMap.get(key);
+                
+                // ⭐ UTILISER afficherAvecNom POUR MONTRER LE NOM
+                const identifiant = window.afficherAvecNom(userCode) || "Anonyme";
+                
+                let dateValue = d.createdAtISO ? new Date(d.createdAtISO) : (d.date ? new Date(d.date) : (d.createdAt?.toDate ? d.createdAt.toDate() : new Date()));
+                
+                let noteFinal = "--";
+                let estCorrige = false;
+                
+                if (evaluation && evaluation.note_finale !== undefined) {
+                    noteFinal = evaluation.note_finale;
+                    estCorrige = true;
+                } else {
+                    noteFinal = extractNote20(d) ?? "--";
+                }
+                
+                allData.push({
+                    id: docSnap.id, path: docSnap.ref.path, eleveCode: userCode, raw: d,
+                    date: dateValue, identifiant, userCode, classe: d.eleve?.classe || d.classe || "?",
+                    temps_secondes: d.temps_secondes || 0, exercice_titre: d.titre || devoirId || "Devoir",
+                    devoirId, reponses: d.reponses, eleve: d.eleve, note_finale: noteFinal,
+                    competences: d.competences || {}, estCorrige, evaluation
+                });
 
-    window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
-    init();
+                if(d.eleve?.classe || d.classe) classes.add(d.eleve?.classe || d.classe);
+                if(d.titre || devoirId) exercices.add(d.titre || devoirId);
+            });
+            
+            // Filtres
+            const selClass = document.getElementById("filter-class");
+            const selExo = document.getElementById("filter-exercice");
+            selClass.innerHTML = '<option value="ALL">Toutes les classes</option>';
+            classes.forEach(c => selClass.innerHTML += `<option value="${c}">${c}</option>`);
+            selExo.innerHTML = '<option value="ALL">Tous les exercices</option>';
+            exercices.forEach(e => selExo.innerHTML += `<option value="${e}">${e}</option>`);
+
+            applyFilters();
+            console.log("✅ " + allData.length + " copies chargées");
+
+        } catch(e) { 
+            console.error("❌ Erreur:", e); 
+            alert("Erreur: " + e.message);
+        }
+    };
+
+    window.applyFilters = function() {
+        const fClass = document.getElementById("filter-class").value;
+        const fExo = document.getElementById("filter-exercice").value;
+        const fName = document.getElementById("filter-student").value.toLowerCase();
+        const fStatut = document.getElementById("filter-statut").value;
+
+        filteredData = allData.filter(d => {
+            if(fClass !== "ALL" && d.classe !== fClass) return false;
+            if(fExo !== "ALL" && d.exercice_titre !== fExo) return false;
+            if(fName && !d.identifiant.toLowerCase().includes(fName)) return false;
+            if(fStatut === "A_CORRIGER" && d.estCorrige) return false;
+            if(fStatut === "CORRIGES" && !d.estCorrige) return false;
+            if(fStatut === "NON_NOTE" && d.note_finale !== "NN") return false;
+            return true;
+        });
+        sortData(currentSort.col, false);
+    };
+    
+    window.sortData = function(col, toggle = true) {
+        if (toggle) {
+            if (currentSort.col === col) currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+            else { currentSort.col = col; currentSort.dir = "asc"; }
+        }
+
+        filteredData.sort((a, b) => {
+            let va = a[col], vb = b[col];
+            if (col === "date") { va = a.date?.getTime?.() || 0; vb = b.date?.getTime?.() || 0; }
+            if (col === "note_finale" || col === "temps_secondes") { va = Number(va ?? 0); vb = Number(vb ?? 0); }
+            if (col === "collages") { va = a.raw?.pasteStats?.external || 0; vb = b.raw?.pasteStats?.external || 0; }
+            if (typeof va === "string") va = va.toLowerCase();
+            if (typeof vb === "string") vb = vb.toLowerCase();
+            if (va < vb) return currentSort.dir === "asc" ? -1 : 1;
+            if (va > vb) return currentSort.dir === "asc" ? 1 : -1;
+            return 0;
+        });
+
+        renderTable();
+    };
+
+    function renderTable() {
+        const tbody = document.getElementById("tbody-eleves");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        if (!filteredData || filteredData.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='8' class='scores-empty'>Aucun résultat trouvé.</td></tr>";
+            return;
+        }
+
+        filteredData.forEach(d => {
+            let dateStr = d.date instanceof Date ? d.date.toLocaleDateString("fr-FR") : "-";
+            let scoreStyle = "color:#4b5563";
+            let scoreTxt = d.note_finale;
+            let correctionBadge = "";
+
+            if (scoreTxt === "NN" || d.evaluation?.nonNote) {
+                scoreTxt = "NN"; scoreStyle = "color:#b45309;font-weight:bold";
+                correctionBadge = '<span style="display:inline-block; background:#fef3c7; color:#b45309; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:5px;">⚠️</span>';
+            } else if (scoreTxt !== "--") {
+                scoreTxt = scoreTxt + "/20";
+                const val = parseFloat(d.note_finale);
+                if (!isNaN(val)) {
+                    if (val < 10) scoreStyle = "color:#dc2626;font-weight:bold";
+                    else if (val >= 14) scoreStyle = "color:#16a34a;font-weight:bold";
+                }
+                if (d.estCorrige) correctionBadge = '<span style="display:inline-block; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:5px;">✓</span>';
+            }
+
+            const pasteBadge = getPasteBadge(d.raw?.pasteStats);
+
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><span class="eleve-link" onclick="openStudentDetail('${d.userCode || d.identifiant}')">${d.identifiant}</span></td>
+                <td><span class="pill pill-blue">${d.classe}</span></td>
+                <td>${d.exercice_titre}</td>
+                <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}${correctionBadge}</td>
+                <td style="text-align:center;">${pasteBadge}</td>
+                <td style="text-align:center;">${d.evaluation?.luLe ? '👁️' : '✉️'}</td>
+                <td style="display:flex; gap:5px;">
+                    <button onclick='ouvrirCorrection(${JSON.stringify(d).replace(/'/g,"&#39;")})' style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">✍️</button>
+                    <button onclick='openMirror(${JSON.stringify(d).replace(/'/g, "&#39;")})' style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</button>
+                    <button onclick='deleteSubmission("${d.path}", "${d.eleveCode}", "${d.devoirId}", "${d.identifiant}")' style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">🗑️</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    window.ouvrirCorrection = function(copy) {
+        try {
+            localStorage.setItem("cockpit_transfert", JSON.stringify(copy));
+            window.open("grille.html", "_blank");
+        } catch (e) { alert("Erreur: " + e.message); }
+    };
+
+    window.openMirror = function(data) {
+        alert("Copie de " + data.identifiant + "\n\nExercice: " + data.exercice_titre + "\nNote: " + data.note_finale);
+    };
+
+    window.deleteSubmission = async function(path, eleveCode, devoirId, identifiant) {
+        if (!currentUser) { alert("Connexion requise"); return; }
+        if (!confirm("Supprimer la copie de " + identifiant + " ?")) return;
+        try {
+            await deleteDoc(doc(db, path));
+            const evalPath = `resultats/${eleveCode}/evaluations/${devoirId}_eval`;
+            const evalSnap = await getDoc(doc(db, evalPath));
+            if (evalSnap.exists()) await deleteDoc(doc(db, evalPath));
+            alert("✅ Supprimé !");
+            chargerDonnees();
+        } catch (error) {
+            alert("Erreur: " + error.message);
+        }
+    };
+
+    window.openStudentDetail = function(studentIdentifier) {
+        const studentHistory = allData.filter(d => d.userCode === studentIdentifier || d.identifiant === studentIdentifier);
+        if(studentHistory.length === 0) return;
+        const last = studentHistory[0];
+        document.getElementById("modal-name").innerText = last.identifiant;
+        document.getElementById("modal-class").innerText = last.classe;
+        let totalScore = 0, nbNotes = 0;
+        studentHistory.forEach(h => {
+            if(h.note_finale && h.note_finale !== "--"){
+                let v = parseFloat(h.note_finale);
+                if(!isNaN(v)) { totalScore += v; nbNotes++; }
+            }
+        });
+        document.getElementById("modal-avg").innerText = nbNotes > 0 ? (totalScore/nbNotes).toFixed(1) + " / 20" : "--";
+        document.getElementById("modalStudent").classList.add("open");
+    };
+
+    window.closeModal = function() { document.getElementById("modalStudent").classList.remove("open"); };
+    window.showStatDetails = function(type) { alert("Statistiques: " + type); };
+    window.closeStatModal = function() { document.getElementById("modalStats").classList.remove("open"); };
+
+    // Sessions
+    window.createNewSession = async function() {
+        const title = document.getElementById("session-title-input").value.trim();
+        if(!title) { alert("Mettez un titre !"); return; }
+        const ref = await addDoc(collection(db, "sessions"), { title, createdAt: serverTimestamp(), isActive: true });
+        currentSessionId = ref.id;
+        await setDoc(doc(db, "config", "live"), { activeSessionId: currentSessionId, sessionTitle: title, currentStep: "wait", updatedAt: serverTimestamp() }, { merge: true });
+        document.getElementById("live-panel").style.display = "block";
+        document.getElementById("session-info").style.display = "block";
+        document.getElementById("current-session-name").innerText = title;
+        document.getElementById("session-title-input").value = "";
+    };
+
+    window.stopSession = async function() {
+        if(!confirm("Arrêter la session ?")) return;
+        if(currentSessionId) await updateDoc(doc(db, "sessions", currentSessionId), { isActive: false });
+        await setDoc(doc(db, "config", "live"), { activeSessionId: null, currentStep: "wait" }, { merge: true });
+        document.getElementById("live-panel").style.display = "none";
+        document.getElementById("session-info").style.display = "none";
+        currentSessionId = null;
+        if(typeof loadHistory === 'function') loadHistory();
+    };
+
+    window.loadHistory = async function() {
+        try {
+            const qSessions = query(collection(db, "sessions"), orderBy("createdAt", "desc"), limit(10));
+            const snapshot = await getDocs(qSessions);
+            const histDiv = document.getElementById("history-list");
+            if (!histDiv) return;
+            let html = "";
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const date = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
+                const status = data.isActive ? '<span class="pill pill-green">Active</span>' : '<span class="pill pill-orange">Terminée</span>';
+                html += `<div style="padding:8px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between;"><div><strong>${data.title}</strong><br><small style="color:#64748b;">${date}</small></div>${status}</div>`;
+            });
+            histDiv.innerHTML = html || '<p style="text-align:center; color:#94a3b8;">Aucun historique</p>';
+        } catch(e) { console.error("Erreur loadHistory:", e); }
+    };
+
+    window.loadLibrary = async function() {
+        try {
+            const qLib = query(collection(db, "library"), orderBy("createdAt", "desc"));
+            const snapshot = await getDocs(qLib);
+            libraryData = [];
+            const ul = document.getElementById("library-list");
+            if (!ul) return;
+            let html = "";
+            snapshot.forEach(doc => {
+                const data = { id: doc.id, ...doc.data() };
+                libraryData.push(data);
+                const tag = data.type === "poll" ? '<span class="tag tag-poll">Sondage</span>' : data.type === "quiz" ? '<span class="tag tag-quiz">Quiz</span>' : '<span class="tag tag-cloud">Nuage</span>';
+                html += `<li class="lib-item" onclick="loadFromLibrary('${data.id}')"><div>${tag}<strong>${data.title}</strong></div></li>`;
+            });
+            ul.innerHTML = html || '<li style="text-align:center; color:#94a3b8; padding:20px;">Bibliothèque vide</li>';
+        } catch(e) { console.error("Erreur loadLibrary:", e); }
+    };
+
+    window.toggleCreator = function() {
+        const panel = document.getElementById("creator-panel");
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+    };
+
+    window.updateCreatorForm = function() {};
+    window.addOptionInput = function() {};
+    window.saveToLibrary = async function() { alert("Enregistrement bibliothèque"); };
+    window.loadFromLibrary = function(id) { alert("Chargement item " + id); };
+    window.setMode = function(mode) { console.log("Mode:", mode); };
+    window.revealQuiz = function() {};
+    window.resetQuiz = function() {};
+
+    // Chargement initial
+    chargerDonnees();
+    loadLibrary();
+
+    // Swipe mobile
+    let touchStartX = 0;
+    document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    document.addEventListener('touchend', e => {
+        if(document.body.classList.contains("menu-open") && e.changedTouches[0].screenX < touchStartX - 50) closeMenu();
+    }, {passive: true});
+
+    console.log("✅ Cockpit chargé avec succès !");
   </script>
 </body>
 </html>
