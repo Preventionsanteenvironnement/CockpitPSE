@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Dossier Classe — Notes & Moyennes</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; color: #1a1a2e; }
+        .topbar {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        }
+        .topbar h1 { font-size: 1.3em; flex: 1; }
+        .topbar .btn { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; text-decoration: none; transition: background 0.2s; }
+        .topbar .btn:hover { background: rgba(255,255,255,0.35); }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 20px; }
+        .card h2 { font-size: 1.1em; color: #059669; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        .class-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .class-chip { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 2px solid #e2e8f0; border-radius: 20px; cursor: pointer; font-size: 0.85em; font-weight: 600; background: #fff; transition: all 0.2s; user-select: none; }
+        .class-chip:hover { border-color: #10b981; background: #ecfdf5; }
+        .class-chip.active { border-color: #059669; background: #059669; color: #fff; }
+        .class-chip input { display: none; }
+        .btn-primary { background: linear-gradient(135deg, #059669, #10b981); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: transform 0.2s; }
+        .btn-primary:hover { transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-export { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+        .btn-import { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+        .status-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-orange { background: #fef3c7; color: #92400e; }
+        .table-scroll { overflow-x: auto; margin-top: 10px; }
+        .grades-table { border-collapse: collapse; font-size: 0.82em; min-width: 100%; }
+        .grades-table th { background: #059669; color: #fff; padding: 8px 10px; text-align: center; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+        .grades-table th.col-nom { text-align: left; min-width: 140px; position: sticky; left: 0; z-index: 3; background: #047857; }
+        .grades-table th.col-classe { min-width: 70px; }
+        .grades-table th.col-exo { min-width: 80px; max-width: 120px; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); height: 120px; font-size: 0.75em; padding: 6px 4px; }
+        .grades-table th.col-avg { background: #1e40af; min-width: 70px; }
+        .grades-table td { padding: 6px 8px; border: 1px solid #e5e7eb; text-align: center; }
+        .grades-table td.td-nom { text-align: left; font-weight: 600; position: sticky; left: 0; background: #fff; z-index: 1; white-space: nowrap; }
+        .grades-table tr:nth-child(even) td { background: #f8fafc; }
+        .grades-table tr:nth-child(even) td.td-nom { background: #f8fafc; }
+        .grades-table tr:hover td { background: #ecfdf5; }
+        .grades-table tr:hover td.td-nom { background: #ecfdf5; }
+        .grades-table tr.row-avg td { background: #f0fdf4 !important; border-top: 3px solid #059669; font-weight: 700; }
+        .note-red { color: #dc2626; font-weight: 700; }
+        .note-green { color: #16a34a; font-weight: 700; }
+        .note-orange { color: #d97706; font-weight: 600; }
+        .note-gray { color: #9ca3af; }
+        .note-bold { font-weight: 800; font-size: 1em; }
+        .auth-overlay { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
+        .auth-box { text-align: center; padding: 40px; }
+        .auth-box h2 { color: #059669; margin-bottom: 16px; }
+        .auth-box p { color: #64748b; margin-bottom: 20px; }
+        .import-section { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+        .file-input-wrap { position: relative; display: inline-block; }
+        .file-input-wrap input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #059669; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .topbar { padding: 12px 14px; }
+            .topbar h1 { font-size: 1.1em; }
+            .grades-table th.col-exo { height: 80px; font-size: 0.7em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <h1>📊 Dossier Classe — Notes & Moyennes</h1>
+    <a href="indexcokpit.html" class="btn">⬅ Cockpit</a>
+    <button class="btn" onclick="exportCSV()" id="btnExportTop" style="display:none;">📥 Export CSV</button>
+</div>
+
+<div class="container">
+
+    <div id="authSection" class="auth-overlay">
+        <div class="auth-box card">
+            <h2>🔐 Connexion requise</h2>
+            <p>Connectez-vous pour acceder aux notes de vos classes.</p>
+            <button class="btn-primary" onclick="connexionProf()" style="font-size:1.1em; padding:14px 32px;">
+                🔑 Se connecter avec Google
+            </button>
+        </div>
+    </div>
+
+    <div id="mainContent" style="display:none;">
+
+        <div class="card">
+            <h2>🏫 Selection des classes</h2>
+            <div class="class-grid" id="classGrid"></div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn-primary" onclick="chargerNotes()" id="btnCharger">📥 Charger les notes</button>
+                <span id="loadStatus" style="color:#64748b; font-size:0.85em;"></span>
+            </div>
+        </div>
+
+        <div id="statusBar" class="status-bar" style="display:none;">
+            <span class="status-badge badge-green" id="badgeEleves">—</span>
+            <span class="status-badge badge-blue" id="badgeExos">—</span>
+            <span class="status-badge badge-orange" id="badgeMoyenne">—</span>
+        </div>
+
+        <div class="card" id="tableCard" style="display:none;">
+            <h2>📋 Tableau des notes</h2>
+            <div class="table-scroll" id="tableScroll">
+                <table class="grades-table" id="gradesTable">
+                    <thead id="gradesThead"></thead>
+                    <tbody id="gradesTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📂 Import / Export</h2>
+            <div class="import-section">
+                <button class="btn-export" onclick="exportCSV()" id="btnExport2" disabled>📥 Exporter CSV pour Pronote</button>
+                <div class="file-input-wrap">
+                    <button class="btn-import">📤 Importer CSV eleves</button>
+                    <input type="file" accept=".csv,.txt" onchange="importCSV(event)">
+                </div>
+                <button class="btn-secondary" onclick="exportCSVEleves()">💾 Exporter annuaire</button>
+            </div>
+            <p style="color:#94a3b8; font-size:0.8em; margin-top:8px;">
+                Format import : <code>Code;Nom Prenom;Classe</code> (1 ligne par eleve, separateur <code>;</code> ou <code>,</code>). Les noms enrichissent l'annuaire du cockpit.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CLASSES = [
+        { id: "BTAGO1", label: "BT AGO1" }, { id: "BTAGO2", label: "BT AGO2" }, { id: "BTMELEC", label: "BT MELEC" },
+        { id: "B1AGO1", label: "1 AGO1" }, { id: "B1AGO2", label: "1 AGO2" }, { id: "B1MELEC", label: "1 MELEC" },
+        { id: "B2GATL1", label: "2 GATL1" }, { id: "B2GATL2", label: "2 GATL2" }, { id: "B2MELEC", label: "2 MELEC" },
+        { id: "C1CAN", label: "CAP1 CAN" }, { id: "C1HORT", label: "CAP1 HORT" }, { id: "C1JP", label: "CAP1 JP" },
+        { id: "C1PSR", label: "CAP1 PSR" }, { id: "C1VAN", label: "CAP1 VAN" },
+        { id: "C2CAN", label: "CAP2 CAN" }, { id: "C2HORT", label: "CAP2 HORT" }, { id: "C2JP", label: "CAP2 JP" },
+        { id: "C2PSR", label: "CAP2 PSR" }, { id: "C2VAN", label: "CAP2 VAN" }
+    ];
+
+    const CLE_ELEVES = 'cockpit_eleves_noms';
+    const CLE_SELECTED_CLASSES = 'dossier_classe_selection';
+    let gradesData = null;
+
+    function initClassGrid() {
+        const grid = document.getElementById('classGrid');
+        const saved = JSON.parse(localStorage.getItem(CLE_SELECTED_CLASSES) || '[]');
+        CLASSES.forEach(c => {
+            const chip = document.createElement('label');
+            chip.className = 'class-chip' + (saved.includes(c.id) ? ' active' : '');
+            chip.innerHTML = '<input type="checkbox" value="' + c.id + '"' + (saved.includes(c.id) ? ' checked' : '') + '> ' + c.label;
+            chip.querySelector('input').addEventListener('change', function() {
+                chip.classList.toggle('active', this.checked);
+                saveClassSelection();
+            });
+            grid.appendChild(chip);
+        });
+    }
+
+    function saveClassSelection() {
+        const checked = Array.from(document.querySelectorAll('.class-chip input:checked')).map(function(i) { return i.value; });
+        localStorage.setItem(CLE_SELECTED_CLASSES, JSON.stringify(checked));
+    }
+
+    function getSelectedClasses() {
+        return Array.from(document.querySelectorAll('.class-chip input:checked')).map(function(i) { return i.value; });
+    }
+
+    function getNomEleve(code) {
+        var eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+        return eleves[(code || '').toUpperCase()] || null;
+    }
+
+    initClassGrid();
+</script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collectionGroup, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.appspot.com",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    window.connexionProf = async function() {
+        try {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) { await signInWithRedirect(auth, googleProvider); }
+            else { await signInWithPopup(auth, googleProvider); }
+        } catch(e) { alert("Erreur connexion : " + e.message); }
+    };
+
+    try { await getRedirectResult(auth); } catch(e) {}
+
+    onAuthStateChanged(auth, (user) => {
+        document.getElementById('authSection').style.display = user ? 'none' : 'flex';
+        document.getElementById('mainContent').style.display = user ? 'block' : 'none';
+    });
+
+    // ══════════════════════════════════════════════════════
+    // CHARGER LES NOTES
+    // ══════════════════════════════════════════════════════
+    window.chargerNotes = async function() {
+        const classes = getSelectedClasses();
+        if (classes.length === 0) { alert("Selectionnez au moins une classe."); return; }
+
+        const btn = document.getElementById('btnCharger');
+        const status = document.getElementById('loadStatus');
+        btn.disabled = true;
+        status.innerHTML = '<span class="spinner"></span> Chargement...';
+
+        try {
+            const qCopies = query(collectionGroup(db, "copies"), limit(500));
+            const snapCopies = await getDocs(qCopies);
+            const qEvals = query(collectionGroup(db, "evaluations"), limit(500));
+            const snapEvals = await getDocs(qEvals);
+
+            const evalsMap = new Map();
+            snapEvals.forEach(docSnap => {
+                const ev = docSnap.data();
+                const pathParts = docSnap.ref.path.split('/');
+                const userCode = pathParts.length >= 2 ? pathParts[1] : ev.eleveCode;
+                const devoirId = ev.devoirId || "unknown";
+                evalsMap.set(devoirId + "_" + userCode, ev);
+            });
+
+            const studentsMap = new Map();
+            const exercisesMap = new Map();
+            const grades = {};
+
+            snapCopies.forEach(docSnap => {
+                const d = docSnap.data();
+                const pathParts = docSnap.ref.path.split('/');
+                const userCode = pathParts.length >= 2 ? pathParts[1] : (d.eleve?.userCode || d.userCode || null);
+                if (!userCode) return;
+
+                const classe = d.eleve?.classe || d.classe || "?";
+                if (!classes.includes(classe)) return;
+
+                const devoirId = d.devoirId || "unknown";
+                const titre = d.titre || devoirId;
+                const key = devoirId + "_" + userCode;
+
+                if (!studentsMap.has(userCode)) {
+                    studentsMap.set(userCode, { code: userCode, nom: getNomEleve(userCode) || "", classe: classe });
+                }
+
+                if (!exercisesMap.has(devoirId)) {
+                    exercisesMap.set(devoirId, { devoirId: devoirId, titre: titre });
+                }
+
+                const evaluation = evalsMap.get(key);
+                let note = null;
+                if (evaluation) {
+                    if (evaluation.nonNote) note = "NN";
+                    else if (evaluation.absent) note = "ABS";
+                    else if (evaluation.note_finale !== undefined) note = evaluation.note_finale;
+                }
+                if (note === null) {
+                    const candidates = [d?.note_finale, d?.resultat_auto?.score, d?.meta?.score, d?.score, d?.note];
+                    for (const c of candidates) {
+                        if (c === 0) { note = 0; break; }
+                        if (c === null || c === undefined) continue;
+                        if (typeof c === "number" && !isNaN(c)) { note = c; break; }
+                        if (typeof c === "string") { const m = c.match(/(\d+(?:[.,]\d+)?)/); if (m) { note = parseFloat(m[1].replace(",", ".")); break; } }
+                    }
+                }
+                grades[key] = note;
+            });
+
+            const exercises = Array.from(exercisesMap.values());
+            exercises.sort((a, b) => a.titre.localeCompare(b.titre));
+
+            const students = Array.from(studentsMap.values());
+            students.sort((a, b) => {
+                const cmp = a.classe.localeCompare(b.classe);
+                if (cmp !== 0) return cmp;
+                return (a.nom || a.code).localeCompare(b.nom || b.code);
+            });
+
+            gradesData = { students, exercises, grades };
+            renderTable();
+            status.textContent = "✅ Charge !";
+        } catch(e) {
+            console.error("Erreur:", e);
+            status.textContent = "❌ Erreur : " + e.message;
+        }
+        btn.disabled = false;
+    };
+
+    // ══════════════════════════════════════════════════════
+    // RENDER TABLE
+    // ══════════════════════════════════════════════════════
+    function renderTable() {
+        if (!gradesData) return;
+        const { students, exercises, grades } = gradesData;
+
+        document.getElementById('tableCard').style.display = 'block';
+        document.getElementById('statusBar').style.display = 'flex';
+        document.getElementById('btnExportTop').style.display = 'inline-flex';
+        document.getElementById('btnExport2').disabled = false;
+
+        document.getElementById('badgeEleves').textContent = '👤 ' + students.length + ' eleve' + (students.length > 1 ? 's' : '');
+        document.getElementById('badgeExos').textContent = '📝 ' + exercises.length + ' exercice' + (exercises.length > 1 ? 's' : '');
+
+        const thead = document.getElementById('gradesThead');
+        let headerHTML = '<tr><th class="col-nom">Eleve</th><th class="col-classe">Classe</th>';
+        exercises.forEach(function(ex) {
+            headerHTML += '<th class="col-exo" title="' + ex.titre + '">' + ex.titre + '</th>';
+        });
+        headerHTML += '<th class="col-avg">Moyenne</th></tr>';
+        thead.innerHTML = headerHTML;
+
+        const tbody = document.getElementById('gradesTbody');
+        tbody.innerHTML = '';
+
+        let globalSum = 0, globalCount = 0;
+        const exoSums = exercises.map(function() { return { sum: 0, count: 0 }; });
+
+        students.forEach(function(st) {
+            let tr = '<tr>';
+            const displayName = st.nom ? st.code + ' (' + st.nom + ')' : st.code;
+            tr += '<td class="td-nom">' + displayName + '</td>';
+            tr += '<td>' + st.classe + '</td>';
+
+            let studentSum = 0, studentCount = 0;
+
+            exercises.forEach(function(ex, i) {
+                const key = ex.devoirId + '_' + st.code;
+                const note = grades[key];
+                let cell = '', cls = '';
+
+                if (note === null || note === undefined) {
+                    cell = '—'; cls = 'note-gray';
+                } else if (note === "NN") {
+                    cell = 'NN'; cls = 'note-orange';
+                } else if (note === "ABS") {
+                    cell = 'ABS'; cls = 'note-red';
+                } else {
+                    const val = parseFloat(note);
+                    if (isNaN(val)) { cell = String(note); cls = 'note-gray'; }
+                    else {
+                        cell = val % 1 === 0 ? val.toString() : val.toFixed(1);
+                        cls = val < 10 ? 'note-red' : val >= 14 ? 'note-green' : '';
+                        studentSum += val; studentCount++;
+                        exoSums[i].sum += val; exoSums[i].count++;
+                    }
+                }
+                tr += '<td class="' + cls + '">' + cell + '</td>';
+            });
+
+            let avg = '—', avgCls = 'note-gray';
+            if (studentCount > 0) {
+                const v = studentSum / studentCount;
+                avg = v.toFixed(1);
+                avgCls = v < 10 ? 'note-red note-bold' : v >= 14 ? 'note-green note-bold' : 'note-bold';
+                globalSum += v; globalCount++;
+            }
+            tr += '<td class="' + avgCls + '">' + avg + '</td></tr>';
+            tbody.innerHTML += tr;
+        });
+
+        // Moyenne classe row
+        let avgRow = '<tr class="row-avg"><td class="td-nom" style="background:#f0fdf4 !important;">📊 Moyenne classe</td><td></td>';
+        exercises.forEach(function(ex, i) {
+            if (exoSums[i].count > 0) {
+                const v = exoSums[i].sum / exoSums[i].count;
+                const cls = v < 10 ? 'note-red' : v >= 14 ? 'note-green' : '';
+                avgRow += '<td class="' + cls + '">' + v.toFixed(1) + '</td>';
+            } else {
+                avgRow += '<td class="note-gray">—</td>';
+            }
+        });
+        let globalAvg = '—', gCls = '';
+        if (globalCount > 0) {
+            const v = globalSum / globalCount;
+            globalAvg = v.toFixed(1);
+            gCls = v < 10 ? 'note-red' : v >= 14 ? 'note-green' : '';
+        }
+        avgRow += '<td class="' + gCls + '" style="font-weight:800; font-size:1.1em;">' + globalAvg + '</td></tr>';
+        tbody.innerHTML += avgRow;
+
+        document.getElementById('badgeMoyenne').textContent = '📊 Moyenne : ' + globalAvg + '/20';
+    }
+
+    // ══════════════════════════════════════════════════════
+    // EXPORT CSV (Pronote)
+    // ══════════════════════════════════════════════════════
+    window.exportCSV = function() {
+        if (!gradesData) { alert("Chargez les notes d'abord."); return; }
+        const { students, exercises, grades } = gradesData;
+
+        let csv = "Code;Nom;Classe";
+        exercises.forEach(function(ex) { csv += ";" + ex.titre.replace(/;/g, ","); });
+        csv += ";Moyenne\n";
+
+        students.forEach(function(st) {
+            csv += st.code + ";" + (st.nom || "") + ";" + st.classe;
+            let sum = 0, count = 0;
+            exercises.forEach(function(ex) {
+                const key = ex.devoirId + "_" + st.code;
+                const note = grades[key];
+                if (note === null || note === undefined) { csv += ";"; }
+                else if (note === "NN" || note === "ABS") { csv += ";" + note; }
+                else {
+                    const val = parseFloat(note);
+                    csv += ";" + (isNaN(val) ? "" : val.toString().replace(".", ","));
+                    if (!isNaN(val)) { sum += val; count++; }
+                }
+            });
+            csv += ";" + (count > 0 ? (sum / count).toFixed(1).replace(".", ",") : "") + "\n";
+        });
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const classes = getSelectedClasses().join("-") || "toutes";
+        a.download = 'notes_' + classes + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+    };
+
+    // ══════════════════════════════════════════════════════
+    // IMPORT CSV (enrichit annuaire)
+    // ══════════════════════════════════════════════════════
+    window.importCSV = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lines = e.target.result.split(/\r?\n/);
+            const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+            let nb = 0;
+            lines.forEach(function(line) {
+                line = line.trim();
+                if (!line) return;
+                const parts = line.split(/[,;]/);
+                if (parts.length >= 2) {
+                    const code = parts[0].trim().toUpperCase();
+                    const nom = parts[1].trim();
+                    if (code && nom && code !== "CODE" && code.toLowerCase() !== "code") {
+                        eleves[code] = nom;
+                        nb++;
+                    }
+                }
+            });
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+            alert('✅ ' + nb + ' eleve(s) importe(s) dans l\'annuaire !');
+            if (gradesData) {
+                gradesData.students.forEach(function(st) {
+                    const nom = getNomEleve(st.code);
+                    if (nom) st.nom = nom;
+                });
+                renderTable();
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+        event.target.value = '';
+    };
+
+    window.exportCSVEleves = function() {
+        const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+        const entries = Object.entries(eleves).sort(function(a, b) { return a[1].localeCompare(b[1]); });
+        if (!entries.length) { alert('Aucun eleve dans l\'annuaire.'); return; }
+        let csv = "Code,Nom\n";
+        entries.forEach(function(e) { csv += e[0] + "," + e[1] + "\n"; });
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'annuaire_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+    };
+</script>
+</body>
+</html>
