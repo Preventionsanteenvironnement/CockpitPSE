@@ -1304,6 +1304,7 @@ QN80,Wael HWORI</pre>
             if (va > vb) return currentSort.dir === "asc" ? 1 : -1;
             return 0;
         });
+        window.filteredData = filteredData;
 
         renderTable();
     };
@@ -1358,41 +1359,102 @@ QN80,Wael HWORI</pre>
                     statutBadge = '<span style="display:inline-block; background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75em; font-weight:bold;">📝 À corriger</span>';
             }
 
+            // Échapper les données pour les attributs HTML
+            const safeUserCode = (d.userCode || d.identifiant || '').replace(/"/g, '&quot;');
+            const safePath = (d.path || '').replace(/"/g, '&quot;');
+            const safeEleveCode = (d.eleveCode || '').replace(/"/g, '&quot;');
+            const safeDevoirId = (d.devoirId || '').replace(/"/g, '&quot;');
+            const safeIdentifiant = (d.identifiant || '').replace(/"/g, '&quot;');
+
             tbody.innerHTML += `<tr>
                 <td>${dateStr}</td>
-                <td><span class="eleve-link" onclick="openStudentDetail('${d.userCode || d.identifiant}')">${d.identifiant}</span></td>
+                <td><span class="eleve-link" data-action="student" data-code="${safeUserCode}">${d.identifiant}</span></td>
                 <td><span class="pill pill-blue">${d.classe}</span></td>
                 <td>${d.exercice_titre}</td>
                 <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}${correctionBadge}</td>
                 <td style="text-align:center;">${pasteBadge}</td>
                 <td style="text-align:center;">${statutBadge}</td>
                 <td style="display:flex; gap:5px;">
-                    <button type="button" onclick='ouvrirCorrection(window.filteredData[${idx}])' style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">✍️</button>
-                    <button type="button" onclick='openMirror(window.filteredData[${idx}])' style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</button>
-                    <button type="button" onclick='deleteSubmission("${d.path}", "${d.eleveCode}", "${d.devoirId}", "${d.identifiant}")' style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">🗑️</button>
+                    <a href="grille.html" target="_blank" data-action="corriger" data-idx="${idx}" style="display:inline-block; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem; text-decoration:none;">✍️</a>
+                    <span data-action="mirror" data-idx="${idx}" style="display:inline-block; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</span>
+                    <span data-action="delete" data-path="${safePath}" data-eleve="${safeEleveCode}" data-devoir="${safeDevoirId}" data-ident="${safeIdentifiant}" style="display:inline-block; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">🗑️</span>
                 </td>
             </tr>`;
         });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // EVENT DELEGATION — un seul listener pour tous les clics du tableau
+    // ═══════════════════════════════════════════════════════════════
+    document.getElementById("tbody-eleves").addEventListener("click", function(e) {
+        const el = e.target.closest("[data-action]");
+        if (!el) return;
+        const action = el.dataset.action;
+
+        if (action === "corriger") {
+            // Préparer localStorage AVANT que le lien <a> ouvre grille.html
+            const idx = parseInt(el.dataset.idx);
+            const copy = filteredData[idx];
+            if (!copy) { e.preventDefault(); alert("❌ Données manquantes. Actualisez."); return; }
+            try {
+                // ⚡ SAFE COPY — on ne garde que ce dont grille.html a besoin
+                // (pas de "raw" qui contient le doc Firestore entier = trop gros pour localStorage)
+                localStorage.removeItem("cockpit_transfert");
+                const safeCopy = {
+                    id: copy.id,
+                    path: copy.path,
+                    eleveCode: copy.eleveCode,
+                    userCode: copy.userCode,
+                    devoirId: copy.devoirId,
+                    identifiant: copy.identifiant,
+                    classe: copy.classe,
+                    exercice_titre: copy.exercice_titre
+                };
+                localStorage.setItem("cockpit_transfert", JSON.stringify(safeCopy));
+                const copyList = filteredData.map(d => ({
+                    id: d.id, path: d.path, eleveCode: d.eleveCode,
+                    userCode: d.userCode, devoirId: d.devoirId
+                }));
+                localStorage.setItem("cockpit_copy_list", JSON.stringify(copyList));
+                console.log("✅ Préparé correction:", safeCopy.eleveCode, safeCopy.devoirId, "(" + JSON.stringify(safeCopy).length + " octets)");
+                // Le <a href="grille.html" target="_blank"> fait le reste naturellement
+            } catch(err) {
+                e.preventDefault();
+                console.error("❌ Préparation correction:", err);
+                alert("Erreur : " + err.message);
+            }
+        }
+        else if (action === "mirror") {
+            const idx = parseInt(el.dataset.idx);
+            const copy = filteredData[idx];
+            if (copy) openMirror(copy);
+        }
+        else if (action === "delete") {
+            deleteSubmission(el.dataset.path, el.dataset.eleve, el.dataset.devoir, el.dataset.ident);
+        }
+        else if (action === "student") {
+            openStudentDetail(el.dataset.code);
+        }
+    });
+
+    // ouvrirCorrection gardée en backup (pour la correction en lot)
     window.ouvrirCorrection = function(copy) {
         try {
-            if (!copy) { alert("❌ Erreur : données de copie manquantes. Actualisez la page."); return; }
-            console.log("📋 ouvrirCorrection:", copy.eleveCode, copy.devoirId);
-            localStorage.setItem("cockpit_transfert", JSON.stringify(copy));
-            // Envoyer aussi la liste filtrée pour navigation "Suivant" dans la grille
-            const copyList = (window.filteredData || []).map(d => ({
+            if (!copy) { alert("❌ Données manquantes."); return; }
+            localStorage.removeItem("cockpit_transfert");
+            const safeCopy = {
+                id: copy.id, path: copy.path,
+                eleveCode: copy.eleveCode, userCode: copy.userCode,
+                devoirId: copy.devoirId, identifiant: copy.identifiant,
+                classe: copy.classe, exercice_titre: copy.exercice_titre
+            };
+            localStorage.setItem("cockpit_transfert", JSON.stringify(safeCopy));
+            const copyList = filteredData.map(d => ({
                 id: d.id, path: d.path, eleveCode: d.eleveCode,
                 userCode: d.userCode, devoirId: d.devoirId
             }));
             localStorage.setItem("cockpit_copy_list", JSON.stringify(copyList));
-            // Ouvrir la grille — fallback si popup bloqué
-            const w = window.open("grille.html", "_blank");
-            if (!w || w.closed) {
-                // Popup bloqué par le navigateur → ouvrir dans le même onglet
-                console.warn("⚠️ Popup bloqué, ouverture dans le même onglet");
-                window.location.href = "grille.html";
-            }
+            window.open("grille.html", "_blank");
         } catch (e) { 
             console.error("❌ ouvrirCorrection:", e);
             alert("Erreur: " + e.message); 
