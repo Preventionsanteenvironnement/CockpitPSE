@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Grille PSE - V19 (V18 + Auto-correction — 21 fixes)</title>
+  <title>Grille PSE - V20 (checkbox partiel + valider/publier + suivant)</title>
 
   <!-- FIX #22 : Chargement fichiers externes avec fallback si manquants -->
   <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
@@ -436,6 +436,8 @@
 
     <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
     <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
+    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">⚡ Valider & Publier</button>
+    <button id="btnSuivant" class="action-btn" onclick="chargerCopieSuivante()" style="display:none; background:#dbeafe; border:1px solid #3b82f6; color:#1d4ed8; font-weight:bold;">➡️ Suivant</button>
   </div>
 
   <div id="saveMessage">✅ Correction enregistrée !</div>
@@ -1119,6 +1121,117 @@
       document.getElementById('confirmModal').style.display = 'none';
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ⚡ VALIDER & PUBLIER (un clic) + ➡️ SUIVANT (navigation copies)
+    // ═══════════════════════════════════════════════════════════════
+
+    let COPY_LIST = []; // Liste des copies à corriger (depuis cockpit)
+    let COPY_INDEX = -1; // Position actuelle dans la liste
+
+    function initCopyNavigation() {
+      try {
+        const listRaw = localStorage.getItem("cockpit_copy_list");
+        if (listRaw) {
+          COPY_LIST = JSON.parse(listRaw);
+          const currentId = CURRENT_DOC_ID;
+          COPY_INDEX = COPY_LIST.findIndex(c => c.id === currentId);
+          if (COPY_INDEX === -1) COPY_INDEX = 0;
+        }
+      } catch(e) { console.warn("Pas de liste de copies:", e); }
+
+      // Afficher boutons si auto-corrigé
+      if (CURRENT_BLUEPRINT?.autocorrect === true) {
+        const btnVP = document.getElementById('btnValiderPublier');
+        if (btnVP) btnVP.style.display = 'inline-block';
+      }
+
+      // Afficher bouton Suivant si liste > 1
+      if (COPY_LIST.length > 1) {
+        const btnS = document.getElementById('btnSuivant');
+        if (btnS) {
+          btnS.style.display = 'inline-block';
+          const remaining = COPY_LIST.length - (COPY_INDEX + 1);
+          btnS.textContent = remaining > 0 ? `➡️ Suivant (${remaining})` : '➡️ Fin';
+          btnS.disabled = (remaining === 0);
+        }
+      }
+    }
+
+    window.validerEtPublier = async function() {
+      if (IS_PUBLISHING) return;
+      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
+      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
+
+      IS_PUBLISHING = true;
+      const btn = document.getElementById('btnValiderPublier');
+      const origText = btn.textContent;
+      btn.textContent = "⏳ Envoi...";
+      btn.disabled = true;
+
+      try {
+        const evaluation = collecterDonneesCorrection();
+        evaluation.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
+        evaluation.statut = "noté";
+        evaluation.publie = true;
+        evaluation.autocorrected = true;
+
+        const evalDocId = evaluation.devoirId + "_eval";
+        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
+
+        CURRENT_EVALUATION = evaluation;
+        IS_SAVED = true;
+        updateStatusBanner();
+
+        btn.textContent = "✅ Publié !";
+        btn.style.background = "#bbf7d0";
+        document.getElementById('finalNote').style.color = "#d9534f";
+
+        // Marquer comme traitée dans la liste locale
+        if (COPY_LIST.length > 0 && COPY_INDEX >= 0) {
+          COPY_LIST[COPY_INDEX].done = true;
+          localStorage.setItem("cockpit_copy_list", JSON.stringify(COPY_LIST));
+        }
+
+        console.log("⚡ Valider & publier OK — " + CURRENT_ELEVE_CODE + " → " + evaluation.note_finale + "/20");
+
+        // Auto-passer au suivant après 1.5s si disponible
+        const remaining = COPY_LIST.length - (COPY_INDEX + 1);
+        if (remaining > 0) {
+          setTimeout(() => {
+            if (confirm(`✅ ${CURRENT_ELEVE_CODE} publié (${evaluation.note_finale}/20).\n\nPasser à la copie suivante ? (${remaining} restante${remaining > 1 ? 's' : ''})`)) {
+              chargerCopieSuivante();
+            }
+          }, 500);
+        } else {
+          afficherConfirmation("✅", "Correction publiée !", `${CURRENT_ELEVE_CODE} — ${evaluation.note_finale}/20`, "#16a34a");
+        }
+
+      } catch(e) {
+        console.error("❌", e);
+        alert("Erreur : " + e.message);
+        btn.textContent = origText;
+        btn.disabled = false;
+      } finally {
+        IS_PUBLISHING = false;
+        setTimeout(() => { btn.disabled = false; }, 2000);
+      }
+    }
+
+    window.chargerCopieSuivante = function() {
+      if (COPY_LIST.length === 0) { alert("Pas de liste de copies."); return; }
+
+      COPY_INDEX++;
+      if (COPY_INDEX >= COPY_LIST.length) {
+        alert("🏁 Toutes les copies ont été traitées !");
+        return;
+      }
+
+      const nextCopy = COPY_LIST[COPY_INDEX];
+      localStorage.setItem("cockpit_transfert", JSON.stringify(nextCopy));
+      localStorage.setItem("cockpit_copy_list", JSON.stringify(COPY_LIST));
+      window.location.reload();
+    }
+
     function loadExistingCorrection(correction) {
       if (!correction) return;
 
@@ -1279,8 +1392,13 @@
       document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
         if (r.dataset.comp === comp && r.dataset.level) {
           const bareme = parseFloat(r.dataset.bareme) || 0;
-          const ratio = LEVEL_RATIO[r.dataset.level] ?? 0;
-          totalPts += bareme * ratio;
+          // Utiliser les points explicites (checkbox partiel) si disponibles
+          if (r.dataset.autoPoints !== undefined && r.dataset.autoPoints !== "") {
+            totalPts += parseFloat(r.dataset.autoPoints) || 0;
+          } else {
+            const ratio = LEVEL_RATIO[r.dataset.level] ?? 0;
+            totalPts += bareme * ratio;
+          }
         }
       });
       const ptsEl = document.getElementById(`pts_${comp}`);
@@ -1673,7 +1791,7 @@
       // Not answered
       if (raw === undefined || raw === null || raw === "" ||
           (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: "Non r\u00e9pondu", correct: false };
+        return { level: "NT", comment: "Non r\u00e9pondu", correct: false, points: 0 };
       }
 
       const inputType = (q.inputType || "").toLowerCase();
@@ -1688,14 +1806,43 @@
           break;
 
         case "checkbox": {
-          // Both must be arrays, sorted, identical
-          // Handle case where raw might be a single string (Firestore edge case)
+          // Partial scoring: count correct matches, ignore incorrect selections
           let studentArr = Array.isArray(raw) ? raw : [raw];
-          studentArr = studentArr.map(v => String(v).trim()).filter(Boolean).sort();
+          studentArr = studentArr.map(v => String(v).trim()).filter(Boolean);
           const correctArr = (Array.isArray(correct) ? correct : [correct])
-            .map(v => String(v).trim()).filter(Boolean).sort();
-          isCorrect = (studentArr.length === correctArr.length) &&
-                      studentArr.every((v, i) => v === correctArr[i]);
+            .map(v => String(v).trim()).filter(Boolean);
+
+          const nbCorrectTotal = correctArr.length;
+          const nbBonnesCochees = studentArr.filter(v => correctArr.includes(v)).length;
+          const nbMauvaisesCochees = studentArr.filter(v => !correctArr.includes(v)).length;
+          const bareme = Number(q.bareme) || 1;
+
+          // Mode partiel: bareme == nombre de bonnes réponses (1 pt par bonne)
+          // Mode binaire: bareme < nombre de bonnes réponses (tout ou rien)
+          const isPartial = (bareme === nbCorrectTotal);
+
+          if (isPartial) {
+            // Partiel: points = nombre de bonnes cochées (mauvaises ignorées)
+            if (nbBonnesCochees === nbCorrectTotal && nbMauvaisesCochees === 0) {
+              return { level: "M", comment: "", correct: true, points: bareme };
+            } else if (nbBonnesCochees > 0) {
+              const attendu = q.reponseAttendue || correctArr.join(", ");
+              return {
+                level: "I",
+                comment: nbBonnesCochees + "/" + nbCorrectTotal + " correct(s) — Attendu : " + attendu,
+                correct: false,
+                points: nbBonnesCochees
+              };
+            } else {
+              return { level: "NT", comment: "Non répondu ou aucune bonne réponse", correct: false, points: 0 };
+            }
+          } else {
+            // Binaire (tout ou rien) — bareme ≠ nombre de bonnes réponses
+            const sortedStudent = [...studentArr].sort();
+            const sortedCorrect = [...correctArr].sort();
+            isCorrect = (sortedStudent.length === sortedCorrect.length) &&
+                        sortedStudent.every((v, i) => v === sortedCorrect[i]);
+          }
           break;
         }
 
@@ -1719,7 +1866,7 @@
               }
             }
             if (!anyFound) {
-              return { level: "NT", comment: "Non r\u00e9pondu", correct: false };
+              return { level: "NT", comment: "Non r\u00e9pondu", correct: false, points: 0 };
             }
             isCorrect = allMatch;
           }
@@ -1752,10 +1899,10 @@
       }
 
       if (isCorrect) {
-        return { level: "M", comment: "", correct: true };
+        return { level: "M", comment: "", correct: true, points: Number(q.bareme) || 0 };
       } else {
         const attendu = q.reponseAttendue || String(correct);
-        return { level: "I", comment: "Attendu : " + attendu, correct: false };
+        return { level: "I", comment: "Attendu : " + attendu, correct: false, points: 0 };
       }
     }
 
@@ -1781,6 +1928,10 @@
 
         // Apply level
         row.dataset.level = result.level;
+        // Store explicit points if provided (checkbox partial)
+        if (result.points !== undefined) {
+          row.dataset.autoPoints = result.points;
+        }
         const btn = row.querySelector(`.level-btn.${result.level.toLowerCase()}`);
         if (btn) {
           Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
@@ -1836,7 +1987,7 @@
     }
 
     async function init() {
-      console.log("🚀 Grille V19 (auto-correction) - Démarrage (audit complet — 21 fixes)...");
+      console.log("🚀 Grille V20 (checkbox partiel + valider/publier + suivant) - Démarrage...");
       loadPreferences();
       initSummary([], {});
       updateStatusBanner();
@@ -1928,8 +2079,11 @@
           IS_SAVED = false; // Not saved yet, prof needs to validate
         }
 
+        // Init copy navigation (Suivant + Valider&Publier buttons)
+        initCopyNavigation();
+
         updateStatusBanner();
-        console.log("✅ Grille V19 prête !");
+        console.log("✅ Grille V20 prête !");
       } catch (e) {
         document.getElementById('statusText').innerHTML = "❌ " + e.message;
         document.getElementById('statusBanner').classList.add('not-saved');
