@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Grille PSE - V20 (checkbox partiel + valider/publier + suivant)</title>
+  <title>Grille PSE - V21 (rappel oublis avant publication)</title>
 
   <!-- FIX #22 : Chargement fichiers externes avec fallback si manquants -->
   <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
@@ -436,7 +436,7 @@
 
     <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
     <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
-    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">⚡ Valider & Publier</button>
+    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">âš¡ Valider & Publier</button>
     <button id="btnSuivant" class="action-btn" onclick="chargerCopieSuivante()" style="display:none; background:#dbeafe; border:1px solid #3b82f6; color:#1d4ed8; font-weight:bold;">➡️ Suivant</button>
   </div>
 
@@ -521,10 +521,10 @@
   </table>
 
   <div class="bottom-container">
-    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé &nbsp; | &nbsp; ⌨️ <b>Raccourcis :</b> 1=NT 2=I 3=A 4=M, Tab=suivante</div>
+    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé &nbsp; | &nbsp; <b>⌨ Raccourcis :</b> 1=NT 2=I 3=A 4=M, Tab=suivante</div>
     <div class="revision-box">
-      <div class="revision-text">Pour réviser :<br><b>preventionsanteenvironnement.github.io/PSE/</b></div>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://preventionsanteenvironnement.github.io/PSE/" alt="QR" class="qr-img">
+      <div class="revision-text">Pour réviser :<br><b>mapse.fr</b></div>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAABsAQAAAACnHWpgAAAA2ElEQVR4nKWVwW0EUQhDH6O9mw6m/7LSganAOYyibJLDLBs4WcIyFvB/haeYgx9xA6eqhqmeqror/g0TqxVIvOVOMe42U/fFf6Ea96vF3/EA4ANmzz1QmO4Kylq3wIahwCtuBWBOMPv5DtOngZ7Z9UysSARLy54xIRgw3nJjBYxQltwgFIGVrW6InADK3q9IFMjab0zkiOz9GltChmirm8RfueMeU1UUdR3SG++G2gi03EkbJwHYzuiCA5JnqfsAmJOMSts7cuJrt8hyvgdVPSkgvdStf/wLn3Fej9INnSsFAAAAAElFTkSuQmCC" alt="QR mapse.fr" class="qr-img">
     </div>
   </div>
 
@@ -1012,12 +1012,65 @@
 
     let IS_PUBLISHING = false; // FIX #1+#5 : verrou anti-double-clic
 
+    // FIX #23 : Vérification de complétude avant publication
+    // Retourne un texte d'avertissement si des oublis sont détectés, sinon ""
+    function verifierCompletude() {
+      const oublis = [];
+
+      // 1. Questions sans niveau
+      const rows = document.querySelectorAll('#correctionTable tbody tr');
+      const sansNiveau = [];
+      const sansCommentaire = [];
+      rows.forEach(row => {
+        const label = row.cells[0]?.innerText?.trim() || "?";
+        if (!row.dataset.level) sansNiveau.push(label);
+        const commentDiv = row.querySelector('.editable-div');
+        if (commentDiv && !commentDiv.innerText.trim()) sansCommentaire.push(label);
+      });
+
+      if (sansNiveau.length > 0) {
+        oublis.push("⚠️ Niveau manquant (" + sansNiveau.length + ") : " + sansNiveau.join(", "));
+      }
+
+      // 2. Commentaires vides
+      if (sansCommentaire.length > 0) {
+        oublis.push("💬 Commentaire vide (" + sansCommentaire.length + ") : " + sansCommentaire.join(", "));
+      }
+
+      // 3. Appréciation générale vide
+      const appreciation = document.getElementById('appreciationArea');
+      if (appreciation && !appreciation.value.trim()) {
+        oublis.push("📝 Appréciation générale non remplie");
+      }
+
+      return oublis;
+    }
+
+    // FIX #23 : Affiche le rappel et retourne true si l'utilisateur veut continuer, false sinon
+    function afficherRappelOublis() {
+      const oublis = verifierCompletude();
+      if (oublis.length === 0) return true; // Rien d'oublié, on continue
+
+      const message = "📋 RAPPEL — Oublis détectés :\n\n" +
+        oublis.join("\n\n") +
+        "\n\n─────────────────────\n" +
+        "Cliquez OK pour publier quand même.\n" +
+        "Cliquez Annuler pour corriger d'abord.";
+
+      return confirm(message);
+    }
+
     window.publierCorrection = async function() {
       if (IS_PUBLISHING) return; // FIX #1 : ignorer si déjà en cours
       if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
       if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
 
+      // FIX #23 : Rappel oublis uniquement si publication avec note
       const typePublication = document.getElementById('publishType').value;
+      if (typePublication === "note") {
+        if (!afficherRappelOublis()) return;
+      }
+
       let noteFinale, statut, messageConfirm, iconConfirm, couleur;
 
       switch(typePublication) {
@@ -1161,6 +1214,9 @@
       if (IS_PUBLISHING) return;
       if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
       if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
+
+      // FIX #23 : Rappel oublis avant validation rapide
+      if (!afficherRappelOublis()) return;
 
       IS_PUBLISHING = true;
       const btn = document.getElementById('btnValiderPublier');
@@ -1987,7 +2043,7 @@
     }
 
     async function init() {
-      console.log("🚀 Grille V20 (checkbox partiel + valider/publier + suivant) - Démarrage...");
+      console.log("🚀 Grille V21 (rappel oublis avant publication) - Démarrage...");
       loadPreferences();
       initSummary([], {});
       updateStatusBanner();
