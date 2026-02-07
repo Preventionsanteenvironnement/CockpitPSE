@@ -436,7 +436,7 @@
 
     <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
     <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
-    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">âš¡ Valider & Publier</button>
+    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">⚡ Valider & Publier</button>
     <button id="btnSuivant" class="action-btn" onclick="chargerCopieSuivante()" style="display:none; background:#dbeafe; border:1px solid #3b82f6; color:#1d4ed8; font-weight:bold;">➡️ Suivant</button>
   </div>
 
@@ -1847,7 +1847,7 @@
       // Not answered
       if (raw === undefined || raw === null || raw === "" ||
           (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: "Non r\u00e9pondu", correct: false, points: 0 };
+        return { level: "NT", comment: "Non répondu", correct: false, points: 0 };
       }
 
       const inputType = (q.inputType || "").toLowerCase();
@@ -1922,7 +1922,7 @@
               }
             }
             if (!anyFound) {
-              return { level: "NT", comment: "Non r\u00e9pondu", correct: false, points: 0 };
+              return { level: "NT", comment: "Non répondu", correct: false, points: 0 };
             }
             isCorrect = allMatch;
           }
@@ -2005,7 +2005,7 @@
         if (labelCell) {
           const badge = document.createElement('span');
           badge.className = 'ac-badge auto-' + result.level.toLowerCase();
-          badge.textContent = result.correct ? '\u2713' : '\u2717';
+          badge.textContent = result.correct ? '✓' : '✗';
           badge.title = result.correct ? 'Correct (auto)' : 'Incorrect (auto)';
           labelCell.appendChild(badge);
         }
@@ -2029,17 +2029,17 @@
       const total = countCorrect + countIncorrect + countNT;
       const bannerHTML = `
         <div class="autocorrect-banner" id="autocorrectBanner">
-          <div>\uD83E\uDD16 MODE AUTO-CORRECTION \u2014 ${total} question${total > 1 ? 's' : ''} corrig\u00e9e${total > 1 ? 's' : ''} automatiquement</div>
+          <div>🤖 MODE AUTO-CORRECTION — ${total} question${total > 1 ? 's' : ''} corrigée${total > 1 ? 's' : ''} automatiquement</div>
           <div class="ac-stats">
-            <span class="ac-stat correct">\u2705 ${countCorrect} correct${countCorrect > 1 ? 's' : ''}</span>
-            <span class="ac-stat incorrect">\u274C ${countIncorrect} incorrect${countIncorrect > 1 ? 's' : ''}</span>
-            ${countNT > 0 ? `<span class="ac-stat unanswered">\u2B1C ${countNT} non r\u00e9pondu${countNT > 1 ? 's' : ''}</span>` : ''}
+            <span class="ac-stat correct">✅ ${countCorrect} correct${countCorrect > 1 ? 's' : ''}</span>
+            <span class="ac-stat incorrect">❌ ${countIncorrect} incorrect${countIncorrect > 1 ? 's' : ''}</span>
+            ${countNT > 0 ? `<span class="ac-stat unanswered">⬜ ${countNT} non répondu${countNT > 1 ? 's' : ''}</span>` : ''}
           </div>
         </div>`;
       const statusBanner = document.getElementById('statusBanner');
       if (statusBanner) statusBanner.insertAdjacentHTML('afterend', bannerHTML);
 
-      console.log(`\uD83E\uDD16 Auto-correction termin\u00e9e : ${countCorrect} M, ${countIncorrect} I, ${countNT} NT sur ${total} questions`);
+      console.log(`🤖 Auto-correction terminée : ${countCorrect} M, ${countIncorrect} I, ${countNT} NT sur ${total} questions`);
     }
 
     async function init() {
@@ -2093,10 +2093,38 @@
         const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
         if (!devoirId) throw new Error("devoirId invalide");
 
-        const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
-        if (!resp.ok) throw new Error("Blueprint non trouvé: " + devoirId);
+        // ═══════════════════════════════════════════════════════════════
+        // CHARGEMENT BLUEPRINT - LOGIQUE DOUBLE (externe + fallback intégré)
+        // ═══════════════════════════════════════════════════════════════
+        
+        let blueprintLoaded = false;
+        
+        // ÉTAPE 1 : Tentative blueprint externe (cockpit)
+        try {
+          const resp = await fetch(`${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
+          if (resp.ok) {
+            CURRENT_BLUEPRINT = await resp.json();
+            console.log("✅ Blueprint externe chargé depuis le cockpit");
+            blueprintLoaded = true;
+          }
+        } catch (fetchError) {
+          console.warn("⚠️ Blueprint externe non accessible:", fetchError.message);
+        }
+        
+        // ÉTAPE 2 : Fallback blueprint intégré dans la copie
+        if (!blueprintLoaded) {
+          if (CURRENT_COPY.blueprint) {
+            CURRENT_BLUEPRINT = CURRENT_COPY.blueprint;
+            console.log("✅ Blueprint intégré utilisé depuis la copie");
+            blueprintLoaded = true;
+          }
+        }
+        
+        // ÉCHEC TOTAL : Aucun blueprint trouvé
+        if (!blueprintLoaded) {
+          throw new Error("Blueprint non trouvé: " + devoirId + " (ni externe ni intégré dans la copie)");
+        }
 
-        CURRENT_BLUEPRINT = await resp.json();
         document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
 
         const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
@@ -2139,7 +2167,7 @@
         initCopyNavigation();
 
         updateStatusBanner();
-        console.log("✅ Grille V20 prête !");
+        console.log("✅ Grille V21 prête !");
       } catch (e) {
         document.getElementById('statusText').innerHTML = "❌ " + e.message;
         document.getElementById('statusBanner').classList.add('not-saved');
