@@ -365,6 +365,11 @@
                 <option value="PUBLIE">✅ Publié</option>
                 <option value="NON_NOTE">⚠️ Non notés</option>
               </select>
+              <select id="filter-type" class="filter-select" onchange="applyFilters()">
+                <option value="ALL">Tous les types</option>
+                <option value="AUTOCORRECTION">🤖 Autocorrection</option>
+                <option value="MANUEL">📝 Correction manuelle</option>
+              </select>
               <div style="position:relative; display:inline-block;">
                 <button id="btnMonthFilter" onclick="toggleMonthDropdown()" class="filter-select" style="cursor:pointer; min-width:140px; text-align:left; background:white;">
                   📅 Mois : Tous
@@ -1139,8 +1144,24 @@ QN80,Wael HWORI</pre>
         }
         
         try {
-            const qCopies = query(collectionGroup(db, "copies"), limit(100));
-            const snapCopies = await getDocs(qCopies);
+            // ✅ FIX: Trier par timestamp décroissant + augmenter limite pour récupérer copies autocorrection
+            let snapCopies;
+            try {
+                // Tentative avec tri (nécessite un index Firestore)
+                const qCopiesSorted = query(
+                    collectionGroup(db, "copies"), 
+                    orderBy("ts", "desc"),  // Trier par timestamp (le plus récent en premier)
+                    limit(300)              // Augmenter limite pour voir plus de copies
+                );
+                snapCopies = await getDocs(qCopiesSorted);
+                console.log("✅ Copies récupérées avec tri par timestamp");
+            } catch (indexError) {
+                console.warn("⚠️ Index Firestore manquant pour orderBy sur collectionGroup, fallback sans tri");
+                // Fallback sans tri mais avec limite augmentée
+                const qCopiesUnsorted = query(collectionGroup(db, "copies"), limit(300));
+                snapCopies = await getDocs(qCopiesUnsorted);
+                console.log("⚠️ Copies récupérées sans tri (limite augmentée à 300)");
+            }
             const copiesMap = new Map();
             
             snapCopies.forEach(docSnap => {
@@ -1236,6 +1257,7 @@ QN80,Wael HWORI</pre>
         const fExo = document.getElementById("filter-exercice").value;
         const fName = document.getElementById("filter-student").value.toLowerCase();
         const fStatut = document.getElementById("filter-statut").value;
+        const fType = document.getElementById("filter-type")?.value || "ALL"; // Nouveau filtre type
 
         // Filtre mois
         const allMonths = isAllMonths();
@@ -1249,6 +1271,16 @@ QN80,Wael HWORI</pre>
             if(fStatut === "CORRIGE_NON_PUBLIE" && d.statut !== "corrige_non_publie") return false;
             if(fStatut === "PUBLIE" && d.statut !== "publie") return false;
             if(fStatut === "NON_NOTE" && d.statut !== "non_note") return false;
+            
+            // ✅ NOUVEAU: Filtre par type (autocorrection vs manuel)
+            if(fType === "AUTOCORRECTION") {
+                // Copie autocorrection: a note_auto ou vient du runner PSE
+                if(!(d.raw?.note_auto !== undefined || d.raw?.ts || d.path?.includes('/copies/'))) return false;
+            }
+            if(fType === "MANUEL") {
+                // Copie manuelle: pas de note_auto et pas du runner PSE
+                if(d.raw?.note_auto !== undefined || d.raw?.ts || d.path?.includes('/copies/')) return false;
+            }
             // Filtre mois
             if (!allMonths && selectedMonths && selectedMonths.length > 0) {
                 const month = d.date instanceof Date ? d.date.getMonth() : -1;
@@ -1359,6 +1391,13 @@ QN80,Wael HWORI</pre>
                     statutBadge = '<span style="display:inline-block; background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75em; font-weight:bold;">📝 À corriger</span>';
             }
 
+            // ✅ NOUVEAU: Badge type de copie (autocorrection vs manuelle)
+            let typeBadge = '';
+            const isAutocorrection = d.raw?.note_auto !== undefined || d.raw?.ts || d.path?.includes('/copies/');
+            if (isAutocorrection) {
+                typeBadge = '<span style="display:inline-block; background:#f0f9ff; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:5px; border:1px solid #bae6fd;">🤖 Auto</span>';
+            }
+
             // Échapper les données pour les attributs HTML
             const safeUserCode = (d.userCode || d.identifiant || '').replace(/"/g, '&quot;');
             const safePath = (d.path || '').replace(/"/g, '&quot;');
@@ -1373,7 +1412,7 @@ QN80,Wael HWORI</pre>
                 <td>${d.exercice_titre}</td>
                 <td style="font-weight:bold; ${scoreStyle}">${scoreTxt}${correctionBadge}</td>
                 <td style="text-align:center;">${pasteBadge}</td>
-                <td style="text-align:center;">${statutBadge}</td>
+                <td style="text-align:center;">${statutBadge}${typeBadge}</td>
                 <td style="display:flex; gap:5px;">
                     <a href="grille.html" target="_blank" data-action="corriger" data-idx="${idx}" style="display:inline-block; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem; text-decoration:none;">✍️</a>
                     <span data-action="mirror" data-idx="${idx}" style="display:inline-block; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:5px 8px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.8rem;">👁️</span>
