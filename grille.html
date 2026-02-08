@@ -817,19 +817,37 @@
       else alert("✅ Toutes les questions ont un niveau.");
     }
 
-    function extractQuestionsFromBlueprint(blueprint) {
-      if (Array.isArray(blueprint?.questions)) return blueprint.questions;
-      const questions = [];
-      function walk(blocks) {
-        if (!Array.isArray(blocks)) return;
-        blocks.forEach(b => {
-          if (b && b.type === "question") questions.push(b);
-          if (b && b.content) walk(b.content);
-        });
-      }
-      walk(blueprint?.content);
-      return questions;
-    }
+   function extractQuestionsFromBlueprint(bp) {
+  if (!bp) return [];
+
+  const arr =
+    Array.isArray(bp.content) ? bp.content :
+    Array.isArray(bp.questions) ? bp.questions :
+    Array.isArray(bp.items) ? bp.items :
+    [];
+
+  return arr.map((q, i) => {
+    const id = String(q.qid || q.id || `q${i+1}`);
+
+    return {
+      id,
+      qid: id,
+
+      enonce: q.enonce || q.question || q.titre || q.label || "",
+
+      bareme: Number(q.bareme ?? q.points ?? 1),
+      points: Number(q.bareme ?? q.points ?? 1),
+
+      competence: q.competence || q.comp || "",
+
+      inputType: q.inputType || q.type || "radio",
+      options: q.options || q.choix || q.items || [],
+
+      reponseCorrecte: q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer,
+      attendu: q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer
+    };
+  });
+}
 
     function escapeHTML(str) {
       return String(str ?? "")
