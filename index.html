@@ -773,7 +773,8 @@ QN80,Wael HWORI</pre>
     
     window.toggleMonthDropdown = function() {
       const dd = document.getElementById('monthDropdown');
-      dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+      if (!dd) return; // ✅ PATCH 1: Protection anti-erreur
+      dd.style.display = (dd.style.display === 'none' || !dd.style.display) ? 'block' : 'none';
     };
     
     // Fermer le dropdown si on clique ailleurs
@@ -1709,20 +1710,40 @@ QN80,Wael HWORI</pre>
         }
     };
 
+    // ✅ PATCH 2: openStudentDetail robuste avec multi-matching, tri, calculs moyennes/temps, limite 30
     window.openStudentDetail = function(studentIdentifier) {
-        const studentHistory = allData.filter(d => d.userCode === studentIdentifier || d.identifiant === studentIdentifier);
-        if(studentHistory.length === 0) return;
+        const key = String(studentIdentifier || "").trim();
+        if (!key) return;
+        const studentHistory = allData
+            .filter(d =>
+                d?.userCode === key ||
+                d?.eleveCode === key ||
+                d?.raw?.eleve?.userCode === key ||
+                d?.raw?.userCode === key ||
+                d?.identifiant === key
+            )
+            .sort((a,b) => (b?.date?.getTime?.()||0) - (a?.date?.getTime?.()||0));
+        if (studentHistory.length === 0) return;
         const last = studentHistory[0];
-        document.getElementById("modal-name").innerText = last.identifiant;
-        document.getElementById("modal-class").innerText = last.classe;
+        document.getElementById("modal-name").innerText = last.identifiant || key;
+        document.getElementById("modal-class").innerText = last.classe || "-";
         let totalScore = 0, nbNotes = 0;
         studentHistory.forEach(h => {
-            if(h.note_finale && h.note_finale !== "--"){
-                let v = parseFloat(h.note_finale);
-                if(!isNaN(v)) { totalScore += v; nbNotes++; }
-            }
+            const v = parseFloat(h.note_finale);
+            if (!isNaN(v)) { totalScore += v; nbNotes++; }
         });
         document.getElementById("modal-avg").innerText = nbNotes > 0 ? (totalScore/nbNotes).toFixed(1) + " / 20" : "--";
+        const timeAvg = studentHistory.reduce((acc,h)=>acc + (Number(h.temps_secondes)||0),0) / Math.max(1, studentHistory.length);
+        const mm = Math.floor(timeAvg/60), ss = Math.floor(timeAvg%60);
+        document.getElementById("modal-time").innerText = (mm||ss) ? (String(mm).padStart(2,"0")+":"+String(ss).padStart(2,"0")) : "--";
+        const tbody = document.getElementById("modal-history");
+        tbody.innerHTML = "";
+        studentHistory.slice(0, 30).forEach(h => {
+            const d = h.date instanceof Date ? h.date.toLocaleDateString("fr-FR") : "-";
+            const ex = h.exercice_titre || h.devoirId || "-";
+            const n = (h.note_finale === "--" || h.note_finale === undefined) ? "--" : (h.note_finale + "/20");
+            tbody.innerHTML += `<tr><td>${d}</td><td>${ex}</td><td>${n}</td></tr>`;
+        });
         document.getElementById("modalStudent").classList.add("open");
     };
 
