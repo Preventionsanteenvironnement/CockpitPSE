@@ -2116,34 +2116,50 @@
         // ═══════════════════════════════════════════════════════════════
         
         let blueprintLoaded = false;
-        
-        // ÉTAPE 1 : Tentative blueprint externe (cockpit)
-        try {
-          const resp = await fetch(`/PSE/devoirs/${devoirId}_blueprint.json?ts=${Date.now()}`, { cache: "no-store" });
-          if (resp.ok) {
-            CURRENT_BLUEPRINT = await resp.json();
-            console.log("✅ Blueprint externe chargé depuis le cockpit");
-            blueprintLoaded = true;
-          }
-        } catch (fetchError) {
-          console.warn("⚠️ Blueprint externe non accessible:", fetchError.message);
-        }
-        
-        // ÉTAPE 2 : Fallback blueprint intégré dans la copie
-        if (!blueprintLoaded) {
-          if (CURRENT_COPY.blueprint) {
-            CURRENT_BLUEPRINT = CURRENT_COPY.blueprint;
-            console.log("✅ Blueprint intégré utilisé depuis la copie");
-            blueprintLoaded = true;
-          }
-        }
-        
-        // ÉCHEC TOTAL : Aucun blueprint trouvé
-        if (!blueprintLoaded) {
-          throw new Error("Blueprint non trouvé: " + devoirId + " (ni externe ni intégré dans la copie)");
-        }
 
-        document.getElementById('docTitle').innerText = "Correction : " + (CURRENT_BLUEPRINT.titre || devoirId);
+// ÉTAPE 1 : Priorité au blueprint intégré dans la copie
+if (CURRENT_COPY && CURRENT_COPY.blueprint && typeof CURRENT_COPY.blueprint === "object") {
+  CURRENT_BLUEPRINT = CURRENT_COPY.blueprint;
+  console.log("✅ Blueprint intégré utilisé depuis la copie");
+  blueprintLoaded = true;
+}
+
+// ÉTAPE 2 : Sinon, tentative blueprint externe (mapse.fr)
+if (!blueprintLoaded) {
+  try {
+    const url = `https://mapse.fr/devoirs/${devoirId}_blueprint.json?ts=${Date.now()}`;
+    const resp = await fetch(url, { cache: "no-store" });
+    if (resp.ok) {
+      CURRENT_BLUEPRINT = await resp.json();
+      console.log("✅ Blueprint externe chargé depuis mapse.fr");
+      blueprintLoaded = true;
+    }
+  } catch (fetchError) {
+    console.warn("⚠️ Blueprint mapse.fr non accessible:", fetchError.message);
+  }
+}
+
+// ÉTAPE 3 : Dernier fallback externe (GitHub Pages /PSE)
+if (!blueprintLoaded) {
+  try {
+    const url = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${devoirId}_blueprint.json?ts=${Date.now()}`;
+    const resp = await fetch(url, { cache: "no-store" });
+    if (resp.ok) {
+      CURRENT_BLUEPRINT = await resp.json();
+      console.log("✅ Blueprint externe chargé depuis GitHub /PSE");
+      blueprintLoaded = true;
+    }
+  } catch (fetchError) {
+    console.warn("⚠️ Blueprint GitHub /PSE non accessible:", fetchError.message);
+  }
+}
+
+// ÉCHEC TOTAL : Aucun blueprint trouvé
+if (!blueprintLoaded) {
+  throw new Error("Blueprint non trouvé: " + devoirId + " (ni intégré ni externe)");
+}
+
+        document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
 
         const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
         renderCorrection({ questions }, CURRENT_COPY.reponses || {});
