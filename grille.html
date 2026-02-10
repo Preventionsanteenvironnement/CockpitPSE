@@ -786,8 +786,8 @@
       const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT || {});
       if (questions.length > 0) {
         questions.forEach((q, idx) => {
-          const label = q?.label || ("Q" + (idx + 1));
-          const qText = q?.questionText || q?.question || q?.enonce || q?.texte || "";
+          const label = "Q" + (idx + 1);
+          const qText = q?.enonce || "";
           const rep = getReponseEleve(reponses, q);
           html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
             <div style="font-weight:bold; font-size:0.85em; color:#334155; margin-bottom:4px;">
@@ -825,15 +825,16 @@
     Array.isArray(bp.questions) ? bp.questions :
     Array.isArray(bp.items) ? bp.items :
     [];
+     const onlyQuestions = arr.filter(x => !x?.type || x.type === "question");
 
-  return arr.map((q, i) => {
+  return onlyQuestions.map((q, i) => {
     const id = String(q.qid || q.id || `q${i+1}`);
 
     return {
       id,
       qid: id,
 
-      enonce: q.enonce || q.question || q.titre || q.label || "",
+      enonce: q.questionText || q.enonce || q.question || q.titre || q.texte || q.label || "",
 
       bareme: Number(q.bareme ?? q.points ?? 1),
       points: Number(q.bareme ?? q.points ?? 1),
@@ -843,8 +844,8 @@
       inputType: q.inputType || q.type || "radio",
       options: q.options || q.choix || q.items || [],
 
-      reponseCorrecte: q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer,
-      attendu: q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer
+      reponseCorrecte: q.reponseAttendue ?? q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer ?? "",
+      attendu: q.reponseAttendue ?? q.attendu ?? q.reponseCorrecte ?? q.correct ?? q.answer ?? ""
     };
   });
 }
