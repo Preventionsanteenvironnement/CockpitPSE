@@ -660,11 +660,20 @@
 
     function hasQidMatch(qid, keys) {
       if (!qid) return false;
-      return keys.some(k =>
+      if (keys.some(k =>
         k === qid ||
         k.startsWith(qid + "_") || k.startsWith(qid + ".") ||
         qid.startsWith(k + "_") || qid.startsWith(k + ".")
-      );
+      )) return true;
+
+      // Sous-questions (hole_N, pair_N, trou_N) : matcher par base QID commune
+      // Ex: blueprint "q_xxx_hole_0" ↔ réponse "q_xxx_trous" ou "q_xxx"
+      const sub = String(qid).match(/^(.+?)_(?:hole|pair|trou)_\d+$/);
+      if (sub) {
+        const base = sub[1];
+        return keys.some(k => k === base || k.startsWith(base + "_"));
+      }
+      return false;
     }
 
     function buildQidFallbackMap(questions, reponses) {
@@ -686,10 +695,17 @@
         const sortedKeys = [...keys].sort(compareIdsByTokens);
         const unresolved = sortedQids.filter(qid => !hasQidMatch(qid, keys));
 
-        // Éviter d'écraser les qid déjà alignés (bidirectionnel).
+        // Éviter d'écraser les qid déjà alignés (bidirectionnel + base QID).
         const used = new Set();
         sortedQids.forEach(qid => {
-          const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + ".") || qid.startsWith(k + "_") || qid.startsWith(k + "."));
+          let direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + ".") || qid.startsWith(k + "_") || qid.startsWith(k + "."));
+          if (!direct) {
+            const sub = String(qid).match(/^(.+?)_(?:hole|pair|trou)_\d+$/);
+            if (sub) {
+              const base = sub[1];
+              direct = sortedKeys.find(k => k === base || k.startsWith(base + "_"));
+            }
+          }
           if (direct) used.add(direct);
         });
         const freeKeys = sortedKeys.filter(k => !used.has(k));
@@ -764,6 +780,19 @@
         if (rKey !== qid && (qid.startsWith(rKey + "_") || qid.startsWith(rKey + "."))) {
           const val = reponses[rKey];
           if (val !== undefined && val !== null) return val;
+        }
+      }
+
+      // Sous-questions (hole_N, pair_N, trou_N) : chercher la clé sœur groupée
+      // Ex: blueprint "q_xxx_hole_0" → réponse sous "q_xxx_trous[0]" ou "q_xxx[0]"
+      const subMatch = String(qid).match(/^(.+?)_(?:hole|pair|trou)_(\d+)$/);
+      if (subMatch) {
+        const base = subMatch[1];
+        const idx = parseInt(subMatch[2], 10);
+        const siblings = [base, base + "_trous", base + "_matching", base + "_pairs"];
+        for (const sk of siblings) {
+          const val = reponses[sk];
+          if (Array.isArray(val) && !isNaN(idx) && idx >= 0 && idx < val.length) return val[idx];
         }
       }
 
