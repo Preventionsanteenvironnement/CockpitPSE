@@ -616,6 +616,14 @@
 
     window.autoResize = autoResize;
 
+    function syncDebugGlobals() {
+      // Debug console only (module scope -> window)
+      window.CURRENT_COPY = CURRENT_COPY;
+      window.CURRENT_REPONSES = CURRENT_REPONSES;
+      window.CURRENT_BLUEPRINT = CURRENT_BLUEPRINT;
+      window.QID_FALLBACK_MAP = QID_FALLBACK_MAP;
+    }
+
     function normalizeReponsesPayload(raw) {
       if (raw === null || raw === undefined) return {};
 
@@ -1659,7 +1667,7 @@
         row.dataset.qid = qid;
         row.dataset.bareme = bareme; // FIX #6 : stocker le barème pour calcul semi-auto
 
-        const repEleve = getReponseEleve(reponses, q);
+        const repEleve = getReponseEleve(reponses, { ...q, label });
         const attendu = formatExpected(q);
         const questionHtml = renderQuestionHTML(q, label, competence);
 
@@ -2337,6 +2345,7 @@ markUnsaved();
         if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw?.reponses);
         if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw);
         if (!CURRENT_REPONSES || typeof CURRENT_REPONSES !== "object") CURRENT_REPONSES = {};
+        syncDebugGlobals();
         // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
         localStorage.removeItem("cockpit_transfert");
         if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
@@ -2411,6 +2420,7 @@ if (!blueprintLoaded) {
             console.warn("🗂️ Clés réponses (extrait):", Object.keys(CURRENT_REPONSES || {}).slice(0, 20));
           }
         }
+        syncDebugGlobals();
         renderCorrection({ questions }, CURRENT_REPONSES);
 
         // === AUTO-CORRECTION ENGINE HOOK ===
