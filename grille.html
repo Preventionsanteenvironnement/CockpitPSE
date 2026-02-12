@@ -677,10 +677,12 @@
       const ratio = matched / qids.length;
 
       // Activer le secours seulement si mismatch fort.
+      const unresolved = qids.filter(qid => !hasQidMatch(qid, keys));
+
       if (ratio < 0.7) {
         const sortedQids = [...qids].sort(compareIdsByTokens);
         const sortedKeys = [...keys].sort(compareIdsByTokens);
-        const unresolved = sortedQids.filter(qid => !hasQidMatch(qid, keys));
+        const unresolvedSorted = sortedQids.filter(qid => !hasQidMatch(qid, keys));
 
         // Éviter d'écraser les qid déjà alignés.
         const used = new Set();
@@ -689,8 +691,8 @@
           if (direct) used.add(direct);
         });
         const freeKeys = sortedKeys.filter(k => !used.has(k));
-        const n = Math.min(unresolved.length, freeKeys.length);
-        for (let i = 0; i < n; i++) map[unresolved[i]] = freeKeys[i];
+        const n = Math.min(unresolvedSorted.length, freeKeys.length);
+        for (let i = 0; i < n; i++) map[unresolvedSorted[i]] = freeKeys[i];
       }
 
       return {
@@ -700,7 +702,8 @@
           rCount: keys.length,
           matched,
           ratio,
-          mapped: Object.keys(map).length
+          mapped: Object.keys(map).length,
+          unresolved
         }
       };
     }
@@ -732,6 +735,33 @@
             if (parentVal[suffix] !== undefined) return parentVal[suffix];
             const tailNum = suffix.match(/\d+$/)?.[0];
             if (tailNum && parentVal[tailNum] !== undefined) return parentVal[tailNum];
+          }
+        }
+      }
+
+      // Scan global d'objets imbriqués hétérogènes.
+      // Exemple réel: reponses[someKey] = { hole_0: "...", "0": "...", q_...: "..." }
+      const tailNum = String(qid).match(/(\d+)$/)?.[1];
+      for (const [, container] of Object.entries(reponses)) {
+        if (!container || typeof container !== "object") continue;
+        if (Array.isArray(container)) {
+          if (tailNum !== undefined) {
+            const idx = Number(tailNum);
+            if (!Number.isNaN(idx) && container[idx] !== undefined) return container[idx];
+          }
+          continue;
+        }
+        if (container[qid] !== undefined) return container[qid];
+        if (tailNum !== undefined) {
+          const aliasKeys = [
+            tailNum,
+            "hole_" + tailNum,
+            "trou_" + tailNum,
+            "slot_" + tailNum,
+            "item_" + tailNum
+          ];
+          for (const ak of aliasKeys) {
+            if (container[ak] !== undefined) return container[ak];
           }
         }
       }
@@ -2312,6 +2342,8 @@ if (!blueprintLoaded) {
           console.log("🧭 QID diag:", d);
           if (d.ratio < 0.7) {
             console.warn(`⚠️ Mismatch QID détecté: ${d.matched}/${d.qCount} corrélés (${Math.round(d.ratio * 100)}%). Fallback actif: ${d.mapped}.`);
+            console.warn("🧩 QID non corrélés (extrait):", (d.unresolved || []).slice(0, 12));
+            console.warn("🗂️ Clés réponses (extrait):", Object.keys(CURRENT_REPONSES || {}).slice(0, 20));
           }
         }
         renderCorrection({ questions }, CURRENT_REPONSES);
