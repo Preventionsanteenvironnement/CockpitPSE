@@ -660,10 +660,21 @@
 
     function hasQidMatch(qid, keys) {
       if (!qid) return false;
-      return keys.some(k =>
+      const direct = keys.some(k =>
         k === qid ||
         k.startsWith(qid + "_") || k.startsWith(qid + ".") ||
         qid.startsWith(k + "_") || qid.startsWith(k + ".")
+      );
+      if (direct) return true;
+
+      // Cas soeur: blueprint "..._hole_0" / "..._pair_2" et réponses "...._trous|_pairs|_matching".
+      const m = String(qid).match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
+      if (!m) return false;
+      const base = m[1];
+      return keys.some(k =>
+        k === base ||
+        k.startsWith(base + "_") ||
+        k.startsWith(base + ".")
       );
     }
 
@@ -688,9 +699,18 @@
         unresolved.forEach(qid => {
           const m = qid.match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
           if (!m) return;
-          const parent = m[1];
-          if (reponses[parent] !== undefined) {
-            map[qid] = parent;
+          const base = m[1];
+          const siblingCandidates = [
+            base,
+            base + "_trous",
+            base + "_pairs",
+            base + "_pair",
+            base + "_matching",
+            base + "_match"
+          ];
+          const siblingKey = siblingCandidates.find(k => reponses[k] !== undefined);
+          if (siblingKey) {
+            map[qid] = siblingKey;
           }
         });
 
@@ -730,11 +750,20 @@
       // Cas explicite: qid enfant (hole/pair/...) à résoudre via qid parent.
       const childMatch = String(qid).match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
       if (childMatch) {
-        const parent = childMatch[1];
+        const base = childMatch[1];
         const idx = parseInt(childMatch[3], 10);
-        const parentVal = reponses[parent];
-        if (Array.isArray(parentVal) && !Number.isNaN(idx) && parentVal[idx] !== undefined) return parentVal[idx];
-        if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
+        const siblingCandidates = [
+          base,
+          base + "_trous",
+          base + "_pairs",
+          base + "_pair",
+          base + "_matching",
+          base + "_match"
+        ];
+        for (const sibling of siblingCandidates) {
+          const parentVal = reponses[sibling];
+          if (Array.isArray(parentVal) && !Number.isNaN(idx) && parentVal[idx] !== undefined) return parentVal[idx];
+          if (!parentVal || typeof parentVal !== "object" || Array.isArray(parentVal)) continue;
           const suffix = childMatch[2].toLowerCase() + "_" + childMatch[3];
           if (parentVal[suffix] !== undefined) return parentVal[suffix];
           if (parentVal[childMatch[3]] !== undefined) return parentVal[childMatch[3]];
