@@ -704,6 +704,45 @@
         }
       };
     }
+
+    function resolveAnswerForQid(reponses, qid) {
+      if (!reponses || !qid) return undefined;
+      if (reponses[qid] !== undefined) return reponses[qid];
+
+      // Cas classique: sous-clés sérialisées qid_sub / qid.sub
+      const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
+      if (subKeys.length > 0) {
+        const grouped = {};
+        subKeys.forEach(sk => {
+          const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
+          grouped[suffix || sk] = reponses[sk];
+        });
+        return grouped;
+      }
+
+      // Cas imbriqué: réponses stockées sous une clé parent (objet), ex:
+      // reponses[parentQid] = { hole_0: "...", hole_1: "..." }
+      const parts = String(qid).split("_");
+      if (parts.length > 2) {
+        for (let cut = parts.length - 1; cut >= 2; cut--) {
+          const parent = parts.slice(0, cut).join("_");
+          const suffix = parts.slice(cut).join("_");
+          const parentVal = reponses[parent];
+          if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
+            if (parentVal[suffix] !== undefined) return parentVal[suffix];
+            const tailNum = suffix.match(/\d+$/)?.[0];
+            if (tailNum && parentVal[tailNum] !== undefined) return parentVal[tailNum];
+          }
+        }
+      }
+
+      // Secours mismatch blueprint/réponses : alignement par ordre
+      if (QID_FALLBACK_MAP[qid] && reponses[QID_FALLBACK_MAP[qid]] !== undefined) {
+        return reponses[QID_FALLBACK_MAP[qid]];
+      }
+
+      return undefined;
+    }
     window.openAppreciationBank = openAppreciationBank;
     window.closeModal = closeModal;
     window.sortTable = sortTable;
@@ -1036,6 +1075,9 @@
       const qid = q?.qid;
       const label = q?.label;
 
+      const resolved = resolveAnswerForQid(reponses, qid);
+      if (resolved !== undefined) return formatMaybeBullets(decodeAnswerValue(q, resolved));
+
       // FIX #9 : Mapping intelligent — essayer toutes les variantes de clés
       const keysToTry = [];
       if (qid) keysToTry.push(qid);                                    // q_0
@@ -1070,11 +1112,6 @@
             }
           }
         }
-      }
-
-      // Secours mismatch blueprint/réponses : alignement par ordre si qid non corrélé.
-      if (qid && QID_FALLBACK_MAP[qid] && reponses[QID_FALLBACK_MAP[qid]] !== undefined) {
-        return formatMaybeBullets(decodeAnswerValue(q, reponses[QID_FALLBACK_MAP[qid]]));
       }
 
       return "<i>Non répondu</i>";
@@ -1970,7 +2007,7 @@ markUnsaved();
       const qid = q?.qid;
       if (!qid || !q.autocorrect) return null; // not auto-correctable
 
-      const raw = reponses?.[qid] ?? (QID_FALLBACK_MAP[qid] ? reponses?.[QID_FALLBACK_MAP[qid]] : undefined);
+      const raw = resolveAnswerForQid(reponses, qid);
       const correct = q.reponseCorrecte;
 
       // Not answered
