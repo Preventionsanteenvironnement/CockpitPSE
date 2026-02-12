@@ -586,6 +586,7 @@
     let CURRENT_ELEVE_CODE = null;
     let CURRENT_COPY = null;
     let CURRENT_REPONSES = {};
+    let QID_FALLBACK_MAP = {};
     let CURRENT_EVALUATION = null;
     let IS_SAVED = true;
 
@@ -614,6 +615,95 @@
     let SHOW_EXPECTED = true;
 
     window.autoResize = autoResize;
+
+    function normalizeReponsesPayload(raw) {
+      if (raw === null || raw === undefined) return {};
+
+      let payload = raw;
+      // Certaines copies stockent les réponses sous forme JSON string.
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); }
+        catch (_) { return {}; }
+      }
+
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        if (payload.reponses && typeof payload.reponses === "object") return payload.reponses;
+        return payload;
+      }
+      return {};
+    }
+
+    function hasMeaningfulCorrection(corr) {
+      if (!corr || typeof corr !== "object") return false;
+      const q = corr.questions;
+      if (!q || typeof q !== "object") return false;
+      // Considérer une correction existante seulement si au moins une question a un niveau/commentaire.
+      return Object.values(q).some(v => v && typeof v === "object" && (v.level || v.comment));
+    }
+
+    function qidTokens(id) {
+      const m = String(id || "").match(/\d+/g);
+      return m ? m.map(n => parseInt(n, 10)) : [];
+    }
+
+    function compareIdsByTokens(a, b) {
+      const ta = qidTokens(a);
+      const tb = qidTokens(b);
+      const n = Math.max(ta.length, tb.length);
+      for (let i = 0; i < n; i++) {
+        const va = ta[i] ?? -1;
+        const vb = tb[i] ?? -1;
+        if (va !== vb) return va - vb;
+      }
+      return String(a).localeCompare(String(b));
+    }
+
+    function hasQidMatch(qid, keys) {
+      if (!qid) return false;
+      return keys.some(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
+    }
+
+    function buildQidFallbackMap(questions, reponses) {
+      const qids = (questions || []).map(q => String(q?.qid || "").trim()).filter(Boolean);
+      const keys = Object.keys(reponses || {});
+      const map = {};
+
+      if (!qids.length || !keys.length) {
+        return { map, diag: { qCount: qids.length, rCount: keys.length, matched: 0, ratio: 0, mapped: 0 } };
+      }
+
+      let matched = 0;
+      qids.forEach(qid => { if (hasQidMatch(qid, keys)) matched++; });
+      const ratio = matched / qids.length;
+
+      // Activer le secours seulement si mismatch fort.
+      if (ratio < 0.7) {
+        const sortedQids = [...qids].sort(compareIdsByTokens);
+        const sortedKeys = [...keys].sort(compareIdsByTokens);
+        const unresolved = sortedQids.filter(qid => !hasQidMatch(qid, keys));
+
+        // Éviter d'écraser les qid déjà alignés.
+        const used = new Set();
+        sortedQids.forEach(qid => {
+          const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
+          if (direct) used.add(direct);
+        });
+        const freeKeys = sortedKeys.filter(k => !used.has(k));
+        const n = Math.min(unresolved.length, freeKeys.length);
+        for (let i = 0; i < n; i++) map[unresolved[i]] = freeKeys[i];
+      }
+
+      return {
+        map,
+        diag: {
+          qCount: qids.length,
+          rCount: keys.length,
+          matched,
+          ratio,
+          mapped: Object.keys(map).length
+        }
+      };
+    }
     window.openAppreciationBank = openAppreciationBank;
     window.closeModal = closeModal;
     window.sortTable = sortTable;
@@ -980,6 +1070,11 @@
             }
           }
         }
+      }
+
+      // Secours mismatch blueprint/réponses : alignement par ordre si qid non corrélé.
+      if (qid && QID_FALLBACK_MAP[qid] && reponses[QID_FALLBACK_MAP[qid]] !== undefined) {
+        return formatMaybeBullets(decodeAnswerValue(q, reponses[QID_FALLBACK_MAP[qid]]));
       }
 
       return "<i>Non répondu</i>";
@@ -1875,7 +1970,7 @@ markUnsaved();
       const qid = q?.qid;
       if (!qid || !q.autocorrect) return null; // not auto-correctable
 
-      const raw = reponses?.[qid];
+      const raw = reponses?.[qid] ?? (QID_FALLBACK_MAP[qid] ? reponses?.[QID_FALLBACK_MAP[qid]] : undefined);
       const correct = q.reponseCorrecte;
 
       // Not answered
@@ -2101,13 +2196,14 @@ markUnsaved();
 
         CURRENT_COPY = docSnap.data();
         CURRENT_COPY.id = CURRENT_DOC_ID;
-        CURRENT_REPONSES = (
-          CURRENT_COPY?.reponses ??
-          CURRENT_COPY?.raw?.reponses ??
-          CURRENT_COPY?.payload?.reponses ??
-          CURRENT_COPY?.data?.reponses ??
-          {}
-        );
+        CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.raw?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.payload?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.data?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.raw);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw?.reponses);
+        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw);
         if (!CURRENT_REPONSES || typeof CURRENT_REPONSES !== "object") CURRENT_REPONSES = {};
         // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
         localStorage.removeItem("cockpit_transfert");
@@ -2172,6 +2268,15 @@ if (!blueprintLoaded) {
         document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
 
         const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
+        const qidFallbackData = buildQidFallbackMap(questions, CURRENT_REPONSES);
+        QID_FALLBACK_MAP = qidFallbackData.map || {};
+        if (qidFallbackData?.diag) {
+          const d = qidFallbackData.diag;
+          console.log("🧭 QID diag:", d);
+          if (d.ratio < 0.7) {
+            console.warn(`⚠️ Mismatch QID détecté: ${d.matched}/${d.qCount} corrélés (${Math.round(d.ratio * 100)}%). Fallback actif: ${d.mapped}.`);
+          }
+        }
         renderCorrection({ questions }, CURRENT_REPONSES);
 
         // === AUTO-CORRECTION ENGINE HOOK ===
@@ -2181,11 +2286,16 @@ if (!blueprintLoaded) {
           try {
             const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
             if (evalSnap.exists()) {
-              CURRENT_EVALUATION = evalSnap.data();
-              loadExistingCorrection(CURRENT_EVALUATION);
-              IS_SAVED = true;
-              hasExistingCorrection = true;
-            } else if (CURRENT_COPY.correction) {
+              const existingEval = evalSnap.data();
+              if (hasMeaningfulCorrection(existingEval)) {
+                CURRENT_EVALUATION = existingEval;
+                loadExistingCorrection(CURRENT_EVALUATION);
+                IS_SAVED = true;
+                hasExistingCorrection = true;
+              } else {
+                console.warn("ℹ️ Évaluation existante trouvée mais vide/incomplète: auto-correction autorisée.");
+              }
+            } else if (hasMeaningfulCorrection(CURRENT_COPY.correction)) {
               CURRENT_EVALUATION = CURRENT_COPY.correction;
               loadExistingCorrection(CURRENT_COPY.correction);
               IS_SAVED = true;
