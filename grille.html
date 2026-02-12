@@ -660,7 +660,11 @@
 
     function hasQidMatch(qid, keys) {
       if (!qid) return false;
-      return keys.some(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
+      return keys.some(k =>
+        k === qid ||
+        k.startsWith(qid + "_") || k.startsWith(qid + ".") ||
+        qid.startsWith(k + "_") || qid.startsWith(k + ".")
+      );
     }
 
     function buildQidFallbackMap(questions, reponses) {
@@ -682,10 +686,10 @@
         const sortedKeys = [...keys].sort(compareIdsByTokens);
         const unresolved = sortedQids.filter(qid => !hasQidMatch(qid, keys));
 
-        // Éviter d'écraser les qid déjà alignés.
+        // Éviter d'écraser les qid déjà alignés (bidirectionnel).
         const used = new Set();
         sortedQids.forEach(qid => {
-          const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
+          const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + ".") || qid.startsWith(k + "_") || qid.startsWith(k + "."));
           if (direct) used.add(direct);
         });
         const freeKeys = sortedKeys.filter(k => !used.has(k));
@@ -720,19 +724,40 @@
         return grouped;
       }
 
-      // Cas imbriqué: réponses stockées sous une clé parent (objet), ex:
+      // Cas imbriqué: réponses stockées sous une clé parent (objet ou valeur simple), ex:
       // reponses[parentQid] = { hole_0: "...", hole_1: "..." }
+      // OU reponses["q_1"] = "texte" pour blueprint qid "q_1_problematique"
       const parts = String(qid).split("_");
       if (parts.length > 2) {
         for (let cut = parts.length - 1; cut >= 2; cut--) {
           const parent = parts.slice(0, cut).join("_");
           const suffix = parts.slice(cut).join("_");
           const parentVal = reponses[parent];
-          if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
-            if (parentVal[suffix] !== undefined) return parentVal[suffix];
-            const tailNum = suffix.match(/\d+$/)?.[0];
-            if (tailNum && parentVal[tailNum] !== undefined) return parentVal[tailNum];
+          if (parentVal !== undefined && parentVal !== null) {
+            if (typeof parentVal === "object" && !Array.isArray(parentVal)) {
+              if (parentVal[suffix] !== undefined) return parentVal[suffix];
+              const tailNum = suffix.match(/\d+$/)?.[0];
+              if (tailNum && parentVal[tailNum] !== undefined) return parentVal[tailNum];
+            } else if (Array.isArray(parentVal)) {
+              // Tableau : essayer l'index numérique du suffixe
+              const idx = parseInt(suffix, 10);
+              if (!isNaN(idx) && idx >= 0 && idx < parentVal.length) return parentVal[idx];
+              return parentVal;
+            } else {
+              // Valeur simple (string/number) : la clé parent est un raccourci du qid complet
+              return parentVal;
+            }
           }
+        }
+      }
+
+      // Préfixe inverse : la clé de réponse est un raccourci du qid blueprint
+      // Ex: reponses["q_1"] existe, blueprint demande "q_1_problematique"
+      const rKeys = Object.keys(reponses);
+      for (const rKey of rKeys) {
+        if (rKey !== qid && (qid.startsWith(rKey + "_") || qid.startsWith(rKey + "."))) {
+          const val = reponses[rKey];
+          if (val !== undefined && val !== null) return val;
         }
       }
 
@@ -918,7 +943,7 @@
         questions.forEach((q, idx) => {
           const label = "Q" + (idx + 1);
           const qText = q?.enonce || "";
-          const rep = getReponseEleve(reponses, q);
+          const rep = getReponseEleve(reponses, q, idx);
           html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
             <div style="font-weight:bold; font-size:0.85em; color:#334155; margin-bottom:4px;">
               ${escapeHTML(label)} ${qText ? '— ' + escapeHTML(qText).substring(0, 80) + (qText.length > 80 ? '...' : '') : ''}
@@ -1070,7 +1095,7 @@
       `;
     }
 
-    function getReponseEleve(reponses, q) {
+    function getReponseEleve(reponses, q, idx) {
       if (!reponses) return "<i>Non répondu</i>";
       const qid = q?.qid;
       const label = q?.label;
@@ -1085,6 +1110,11 @@
       if (label) keysToTry.push("Q" + label);                           // Q1.1
       if (qid) keysToTry.push(qid.replace("q_", "Q"));                 // Q0
       if (label) keysToTry.push("Q" + label.replace(".", "_"));         // Q1_1
+      // FIX #23 : Fallback séquentiel — essayer q_N quand le qid est descriptif
+      if (idx !== undefined) {
+        const seqKey = `q_${idx}`;
+        if (seqKey !== qid) keysToTry.push(seqKey);                     // q_0, q_1, ...
+      }
       if (qid) {
         // Variantes avec suffixes courants (matrice, gravité, décision, trous)
         ["_gravite", "_decision", "_matrice", "_trous", "_source"].forEach(suffix => {
@@ -1110,6 +1140,15 @@
               });
               return formatMaybeBullets(grouped);
             }
+          }
+        }
+      }
+
+      // FIX #23 : Recherche inverse — si une clé de réponse est un préfixe du qid
+      if (qid) {
+        for (const rKey of Object.keys(reponses)) {
+          if (rKey !== qid && (qid.startsWith(rKey + "_") || qid.startsWith(rKey + "."))) {
+            return formatMaybeBullets(decodeAnswerValue(q, reponses[rKey]));
           }
         }
       }
@@ -1564,7 +1603,7 @@
         row.dataset.qid = qid;
         row.dataset.bareme = bareme; // FIX #6 : stocker le barème pour calcul semi-auto
 
-        const repEleve = getReponseEleve(reponses, q);
+        const repEleve = getReponseEleve(reponses, q, idx);
         const attendu = formatExpected(q);
         const questionHtml = renderQuestionHTML(q, label, competence);
 
