@@ -660,7 +660,11 @@
 
     function hasQidMatch(qid, keys) {
       if (!qid) return false;
-      return keys.some(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
+      return keys.some(k =>
+        k === qid ||
+        k.startsWith(qid + "_") || k.startsWith(qid + ".") ||
+        qid.startsWith(k + "_") || qid.startsWith(k + ".")
+      );
     }
 
     function buildQidFallbackMap(questions, reponses) {
@@ -680,9 +684,19 @@
       const unresolved = qids.filter(qid => !hasQidMatch(qid, keys));
 
       if (ratio < 0.7) {
+        // 1) Cas connu: sous-QID de type ..._hole_N / ..._pair_N stockés sous le parent en tableau/objet.
+        unresolved.forEach(qid => {
+          const m = qid.match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
+          if (!m) return;
+          const parent = m[1];
+          if (reponses[parent] !== undefined) {
+            map[qid] = parent;
+          }
+        });
+
         const sortedQids = [...qids].sort(compareIdsByTokens);
         const sortedKeys = [...keys].sort(compareIdsByTokens);
-        const unresolvedSorted = sortedQids.filter(qid => !hasQidMatch(qid, keys));
+        const unresolvedSorted = sortedQids.filter(qid => !hasQidMatch(qid, keys) && !map[qid]);
 
         // Éviter d'écraser les qid déjà alignés.
         const used = new Set();
@@ -690,6 +704,7 @@
           const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
           if (direct) used.add(direct);
         });
+        // Les clés déjà affectées aux sous-QID restent réutilisables (1 parent -> n sous-questions).
         const freeKeys = sortedKeys.filter(k => !used.has(k));
         const n = Math.min(unresolvedSorted.length, freeKeys.length);
         for (let i = 0; i < n; i++) map[unresolvedSorted[i]] = freeKeys[i];
@@ -712,6 +727,20 @@
       if (!reponses || !qid) return undefined;
       if (reponses[qid] !== undefined) return reponses[qid];
 
+      // Cas explicite: qid enfant (hole/pair/...) à résoudre via qid parent.
+      const childMatch = String(qid).match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
+      if (childMatch) {
+        const parent = childMatch[1];
+        const idx = parseInt(childMatch[3], 10);
+        const parentVal = reponses[parent];
+        if (Array.isArray(parentVal) && !Number.isNaN(idx) && parentVal[idx] !== undefined) return parentVal[idx];
+        if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
+          const suffix = childMatch[2].toLowerCase() + "_" + childMatch[3];
+          if (parentVal[suffix] !== undefined) return parentVal[suffix];
+          if (parentVal[childMatch[3]] !== undefined) return parentVal[childMatch[3]];
+        }
+      }
+
       // Cas classique: sous-clés sérialisées qid_sub / qid.sub
       const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
       if (subKeys.length > 0) {
@@ -731,10 +760,17 @@
           const parent = parts.slice(0, cut).join("_");
           const suffix = parts.slice(cut).join("_");
           const parentVal = reponses[parent];
+          const tailNum = suffix.match(/(\d+)$/)?.[1];
+
+          // Cas parent tableau: qid enfant -> index de tableau via suffixe (hole_0, pair_2, ...)
+          if (Array.isArray(parentVal) && tailNum !== undefined) {
+            const idx = parseInt(tailNum, 10);
+            if (!Number.isNaN(idx) && idx >= 0 && idx < parentVal.length) return parentVal[idx];
+          }
+
           if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
             if (parentVal[suffix] !== undefined) return parentVal[suffix];
-            const tailNum = suffix.match(/\d+$/)?.[0];
-            if (tailNum && parentVal[tailNum] !== undefined) return parentVal[tailNum];
+            if (tailNum !== undefined && parentVal[tailNum] !== undefined) return parentVal[tailNum];
           }
         }
       }
