@@ -870,6 +870,36 @@
       return lines;
     }
 
+    function getOptionLabelMap(q) {
+      const map = {};
+      const opts = Array.isArray(q?.options) ? q.options : [];
+      opts.forEach(opt => {
+        if (!opt || typeof opt !== "object") return;
+        const val = String(opt.value ?? "").trim();
+        const lbl = String(opt.label ?? "").trim();
+        if (val && lbl) map[val] = lbl;
+      });
+      return map;
+    }
+
+    function decodeAnswerValue(q, value) {
+      const labelMap = getOptionLabelMap(q);
+
+      const decodeOne = (v) => {
+        const key = String(v ?? "").trim();
+        if (!key) return v;
+        return Object.prototype.hasOwnProperty.call(labelMap, key) ? labelMap[key] : v;
+      };
+
+      if (Array.isArray(value)) return value.map(decodeOne);
+      if (value && typeof value === "object") {
+        const out = {};
+        Object.entries(value).forEach(([k, v]) => { out[k] = decodeOne(v); });
+        return out;
+      }
+      return decodeOne(value);
+    }
+
     function formatMaybeBullets(value) {
       if (value === null || value === undefined) return "<i>Non répondu</i>";
 
@@ -930,7 +960,7 @@
       }
 
       for (const key of keysToTry) {
-        if (key && reponses[key] !== undefined) return formatMaybeBullets(reponses[key]);
+        if (key && reponses[key] !== undefined) return formatMaybeBullets(decodeAnswerValue(q, reponses[key]));
       }
 
       // FIX #9 : Recherche partielle — si qid contient le début d'une clé dans reponses
@@ -943,7 +973,7 @@
               const grouped = {};
               subKeys.forEach(sk => {
                 const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
-                grouped[suffix || sk] = reponses[sk];
+                grouped[suffix || sk] = decodeAnswerValue(q, reponses[sk]);
               });
               return formatMaybeBullets(grouped);
             }
