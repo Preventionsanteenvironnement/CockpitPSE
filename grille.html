@@ -2192,11 +2192,22 @@ if (!blueprintLoaded) {
           }
         }
 
-                // Auto-correction désactivée (mode 100% manuel)
-// if (!hasExistingCorrection && CURRENT_BLUEPRINT.autocorrect === true) {
-//   autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_COPY.reponses || {});
-//   IS_SAVED = false;
-// }
+        // Auto-correction conditionnelle (safe): uniquement pour blueprints compatibles,
+        // sans écraser une correction déjà existante.
+        if (!hasExistingCorrection) {
+          const qs = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
+          const hasAutocorrectMeta = CURRENT_BLUEPRINT?.autocorrect === true ||
+            qs.some(q => q?.autocorrect === true);
+          const hasAutocorrectData = qs.some(q =>
+            q && q.reponseCorrecte !== undefined && q.reponseCorrecte !== null &&
+            String(q.inputType || "").trim() !== ""
+          );
+
+          if (hasAutocorrectMeta && hasAutocorrectData) {
+            autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_COPY.reponses || {});
+            IS_SAVED = false;
+          }
+        }
 
         // Init copy navigation (Suivant + Valider&Publier buttons)
         initCopyNavigation();
