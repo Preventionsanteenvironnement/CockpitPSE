@@ -585,6 +585,7 @@
     let CURRENT_DOC_ID = null;
     let CURRENT_ELEVE_CODE = null;
     let CURRENT_COPY = null;
+    let CURRENT_REPONSES = {};
     let CURRENT_EVALUATION = null;
     let IS_SAVED = true;
 
@@ -759,11 +760,11 @@
 
     // FIX #16 : Aperçu copie intégré
     function ouvrirApercuCopie() {
-      if (!CURRENT_COPY || !CURRENT_COPY.reponses) {
+      if (!CURRENT_COPY || !CURRENT_REPONSES || Object.keys(CURRENT_REPONSES).length === 0) {
         alert("Aucune copie chargée.");
         return;
       }
-      const reponses = CURRENT_COPY.reponses;
+      const reponses = CURRENT_REPONSES;
       const meta = CURRENT_COPY.eleve || CURRENT_COPY;
       let html = `<div style="margin-bottom:10px; padding:8px; background:#f8fafc; border-radius:8px; font-size:0.85em; color:#475569;">
         <b>Code :</b> ${escapeHTML(CURRENT_ELEVE_CODE)} &nbsp;|&nbsp;
@@ -844,7 +845,7 @@
       inputType: q.inputType || q.type || "radio",
       options: q.options || q.choix || q.items || [],
 
-      reponseCorrecte: q.reponseAttendue ?? q.reponseCorrecte ?? q.attendu ?? q.correct ?? q.answer ?? "",
+      reponseCorrecte: q.reponseCorrecte ?? q.correct ?? q.answer ?? q.reponseAttendue ?? q.attendu ?? "",
       attendu: q.reponseAttendue ?? q.attendu ?? q.reponseCorrecte ?? q.correct ?? q.answer ?? ""
     };
   });
@@ -2100,6 +2101,14 @@ markUnsaved();
 
         CURRENT_COPY = docSnap.data();
         CURRENT_COPY.id = CURRENT_DOC_ID;
+        CURRENT_REPONSES = (
+          CURRENT_COPY?.reponses ??
+          CURRENT_COPY?.raw?.reponses ??
+          CURRENT_COPY?.payload?.reponses ??
+          CURRENT_COPY?.data?.reponses ??
+          {}
+        );
+        if (!CURRENT_REPONSES || typeof CURRENT_REPONSES !== "object") CURRENT_REPONSES = {};
         // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
         localStorage.removeItem("cockpit_transfert");
         if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
@@ -2163,7 +2172,7 @@ if (!blueprintLoaded) {
         document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
 
         const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
-        renderCorrection({ questions }, CURRENT_COPY.reponses || {});
+        renderCorrection({ questions }, CURRENT_REPONSES);
 
         // === AUTO-CORRECTION ENGINE HOOK ===
         let hasExistingCorrection = false;
@@ -2204,7 +2213,7 @@ if (!blueprintLoaded) {
           );
 
           if (hasAutocorrectMeta && hasAutocorrectData) {
-            autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_COPY.reponses || {});
+            autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_REPONSES);
             IS_SAVED = false;
           }
         }
