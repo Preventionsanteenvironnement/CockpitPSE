@@ -121,6 +121,57 @@
     .ac-badge.auto-m { background: #dcfce7; color: #166534; }
     .ac-badge.auto-i { background: #fee2e2; color: #991b1b; }
     .ac-badge.auto-nt { background: #f1f5f9; color: #64748b; }
+    .ac-badge.manual { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+    .manual-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7em;
+      font-weight: 700;
+      border: 1px solid #fdba74;
+      background: #fff7ed;
+      color: #9a3412;
+      cursor: pointer;
+      user-select: none;
+    }
+    .manual-indicator.hidden { display: none !important; }
+    .manual-popover {
+      position: fixed;
+      top: 84px;
+      right: 18px;
+      z-index: 2500;
+      max-width: 420px;
+      width: min(420px, 95vw);
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.14);
+      padding: 10px 12px;
+      font-size: 0.83em;
+      color: #334155;
+    }
+    .manual-popover.hidden { display: none !important; }
+    .manual-popover .manual-title { font-weight: 800; margin-bottom: 8px; color: #9a3412; }
+    .manual-popover .manual-list { max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
+    .manual-popover .manual-item {
+      padding: 6px 8px;
+      border: 1px solid #f1f5f9;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      background: #f8fafc;
+    }
+    .manual-popover .manual-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .manual-popover .manual-actions button {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.95em;
+      cursor: pointer;
+    }
 
     h1 {
       text-align: center;
@@ -515,10 +566,21 @@
     <tfoot>
       <tr>
         <td colspan="6" class="total-label">NOTE :</td>
-        <td class="total-points"><span id="finalNote" class="total-note">-- / 20</span></td>
+        <td class="total-points">
+          <span id="finalNote" class="total-note">-- / 20</span>
+          <span id="manualIndicator" class="manual-indicator hidden" onclick="toggleManualPopover()">🟠 Reste : 0</span>
+        </td>
       </tr>
     </tfoot>
   </table>
+  <div id="manualPopover" class="manual-popover hidden no-print">
+    <div class="manual-title">Reste à corriger manuellement</div>
+    <div id="manualList" class="manual-list"></div>
+    <div class="manual-actions">
+      <button type="button" onclick="gotoNextManualItem()">Aller au prochain</button>
+      <button type="button" onclick="toggleManualPopover(false)">Fermer</button>
+    </div>
+  </div>
 
   <div class="bottom-container">
     <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé</div>
@@ -613,8 +675,13 @@
 
     let SHOW_QUESTION = true;
     let SHOW_EXPECTED = true;
+    const DEBUG = true;
+    let AUTO_REPORT = null;
+    let CURRENT_MANUAL_INDEX = -1;
 
     window.autoResize = autoResize;
+    window.toggleManualPopover = toggleManualPopover;
+    window.gotoNextManualItem = gotoNextManualItem;
 
     function syncDebugGlobals() {
       // Debug console only (module scope -> window)
@@ -1221,14 +1288,22 @@
     }
 
     function formatExpected(q) {
-      const att = q?.reponseAttendue ?? q?.attendu ?? q?.corrige ?? "";
-      const s = String(att ?? "").trim();
-      if (!s) return "<i>Non renseigné</i>";
-      const bullets = splitToBullets(s);
-      if (bullets.length >= 2) {
-        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
+      const attendu = q?.reponseAttendue ?? q?.attendu ?? q?.corrige ?? "";
+      const explication = q?.explication ?? q?.guide ?? "";
+
+      const hasAtt = (Array.isArray(attendu) && attendu.length > 0) ||
+        (attendu && typeof attendu === "object" && Object.keys(attendu).length > 0) ||
+        (typeof attendu === "string" && attendu.trim() !== "");
+      const hasExp = (typeof explication === "string" && explication.trim() !== "");
+
+      if (hasAtt && hasExp && typeof attendu === "string") {
+        const a = formatMaybeBullets(attendu);
+        const e = formatMaybeBullets(explication);
+        return `${a}<div style="margin-top:6px;"><b>Guide :</b> ${e}</div>`;
       }
-      return escapeHTML(s).replaceAll("\n","<br>");
+      if (hasAtt) return formatMaybeBullets(attendu);
+      if (hasExp) return formatMaybeBullets(explication);
+      return "<i>Non renseigné</i>";
     }
 
     function collecterDonneesCorrection() {
@@ -1646,6 +1721,9 @@
     function renderCorrection(blueprint, reponses) {
       const tbody = document.getElementById('correctionTable').querySelector('tbody');
       tbody.innerHTML = "";
+      AUTO_REPORT = null;
+      CURRENT_MANUAL_INDEX = -1;
+      updateManualIndicator({ manualItems: [] });
       let maxMap = {}, qMap = {}, activeComps = [];
 
       const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
@@ -1731,8 +1809,27 @@
 
     // FIX #6 : Calcul semi-auto des points par compétence
     function autoCalculatePoints(comp) {
-  return;
-}
+      const ptsEl = document.getElementById(`pts_${comp}`);
+      if (!ptsEl || MANUAL_OVERRIDE[comp]) return;
+
+      let pts = 0;
+      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
+        if (r.dataset.comp !== comp) return;
+        if (r.dataset.manual === "1") return; // exclus du total auto
+        if (r.dataset.autoPoints !== undefined && r.dataset.autoPoints !== "") {
+          pts += Number(r.dataset.autoPoints) || 0;
+          return;
+        }
+        const lvl = r.dataset.level;
+        const bareme = Number(r.dataset.bareme) || 0;
+        if (lvl && LEVEL_RATIO[lvl] !== undefined) {
+          pts += bareme * LEVEL_RATIO[lvl];
+        }
+      });
+      ptsEl.value = (Math.round(pts * 100) / 100).toString();
+      ptsEl.style.color = '#2563eb';
+      ptsEl.title = 'Auto (modifiable)';
+    }
 
     // FIX #7 : Calcul et affichage du niveau dominant par compétence
     function updateDominantLevel(comp) {
@@ -1804,6 +1901,16 @@ markUnsaved();
     }
 
     function calculateTotal() {
+      if (AUTO_REPORT && Number.isFinite(AUTO_REPORT.totalAutoMax)) {
+        const autoPts = Number(AUTO_REPORT.totalObtenu || 0);
+        const autoMax = Number(AUTO_REPORT.totalAutoMax || 0);
+        const fullMax = Number(AUTO_REPORT.totalMax || autoMax);
+        const elNote = document.getElementById('finalNote');
+        elNote.innerText = `${autoPts.toFixed(1)} / ${autoMax.toFixed(1)} (Auto) · Max ${fullMax.toFixed(1)}`;
+        elNote.style.color = autoMax > 0 && (autoPts / autoMax) < 0.5 ? "#d9534f" : "#16a34a";
+        return;
+      }
+
       let totalPts = 0;
       comps.forEach(c => {
         const row = document.getElementById(`row_${c}`);
@@ -2231,6 +2338,73 @@ markUnsaved();
       }
     }
 
+    function getNormalizedInputType(q) {
+      const t = String(q?.inputType || q?.type || "").trim().toLowerCase();
+      if (t === "qcu") return "checkbox";
+      if (t === "short") return "texte_exact";
+      return t;
+    }
+
+    function hasCorrectAnswer(q) {
+      const c = q?.reponseCorrecte;
+      if (Array.isArray(c)) return c.length > 0;
+      if (c && typeof c === "object") return Object.keys(c).length > 0;
+      return c !== undefined && c !== null && String(c).trim() !== "";
+    }
+
+    function isAutocorrectEligible(q) {
+      if (!q || q.type === "doc") return { ok: false, reason: "type non supporté" };
+      if (q.autocorrect !== true) return { ok: false, reason: "autocorrect false" };
+      const inputType = getNormalizedInputType(q);
+      const supported = new Set(["checkbox", "vrai_faux", "select", "number", "texte_exact"]);
+      if (!supported.has(inputType)) return { ok: false, reason: "type non supporté" };
+      if (!hasCorrectAnswer(q)) return { ok: false, reason: "reponseCorrecte absente" };
+      return { ok: true, reason: "" };
+    }
+
+    function updateManualIndicator(report) {
+      const badge = document.getElementById("manualIndicator");
+      const pop = document.getElementById("manualPopover");
+      const list = document.getElementById("manualList");
+      if (!badge || !pop || !list) return;
+
+      const items = report?.manualItems || [];
+      badge.textContent = `🟠 Reste : ${items.length}`;
+      badge.title = items.length ? "Cliquer pour voir le détail" : "Aucune correction manuelle restante";
+      badge.classList.toggle("hidden", items.length === 0);
+
+      list.innerHTML = "";
+      if (!items.length) {
+        pop.classList.add("hidden");
+        return;
+      }
+      items.forEach((it) => {
+        const d = document.createElement("div");
+        d.className = "manual-item";
+        d.innerHTML = `<b>${escapeHTML(it.label || "?")}</b> · ${escapeHTML(it.type || "")}<br><small>${escapeHTML(it.qid || "")} — ${escapeHTML(it.reason || "")}</small>`;
+        list.appendChild(d);
+      });
+    }
+
+    function toggleManualPopover(force) {
+      const pop = document.getElementById("manualPopover");
+      if (!pop) return;
+      if (typeof force === "boolean") {
+        pop.classList.toggle("hidden", !force);
+        return;
+      }
+      pop.classList.toggle("hidden");
+    }
+
+    function gotoNextManualItem() {
+      const items = AUTO_REPORT?.manualItems || [];
+      if (!items.length) return;
+      CURRENT_MANUAL_INDEX = (CURRENT_MANUAL_INDEX + 1) % items.length;
+      const target = items[CURRENT_MANUAL_INDEX];
+      const row = document.querySelector(`#correctionTable tbody tr[data-qid="${CSS.escape(target.qid)}"]`);
+      if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     /** Run auto-correction on all questions and apply to the DOM */
     function autocorrectCopy(blueprint, reponses) {
       const questions = extractQuestionsFromBlueprint(blueprint);
@@ -2242,11 +2416,42 @@ markUnsaved();
       if (!isAutocorrect) return;
 
       let countCorrect = 0, countIncorrect = 0, countNT = 0;
+      let nbAuto = 0, nbManuel = 0;
+      let totalAutoPts = 0, totalAutoMax = 0, totalMax = 0;
+      const manualItems = [];
       const rows = document.querySelectorAll('#correctionTable tbody tr');
 
       rows.forEach((row, idx) => {
         const q = questions[idx];
-        if (!q || !q.autocorrect) return;
+        if (!q) return;
+
+        const bareme = Number(q?.bareme) || 0;
+        totalMax += bareme;
+
+        const eligibility = isAutocorrectEligible(q);
+        if (!eligibility.ok) {
+          nbManuel++;
+          manualItems.push({
+            label: q?.label || ("Q" + (idx + 1)),
+            type: q?.inputType || q?.type || "unknown",
+            qid: q?.qid || `q_${idx}`,
+            reason: eligibility.reason
+          });
+          row.dataset.manualReason = eligibility.reason;
+          row.dataset.manual = "1";
+          const labelCell = row.cells[0];
+          if (labelCell && !labelCell.querySelector('.ac-badge.manual')) {
+            const badge = document.createElement('span');
+            badge.className = 'ac-badge manual';
+            badge.textContent = 'MANUEL';
+            badge.title = 'Correction manuelle requise';
+            labelCell.appendChild(badge);
+          }
+          return;
+        }
+
+        nbAuto++;
+        totalAutoMax += bareme;
 
         const result = autocorrectQuestion(q, reponses);
         if (!result) return;
@@ -2283,6 +2488,7 @@ markUnsaved();
         if (result.level === "M") countCorrect++;
         else if (result.level === "I") countIncorrect++;
         else countNT++;
+        totalAutoPts += (Number(result.points) || 0);
       });
 
             // Update all competence counters and points
@@ -2293,6 +2499,29 @@ markUnsaved();
         autoCalculatePoints(comp);
         updateDominantLevel(comp);
       });
+
+      AUTO_REPORT = {
+        nbAuto,
+        nbManuel,
+        totalAutoMax,
+        totalMax,
+        totalObtenu: totalAutoPts,
+        manualItems
+      };
+
+      if (DEBUG) {
+        console.log("[AUTO DEBUG]", {
+          nbAuto,
+          nbManuel,
+          totalAutoMax,
+          totalMax,
+          totalObtenu: totalAutoPts,
+          manuels: manualItems
+        });
+      }
+
+      updateManualIndicator(AUTO_REPORT);
+      calculateTotal();
 
       // Auto-correction désactivée : pas de bannière
     } // ✅ FIN autocorrectCopy
