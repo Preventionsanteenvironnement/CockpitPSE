@@ -1035,7 +1035,7 @@ QN80,Wael HWORI</pre>
       onSnapshot, query, orderBy, where, limit, Timestamp, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { 
-      getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, signInAnonymously
+      getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut
     } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     
     const firebaseConfig = {
@@ -1050,14 +1050,7 @@ QN80,Wael HWORI</pre>
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
-    
-    // ✅ FIX: Auth anonyme automatique pour éviter les problèmes de permissions
-    try { 
-        await signInAnonymously(auth); 
-        console.log("✅ Auth anonyme réussie");
-    } catch(e) { 
-        console.warn("⚠️ Auth anonyme échouée:", e); 
-    }
+
     const googleProvider = new GoogleAuthProvider();
     let currentUser = null;
     
@@ -1239,8 +1232,18 @@ QN80,Wael HWORI</pre>
             console.log("✅ " + allData.length + " copies chargées");
 
         } catch(e) { 
-            console.error("❌ Erreur:", e); 
-            alert("Erreur: " + e.message);
+            console.error("❌ Erreur:", e);
+            const msg = String(e?.message || e || "");
+            const code = String(e?.code || "");
+            if (msg.includes("Firestore backend") || msg.includes("backend") || msg.includes("10 seconds")) {
+                alert("❌ Firestore indisponible (timeout réseau).\n\nVérifiez la connexion / filtre réseau, puis rechargez la page.");
+            } else if (code.includes("permission-denied")) {
+                alert("❌ Permission Firestore refusée.\n\nConnectez-vous en Prof puis rechargez.");
+            } else if (code.includes("unauthenticated")) {
+                alert("❌ Authentification requise.\n\nConnectez-vous en Prof puis rechargez.");
+            } else {
+                alert("Erreur: " + msg);
+            }
         } finally {
             // ✅ FIX: Toujours arrêter le mode chargement
             const tbody = document.getElementById("tbody-eleves");
