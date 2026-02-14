@@ -119,6 +119,7 @@
       vertical-align: middle;
     }
     .ac-badge.auto-m { background: #dcfce7; color: #166534; }
+    .ac-badge.auto-a { background: #fef3c7; color: #92400e; }
     .ac-badge.auto-i { background: #fee2e2; color: #991b1b; }
     .ac-badge.auto-nt { background: #f1f5f9; color: #64748b; }
     .ac-badge.manual { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
@@ -1147,6 +1148,7 @@
       autocorrect: q.autocorrect,
       besoinCorrectionManuelle: q.besoinCorrectionManuelle,
       correctionMode: q.correctionMode,
+      penalite: q.penalite,
       tolerance: q.tolerance,
 
       reponseCorrecte: q.reponseCorrecte ?? q.correct ?? q.answer ?? q.reponseAttendue ?? q.attendu ?? "",
@@ -2245,44 +2247,68 @@ markUnsaved();
           break;
 
         case "checkbox": {
-          // Partial scoring: count correct matches, ignore incorrect selections
+          // QRM – notation par discordance
           let studentArr = Array.isArray(raw) ? raw : [raw];
           studentArr = studentArr.map(v => String(v).trim()).filter(Boolean);
           const correctArr = (Array.isArray(correct) ? correct : [correct])
             .map(v => String(v).trim()).filter(Boolean);
-
-          const nbCorrectTotal = correctArr.length;
-          const nbBonnesCochees = studentArr.filter(v => correctArr.includes(v)).length;
-          const nbMauvaisesCochees = studentArr.filter(v => !correctArr.includes(v)).length;
           const bareme = Number(q.bareme) || 1;
+          const corrMode = (q.correctionMode || "").toLowerCase();
+          const opts = Array.isArray(q.options) ? q.options : [];
 
-          // Mode partiel: bareme == nombre de bonnes réponses (1 pt par bonne)
-          // Mode binaire: bareme < nombre de bonnes réponses (tout ou rien)
-          const isPartial = (bareme === nbCorrectTotal);
+          // Helper : convertir un value d'option en label lisible
+          const valToLabel = (val) => {
+            const found = opts.find(o => String(o.value || o.id || "").trim() === val);
+            return found ? (found.label || found.text || val) : val;
+          };
 
-          if (isPartial) {
-            // Partiel: points = nombre de bonnes cochées (mauvaises ignorées)
-            if (nbBonnesCochees === nbCorrectTotal && nbMauvaisesCochees === 0) {
-              return { level: "M", comment: "", correct: true, points: bareme };
-            } else if (nbBonnesCochees > 0) {
-              const attendu = q.reponseAttendue || correctArr.join(", ");
-              return {
-                level: "I",
-                comment: nbBonnesCochees + "/" + nbCorrectTotal + " correct(s) — Attendu : " + attendu,
-                correct: false,
-                points: nbBonnesCochees
-              };
-            } else {
-              return { level: "NT", comment: "Non répondu ou aucune bonne réponse", correct: false, points: 0 };
-            }
-          } else {
-            // Binaire (tout ou rien) — bareme ≠ nombre de bonnes réponses
-            const sortedStudent = [...studentArr].sort();
-            const sortedCorrect = [...correctArr].sort();
-            isCorrect = (sortedStudent.length === sortedCorrect.length) &&
-                        sortedStudent.every((v, i) => v === sortedCorrect[i]);
+          // ── Guard QCU : choix unique (single_exact ou 1 seule bonne réponse) ──
+          if (corrMode === "single_exact" || correctArr.length <= 1) {
+            isCorrect = (studentArr[0] === correctArr[0]);
+            break;
           }
-          break;
+
+          // ── QRM : calcul par discordance ──
+          const correctSet = new Set(correctArr);
+          const studentSet = new Set(studentArr);
+
+          // FP = mauvaises réponses cochées (l'élève a coché mais ce n'est pas correct)
+          const fpArr = studentArr.filter(v => !correctSet.has(v));
+          const FP = fpArr.length;
+
+          // FN = bonnes réponses oubliées (correct mais non coché)
+          const fnArr = correctArr.filter(v => !studentSet.has(v));
+          const FN = fnArr.length;
+
+          const discordances = FP + FN;
+          const penalite = Number(q.penalite) || 0.5;
+
+          // Score = max(0, barème − pénalité × discordances), arrondi au demi-point
+          let score = Math.max(0, bareme - penalite * discordances);
+          score = Math.round(score * 2) / 2; // arrondi au 0.5
+
+          if (score === bareme) {
+            // Tout juste → Maîtrisé
+            return { level: "M", comment: "", correct: true, points: bareme };
+          } else if (score > 0) {
+            // Partiellement correct → Acquis
+            const fpLabels = fpArr.map(valToLabel).join(", ");
+            const fnLabels = fnArr.map(valToLabel).join(", ");
+            let detail = `Discordances : ${discordances} (FP=${FP}, FN=${FN})`;
+            if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
+            if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
+            detail += ` | Score : ${bareme} - ${penalite}×${discordances} = ${score}/${bareme}`;
+            return { level: "A", comment: detail, correct: false, points: score };
+          } else {
+            // Zéro → Insuffisant
+            const fpLabels = fpArr.map(valToLabel).join(", ");
+            const fnLabels = fnArr.map(valToLabel).join(", ");
+            let detail = `Discordances : ${discordances} (FP=${FP}, FN=${FN})`;
+            if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
+            if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
+            detail += ` | Score : 0/${bareme}`;
+            return { level: "I", comment: detail, correct: false, points: 0 };
+          }
         }
 
         case "tableau_classement": {
@@ -2493,13 +2519,14 @@ markUnsaved();
         if (labelCell) {
           const badge = document.createElement('span');
           badge.className = 'ac-badge auto-' + result.level.toLowerCase();
-          badge.textContent = result.correct ? '✓' : '✗';
-          badge.title = result.correct ? 'Correct (auto)' : 'Incorrect (auto)';
+          badge.textContent = result.level === "A" ? '≈' : (result.correct ? '✓' : '✗');
+          badge.title = result.level === "A" ? `Partiel (${result.points} pts)` : (result.correct ? 'Correct (auto)' : 'Incorrect (auto)');
           labelCell.appendChild(badge);
         }
 
         // Count stats
         if (result.level === "M") countCorrect++;
+        else if (result.level === "A") countCorrect++; // QRM partial credit
         else if (result.level === "I") countIncorrect++;
         else countNT++;
         totalAutoPts += (Number(result.points) || 0);
