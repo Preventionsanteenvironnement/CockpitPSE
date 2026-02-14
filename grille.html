@@ -123,6 +123,24 @@
     .ac-badge.auto-i { background: #fee2e2; color: #991b1b; }
     .ac-badge.auto-nt { background: #f1f5f9; color: #64748b; }
     .ac-badge.manual { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+    /* Lignes manuelles non corrigées : fond orange pâle pulsant */
+    #correctionTable tbody tr[data-manual="1"]:not([data-level]),
+    #correctionTable tbody tr[data-manual="1"][data-level=""] {
+      background: #fff7ed;
+      animation: pulse-manual 2s ease-in-out infinite;
+    }
+    @keyframes pulse-manual {
+      0%, 100% { background: #fff7ed; }
+      50% { background: #ffedd5; }
+    }
+    /* Dès qu'un niveau est attribué, le fond redevient normal */
+    #correctionTable tbody tr[data-manual="1"][data-level="NT"],
+    #correctionTable tbody tr[data-manual="1"][data-level="I"],
+    #correctionTable tbody tr[data-manual="1"][data-level="A"],
+    #correctionTable tbody tr[data-manual="1"][data-level="M"] {
+      background: transparent;
+      animation: none;
+    }
     .manual-indicator {
       display: inline-flex;
       align-items: center;
@@ -1308,7 +1326,7 @@
       if (hasAtt && hasExp && typeof attendu === "string") {
         const a = formatMaybeBullets(attendu);
         const e = formatMaybeBullets(explication);
-        return `${a}<div style="margin-top:6px;"><b>Guide :</b> ${e}</div>`;
+        return `${a}<div style="margin-top:6px;"><b>📖 Explication :</b> ${e}</div>`;
       }
       if (hasAtt) return formatMaybeBullets(attendu);
       if (hasExp) return formatMaybeBullets(explication);
@@ -1487,6 +1505,11 @@
         evaluation.statut = statut;
         evaluation.publie = true;
 
+        // Embarquer le blueprint pour que l'élève voie toujours les bonnes questions
+        if (CURRENT_BLUEPRINT) {
+          evaluation.blueprint = CURRENT_BLUEPRINT;
+        }
+
         if (typePublication === "nn") {
           evaluation.nonNote = true;
         } else if (typePublication === "absent") {
@@ -1599,6 +1622,11 @@
         evaluation.statut = "noté";
         evaluation.publie = true;
         evaluation.autocorrected = true;
+
+        // Embarquer le blueprint pour que l'élève voie toujours les bonnes questions
+        if (CURRENT_BLUEPRINT) {
+          evaluation.blueprint = CURRENT_BLUEPRINT;
+        }
 
         const evalDocId = evaluation.devoirId + "_eval";
         await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
