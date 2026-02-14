@@ -2346,11 +2346,18 @@ markUnsaved();
     }
 
     function getNormalizedInputType(q) {
-      const t = String(q?.inputType || q?.type || "").trim().toLowerCase();
-      if (t === "qcu") return "checkbox";
-      if (t === "short") return "texte_exact";
-      return t;
-    }
+    // Normalise les anciens noms / variantes pour fiabiliser l'autocorrection
+    const t0 = (q?.inputType || q?.type || "").toString().trim().toLowerCase();
+    // Choix unique
+    if (["qcu", "radio", "single", "single_choice", "qcm_single"].includes(t0)) return "qcm";
+    // Choix multiple
+    if (["qcm_multi", "qcm_multiple", "multiple", "multi_choice"].includes(t0)) return "checkbox";
+    // Compat
+    if (t0 === "qcm") return "qcm";          // historique: qcm = choix unique
+    if (t0 === "checkbox") return "checkbox"; // historique: checkbox = multi (ou 1 seule)
+    if (t0 === "short" || t0 === "text" || t0 === "texte") return "texte_exact";
+    return t0;
+}
 
     function hasCorrectAnswer(q) {
       const c = q?.reponseCorrecte;
