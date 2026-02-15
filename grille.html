@@ -2268,6 +2268,42 @@ markUnsaved();
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }
 
+    /** Cherche le commentaire le plus pertinent dans la banque selon compétence + niveau */
+    function getBankComment(comp, level) {
+      const bank = window.DATA_COMMENTAIRES_COMPETENCES;
+      if (!bank || !bank[comp]) return "";
+      const compData = bank[comp];
+      // Parcourir les catégories : chercher le commentaire le plus utilisé, sinon le 1er de "Général"
+      const stats = loadCommentStats();
+      let bestTxt = "";
+      let bestUsage = -1;
+
+      for (const [catName, levelsObj] of Object.entries(compData)) {
+        const phrases = levelsObj[level];
+        if (!phrases || phrases.length === 0) continue;
+        for (const txt of phrases) {
+          const usage = getCommentUsage(comp, level, txt);
+          if (usage > bestUsage) {
+            bestUsage = usage;
+            bestTxt = txt;
+          }
+        }
+      }
+      // Si aucun n'a jamais été utilisé, prendre le 1er de "Général"
+      if (bestUsage <= 0 && compData["Général"]?.[level]?.length > 0) {
+        bestTxt = compData["Général"][level][0];
+      }
+      return bestTxt;
+    }
+
+    /** Construit le commentaire auto = banque + détail technique */
+    function buildAutoComment(comp, level, detail) {
+      const bankComment = getBankComment(comp, level);
+      if (bankComment && detail) return bankComment + "\n📖 " + detail;
+      if (bankComment) return bankComment;
+      return detail || "";
+    }
+
     /** Compare student answer vs correct answer based on inputType */
     function autocorrectQuestion(q, reponses) {
       const qid = q?.qid;
@@ -2279,7 +2315,7 @@ markUnsaved();
       // Not answered
       if (raw === undefined || raw === null || raw === "" ||
           (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: "Non répondu", correct: false, points: 0 };
+        return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
       }
 
       const inputType = (q.inputType || "").toLowerCase();
@@ -2336,7 +2372,7 @@ markUnsaved();
 
           if (score === bareme) {
             // Tout juste → Maîtrisé
-            return { level: "M", comment: "", correct: true, points: bareme };
+            return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: bareme };
           } else if (score > 0) {
             // Partiellement correct → Acquis
             const fpLabels = fpArr.map(valToLabel).join(", ");
@@ -2345,7 +2381,7 @@ markUnsaved();
             if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
             if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
             detail += ` | Score : ${bareme} - ${penalite}×${discordances} = ${score}/${bareme}`;
-            return { level: "A", comment: detail, correct: false, points: score };
+            return { level: "A", comment: buildAutoComment(q.competence, "A", detail), correct: false, points: score };
           } else {
             // Zéro → Insuffisant
             const fpLabels = fpArr.map(valToLabel).join(", ");
@@ -2354,7 +2390,7 @@ markUnsaved();
             if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
             if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
             detail += ` | Score : 0/${bareme}`;
-            return { level: "I", comment: detail, correct: false, points: 0 };
+            return { level: "I", comment: buildAutoComment(q.competence, "I", detail), correct: false, points: 0 };
           }
         }
 
@@ -2378,7 +2414,7 @@ markUnsaved();
               }
             }
             if (!anyFound) {
-              return { level: "NT", comment: "Non répondu", correct: false, points: 0 };
+              return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
             }
             isCorrect = allMatch;
           }
@@ -2411,10 +2447,10 @@ markUnsaved();
       }
 
       if (isCorrect) {
-        return { level: "M", comment: "", correct: true, points: Number(q.bareme) || 0 };
+        return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: Number(q.bareme) || 0 };
       } else {
         const attendu = q.reponseAttendue || String(correct);
-        return { level: "I", comment: "Attendu : " + attendu, correct: false, points: 0 };
+        return { level: "I", comment: buildAutoComment(q.competence, "I", "Attendu : " + attendu), correct: false, points: 0 };
       }
     }
 
@@ -2725,9 +2761,12 @@ if (!blueprintLoaded) {
 
         document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
 
-        // ═══ Bannière anti-triche (focus leaves, copier-coller) ═══
+        // ═══ Bannière anti-triche (focus leaves, copier-coller, tentative) ═══
         const acBanner = document.getElementById('antiCheatBanner');
         const acAlerts = [];
+        if (CURRENT_COPY.tentative && CURRENT_COPY.tentative >= 2) {
+          acAlerts.push(`🔄 <b>2ème tentative</b>`);
+        }
         if (CURRENT_COPY.focus) {
           const f = CURRENT_COPY.focus;
           if (f.focusLeaves > 0) acAlerts.push(`👁️ <b>${f.focusLeaves}</b> sortie${f.focusLeaves > 1 ? 's' : ''} de page`);
