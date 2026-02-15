@@ -251,7 +251,8 @@
     <div class="nav-item" data-theme="eval" onclick="showView('view-eval', this)">🟨 3. Évaluation & suivi</div>
     <div class="nav-item" data-theme="eval" onclick="showView('view-scores', this)">🟨 4. Scores exercices</div>
     <div class="nav-item" data-theme="eval" onclick="showView('view-2chance', this)">🔄 5. Demandes 2ème chance</div>
-    <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 6. Classes & groupes</div>
+    <div class="nav-item" data-theme="eval" onclick="showView('view-doublons', this)">🚨 6. Alertes doublons <span id="badge-doublons" style="background:#ef4444; color:white; font-size:0.75em; padding:2px 7px; border-radius:10px; display:none;">0</span></div>
+    <div class="nav-item" data-theme="class" onclick="showView('view-class', this)">🟩 7. Classes & groupes</div>
     <div class="nav-item" data-theme="proj" onclick="showView('view-proj', this)">🟪 7. Projets & transversal</div>
     <div class="nav-item" data-theme="admin" onclick="showView('view-admin', this)">🟧 8. Temps & admin</div>
     <div class="nav-item" data-theme="live" onclick="showView('view-live', this)">🟫 9. Classe en temps réel</div>
@@ -482,6 +483,59 @@
               <li>📩 <b>À distance</b> : l'élève envoie une demande ici</li>
             </ul>
             <p>Quand vous <b>acceptez</b>, l'élève est notifié automatiquement et peut renvoyer sa copie.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ ALERTES DOUBLONS ═══════════ -->
+    <section id="view-doublons" class="view-section">
+      <h2 style="color:#ef4444; border-bottom: 2px solid #ef4444; padding-bottom:10px;">🚨 Alertes doublons</h2>
+      <div class="dashboard-grid">
+        <div class="widget">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <span><strong>Tentatives de renvoi</strong> <small id="badge-doublons-count" style="background:#ef4444; color:#fff; padding:2px 8px; border-radius:12px; font-size:0.8em; display:none;">0</small></span>
+            <div style="display:flex; gap:8px;">
+              <button onclick="chargerDoublons()" style="padding:8px 15px; cursor:pointer; background:#f1f5f9; border:1px solid #ccc; border-radius:20px;">🔄 Actualiser</button>
+              <button onclick="marquerTousDoublonsLu()" style="padding:8px 15px; cursor:pointer; background:#fef3c7; border:1px solid #f59e0b; border-radius:20px; font-size:0.85em;">✅ Tout marquer lu</button>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <select id="filter-doublon-classe" class="filter-select" onchange="filtrerDoublons()">
+              <option value="ALL">Toutes les classes</option>
+            </select>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Code élève</th>
+                  <th>Classe</th>
+                  <th>Exercice</th>
+                  <th>Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-doublons">
+                <tr><td colspan="6" class="scores-empty">Cliquez sur "Actualiser" ou ouvrez cette section pour charger les alertes.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="widget">
+          <h3>ℹ️ Qu'est-ce qu'une alerte doublon ?</h3>
+          <div style="padding:10px; color:#64748b; font-size:0.9em; line-height:1.6;">
+            <p>Quand un élève a <b>déjà envoyé</b> sa copie et tente de la <b>renvoyer une 2ème fois</b> sans utiliser le système de 2ème chance, une alerte est générée ici.</p>
+            <p>Cela vous permet de :</p>
+            <ul style="padding-left:20px;">
+              <li>🔍 <b>Identifier</b> les élèves qui tentent de modifier leurs réponses</li>
+              <li>📊 <b>Surveiller</b> les tentatives suspectes</li>
+              <li>💬 <b>Discuter</b> avec l'élève si nécessaire</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -2000,6 +2054,114 @@ QN80,Wael HWORI</pre>
             });
             console.log("❌ Demande refusée:", docId);
             charger2eChanceDemandes();
+        } catch(e) {
+            console.error("❌ Erreur:", e);
+            alert("Erreur: " + e.message);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ALERTES DOUBLONS
+    // ═══════════════════════════════════════════════════════════════════════
+    let allDoublons = [];
+
+    window.chargerDoublons = async function() {
+        try {
+            const qDoublons = query(collection(db, "alertes_doublons"), orderBy("createdAt", "desc"), limit(200));
+            const snapshot = await getDocs(qDoublons);
+            allDoublons = [];
+            const classes = new Set();
+            let nonLu = 0;
+
+            snapshot.forEach(docSnap => {
+                const d = docSnap.data();
+                d.id = docSnap.id;
+                allDoublons.push(d);
+                if (d.classe && d.classe !== "?") classes.add(d.classe);
+                if (!d.lu) nonLu++;
+            });
+
+            // Mettre à jour le filtre classes
+            const selectClasse = document.getElementById("filter-doublon-classe");
+            if (selectClasse) {
+                const currentVal = selectClasse.value;
+                selectClasse.innerHTML = '<option value="ALL">Toutes les classes</option>';
+                [...classes].sort().forEach(c => {
+                    selectClasse.innerHTML += '<option value="' + c + '">' + c + '</option>';
+                });
+                selectClasse.value = currentVal || "ALL";
+            }
+
+            // Badge compteur
+            const badge = document.getElementById("badge-doublons-count");
+            const badgeNav = document.getElementById("badge-doublons");
+            if (badge) { badge.textContent = nonLu; badge.style.display = nonLu > 0 ? "inline" : "none"; }
+            if (badgeNav) { badgeNav.textContent = nonLu; badgeNav.style.display = nonLu > 0 ? "inline" : "none"; }
+
+            filtrerDoublons();
+            console.log("✅ Doublons chargés:", allDoublons.length, "(" + nonLu + " non lus)");
+        } catch(e) {
+            console.error("❌ Erreur chargement doublons:", e);
+        }
+    };
+
+    window.filtrerDoublons = function() {
+        const fClasse = document.getElementById("filter-doublon-classe")?.value || "ALL";
+
+        const filtered = allDoublons.filter(d => {
+            if (fClasse !== "ALL" && d.classe !== fClasse) return false;
+            return true;
+        });
+
+        const tbody = document.getElementById("tbody-doublons");
+        if (!tbody) return;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="scores-empty">Aucune alerte doublon</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(d => {
+            const date = d.createdAt?.toDate
+                ? d.createdAt.toDate().toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" })
+                : "-";
+
+            const statusPill = d.lu
+                ? '<span style="background:#f1f5f9; color:#64748b; padding:3px 10px; border-radius:12px; font-size:0.8em; font-weight:600;">✅ Lu</span>'
+                : '<span style="background:#fee2e2; color:#991b1b; padding:3px 10px; border-radius:12px; font-size:0.8em; font-weight:600; animation: pulse 1.5s infinite;">🔴 Nouveau</span>';
+
+            const actions = !d.lu
+                ? '<button onclick="marquerDoublonLu(\'' + d.id + '\')" style="padding:6px 12px; background:#64748b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:0.8em; font-weight:600;">✅ Lu</button>'
+                : '<span style="color:#94a3b8; font-size:0.8em;">Traité</span>';
+
+            return '<tr style="' + (!d.lu ? 'background:#fef2f2;' : '') + '">'
+                + '<td>' + date + '</td>'
+                + '<td><strong>' + (d.eleveCode || "-") + '</strong></td>'
+                + '<td>' + (d.classe || "?") + '</td>'
+                + '<td>' + (d.devoirId || "-") + '</td>'
+                + '<td>' + statusPill + '</td>'
+                + '<td>' + actions + '</td>'
+                + '</tr>';
+        }).join("");
+    };
+
+    window.marquerDoublonLu = async function(docId) {
+        try {
+            await updateDoc(doc(db, "alertes_doublons", docId), { lu: true });
+            chargerDoublons();
+        } catch(e) {
+            console.error("❌ Erreur:", e);
+            alert("Erreur: " + e.message);
+        }
+    };
+
+    window.marquerTousDoublonsLu = async function() {
+        try {
+            const nonLus = allDoublons.filter(d => !d.lu);
+            for (const d of nonLus) {
+                await updateDoc(doc(db, "alertes_doublons", d.id), { lu: true });
+            }
+            chargerDoublons();
         } catch(e) {
             console.error("❌ Erreur:", e);
             alert("Erreur: " + e.message);
