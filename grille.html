@@ -554,6 +554,7 @@
   </div>
 
   <h1 id="docTitle">Correction</h1>
+  <div id="antiCheatBanner" style="display:none; background:#fef3c7; border:1px solid #f59e0b; padding:6px 12px; border-radius:6px; margin-bottom:8px; font-size:0.85em; color:#92400e;"></div>
 
   <div class="header-row">
     <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
@@ -1090,15 +1091,33 @@
         <b>Date :</b> ${escapeHTML(CURRENT_COPY.submittedAt ? new Date(CURRENT_COPY.submittedAt).toLocaleString('fr-FR') : 'N/A')}
       </div>`;
 
-      // Stats copier-coller si disponibles
+      // Stats anti-triche si disponibles
+      const antiCheatAlerts = [];
+
+      // Copier-coller
       if (CURRENT_COPY.pasteStats) {
         const ps = CURRENT_COPY.pasteStats;
-        const total = ps.totalPastes || 0;
+        const total = ps.totalPastes || ps.external || 0;
         if (total > 0) {
-          html += `<div style="background:#fef3c7; border:1px solid #f59e0b; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85em; color:#92400e;">
-            ⚠️ <b>${total}</b> copier-coller détecté${total > 1 ? 's' : ''}
-          </div>`;
+          antiCheatAlerts.push(`🚫 <b>${total}</b> copier-coller bloqué${total > 1 ? 's' : ''}`);
         }
+      }
+
+      // Focus leaves (sorties de page)
+      if (CURRENT_COPY.focus) {
+        const f = CURRENT_COPY.focus;
+        if (f.focusLeaves > 0) {
+          antiCheatAlerts.push(`👁️ <b>${f.focusLeaves}</b> sortie${f.focusLeaves > 1 ? 's' : ''} de page`);
+        }
+        if (f.copyAttempts > 0) {
+          antiCheatAlerts.push(`📋 <b>${f.copyAttempts}</b> tentative${f.copyAttempts > 1 ? 's' : ''} de copie`);
+        }
+      }
+
+      if (antiCheatAlerts.length > 0) {
+        html += `<div style="background:#fef3c7; border:1px solid #f59e0b; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85em; color:#92400e;">
+          ⚠️ Anti-triche : ${antiCheatAlerts.join(' &nbsp;|&nbsp; ')}
+        </div>`;
       }
 
       // Lister toutes les réponses
@@ -2705,6 +2724,28 @@ if (!blueprintLoaded) {
 }
 
         document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
+
+        // ═══ Bannière anti-triche (focus leaves, copier-coller) ═══
+        const acBanner = document.getElementById('antiCheatBanner');
+        const acAlerts = [];
+        if (CURRENT_COPY.focus) {
+          const f = CURRENT_COPY.focus;
+          if (f.focusLeaves > 0) acAlerts.push(`👁️ <b>${f.focusLeaves}</b> sortie${f.focusLeaves > 1 ? 's' : ''} de page`);
+          if (f.copyAttempts > 0) acAlerts.push(`📋 <b>${f.copyAttempts}</b> tentative${f.copyAttempts > 1 ? 's' : ''} de copie`);
+          if (f.pasteBlocked > 0) acAlerts.push(`🚫 <b>${f.pasteBlocked}</b> coller bloqué${f.pasteBlocked > 1 ? 's' : ''}`);
+        }
+        if (CURRENT_COPY.pasteStats) {
+          const total = CURRENT_COPY.pasteStats.totalPastes || CURRENT_COPY.pasteStats.external || 0;
+          if (total > 0 && !acAlerts.some(a => a.includes('coller'))) {
+            acAlerts.push(`🚫 <b>${total}</b> copier-coller`);
+          }
+        }
+        if (acAlerts.length > 0) {
+          acBanner.innerHTML = `⚠️ Anti-triche : ${acAlerts.join(' &nbsp;|&nbsp; ')}`;
+          acBanner.style.display = 'block';
+        } else {
+          acBanner.style.display = 'none';
+        }
 
         const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
         const qidFallbackData = buildQidFallbackMap(questions, CURRENT_REPONSES);
