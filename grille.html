@@ -1,2932 +1,473 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <title>Grille PSE - V21 (rappel oublis avant publication)</title>
-
-  <!-- FIX #22 : Chargement fichiers externes avec fallback si manquants -->
-  <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
-  <script src="data_commentaires_competences.js" onerror="console.warn('⚠️ data_commentaires_competences.js non trouvé — banque commentaires vide'); window.DATA_COMMENTAIRES_COMPETENCES=window.DATA_COMMENTAIRES_COMPETENCES||{};"></script>
-  <script src="data_appreciation.js" onerror="console.warn('⚠️ data_appreciation.js non trouvé — banque appréciations vide'); window.DATA_APPRECIATION=window.DATA_APPRECIATION||{};"></script>
-
-  <style>
-    @page { size: A4; margin: 8mm; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 210mm;
-      margin: 0 auto;
-      padding: 10px 15px;
-      background-color: #fff;
-      color: #333;
-      font-size: 0.9em;
-    }
-
-    .tools-container {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      max-width: 95vw;
-    }
-
-    .action-btn {
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid #ccc;
-      font-size: 1.05em;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-      user-select: none;
-      white-space: nowrap;
-    }
-    .action-btn:hover { background: #f0f0f0; }
-
-    .action-btn.save-btn { background: #dcfce7; border-color: #16a34a; color: #166534; }
-    .action-btn.save-btn:hover { background: #bbf7d0; }
-    .action-btn.auth-btn { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
-    .action-btn.toggle-btn { background: #fff7ed; border-color: #fb923c; color: #9a3412; }
-    .action-btn.toggle-btn.active { background: #ffedd5; border-color: #f97316; color: #7c2d12; }
-
-    #saveMessage {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      background: #16a34a;
-      color: white;
-      padding: 8px 15px;
-      border-radius: 6px;
-      font-size: 0.85em;
-      opacity: 0;
-      transition: opacity 0.5s;
-      font-weight: bold;
-      z-index: 3000;
-    }
-
-    .status-banner {
-      background: #fef3c7;
-      border: 1px solid #f59e0b;
-      color: #92400e;
-      padding: 8px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85em;
-    }
-    .status-banner.saved { background: #dcfce7; border-color: #16a34a; color: #166534; }
-    .status-banner.not-saved { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
-    .status-banner.auth-required { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
-
-    /* === AUTO-CORRECTION === */
-    .autocorrect-banner {
-      background: linear-gradient(135deg, #ede9fe, #dbeafe);
-      border: 2px solid #7c3aed;
-      color: #4c1d95;
-      padding: 10px 18px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.9em;
-      font-weight: 600;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .autocorrect-banner .ac-stats {
-      display: flex;
-      gap: 14px;
-      font-size: 0.88em;
-      font-weight: 500;
-    }
-    .autocorrect-banner .ac-stat { display: flex; align-items: center; gap: 4px; }
-    .autocorrect-banner .ac-stat.correct { color: #16a34a; }
-    .autocorrect-banner .ac-stat.incorrect { color: #dc2626; }
-    .autocorrect-banner .ac-stat.unanswered { color: #7f8c8d; }
-    .ac-badge {
-      display: inline-block;
-      font-size: 0.7em;
-      padding: 1px 6px;
-      border-radius: 8px;
-      font-weight: 700;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-    .ac-badge.auto-m { background: #dcfce7; color: #166534; }
-    .ac-badge.auto-a { background: #fef3c7; color: #92400e; }
-    .ac-badge.auto-i { background: #fee2e2; color: #991b1b; }
-    .ac-badge.auto-nt { background: #f1f5f9; color: #64748b; }
-    .ac-badge.manual { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
-    /* Lignes manuelles non corrigées : fond orange pâle pulsant */
-    #correctionTable tbody tr[data-manual="1"]:not([data-level]),
-    #correctionTable tbody tr[data-manual="1"][data-level=""] {
-      background: #fff7ed;
-      animation: pulse-manual 2s ease-in-out infinite;
-    }
-    @keyframes pulse-manual {
-      0%, 100% { background: #fff7ed; }
-      50% { background: #ffedd5; }
-    }
-    /* Dès qu'un niveau est attribué, le fond redevient normal */
-    #correctionTable tbody tr[data-manual="1"][data-level="NT"],
-    #correctionTable tbody tr[data-manual="1"][data-level="I"],
-    #correctionTable tbody tr[data-manual="1"][data-level="A"],
-    #correctionTable tbody tr[data-manual="1"][data-level="M"] {
-      background: transparent;
-      animation: none;
-    }
-    .manual-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 0.7em;
-      font-weight: 700;
-      border: 1px solid #fdba74;
-      background: #fff7ed;
-      color: #9a3412;
-      cursor: pointer;
-      user-select: none;
-    }
-    .manual-indicator.hidden { display: none !important; }
-    .manual-popover {
-      position: fixed;
-      top: 84px;
-      right: 18px;
-      z-index: 2500;
-      max-width: 420px;
-      width: min(420px, 95vw);
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(15,23,42,0.14);
-      padding: 10px 12px;
-      font-size: 0.83em;
-      color: #334155;
-    }
-    .manual-popover.hidden { display: none !important; }
-    .manual-popover .manual-title { font-weight: 800; margin-bottom: 8px; color: #9a3412; }
-    .manual-popover .manual-list { max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
-    .manual-popover .manual-item {
-      padding: 6px 8px;
-      border: 1px solid #f1f5f9;
-      border-radius: 6px;
-      margin-bottom: 6px;
-      background: #f8fafc;
-    }
-    .manual-popover .manual-actions { display: flex; justify-content: flex-end; gap: 8px; }
-    .manual-popover .manual-actions button {
-      border: 1px solid #cbd5e1;
-      background: #fff;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.95em;
-      cursor: pointer;
-    }
-
-    h1 {
-      text-align: center;
-      color: #d9534f;
-      margin: 0 0 5px 0;
-      border-bottom: 2px solid #d9534f;
-      padding-bottom: 5px;
-      font-size: 1.4em;
-    }
-
-    .header-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-      background-color: #f8f9fa;
-      padding: 5px 10px;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-    }
-    .input-group { display: flex; flex-direction: column; flex-grow: 1; }
-    .input-group label { font-size: 0.75em; color: #666; font-weight: bold; }
-    .input-group input {
-      padding: 3px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95em;
-      font-weight: bold;
-      color: #0f172a;
-    }
-
-    .appreciation-box { margin-bottom: 10px; position: relative; }
-    .appreciation-box label {
-      font-weight: bold;
-      color: #2e7bb6;
-      cursor: pointer;
-      text-decoration: underline;
-      font-size: 0.85em;
-      display:flex;
-      align-items:center;
-      gap:5px;
-      margin-bottom: 3px;
-    }
-    .appreciation-box textarea {
-      width: 100%;
-      min-height: 50px;
-      padding: 8px;
-      border: 2px solid #2e7bb6;
-      border-radius: 6px;
-      background-color: #f0f8ff;
-      resize: none;
-      font-family: inherit;
-      font-size: 0.9em;
-      overflow-y: hidden;
-      box-sizing: border-box;
-    }
-
-    table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-    th, td { border: 1px solid #ccc; padding: 3px 5px; text-align: center; vertical-align: middle; }
-
-    .thead-dark { background-color: #333; color: white; }
-    .thead-light { background-color: #f4f4f4; color: #333; font-weight: bold; font-size: 0.8em; }
-    .correction-th { background-color: #d9534f; color: white; cursor: pointer; user-select: none; font-size: 0.85em; }
-
-    .badge {
-      display: inline-block;
-      color: white;
-      padding: 2px 0;
-      width: 25px;
-      text-align: center;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 0.8em;
-    }
-    .c1 { background-color: #7f8c8d; } .c2 { background-color: #66a5ad; } .c3 { background-color: #b03052; }
-    .c4 { background-color: #2e7bb6; } .c5 { background-color: #5cb85c; } .c6 { background-color: #f0c05a; }
-
-    .stat-counters {
-      font-size: 0.75em;
-      color: #666;
-      margin-top: 3px;
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      background: #f9f9f9;
-      padding: 2px;
-      border-radius: 4px;
-    }
-
-    .score-input {
-      width: 46px;
-      text-align: center;
-      font-weight: bold;
-      border: 1px solid #ccc;
-      padding: 2px;
-      border-radius: 4px;
-      font-size: 1em;
-      background: #fff;
-    }
-    .max-input {
-      width: 42px;
-      text-align: center;
-      border: none;
-      font-weight:bold;
-      color: #666;
-      font-size: 0.9em;
-      background: transparent;
-    }
-
-    input[type="radio"] { transform: scale(1.1); cursor: pointer; }
-
-    tfoot { border-top: 2px solid #333; background-color: #fffef0; }
-    .total-label { text-align: right; font-weight: bold; font-size: 1.1em; padding-right: 15px; }
-    .total-points { font-weight: bold; text-align: center; width: 120px; vertical-align: middle; }
-    .total-note { font-weight: 900; font-size: 1.4em; color: #d9534f; display: block; line-height: 1.2; }
-
-    .level-btn {
-      border: 1px solid #ddd;
-      background: #f9f9f9;
-      font-size: 0.7em;
-      padding: 3px 6px;
-      cursor: pointer;
-      border-radius: 4px;
-      font-weight: bold;
-      color: #aaa;
-      transition: 0.15s;
-      user-select: none;
-    }
-    .level-btn:hover { background: #eee; color:#333; }
-    .level-btn.active { border: 2px solid #333; color: #fff; transform: scale(1.06); }
-    .level-btn.active.nt { background: #7f8c8d; border-color: #7f8c8d; }
-    .level-btn.active.i  { background: #d9534f; border-color: #d9534f; }
-    .level-btn.active.a  { background: #f0c05a; border-color: #f0c05a; }
-    .level-btn.active.m  { background: #5cb85c; border-color: #5cb85c; }
-
-    .editable-div {
-      min-height: 25px;
-      max-height: 150px; /* FIX #18 : limiter la hauteur */
-      overflow-y: auto;  /* FIX #18 : scroll si trop long */
-      text-align: left;
-      outline: none;
-      padding: 6px;
-      font-size: 0.9em;
-      border: 1px dashed #ccc;
-      cursor: text;
-      background: #fff;
-      border-radius: 6px;
-      line-height: 1.25;
-      white-space: pre-wrap;
-    }
-    .editable-div:focus { background-color: #e8f0fe; border-color: #2e7bb6; border-style: solid; }
-    .editable-div:empty::before { content: attr(placeholder); color: #ccc; font-style: italic; }
-
-    .bottom-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .legend-box { font-size: 0.75em; color: #555; font-style: italic; }
-
-    .revision-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #f8fafc;
-      border: 1px dashed #94a3b8;
-      border-radius: 8px;
-      padding: 5px 10px;
-    }
-    .revision-text { font-size: 0.75em; color: #475569; text-align: right; line-height: 1.2; }
-    .qr-img { height: 40px; width: 40px; mix-blend-mode: multiply; }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 2000;
-      justify-content: center;
-      align-items: center;
-    }
-    .modal-box {
-      background: white;
-      width: 650px;
-      max-width: 95%;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      display: flex;
-      flex-direction: column;
-      max-height: 85vh;
-    }
-    .modal-header {
-      padding: 10px 15px;
-      border-bottom: 1px solid #eee;
-      background: #f8f9fa;
-      border-radius: 12px 12px 0 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      color: #2e7bb6;
-    }
-    .modal-body { padding: 0; overflow-y: auto; }
-    .bank-title {
-      background: #f1f5f9;
-      padding: 5px 15px;
-      font-size: 0.8em;
-      font-weight: bold;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-top: 1px solid #eee;
-    }
-    .comment-item {
-      padding: 8px 15px;
-      border-bottom: 1px solid #f9f9f9;
-      cursor: pointer;
-      font-size: 0.9em;
-      transition: background 0.1s;
-      line-height: 1.25;
-      white-space: pre-wrap;
-    }
-    .comment-item:hover { background-color: #e0f2fe; color: #0284c7; }
-
-    .qa-stack { text-align: left; }
-    .qa-block {
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-      line-height: 1.25;
-      white-space: normal;
-    }
-    .qa-title {
-      font-weight: 800;
-      margin: 0 0 6px 0;
-      font-size: 0.95em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75em;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      user-select: none;
-      white-space: nowrap;
-    }
-    .pill.q { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
-    .pill.e { background: #ecfeff; border-color: #67e8f9; color: #155e75; }
-    .pill.a { background: #f0fdf4; border-color: #86efac; color: #166534; }
-
-    .qa-question { background: #fff7ed; border: 1px solid #fdba74; }
-    .qa-student  { background: #f0f9ff; border: 1px solid #93c5fd; }
-    .qa-expected { background: #f0fdf4; border: 1px dashed #86efac; }
-
-    .qa-content { white-space: pre-wrap; }
-    .qa-content ul { margin: 6px 0 0 18px; padding: 0; }
-    .qa-content li { margin: 2px 0; }
-
-    .hidden { display: none !important; }
-
-    @media print {
-      .no-print { display: none !important; }
-      body { padding: 0; margin: 0; background: white; }
-      .status-banner { display: none !important; }
-      .rep-prof-box { display: none; }
-      .header-row, .revision-box { border: 1px solid #eee; }
-      .input-group input { border: none; border-bottom: 1px solid #333; border-radius: 0; padding: 0; }
-      textarea { border: 1px solid #333 !important; background: transparent !important; }
-      .editable-div { border: none; }
-      .score-input, .max-input { border: none; text-align: right; width: auto; font-weight: bold; }
-      tr[style*="display: none"] { display: none !important; }
-      .qa-block { break-inside: avoid; page-break-inside: avoid; }
-    }
-  </style>
-</head>
-
-<body>
-
-  <div class="tools-container no-print">
-    <button id="authBtn" class="action-btn auth-btn" onclick="connexionProf()">🔐 Connexion</button>
-
-    <button id="toggleQuestionBtn" class="action-btn toggle-btn active" onclick="toggleShowQuestion()">👁️ Question</button>
-    <button id="toggleExpectedBtn" class="action-btn toggle-btn active" onclick="toggleShowExpected()">🎯 Attendu</button>
-
-    <button class="action-btn" onclick="scrollToNextUnrated()">➡️ Non notées</button>
-
-    <!-- FIX #16 : Bouton aperçu copie intégré -->
-    <button class="action-btn" onclick="ouvrirApercuCopie()" style="background:#f0f9ff; color:#0369a1; border:1px solid #93c5fd;">👁️ Copie</button>
-
-    <button class="action-btn draft-btn" onclick="sauvegarderBrouillon()" style="background:#e0f2fe; color:#0369a1; border:1px solid #0ea5e9;">💾 Brouillon</button>
-
-    <div style="display:flex; align-items:center; gap:5px; background:#f0fdf4; padding:5px 10px; border-radius:8px; border:1px solid #16a34a;">
-      <select id="publishType" style="padding:5px; border-radius:6px; border:1px solid #ccc; font-size:0.95em;">
-        <option value="note">📊 Noté</option>
-        <option value="nn">⚠️ Non noté</option>
-        <option value="absent">🚫 Absent</option>
-      </select>
-      <button class="action-btn save-btn" onclick="publierCorrection()">✅ Publier</button>
-    </div>
-
-    <button class="action-btn" onclick="window.print()">🖨️ Imprimer</button>
-    <button class="action-btn" onclick="resetNewStudent()">♻️ Autre copie</button>
-    <button id="btnValiderPublier" class="action-btn" onclick="validerEtPublier()" style="display:none; background:linear-gradient(135deg,#dcfce7,#bbf7d0); border:2px solid #16a34a; color:#166534; font-weight:bold;">⚡ Valider & Publier</button>
-    <button id="btnSuivant" class="action-btn" onclick="chargerCopieSuivante()" style="display:none; background:#dbeafe; border:1px solid #3b82f6; color:#1d4ed8; font-weight:bold;">➡️ Suivant</button>
-  </div>
-
-  <div id="saveMessage">✅ Correction enregistrée !</div>
-
-  <div id="confirmModal" class="modal-overlay no-print">
-    <div class="modal-box" style="width:400px; text-align:center;">
-      <div class="modal-header">
-        <span>✅ Confirmation</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="fermerConfirmModal()">×</span>
-      </div>
-      <div style="padding:20px;">
-        <div id="confirmIcon" style="font-size:3em; margin-bottom:10px;">✅</div>
-        <div id="confirmMessage" style="font-size:1.1em; color:#166534; margin-bottom:15px;">Correction publiée !</div>
-        <div id="confirmDetails" style="font-size:0.9em; color:#64748b;"></div>
-        <button onclick="fermerConfirmModal()" style="margin-top:15px; padding:8px 20px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-size:1em;">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="statusBanner" class="status-banner no-print">
-    <span id="statusText">⏳ Chargement...</span>
-    <span id="statusDate"></span>
-  </div>
-
-  <div id="commentModal" class="modal-overlay no-print">
-    <div class="modal-box">
-      <div class="modal-header">
-        <span id="modalTitle">Banque</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="closeModal()">×</span>
-      </div>
-      <div id="modalList" class="modal-body"></div>
-    </div>
-  </div>
-
-  <!-- FIX #16 : Modal aperçu copie intégré -->
-  <div id="copyPreviewModal" class="modal-overlay no-print">
-    <div class="modal-box" style="width:750px;">
-      <div class="modal-header" style="background:#f0f9ff;">
-        <span>👁️ Aperçu copie élève</span>
-        <span style="cursor:pointer; font-size:1.5em;" onclick="document.getElementById('copyPreviewModal').style.display='none'">×</span>
-      </div>
-      <div id="copyPreviewBody" class="modal-body" style="padding:15px; max-height:75vh; overflow-y:auto;"></div>
-    </div>
-  </div>
-
-  <h1 id="docTitle">Correction</h1>
-  <div id="antiCheatBanner" style="display:none; background:#fef3c7; border:1px solid #f59e0b; padding:6px 12px; border-radius:6px; margin-bottom:8px; font-size:0.85em; color:#92400e;"></div>
-
-  <div class="header-row">
-    <div class="input-group grow"><label>Nom :</label><input type="text" id="inputNom"></div>
-    <div class="input-group grow"><label>Prénom :</label><input type="text" id="inputPrenom"></div>
-    <div class="input-group" style="width:80px;"><label>Classe :</label><input type="text" id="inputClasse"></div>
-    <div class="input-group" style="width:110px;"><label>Date :</label><input type="date" id="inputDate"></div>
-  </div>
-
-  <div class="appreciation-box">
-    <label onclick="openAppreciationBank()">📝 Appréciation Générale (cliquez pour ouvrir la banque)</label>
-    <textarea id="appreciationArea" oninput="autoResize(this); markUnsaved(); updateCharCount();"></textarea>
-    <!-- FIX #15 : Compteur de caractères -->
-    <div id="charCount" style="text-align:right; font-size:0.75em; color:#94a3b8; margin-top:2px;">0 caractères</div>
-  </div>
-
-  <table id="summaryTable">
-    <thead>
-      <tr class="thead-dark">
-        <th rowspan="2" style="width:30px;">C</th>
-        <th rowspan="2">Compétences évaluées</th>
-        <th colspan="4" class="thead-light">Niveau</th>
-        <th rowspan="2" style="width:120px; background:#fff; color:#333;">Pts / Max</th>
-      </tr>
-      <tr class="thead-light">
-        <th style="width:25px;">NT</th><th style="width:25px;">I</th><th style="width:25px;">A</th><th style="width:25px;">M</th>
-      </tr>
-    </thead>
-    <tbody id="gradingBody"></tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6" class="total-label">NOTE :</td>
-        <td class="total-points">
-          <span id="finalNote" class="total-note">-- / 20</span>
-          <span id="manualIndicator" class="manual-indicator hidden" onclick="toggleManualPopover()">🟠 Reste : 0</span>
-        </td>
-      </tr>
-    </tfoot>
-  </table>
-  <div id="manualPopover" class="manual-popover hidden no-print">
-    <div class="manual-title">Reste à corriger manuellement</div>
-    <div id="manualList" class="manual-list"></div>
-    <div class="manual-actions">
-      <button type="button" onclick="gotoNextManualItem()">Aller au prochain</button>
-      <button type="button" onclick="toggleManualPopover(false)">Fermer</button>
-    </div>
-  </div>
-
-  <div class="bottom-container">
-    <div class="legend-box">* NT : Non Traité &nbsp; I : Insuffisant &nbsp; A : Acceptable &nbsp; M : Maîtrisé</div>
-    <div class="revision-box">
-      <div class="revision-text">Pour réviser :<br><b>mapse.fr</b></div>
-      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAABsAQAAAACnHWpgAAAA2ElEQVR4nKWVwW0EUQhDH6O9mw6m/7LSganAOYyibJLDLBs4WcIyFvB/haeYgx9xA6eqhqmeqror/g0TqxVIvOVOMe42U/fFf6Ea96vF3/EA4ANmzz1QmO4Kylq3wIahwCtuBWBOMPv5DtOngZ7Z9UysSARLy54xIRgw3nJjBYxQltwgFIGVrW6InADK3q9IFMjab0zkiOz9GltChmirm8RfueMeU1UUdR3SG++G2gi03EkbJwHYzuiCA5JnqfsAmJOMSts7cuJrt8hyvgdVPSkgvdStf/wLn3Fej9INnSsFAAAAAElFTkSuQmCC" alt="QR mapse.fr" class="qr-img">
-    </div>
-  </div>
-
-  <h3 style="margin-top:10px; color:#555; border-bottom:1px solid #eee; padding-bottom:5px;">Détail de l'évaluation</h3>
-
-  <!-- FIX #12 : Barre de progression -->
-  <div id="progressBar" class="no-print" style="background:#f1f5f9; border-radius:8px; padding:6px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; font-size:0.85em;">
-    <span id="progressText" style="font-weight:bold; color:#475569;">0 / 0 questions notées</span>
-    <div style="flex:1; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
-      <div id="progressFill" style="width:0%; height:100%; background:#16a34a; border-radius:4px; transition:width 0.3s;"></div>
-    </div>
-    <span id="progressPct" style="font-weight:bold; color:#16a34a;">0%</span>
-  </div>
-
-  <table id="correctionTable">
-    <thead>
-      <tr>
-        <th class="correction-th" onclick="sortTable(0)" style="width:60px;">Q° ⇅</th>
-        <th class="correction-th" onclick="sortTable(1)" style="width:40px;">C ⇅</th>
-        <th class="correction-th" onclick="sortTable(2)" style="width:110px;">Niveau ⇅</th>
-        <th class="correction-th">Question / Réponse élève / Attendu</th>
-        <th class="correction-th" style="width:30%;">Commentaires</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-    // FIX #19 : La config Firebase côté client est normale (clé API publique).
-    // ⚠️ La SÉCURITÉ repose sur les Firestore Security Rules côté serveur.
-    // Vérifier que les règles limitent l'écriture dans "resultats/{eleveCode}" aux profs authentifiés.
-    // Exemple de règle recommandée :
-    //   match /resultats/{code}/evaluations/{evalId} {
-    //     allow read: if true;
-    //     allow write: if request.auth != null && request.auth.token.email_verified;
-    //   }
-    const firebaseConfig = {
-      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
-      authDomain: "devoirs-pse.firebaseapp.com",
-      projectId: "devoirs-pse",
-      storageBucket: "devoirs-pse.appspot.com",
-      messagingSenderId: "614730413904",
-      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const googleProvider = new GoogleAuthProvider();
-
-    let currentUser = null;
-    let CURRENT_TARGET_DIV = null;
-    let CURRENT_BLUEPRINT = null;
-    let CURRENT_DOC_ID = null;
-    let CURRENT_ELEVE_CODE = null;
-    let CURRENT_COPY = null;
-    let CURRENT_REPONSES = {};
-    let QID_FALLBACK_MAP = {};
-    let CURRENT_EVALUATION = null;
-    let IS_SAVED = true;
-
-    const comps = ['C1','C2','C3','C4','C5','C6'];
-
-    // FIX #20 : Helper pour les erreurs Firebase avec détection quota/permission
-    function handleFirebaseError(e, context) {
-      const code = e?.code || '';
-      const msg = e?.message || String(e);
-      if (code === 'resource-exhausted' || msg.includes('quota')) {
-        alert(`⚠️ Quota Firebase dépassé (${context}).\n\nLes lectures/écritures sont temporairement limitées.\nRéessayez dans quelques minutes.`);
-        console.error(`🔥 QUOTA Firebase (${context}):`, e);
-      } else if (code === 'permission-denied' || msg.includes('permission')) {
-        alert(`🔒 Permission refusée (${context}).\n\nVérifiez que vous êtes bien connecté et que les règles Firestore sont correctes.`);
-        console.error(`🔒 PERMISSION Firebase (${context}):`, e);
-      } else if (code === 'unavailable' || msg.includes('offline') || msg.includes('network')) {
-        alert(`📡 Connexion perdue (${context}).\n\nVérifiez votre connexion internet et réessayez.`);
-        console.error(`📡 RÉSEAU Firebase (${context}):`, e);
-      } else {
-        alert(`❌ Erreur (${context}) :\n\n${msg}`);
-        console.error(`❌ Firebase (${context}):`, e);
-      }
-    }
-
-    let SHOW_QUESTION = true;
-    let SHOW_EXPECTED = true;
-    const DEBUG = true;
-    let AUTO_REPORT = null;
-    let CURRENT_MANUAL_INDEX = -1;
-
-    window.autoResize = autoResize;
-    window.toggleManualPopover = toggleManualPopover;
-    window.gotoNextManualItem = gotoNextManualItem;
-
-    function syncDebugGlobals() {
-      // Debug console only (module scope -> window)
-      window.CURRENT_COPY = CURRENT_COPY;
-      window.CURRENT_REPONSES = CURRENT_REPONSES;
-      window.CURRENT_BLUEPRINT = CURRENT_BLUEPRINT;
-      window.QID_FALLBACK_MAP = QID_FALLBACK_MAP;
-    }
-
-    function normalizeReponsesPayload(raw) {
-      if (raw === null || raw === undefined) return {};
-
-      let payload = raw;
-      // Certaines copies stockent les réponses sous forme JSON string.
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload); }
-        catch (_) { return {}; }
-      }
-
-      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-        if (payload.reponses && typeof payload.reponses === "object") return payload.reponses;
-        return payload;
-      }
-      return {};
-    }
-
-    function hasMeaningfulCorrection(corr) {
-      if (!corr || typeof corr !== "object") return false;
-      const q = corr.questions;
-      if (!q || typeof q !== "object") return false;
-      // Considérer une correction existante seulement si au moins une question a un niveau/commentaire.
-      return Object.values(q).some(v => v && typeof v === "object" && (v.level || v.comment));
-    }
-
-    function qidTokens(id) {
-      const m = String(id || "").match(/\d+/g);
-      return m ? m.map(n => parseInt(n, 10)) : [];
-    }
-
-    function compareIdsByTokens(a, b) {
-      const ta = qidTokens(a);
-      const tb = qidTokens(b);
-      const n = Math.max(ta.length, tb.length);
-      for (let i = 0; i < n; i++) {
-        const va = ta[i] ?? -1;
-        const vb = tb[i] ?? -1;
-        if (va !== vb) return va - vb;
-      }
-      return String(a).localeCompare(String(b));
-    }
-
-    function hasQidMatch(qid, keys) {
-      if (!qid) return false;
-      const direct = keys.some(k =>
-        k === qid ||
-        k.startsWith(qid + "_") || k.startsWith(qid + ".") ||
-        qid.startsWith(k + "_") || qid.startsWith(k + ".")
-      );
-      if (direct) return true;
-
-      // Cas soeur: blueprint "..._hole_0" / "..._pair_2" et réponses "...._trous|_pairs|_matching".
-      const m = String(qid).match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
-      if (!m) return false;
-      const base = m[1];
-      return keys.some(k =>
-        k === base ||
-        k.startsWith(base + "_") ||
-        k.startsWith(base + ".")
-      );
-    }
-
-    function buildQidFallbackMap(questions, reponses) {
-      const qids = (questions || []).map(q => String(q?.qid || "").trim()).filter(Boolean);
-      const keys = Object.keys(reponses || {});
-      const map = {};
-
-      if (!qids.length || !keys.length) {
-        return { map, diag: { qCount: qids.length, rCount: keys.length, matched: 0, ratio: 0, mapped: 0 } };
-      }
-
-      let matched = 0;
-      qids.forEach(qid => { if (hasQidMatch(qid, keys)) matched++; });
-      const ratio = matched / qids.length;
-
-      // Activer le secours seulement si mismatch fort.
-      const unresolved = qids.filter(qid => !hasQidMatch(qid, keys));
-
-      if (ratio < 0.7) {
-        // 1) Cas connu: sous-QID de type ..._hole_N / ..._pair_N stockés sous le parent en tableau/objet.
-        unresolved.forEach(qid => {
-          const m = qid.match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
-          if (!m) return;
-          const base = m[1];
-          const siblingCandidates = [
-            base,
-            base + "_trous",
-            base + "_pairs",
-            base + "_pair",
-            base + "_matching",
-            base + "_match"
-          ];
-          const siblingKey = siblingCandidates.find(k => reponses[k] !== undefined);
-          if (siblingKey) {
-            map[qid] = siblingKey;
-          }
-        });
-
-        const sortedQids = [...qids].sort(compareIdsByTokens);
-        const sortedKeys = [...keys].sort(compareIdsByTokens);
-        const unresolvedSorted = sortedQids.filter(qid => !hasQidMatch(qid, keys) && !map[qid]);
-
-        // Éviter d'écraser les qid déjà alignés.
-        const used = new Set();
-        sortedQids.forEach(qid => {
-          const direct = sortedKeys.find(k => k === qid || k.startsWith(qid + "_") || k.startsWith(qid + "."));
-          if (direct) used.add(direct);
-        });
-        // Les clés déjà affectées aux sous-QID restent réutilisables (1 parent -> n sous-questions).
-        const freeKeys = sortedKeys.filter(k => !used.has(k));
-        const n = Math.min(unresolvedSorted.length, freeKeys.length);
-        for (let i = 0; i < n; i++) map[unresolvedSorted[i]] = freeKeys[i];
-      }
-
-      return {
-        map,
-        diag: {
-          qCount: qids.length,
-          rCount: keys.length,
-          matched,
-          ratio,
-          mapped: Object.keys(map).length,
-          unresolved
-        }
-      };
-    }
-
-    function resolveAnswerForQid(reponses, qid) {
-      if (!reponses || !qid) return undefined;
-      if (reponses[qid] !== undefined) return reponses[qid];
-
-      // Cas explicite: qid enfant (hole/pair/...) à résoudre via qid parent.
-      const childMatch = String(qid).match(/^(.*)_(hole|pair|trou|slot|item)_(\d+)$/i);
-      if (childMatch) {
-        const base = childMatch[1];
-        const idx = parseInt(childMatch[3], 10);
-        const siblingCandidates = [
-          base,
-          base + "_trous",
-          base + "_pairs",
-          base + "_pair",
-          base + "_matching",
-          base + "_match"
-        ];
-        for (const sibling of siblingCandidates) {
-          const parentVal = reponses[sibling];
-          if (Array.isArray(parentVal) && !Number.isNaN(idx) && parentVal[idx] !== undefined) return parentVal[idx];
-          if (!parentVal || typeof parentVal !== "object" || Array.isArray(parentVal)) continue;
-          const suffix = childMatch[2].toLowerCase() + "_" + childMatch[3];
-          if (parentVal[suffix] !== undefined) return parentVal[suffix];
-          if (parentVal[childMatch[3]] !== undefined) return parentVal[childMatch[3]];
-        }
-      }
-
-      // Cas classique: sous-clés sérialisées qid_sub / qid.sub
-      const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
-      if (subKeys.length > 0) {
-        const grouped = {};
-        subKeys.forEach(sk => {
-          const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
-          grouped[suffix || sk] = reponses[sk];
-        });
-        return grouped;
-      }
-
-      // Cas imbriqué: réponses stockées sous une clé parent (objet), ex:
-      // reponses[parentQid] = { hole_0: "...", hole_1: "..." }
-      const parts = String(qid).split("_");
-      if (parts.length > 2) {
-        for (let cut = parts.length - 1; cut >= 2; cut--) {
-          const parent = parts.slice(0, cut).join("_");
-          const suffix = parts.slice(cut).join("_");
-          const parentVal = reponses[parent];
-          const tailNum = suffix.match(/(\d+)$/)?.[1];
-
-          // Cas parent tableau: qid enfant -> index de tableau via suffixe (hole_0, pair_2, ...)
-          if (Array.isArray(parentVal) && tailNum !== undefined) {
-            const idx = parseInt(tailNum, 10);
-            if (!Number.isNaN(idx) && idx >= 0 && idx < parentVal.length) return parentVal[idx];
-          }
-
-          if (parentVal && typeof parentVal === "object" && !Array.isArray(parentVal)) {
-            if (parentVal[suffix] !== undefined) return parentVal[suffix];
-            if (tailNum !== undefined && parentVal[tailNum] !== undefined) return parentVal[tailNum];
-          }
-        }
-      }
-
-      // Scan global d'objets imbriqués hétérogènes.
-      // Exemple réel: reponses[someKey] = { hole_0: "...", "0": "...", q_...: "..." }
-      const tailNum = String(qid).match(/(\d+)$/)?.[1];
-      for (const [, container] of Object.entries(reponses)) {
-        if (!container || typeof container !== "object") continue;
-        if (Array.isArray(container)) {
-          if (tailNum !== undefined) {
-            const idx = Number(tailNum);
-            if (!Number.isNaN(idx) && container[idx] !== undefined) return container[idx];
-          }
-          continue;
-        }
-        if (container[qid] !== undefined) return container[qid];
-        if (tailNum !== undefined) {
-          const aliasKeys = [
-            tailNum,
-            "hole_" + tailNum,
-            "trou_" + tailNum,
-            "slot_" + tailNum,
-            "item_" + tailNum
-          ];
-          for (const ak of aliasKeys) {
-            if (container[ak] !== undefined) return container[ak];
-          }
-        }
-      }
-
-      // Secours mismatch blueprint/réponses : alignement par ordre
-      if (QID_FALLBACK_MAP[qid] && reponses[QID_FALLBACK_MAP[qid]] !== undefined) {
-        return reponses[QID_FALLBACK_MAP[qid]];
-      }
-
-      return undefined;
-    }
-    window.openAppreciationBank = openAppreciationBank;
-    window.closeModal = closeModal;
-    window.sortTable = sortTable;
-    window.markUnsaved = markUnsaved;
-    window.ouvrirApercuCopie = ouvrirApercuCopie;
-    window.setGlobalLevel = setGlobalLevel;
-    window.resetNewStudent = resetNewStudent;
-    window.setNoteVisual = setNoteVisual;
-    window.calculateTotal = calculateTotal;
-    window.connexionProf = connexionProf;
-
-    window.toggleShowQuestion = toggleShowQuestion;
-    window.toggleShowExpected = toggleShowExpected;
-    window.scrollToNextUnrated = scrollToNextUnrated;
-
-    onAuthStateChanged(auth, (user) => {
-      currentUser = user;
-      updateAuthButton();
-      updateStatusBanner();
-      if (user) console.log("✅ Prof connecté:", user.email);
-    });
-
-    function updateAuthButton() {
-      const btn = document.getElementById('authBtn');
-      if (currentUser) {
-        btn.textContent = "✅ " + currentUser.email.split('@')[0];
-        btn.style.background = "#dcfce7";
-        btn.style.color = "#166534";
-        btn.style.borderColor = "#16a34a";
-      } else {
-        btn.textContent = "🔐 Connexion";
-        btn.style.background = "#dbeafe";
-        btn.style.color = "#1d4ed8";
-        btn.style.borderColor = "#3b82f6";
-      }
-    }
-
-    async function connexionProf() {
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        currentUser = result.user;
-        console.log("✅ Connecté:", currentUser.email, "UID:", currentUser.uid);
-        alert("✅ Connecté: " + currentUser.email + "\n\nUID (pour les règles):\n" + currentUser.uid);
-        updateAuthButton();
-        updateStatusBanner();
-      } catch (error) {
-        console.error("❌ Erreur:", error);
-        alert("Erreur: " + error.message);
-      }
-    }
-
-    // FIX #21 : autoResize avec debounce (évite recalcul à chaque frappe)
-    let _resizeTimer = null;
-    function autoResize(el) {
-      if (_resizeTimer) clearTimeout(_resizeTimer);
-      _resizeTimer = setTimeout(() => {
-        el.style.height = 'auto';
-        el.style.height = (el.scrollHeight) + 'px';
-        _resizeTimer = null;
-      }, 50);
-    }
-    // FIX #15 : Compteur de caractères
-    function updateCharCount() {
-      const area = document.getElementById('appreciationArea');
-      const counter = document.getElementById('charCount');
-      if (area && counter) {
-        const len = area.value.length;
-        counter.textContent = len + ' caractère' + (len > 1 ? 's' : '');
-        counter.style.color = len > 500 ? '#d9534f' : '#94a3b8';
-      }
-    }
-    function markUnsaved() { IS_SAVED = false; updateStatusBanner(); }
-
-    function updateStatusBanner() {
-      const banner = document.getElementById('statusBanner');
-      const text = document.getElementById('statusText');
-      const dateEl = document.getElementById('statusDate');
-      banner.classList.remove('saved', 'not-saved', 'auth-required');
-
-      if (!currentUser) {
-        banner.classList.add('auth-required');
-        text.innerHTML = '🔐 Connectez-vous pour enregistrer';
-        dateEl.textContent = '';
-      } else if (IS_SAVED && CURRENT_EVALUATION?.savedAt) {
-        banner.classList.add('saved');
-        text.innerHTML = '✅ Correction enregistrée';
-        const d = new Date(CURRENT_EVALUATION.savedAt);
-        dateEl.textContent = 'le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-      } else if (!IS_SAVED) {
-        banner.classList.add('not-saved');
-        text.innerHTML = '⚠️ Modifications non enregistrées';
-        dateEl.textContent = '';
-      } else {
-        text.innerHTML = '📝 Nouvelle correction';
-        dateEl.textContent = '';
-      }
-    }
-
-    function showSaveMessage(success = true) {
-      const msg = document.getElementById('saveMessage');
-      msg.textContent = success ? '✅ Correction enregistrée !' : '❌ Erreur de sauvegarde';
-      msg.style.background = success ? '#16a34a' : '#dc2626';
-      msg.style.opacity = 1;
-      setTimeout(() => msg.style.opacity = 0, 2000);
-    }
-
-    function loadPreferences() {
-      try {
-        const s = JSON.parse(localStorage.getItem("grille_pref_v17") || "{}");
-        SHOW_QUESTION = (s.SHOW_QUESTION !== undefined) ? !!s.SHOW_QUESTION : true;
-        SHOW_EXPECTED = (s.SHOW_EXPECTED !== undefined) ? !!s.SHOW_EXPECTED : true;
-      } catch(e) {}
-      syncToggleButtons();
-    }
-
-    function savePreferences() {
-      localStorage.setItem("grille_pref_v17", JSON.stringify({
-        SHOW_QUESTION,
-        SHOW_EXPECTED
-      }));
-    }
-
-    function syncToggleButtons() {
-      const qBtn = document.getElementById('toggleQuestionBtn');
-      const eBtn = document.getElementById('toggleExpectedBtn');
-      if (qBtn) qBtn.classList.toggle('active', SHOW_QUESTION);
-      if (eBtn) eBtn.classList.toggle('active', SHOW_EXPECTED);
-
-      document.querySelectorAll('.qa-question').forEach(el => el.classList.toggle('hidden', !SHOW_QUESTION));
-      document.querySelectorAll('.qa-expected').forEach(el => el.classList.toggle('hidden', !SHOW_EXPECTED));
-    }
-
-    function toggleShowQuestion() {
-      SHOW_QUESTION = !SHOW_QUESTION;
-      savePreferences();
-      syncToggleButtons();
-    }
-
-    function toggleShowExpected() {
-      SHOW_EXPECTED = !SHOW_EXPECTED;
-      savePreferences();
-      syncToggleButtons();
-    }
-
-    // FIX #16 : Aperçu copie intégré
-    function ouvrirApercuCopie() {
-      if (!CURRENT_COPY || !CURRENT_REPONSES || Object.keys(CURRENT_REPONSES).length === 0) {
-        alert("Aucune copie chargée.");
-        return;
-      }
-      const reponses = CURRENT_REPONSES;
-      const meta = CURRENT_COPY.eleve || CURRENT_COPY;
-      let html = `<div style="margin-bottom:10px; padding:8px; background:#f8fafc; border-radius:8px; font-size:0.85em; color:#475569;">
-        <b>Code :</b> ${escapeHTML(CURRENT_ELEVE_CODE)} &nbsp;|&nbsp;
-        <b>Classe :</b> ${escapeHTML(meta.classe || '')} &nbsp;|&nbsp;
-        <b>Date :</b> ${escapeHTML(CURRENT_COPY.submittedAt ? new Date(CURRENT_COPY.submittedAt).toLocaleString('fr-FR') : 'N/A')}
-      </div>`;
-
-      // Stats anti-triche si disponibles
-      const antiCheatAlerts = [];
-
-      // Copier-coller
-      if (CURRENT_COPY.pasteStats) {
-        const ps = CURRENT_COPY.pasteStats;
-        const total = ps.totalPastes || ps.external || 0;
-        if (total > 0) {
-          antiCheatAlerts.push(`🚫 <b>${total}</b> copier-coller bloqué${total > 1 ? 's' : ''}`);
-        }
-      }
-
-      // Focus leaves (sorties de page)
-      if (CURRENT_COPY.focus) {
-        const f = CURRENT_COPY.focus;
-        if (f.focusLeaves > 0) {
-          antiCheatAlerts.push(`👁️ <b>${f.focusLeaves}</b> sortie${f.focusLeaves > 1 ? 's' : ''} de page`);
-        }
-        if (f.copyAttempts > 0) {
-          antiCheatAlerts.push(`📋 <b>${f.copyAttempts}</b> tentative${f.copyAttempts > 1 ? 's' : ''} de copie`);
-        }
-      }
-
-      if (antiCheatAlerts.length > 0) {
-        html += `<div style="background:#fef3c7; border:1px solid #f59e0b; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85em; color:#92400e;">
-          ⚠️ Anti-triche : ${antiCheatAlerts.join(' &nbsp;|&nbsp; ')}
-        </div>`;
-      }
-
-      // Lister toutes les réponses
-      const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT || {});
-      if (questions.length > 0) {
-        questions.forEach((q, idx) => {
-          const label = "Q" + (idx + 1);
-          const qText = q?.enonce || "";
-          const rep = getReponseEleve(reponses, q);
-          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
-            <div style="font-weight:bold; font-size:0.85em; color:#334155; margin-bottom:4px;">
-              ${escapeHTML(label)} ${qText ? '— ' + escapeHTML(qText).substring(0, 80) + (qText.length > 80 ? '...' : '') : ''}
-            </div>
-            <div style="font-size:0.9em; color:#1e293b; padding-left:8px; border-left:3px solid #93c5fd;">${rep}</div>
-          </div>`;
-        });
-      } else {
-        // Fallback : afficher les clés brutes
-        for (const [key, val] of Object.entries(reponses)) {
-          html += `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:6px;">
-            <div style="font-weight:bold; font-size:0.85em; color:#334155;">${escapeHTML(key)}</div>
-            <div style="font-size:0.9em; padding-left:8px; border-left:3px solid #93c5fd;">${formatMaybeBullets(val)}</div>
-          </div>`;
-        }
-      }
-
-      document.getElementById('copyPreviewBody').innerHTML = html;
-      document.getElementById('copyPreviewModal').style.display = 'flex';
-    }
-
-    function scrollToNextUnrated() {
-      const rows = Array.from(document.querySelectorAll('#correctionTable tbody tr'));
-      const target = rows.find(r => !r.dataset.level);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      else alert("✅ Toutes les questions ont un niveau.");
-    }
-
-   function extractQuestionsFromBlueprint(bp) {
-  if (!bp) return [];
-
-  const arr =
-    Array.isArray(bp.content) ? bp.content :
-    Array.isArray(bp.questions) ? bp.questions :
-    Array.isArray(bp.items) ? bp.items :
-    [];
-     const onlyQuestions = arr.filter(x => !x?.type || x.type === "question");
-
-  return onlyQuestions.map((q, i) => {
-    const id = String(q.qid || q.id || `q${i+1}`);
-
-    return {
-      id,
-      qid: id,
-
-      enonce: q.questionText || q.enonce || q.question || q.titre || q.texte || q.label || "",
-
-      bareme: Number(q.bareme ?? q.points ?? 1),
-      points: Number(q.bareme ?? q.points ?? 1),
-
-      competence: q.competence || q.comp || "",
-
-      inputType: q.inputType || q.type || "radio",
-      options: q.options || q.choix || q.items || [],
-
-      autocorrect: q.autocorrect,
-      besoinCorrectionManuelle: q.besoinCorrectionManuelle,
-      correctionMode: q.correctionMode,
-      penalite: q.penalite,
-      tolerance: q.tolerance,
-
-      reponseCorrecte: q.reponseCorrecte ?? q.correct ?? q.answer ?? q.reponseAttendue ?? q.attendu ?? "",
-      reponseAttendue: q.reponseAttendue ?? q.attendu ?? "",
-      attendu: q.reponseAttendue ?? q.attendu ?? q.reponseCorrecte ?? q.correct ?? q.answer ?? "",
-      explication: q.explication ?? q.guide ?? ""
-    };
-  });
-}
-
-    function escapeHTML(str) {
-      return String(str ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-
-    function splitToBullets(text) {
-      const raw = String(text ?? "").trim();
-      if (!raw) return [];
-      let t = raw.replace(/\r/g, "");
-      t = t.replace(/•/g, "\n• ");
-      t = t.replace(/\s*-\s+/g, "\n- ");
-      t = t.replace(/\s*;\s*/g, "\n");
-      const lines = t.split("\n").map(l => l.trim()).filter(l => l && l !== "-" && l !== "•");
-      return lines;
-    }
-
-    function getOptionLabelMap(q) {
-      const map = {};
-      const opts = Array.isArray(q?.options) ? q.options : [];
-      opts.forEach(opt => {
-        if (!opt || typeof opt !== "object") return;
-        const val = String(opt.value ?? "").trim();
-        const lbl = String(opt.label ?? "").trim();
-        if (val && lbl) map[val] = lbl;
-      });
-      return map;
-    }
-
-    function decodeAnswerValue(q, value) {
-      const labelMap = getOptionLabelMap(q);
-
-      const decodeOne = (v) => {
-        const key = String(v ?? "").trim();
-        if (!key) return v;
-        return Object.prototype.hasOwnProperty.call(labelMap, key) ? labelMap[key] : v;
-      };
-
-      if (Array.isArray(value)) return value.map(decodeOne);
-      if (value && typeof value === "object") {
-        const out = {};
-        Object.entries(value).forEach(([k, v]) => { out[k] = decodeOne(v); });
-        return out;
-      }
-      return decodeOne(value);
-    }
-
-    function formatMaybeBullets(value) {
-      if (value === null || value === undefined) return "<i>Non répondu</i>";
-
-      if (Array.isArray(value)) {
-        const items = value.map(v => String(v).trim()).filter(Boolean);
-        if (!items.length) return "<i>Non répondu</i>";
-        if (items.length === 1) return escapeHTML(items[0]);
-        return "<ul>" + items.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
-      }
-
-      if (typeof value === "object") {
-        const entries = Object.entries(value);
-        if (!entries.length) return "<i>Non répondu</i>";
-        return "<ul>" + entries.map(([k,v]) => "<li><b>" + escapeHTML(k) + "</b> : " + escapeHTML(v) + "</li>").join("") + "</ul>";
-      }
-
-      const s = String(value ?? "").trim();
-      if (!s) return "<i>Non répondu</i>";
-
-      const bullets = splitToBullets(s);
-      if (bullets.length >= 2) {
-        return "<ul>" + bullets.map(i => "<li>" + escapeHTML(i) + "</li>").join("") + "</ul>";
-      }
-      return escapeHTML(s);
-    }
-
-    function renderQuestionHTML(q, label, competence) {
-      const qt = q?.questionText || q?.question || q?.enonce || q?.texte || "";
-      const txt = String(qt ?? "").trim();
-      const safe = txt ? escapeHTML(txt) : "<i>Question non fournie</i>";
-      const compPill = competence ? `<span class="pill e">${escapeHTML(competence)}</span>` : "";
-      const labPill = label ? `<span class="pill q">${escapeHTML(label)}</span>` : "";
-      return `
-        <div class="qa-block qa-question">
-          <div class="qa-title">${labPill}${compPill}<span class="pill q">Question</span></div>
-          <div class="qa-content">${safe.replaceAll("\n","<br>")}</div>
-        </div>
-      `;
-    }
-
-    function getReponseEleve(reponses, q) {
-      if (!reponses) return "<i>Non répondu</i>";
-      const qid = q?.qid;
-      const label = q?.label;
-
-      const resolved = resolveAnswerForQid(reponses, qid);
-      if (resolved !== undefined) return formatMaybeBullets(decodeAnswerValue(q, resolved));
-
-      // FIX #9 : Mapping intelligent — essayer toutes les variantes de clés
-      const keysToTry = [];
-      if (qid) keysToTry.push(qid);                                    // q_0
-      if (label) keysToTry.push(label);                                 // 1.1
-      if (label) keysToTry.push("Q" + label);                           // Q1.1
-      if (qid) keysToTry.push(qid.replace("q_", "Q"));                 // Q0
-      if (label) keysToTry.push("Q" + label.replace(".", "_"));         // Q1_1
-      if (qid) {
-        // Variantes avec suffixes courants (matrice, gravité, décision, trous)
-        ["_gravite", "_decision", "_matrice", "_trous", "_source"].forEach(suffix => {
-          keysToTry.push(qid + suffix);
-        });
-      }
-
-      for (const key of keysToTry) {
-        if (key && reponses[key] !== undefined) return formatMaybeBullets(decodeAnswerValue(q, reponses[key]));
-      }
-
-      // FIX #9 : Recherche partielle — si qid contient le début d'une clé dans reponses
-      if (qid) {
-        for (const rKey of Object.keys(reponses)) {
-          if (rKey.startsWith(qid + "_") || rKey.startsWith(qid + ".")) {
-            // Grouper toutes les sous-réponses
-            const subKeys = Object.keys(reponses).filter(k => k.startsWith(qid + "_") || k.startsWith(qid + "."));
-            if (subKeys.length > 0) {
-              const grouped = {};
-              subKeys.forEach(sk => {
-                const suffix = sk.replace(qid, "").replace(/^[_.]/, "");
-                grouped[suffix || sk] = decodeAnswerValue(q, reponses[sk]);
-              });
-              return formatMaybeBullets(grouped);
-            }
-          }
-        }
-      }
-
-      return "<i>Non répondu</i>";
-    }
-
-    function formatExpected(q) {
-      const attendu = q?.reponseAttendue ?? q?.attendu ?? q?.corrige ?? "";
-      const explication = q?.explication ?? q?.guide ?? "";
-
-      const hasAtt = (Array.isArray(attendu) && attendu.length > 0) ||
-        (attendu && typeof attendu === "object" && Object.keys(attendu).length > 0) ||
-        (typeof attendu === "string" && attendu.trim() !== "");
-      const hasExp = (typeof explication === "string" && explication.trim() !== "");
-
-      if (hasAtt && hasExp && typeof attendu === "string") {
-        const a = formatMaybeBullets(attendu);
-        const e = formatMaybeBullets(explication);
-        return `${a}<div style="margin-top:6px;"><b>📖 Explication :</b> ${e}</div>`;
-      }
-      if (hasAtt) return formatMaybeBullets(attendu);
-      if (hasExp) return formatMaybeBullets(explication);
-      return "<i>Non renseigné</i>";
-    }
-
-    function collecterDonneesCorrection() {
-      const data = {
-        savedAt: new Date().toISOString(),
-        savedBy: currentUser?.email || "anonyme",
-        profUid: currentUser?.uid || "",
-        eleveCode: CURRENT_ELEVE_CODE,
-        classe: document.getElementById('inputClasse').value || "",
-        devoirId: CURRENT_COPY?.devoirId || "unknown",
-        titre: CURRENT_BLUEPRINT?.titre || CURRENT_COPY?.titre || "Devoir",
-        copyDocId: CURRENT_DOC_ID,
-        appreciation: document.getElementById('appreciationArea').value || "",
-        autocorrected: CURRENT_BLUEPRINT?.autocorrect === true,
-        competences: {},
-        questions: {}
-      };
-
-      comps.forEach(c => {
-        const ptsEl = document.getElementById(`pts_${c}`);
-        const maxEl = document.getElementById(`max_${c}`);
-        if (ptsEl && maxEl) {
-          data.competences[c] = {
-            pts: parseFloat(ptsEl.value) || 0,
-            max: parseFloat(maxEl.value) || 0
-          };
-        }
-      });
-
-      document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-        const qid = row.dataset.qid || `q_${idx}`;
-        const commentDiv = row.querySelector('.editable-div');
-        data.questions[qid] = {
-          level: row.dataset.level || "",
-          comment: commentDiv ? commentDiv.innerText.trim() : ""
-        };
-      });
-
-      return data;
-    }
-
-    window.sauvegarderBrouillon = async function() {
-      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
-      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
-
-      try {
-        const brouillon = collecterDonneesCorrection();
-        brouillon.statut = "brouillon";
-        brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-        brouillon.publie = false;
-
-        const brouillonDocId = brouillon.devoirId + "_brouillon";
-        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon);
-
-        CURRENT_EVALUATION = brouillon;
-        IS_SAVED = true;
-        updateStatusBanner();
-
-        afficherConfirmation("💾", "Brouillon sauvegardé !", "Ton travail est enregistré.\nL'élève ne voit pas encore la correction.", "#0369a1");
-      } catch (e) {
-        console.error("❌ Erreur:", e);
-        showSaveMessage(false);
-        handleFirebaseError(e, "sauvegarde brouillon"); // FIX #20
-      }
-    }
-
-    let IS_PUBLISHING = false; // FIX #1+#5 : verrou anti-double-clic
-
-    // FIX #23 : Vérification de complétude avant publication
-    // Retourne un texte d'avertissement si des oublis sont détectés, sinon ""
-    function verifierCompletude() {
-      const oublis = [];
-
-      // 1. Questions sans niveau
-      const rows = document.querySelectorAll('#correctionTable tbody tr');
-      const sansNiveau = [];
-      const sansCommentaire = [];
-      rows.forEach(row => {
-        const label = row.cells[0]?.innerText?.trim() || "?";
-        if (!row.dataset.level) sansNiveau.push(label);
-        const commentDiv = row.querySelector('.editable-div');
-        if (commentDiv && !commentDiv.innerText.trim()) sansCommentaire.push(label);
-      });
-
-      if (sansNiveau.length > 0) {
-        oublis.push("⚠️ Niveau manquant (" + sansNiveau.length + ") : " + sansNiveau.join(", "));
-      }
-
-      // 2. Commentaires vides
-      if (sansCommentaire.length > 0) {
-        oublis.push("💬 Commentaire vide (" + sansCommentaire.length + ") : " + sansCommentaire.join(", "));
-      }
-
-      // 3. Appréciation générale vide
-      const appreciation = document.getElementById('appreciationArea');
-      if (appreciation && !appreciation.value.trim()) {
-        oublis.push("📝 Appréciation générale non remplie");
-      }
-
-      return oublis;
-    }
-
-    // FIX #23 : Affiche le rappel et retourne true si l'utilisateur veut continuer, false sinon
-    function afficherRappelOublis() {
-      const oublis = verifierCompletude();
-      if (oublis.length === 0) return true; // Rien d'oublié, on continue
-
-      const message = "📋 RAPPEL — Oublis détectés :\n\n" +
-        oublis.join("\n\n") +
-        "\n\n─────────────────────\n" +
-        "Cliquez OK pour publier quand même.\n" +
-        "Cliquez Annuler pour corriger d'abord.";
-
-      return confirm(message);
-    }
-
-    window.publierCorrection = async function() {
-      if (IS_PUBLISHING) return; // FIX #1 : ignorer si déjà en cours
-      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
-      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
-
-      // FIX #23 : Rappel oublis uniquement si publication avec note
-      const typePublication = document.getElementById('publishType').value;
-      if (typePublication === "note") {
-        if (!afficherRappelOublis()) return;
-      }
-
-      let noteFinale, statut, messageConfirm, iconConfirm, couleur;
-
-      switch(typePublication) {
-        case "note":
-          noteFinale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-          statut = "noté";
-          messageConfirm = `Correction publiée avec la note ${noteFinale}/20`;
-          iconConfirm = "✅";
-          couleur = "#16a34a";
-          break;
-        case "nn":
-          noteFinale = "NN";
-          statut = "non_noté";
-          messageConfirm = "Copie publiée comme 'Non noté'";
-          iconConfirm = "⚠️";
-          couleur = "#b45309";
-          break;
-        case "absent":
-          noteFinale = "ABS";
-          statut = "absent";
-          messageConfirm = "Copie marquée comme 'Absent'";
-          iconConfirm = "🚫";
-          couleur = "#dc2626";
-          break;
-      }
-
-      if (!confirm(`Publier cette correction ?\n\n${messageConfirm}\n\nL'élève ${CURRENT_ELEVE_CODE} pourra voir sa correction.`)) return;
-
-      // FIX #11 : Avertissement si la copie est déjà publiée
-      if (CURRENT_EVALUATION && CURRENT_EVALUATION.publie) {
-        if (!confirm("⚠️ Cette copie a DÉJÀ été publiée.\n\nVoulez-vous écraser la correction existante ?")) return;
-      }
-
-      // FIX #5 : désactiver le bouton visuellement pendant l'écriture
-      IS_PUBLISHING = true;
-      const publishBtn = document.querySelector('.save-btn');
-      const originalBtnText = publishBtn.textContent;
-      publishBtn.textContent = "⏳ Envoi...";
-      publishBtn.disabled = true;
-      publishBtn.style.opacity = "0.5";
-
-      try {
-        const evaluation = collecterDonneesCorrection();
-        evaluation.note_finale = noteFinale;
-        evaluation.statut = statut;
-        evaluation.publie = true;
-
-        // Embarquer le blueprint pour que l'élève voie toujours les bonnes questions
-        if (CURRENT_BLUEPRINT) {
-          evaluation.blueprint = CURRENT_BLUEPRINT;
-        }
-
-        if (typePublication === "nn") {
-          evaluation.nonNote = true;
-        } else if (typePublication === "absent") {
-          evaluation.absent = true;
-          evaluation.appreciation = evaluation.appreciation || "Absent(e) lors de l'évaluation.";
-        }
-
-        const evalDocId = evaluation.devoirId + "_eval";
-        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
-
-        if (typePublication === "note") {
-          document.getElementById('finalNote').style.color = "#d9534f";
-        } else if (typePublication === "nn") {
-          document.getElementById('finalNote').innerText = "Non noté";
-          document.getElementById('finalNote').style.color = "#b45309";
-        } else if (typePublication === "absent") {
-          document.getElementById('finalNote').innerText = "Absent";
-          document.getElementById('finalNote').style.color = "#dc2626";
-        }
-
-        CURRENT_EVALUATION = evaluation;
-        IS_SAVED = true;
-        updateStatusBanner();
-
-        // FIX #5 : bouton passe en "Déjà publié" après succès
-        publishBtn.textContent = "✅ Publié";
-        publishBtn.style.opacity = "1";
-        publishBtn.style.background = "#bbf7d0";
-
-        afficherConfirmation(iconConfirm, messageConfirm, `L'élève ${CURRENT_ELEVE_CODE} peut maintenant voir sa correction.`, couleur);
-      } catch (e) {
-        console.error("❌ Erreur:", e);
-        showSaveMessage(false);
-        handleFirebaseError(e, "publication correction"); // FIX #20
-        publishBtn.textContent = originalBtnText;
-        publishBtn.disabled = false;
-        publishBtn.style.opacity = "1";
-      } finally {
-        IS_PUBLISHING = false;
-        // FIX #5 : réactiver après 3s pour permettre une republication si besoin
-        setTimeout(() => { publishBtn.disabled = false; }, 3000);
-      }
-    }
-
-    function afficherConfirmation(icon, message, details, couleur) {
-      document.getElementById('confirmIcon').textContent = icon;
-      document.getElementById('confirmMessage').textContent = message;
-      document.getElementById('confirmMessage').style.color = couleur;
-      document.getElementById('confirmDetails').textContent = details;
-      document.getElementById('confirmModal').style.display = 'flex';
-    }
-
-    window.fermerConfirmModal = function() {
-      document.getElementById('confirmModal').style.display = 'none';
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // ⚡ VALIDER & PUBLIER (un clic) + ➡️ SUIVANT (navigation copies)
-    // ═══════════════════════════════════════════════════════════════
-
-    let COPY_LIST = []; // Liste des copies à corriger (depuis cockpit)
-    let COPY_INDEX = -1; // Position actuelle dans la liste
-
-    function initCopyNavigation() {
-      try {
-        const listRaw = localStorage.getItem("cockpit_copy_list");
-        if (listRaw) {
-          COPY_LIST = JSON.parse(listRaw);
-          const currentId = CURRENT_DOC_ID;
-          COPY_INDEX = COPY_LIST.findIndex(c => c.id === currentId);
-          if (COPY_INDEX === -1) COPY_INDEX = 0;
-        }
-      } catch(e) { console.warn("Pas de liste de copies:", e); }
-
-      // Afficher boutons si auto-corrigé
-      if (CURRENT_BLUEPRINT?.autocorrect === true) {
-        const btnVP = document.getElementById('btnValiderPublier');
-        if (btnVP) btnVP.style.display = 'inline-block';
-      }
-
-      // Afficher bouton Suivant si liste > 1
-      if (COPY_LIST.length > 1) {
-        const btnS = document.getElementById('btnSuivant');
-        if (btnS) {
-          btnS.style.display = 'inline-block';
-          const remaining = COPY_LIST.length - (COPY_INDEX + 1);
-          btnS.textContent = remaining > 0 ? `➡️ Suivant (${remaining})` : '➡️ Fin';
-          btnS.disabled = (remaining === 0);
-        }
-      }
-    }
-
-    window.validerEtPublier = async function() {
-      if (IS_PUBLISHING) return;
-      if (!currentUser) { alert("🔐 Connectez-vous d'abord !"); connexionProf(); return; }
-      if (!CURRENT_ELEVE_CODE || CURRENT_ELEVE_CODE === "UNKNOWN") { alert("Erreur : Code élève manquant."); return; }
-
-      // FIX #23 : Rappel oublis avant validation rapide
-      if (!afficherRappelOublis()) return;
-
-      IS_PUBLISHING = true;
-      const btn = document.getElementById('btnValiderPublier');
-      const origText = btn.textContent;
-      btn.textContent = "⏳ Envoi...";
-      btn.disabled = true;
-
-      try {
-        const evaluation = collecterDonneesCorrection();
-        evaluation.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-        evaluation.statut = "noté";
-        evaluation.publie = true;
-        evaluation.autocorrected = true;
-
-        // Embarquer le blueprint pour que l'élève voie toujours les bonnes questions
-        if (CURRENT_BLUEPRINT) {
-          evaluation.blueprint = CURRENT_BLUEPRINT;
-        }
-
-        const evalDocId = evaluation.devoirId + "_eval";
-        await setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", evalDocId), evaluation);
-
-        CURRENT_EVALUATION = evaluation;
-        IS_SAVED = true;
-        updateStatusBanner();
-
-        btn.textContent = "✅ Publié !";
-        btn.style.background = "#bbf7d0";
-        document.getElementById('finalNote').style.color = "#d9534f";
-
-        // Marquer comme traitée dans la liste locale
-        if (COPY_LIST.length > 0 && COPY_INDEX >= 0) {
-          COPY_LIST[COPY_INDEX].done = true;
-          localStorage.setItem("cockpit_copy_list", JSON.stringify(COPY_LIST));
-        }
-
-        console.log("⚡ Valider & publier OK — " + CURRENT_ELEVE_CODE + " → " + evaluation.note_finale + "/20");
-
-        // Auto-passer au suivant après 1.5s si disponible
-        const remaining = COPY_LIST.length - (COPY_INDEX + 1);
-        if (remaining > 0) {
-          setTimeout(() => {
-            if (confirm(`✅ ${CURRENT_ELEVE_CODE} publié (${evaluation.note_finale}/20).\n\nPasser à la copie suivante ? (${remaining} restante${remaining > 1 ? 's' : ''})`)) {
-              chargerCopieSuivante();
-            }
-          }, 500);
-        } else {
-          afficherConfirmation("✅", "Correction publiée !", `${CURRENT_ELEVE_CODE} — ${evaluation.note_finale}/20`, "#16a34a");
-        }
-
-      } catch(e) {
-        console.error("❌", e);
-        alert("Erreur : " + e.message);
-        btn.textContent = origText;
-        btn.disabled = false;
-      } finally {
-        IS_PUBLISHING = false;
-        setTimeout(() => { btn.disabled = false; }, 2000);
-      }
-    }
-
-    window.chargerCopieSuivante = function() {
-      if (COPY_LIST.length === 0) { alert("Pas de liste de copies."); return; }
-
-      COPY_INDEX++;
-      if (COPY_INDEX >= COPY_LIST.length) {
-        alert("🏁 Toutes les copies ont été traitées !");
-        return;
-      }
-
-      const nextCopy = COPY_LIST[COPY_INDEX];
-      localStorage.setItem("cockpit_transfert", JSON.stringify(nextCopy));
-      localStorage.setItem("cockpit_copy_list", JSON.stringify(COPY_LIST));
-      window.location.reload();
-    }
-
-    function loadExistingCorrection(correction) {
-      if (!correction) return;
-
-      if (correction.nonNote || correction.note_finale === "NN") {
-        document.getElementById('finalNote').innerText = "Non noté";
-        document.getElementById('finalNote').style.color = "#b45309";
-      }
-
-      if (correction.appreciation) {
-        const area = document.getElementById('appreciationArea');
-        area.value = correction.appreciation;
-        autoResize(area);
-      }
-
-      if (correction.competences) {
-        for (const c in correction.competences) {
-          const ptsEl = document.getElementById(`pts_${c}`);
-          if (ptsEl && correction.competences[c]?.pts !== undefined) ptsEl.value = correction.competences[c].pts;
-        }
-      }
-
-      if (correction.questions) {
-        document.querySelectorAll('#correctionTable tbody tr').forEach((row, idx) => {
-          const qid = row.dataset.qid || `q_${idx}`;
-          const qData = correction.questions[qid];
-          if (qData) {
-            if (qData.level) {
-              row.dataset.level = qData.level;
-              const btn = row.querySelector(`.level-btn.${qData.level.toLowerCase()}`);
-              if (btn) btn.classList.add('active');
-            }
-            if (qData.comment) {
-              const commentDiv = row.querySelector('.editable-div');
-              if (commentDiv) commentDiv.innerText = qData.comment;
-            }
-          }
-        });
-      }
-
-      comps.forEach(c => updateCounters(c));
-      if (!correction.nonNote && correction.note_finale !== "NN") calculateTotal();
-      IS_SAVED = true;
-    }
-
-    function initSummary(activeComps, maxMap) {
-      const tbody = document.getElementById('gradingBody');
-      tbody.innerHTML = "";
-      comps.forEach((c) => {
-        const isVisible = activeComps.includes(c) || c === 'C6';
-        const displayStyle = isVisible ? "" : "display:none;";
-        const initialMax = maxMap[c] || 0;
-        tbody.innerHTML += `<tr id="row_${c}" style="${displayStyle}">
-          <td><span class="badge ${c.toLowerCase()}">${c}</span></td>
-          <td>
-            <input type="text" id="q_list_${c}" style="width:100%; border:none; text-align:center; font-size:0.85em; color:#666;" readonly>
-            <div id="stats_${c}" class="stat-counters">🔴 0 | 🟠 0 | 🔵 0 | 🟢 0</div>
-          </td>
-          <td><input type="radio" name="r_${c}" value="NT" onclick="setGlobalLevel('${c}','NT')"></td>
-          <td><input type="radio" name="r_${c}" value="I" onclick="setGlobalLevel('${c}','I')"></td>
-          <td><input type="radio" name="r_${c}" value="A" onclick="setGlobalLevel('${c}','A')"></td>
-          <td><input type="radio" name="r_${c}" value="M" onclick="setGlobalLevel('${c}','M')"></td>
-          <td style="white-space:nowrap;">
-            <input type="number" id="pts_${c}" class="score-input" step="0.25" placeholder="0" oninput="MANUAL_OVERRIDE['${c}']=true; this.style.color='#333'; this.title='Mode manuel'; calculateTotal(); markUnsaved();"> /
-            <input type="number" id="max_${c}" class="max-input" step="0.5" value="${initialMax}" oninput="calculateTotal(); markUnsaved();">
-          </td>
-        </tr>`;
-      });
-      setTimeout(calculateTotal, 100);
-    }
-
-    function renderCorrection(blueprint, reponses) {
-      const tbody = document.getElementById('correctionTable').querySelector('tbody');
-      tbody.innerHTML = "";
-      AUTO_REPORT = null;
-      CURRENT_MANUAL_INDEX = -1;
-      updateManualIndicator({ manualItems: [] });
-      let maxMap = {}, qMap = {}, activeComps = [];
-
-      const list = Array.isArray(blueprint?.questions) ? blueprint.questions : [];
-
-      list.forEach((q, idx) => {
-        const competence = (q && q.competence && /^C[1-6]$/.test(q.competence)) ? q.competence : "C6";
-        const bareme = Number(q?.bareme) || 0;
-        const label = q?.label || ("Q" + (idx + 1));
-        const qid = q?.qid || `q_${idx}`;
-
-        if(!activeComps.includes(competence)) activeComps.push(competence);
-        maxMap[competence] = (maxMap[competence] || 0) + bareme;
-        qMap[competence] = qMap[competence] || [];
-        qMap[competence].push(label);
-
-        const row = tbody.insertRow();
-        row.dataset.comp = competence;
-        row.dataset.level = "";
-        row.dataset.qid = qid;
-        row.dataset.bareme = bareme; // FIX #6 : stocker le barème pour calcul semi-auto
-
-        const repEleve = getReponseEleve(reponses, { ...q, label });
-        const attendu = formatExpected(q);
-        const questionHtml = renderQuestionHTML(q, label, competence);
-
-        row.innerHTML = `
-          <td style="font-weight:bold">${escapeHTML(label)}</td>
-          <td><span class="badge ${competence.toLowerCase()}">${competence}</span></td>
-          <td>
-            <div style="display:flex; gap:2px; justify-content:center;">
-              <span class="level-btn nt" onclick="setNoteVisual(this, 'NT')">NT</span>
-              <span class="level-btn i"  onclick="setNoteVisual(this, 'I')">I</span>
-              <span class="level-btn a"  onclick="setNoteVisual(this, 'A')">A</span>
-              <span class="level-btn m"  onclick="setNoteVisual(this, 'M')">M</span>
-            </div>
-          </td>
-          <td class="qa-stack">
-            ${questionHtml}
-            <div class="qa-block qa-student">
-              <div class="qa-title"><span class="pill e">Réponse élève</span></div>
-              <div class="qa-content">${repEleve}</div>
-            </div>
-            <div class="qa-block qa-expected">
-              <div class="qa-title"><span class="pill a">Attendu</span></div>
-              <div class="qa-content">${attendu}</div>
-            </div>
-          </td>
-          <td>
-            <div class="editable-div" contenteditable="true" placeholder="💡 Commentaire..." oninput="markUnsaved()"></div>
-          </td>
-        `;
-      });
-
-      if(!maxMap['C6']) maxMap['C6'] = 2;
-      initSummary(activeComps, maxMap);
-      for(let c in qMap) {
-        const el = document.getElementById(`q_list_${c}`);
-        if(el) el.value = qMap[c].join(", ");
-      }
-
-      syncToggleButtons();
-    }
-
-    // FIX #6 : Ratios barème semi-auto (modifiable par le prof)
-    const LEVEL_RATIO = { M: 1.0, A: 0.66, I: 0.33, NT: 0 };
-    window.LEVEL_RATIO = LEVEL_RATIO;
-    // FIX #6 : Tracker les compétences en mode manuel (modifiées à la main)
-    const MANUAL_OVERRIDE = {};
-    window.MANUAL_OVERRIDE = MANUAL_OVERRIDE;
-
-    function setNoteVisual(btn, level) {
-      const row = btn.closest('tr');
-      Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      row.dataset.level = level;
-      updateCounters(row.dataset.comp);
-      calculateTotal();
-      autoCalculatePoints(row.dataset.comp); // FIX #6 : recalcul semi-auto
-      updateDominantLevel(row.dataset.comp); // FIX #7 : niveau dominant
-      markUnsaved();
-      openCommentBank(row.dataset.comp, level, row.querySelector('.editable-div'));
-    }
-
-    // FIX #6 : Calcul semi-auto des points par compétence
-    function autoCalculatePoints(comp) {
-      const ptsEl = document.getElementById(`pts_${comp}`);
-      if (!ptsEl || MANUAL_OVERRIDE[comp]) return;
-
-      let pts = 0;
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp !== comp) return;
-        if (r.dataset.manual === "1") return; // exclus du total auto
-        if (r.dataset.autoPoints !== undefined && r.dataset.autoPoints !== "") {
-          pts += Number(r.dataset.autoPoints) || 0;
-          return;
-        }
-        const lvl = r.dataset.level;
-        const bareme = Number(r.dataset.bareme) || 0;
-        if (lvl && LEVEL_RATIO[lvl] !== undefined) {
-          pts += bareme * LEVEL_RATIO[lvl];
-        }
-      });
-      ptsEl.value = (Math.round(pts * 100) / 100).toString();
-      ptsEl.style.color = '#2563eb';
-      ptsEl.title = 'Auto (modifiable)';
-    }
-
-    // FIX #7 : Calcul et affichage du niveau dominant par compétence
-    function updateDominantLevel(comp) {
-      let counts = { NT: 0, I: 0, A: 0, M: 0 };
-      let total = 0;
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp === comp && r.dataset.level) {
-          counts[r.dataset.level]++;
-          total++;
-        }
-      });
-      if (total === 0) return;
-      // Niveau dominant = celui qui apparaît le plus
-      const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-      const levelColors = { M: '#5cb85c', A: '#f0c05a', I: '#d9534f', NT: '#7f8c8d' };
-      const levelEmoji = { M: '🟢', A: '🔵', I: '🟠', NT: '🔴' };
-      const display = document.getElementById(`dominant_${comp}`);
-      if (display) {
-        display.textContent = `${levelEmoji[dominant]} ${dominant}`;
-        display.style.color = levelColors[dominant];
-        display.style.fontWeight = 'bold';
-      }
-    }
-
-    // FIX #7 : Les radios du récapitulatif mettent TOUTES les questions d'une compétence au même niveau
-    function setGlobalLevel(comp, level) {
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if (r.dataset.comp === comp) {
-          r.dataset.level = level;
-          const btns = r.querySelectorAll('.level-btn');
-          btns.forEach(b => b.classList.remove('active'));
-          const target = r.querySelector(`.level-btn.${level.toLowerCase()}`);
-          if (target) target.classList.add('active');
-        }
-      });
-      updateCounters(comp);
-calculateTotal();
-autoCalculatePoints(comp);
-updateDominantLevel(comp);
-markUnsaved();
-    }
-
-    function updateCounters(comp) {
-      let counts = { NT:0, I:0, A:0, M:0 };
-      document.querySelectorAll('#correctionTable tbody tr').forEach(r => {
-        if(r.dataset.comp === comp && r.dataset.level) counts[r.dataset.level]++;
-      });
-      const statBox = document.getElementById(`stats_${comp}`);
-      if(statBox) statBox.innerHTML = `🔴 ${counts.NT} | 🟠 ${counts.I} | 🔵 ${counts.A} | 🟢 ${counts.M}`;
-      updateProgress(); // FIX #12
-    }
-
-    // FIX #12 : Mise à jour de la barre de progression
-    function updateProgress() {
-      const rows = document.querySelectorAll('#correctionTable tbody tr');
-      const total = rows.length;
-      let noted = 0;
-      rows.forEach(r => { if (r.dataset.level) noted++; });
-      const pct = total > 0 ? Math.round((noted / total) * 100) : 0;
-      const textEl = document.getElementById('progressText');
-      const fillEl = document.getElementById('progressFill');
-      const pctEl = document.getElementById('progressPct');
-      if (textEl) textEl.textContent = `${noted} / ${total} questions notées`;
-      if (fillEl) fillEl.style.width = pct + '%';
-      if (pctEl) {
-        pctEl.textContent = pct + '%';
-        pctEl.style.color = pct === 100 ? '#16a34a' : pct > 50 ? '#2e7bb6' : '#d9534f';
-      }
-    }
-
-    function calculateTotal() {
-      if (AUTO_REPORT && Number.isFinite(AUTO_REPORT.totalAutoMax)) {
-        const autoPts = Number(AUTO_REPORT.totalObtenu || 0);
-        const autoMax = Number(AUTO_REPORT.totalAutoMax || 0);
-        const fullMax = Number(AUTO_REPORT.totalMax || autoMax);
-        const elNote = document.getElementById('finalNote');
-        elNote.innerText = `${autoPts.toFixed(1)} / ${autoMax.toFixed(1)} (Auto) · Max ${fullMax.toFixed(1)}`;
-        elNote.style.color = autoMax > 0 && (autoPts / autoMax) < 0.5 ? "#d9534f" : "#16a34a";
-        return;
-      }
-
-      let totalPts = 0;
-      comps.forEach(c => {
-        const row = document.getElementById(`row_${c}`);
-        if(row && row.style.display !== 'none') {
-          const v = document.getElementById(`pts_${c}`)?.value;
-          totalPts += parseFloat(String(v ?? "0").replace(",", ".")) || 0;
-        }
-      });
-      const elNote = document.getElementById('finalNote');
-      elNote.innerText = totalPts.toFixed(1) + " / 20";
-      elNote.style.color = totalPts < 10 ? "#d9534f" : "#16a34a";
-    }
-
-    // FIX #8 : Banque de commentaires dynamique
-    // — Ajout de commentaires personnalisés
-    // — Compteur de fréquence d'utilisation (tri par usage)
-    // — Persistance localStorage
-    const COMMENT_STATS_KEY = "grille_comment_stats";
-    const CUSTOM_COMMENTS_KEY = "grille_custom_comments";
-
-    function loadCommentStats() {
-      try { return JSON.parse(localStorage.getItem(COMMENT_STATS_KEY) || "{}"); } catch(e) { return {}; }
-    }
-    function saveCommentStats(stats) {
-      try { localStorage.setItem(COMMENT_STATS_KEY, JSON.stringify(stats)); } catch(e) {}
-    }
-    function loadCustomComments() {
-      try { return JSON.parse(localStorage.getItem(CUSTOM_COMMENTS_KEY) || "{}"); } catch(e) { return {}; }
-    }
-    function saveCustomComments(custom) {
-      try { localStorage.setItem(CUSTOM_COMMENTS_KEY, JSON.stringify(custom)); } catch(e) {}
-    }
-
-    function incrementCommentUsage(comp, level, txt) {
-      const stats = loadCommentStats();
-      const key = `${comp}_${level}`;
-      if (!stats[key]) stats[key] = {};
-      stats[key][txt] = (stats[key][txt] || 0) + 1;
-      saveCommentStats(stats);
-    }
-
-    function getCommentUsage(comp, level, txt) {
-      const stats = loadCommentStats();
-      const key = `${comp}_${level}`;
-      return stats[key]?.[txt] || 0;
-    }
-
-    function openCommentBank(comp, level, target) {
-      CURRENT_TARGET_DIV = target;
-      const list = document.getElementById('modalList');
-      list.innerHTML = "";
-      document.getElementById('modalTitle').innerText = `Banque ${comp} (${level})`;
-
-      // Collecter tous les commentaires (statiques + perso)
-      const allPhrases = [];
-      const compData = window.DATA_COMMENTAIRES_COMPETENCES?.[comp];
-      if (compData) {
-        for (const [catName, levelsObj] of Object.entries(compData)) {
-          const phrases = levelsObj[level];
-          if (phrases && phrases.length > 0) {
-            phrases.forEach(txt => allPhrases.push({ txt, cat: catName, custom: false }));
-          }
-        }
-      }
-
-      // Commentaires personnalisés
-      const custom = loadCustomComments();
-      const customKey = `${comp}_${level}`;
-      if (custom[customKey] && custom[customKey].length > 0) {
-        custom[customKey].forEach(txt => allPhrases.push({ txt, cat: "✏️ Mes commentaires", custom: true }));
-      }
-
-      if (allPhrases.length === 0 && !compData) {
-        list.innerHTML = "<div style='padding:20px; text-align:center;'>Pas de données.</div>";
-      } else {
-        // Trier par fréquence d'utilisation (les plus utilisés en premier)
-        allPhrases.sort((a, b) => {
-          const freqA = getCommentUsage(comp, level, a.txt);
-          const freqB = getCommentUsage(comp, level, b.txt);
-          if (freqB !== freqA) return freqB - freqA;
-          return 0; // Garder l'ordre d'origine si même fréquence
-        });
-
-        // Grouper par catégorie
-        const grouped = {};
-        allPhrases.forEach(p => {
-          if (!grouped[p.cat]) grouped[p.cat] = [];
-          grouped[p.cat].push(p);
-        });
-
-        // Section "Fréquents" si au moins un commentaire a été utilisé
-        const stats = loadCommentStats();
-        const statsKey = `${comp}_${level}`;
-        const frequents = allPhrases.filter(p => getCommentUsage(comp, level, p.txt) > 0)
-          .sort((a, b) => getCommentUsage(comp, level, b.txt) - getCommentUsage(comp, level, a.txt))
-          .slice(0, 5);
-
-        if (frequents.length > 0) {
-          const h = document.createElement("div");
-          h.className = "bank-title";
-          h.innerHTML = "⭐ Les plus utilisés";
-          list.appendChild(h);
-          frequents.forEach(p => {
-            const usage = getCommentUsage(comp, level, p.txt);
-            list.appendChild(createCommentItem(p.txt, comp, level, usage));
-          });
-        }
-
-        // Puis les catégories classiques
-        for (const [catName, phrases] of Object.entries(grouped)) {
-          const h = document.createElement("div");
-          h.className = "bank-title";
-          h.innerText = catName;
-          list.appendChild(h);
-          phrases.forEach(p => {
-            const usage = getCommentUsage(comp, level, p.txt);
-            const item = createCommentItem(p.txt, comp, level, usage);
-            // Bouton supprimer pour les commentaires personnalisés
-            if (p.custom) {
-              const delBtn = document.createElement('span');
-              delBtn.textContent = '🗑️';
-              delBtn.style.cssText = 'cursor:pointer; float:right; opacity:0.5; font-size:0.9em;';
-              delBtn.title = 'Supprimer ce commentaire';
-              delBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm("Supprimer ce commentaire personnalisé ?")) {
-                  const c = loadCustomComments();
-                  c[customKey] = (c[customKey] || []).filter(t => t !== p.txt);
-                  saveCustomComments(c);
-                  openCommentBank(comp, level, target); // Recharger
+{
+    "id": "quiz_01",
+    "devoirId": "quiz_01",
+    "titre": "Évaluation PSE : L'addiction au téléphone portable et les risques numériques",
+    "niveau": "Bac Pro",
+    "competences": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5"
+    ],
+    "version": "v1",
+    "autocorrect": true,
+    "options": {
+        "antiLeave": true,
+        "antiPaste": true,
+        "maxLeaves": 2,
+        "recepisse": true,
+        "secondeChance": true,
+        "chrono": true,
+        "chronoMinutes": 1
+    },
+    "content": [
+        {
+            "type": "question",
+            "qid": "q_1771053064030_178",
+            "label": "1",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Qu'est-ce que la « nomophobie » ?",
+            "reponseCorrecte": "q_1771053064030_178_opt2",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "La nomophobie est la peur excessive d'être séparé de son téléphone portable (ou d'être sans réseau/batterie).",
+            "options": [
+                {
+                    "value": "q_1771053064030_178_opt1",
+                    "label": "La peur des ondes électromagnétiques"
+                },
+                {
+                    "value": "q_1771053064030_178_opt2",
+                    "label": "La peur d'être sans son téléphone portable"
+                },
+                {
+                    "value": "q_1771053064030_178_opt3",
+                    "label": "La peur de recevoir des appels inconnus"
                 }
-              };
-              item.prepend(delBtn);
-            }
-            list.appendChild(item);
-          });
-        }
-      }
-
-      // Barre d'ajout personnalisé en bas
-      const addBar = document.createElement('div');
-      addBar.style.cssText = 'padding:10px 15px; border-top:2px solid #e2e8f0; display:flex; gap:8px; align-items:center; background:#f8fafc;';
-      addBar.innerHTML = `
-        <input type="text" id="customCommentInput" placeholder="✏️ Ajouter un commentaire personnalisé..." 
-          style="flex:1; padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9em;">
-        <button onclick="addCustomComment('${comp}','${level}')" 
-          style="padding:6px 14px; background:#2e7bb6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em;">+ Ajouter</button>
-      `;
-      list.appendChild(addBar);
-
-      // Permettre l'ajout avec Entrée
-      setTimeout(() => {
-        const input = document.getElementById('customCommentInput');
-        if (input) {
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); addCustomComment(comp, level); }
-          });
-        }
-      }, 100);
-
-      document.getElementById('commentModal').style.display = "flex";
-    }
-
-    function createCommentItem(txt, comp, level, usage) {
-      const d = document.createElement('div');
-      d.className = "comment-item";
-      d.style.display = 'flex';
-      d.style.justifyContent = 'space-between';
-      d.style.alignItems = 'center';
-      const textSpan = document.createElement('span');
-      textSpan.textContent = txt;
-      textSpan.style.flex = '1';
-      d.appendChild(textSpan);
-      if (usage > 0) {
-        const badge = document.createElement('span');
-        badge.textContent = `×${usage}`;
-        badge.style.cssText = 'font-size:0.7em; background:#e2e8f0; color:#64748b; padding:1px 6px; border-radius:10px; margin-left:8px; white-space:nowrap;';
-        d.appendChild(badge);
-      }
-      d.onclick = () => {
-        const prev = CURRENT_TARGET_DIV.innerText.trim();
-        CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
-        incrementCommentUsage(comp, level, txt);
-        closeModal();
-        markUnsaved();
-      };
-      return d;
-    }
-
-    window.addCustomComment = function(comp, level) {
-      const input = document.getElementById('customCommentInput');
-      if (!input) return;
-      const txt = input.value.trim();
-      if (!txt) { input.focus(); return; }
-      const custom = loadCustomComments();
-      const key = `${comp}_${level}`;
-      if (!custom[key]) custom[key] = [];
-      if (custom[key].includes(txt)) { alert("Ce commentaire existe déjà."); return; }
-      custom[key].push(txt);
-      saveCustomComments(custom);
-      // Insérer directement le commentaire
-      const prev = CURRENT_TARGET_DIV.innerText.trim();
-      CURRENT_TARGET_DIV.innerText = prev ? (prev + " " + txt) : txt;
-      incrementCommentUsage(comp, level, txt);
-      closeModal();
-      markUnsaved();
-    }
-
-    function openAppreciationBank() {
-      CURRENT_TARGET_DIV = document.getElementById('appreciationArea');
-      const list = document.getElementById('modalList');
-      list.innerHTML = "";
-      document.getElementById('modalTitle').innerText = "Appréciations";
-
-      const apprData = window.DATA_APPRECIATION || {};
-      for (const [catName, data] of Object.entries(apprData)) {
-        const h = document.createElement("div");
-        h.className = "bank-title";
-        h.innerText = catName;
-        list.appendChild(h);
-
-        if(Array.isArray(data)) {
-          data.forEach(txt => {
-            const d = document.createElement('div');
-            d.className = "comment-item";
-            d.innerText = txt;
-            d.onclick = () => { insertText(txt, true); };
-            list.appendChild(d);
-          });
-        } else if (typeof data === 'object') {
-          for (const [comp, phrases] of Object.entries(data)) {
-            phrases.forEach(txt => {
-              const d = document.createElement('div');
-              d.className = "comment-item";
-              d.innerHTML = `<strong>(${escapeHTML(comp)})</strong> ${escapeHTML(txt)}`;
-              d.onclick = () => { insertText(`(${comp}) ${txt}`, true); };
-              list.appendChild(d);
-            });
-          }
-        }
-      }
-      document.getElementById('commentModal').style.display = "flex";
-    }
-
-    function insertText(text, newLine) {
-      if(CURRENT_TARGET_DIV) {
-        const sep = (CURRENT_TARGET_DIV.value.length > 0 && newLine) ? "\n" : " ";
-        CURRENT_TARGET_DIV.value += sep + text;
-        autoResize(CURRENT_TARGET_DIV);
-      }
-      closeModal();
-      markUnsaved();
-    }
-
-    function closeModal() { document.getElementById('commentModal').style.display = "none"; }
-
-    function sortTable(n) {
-      const table = document.getElementById("correctionTable");
-      const tbody = table.querySelector('tbody'); // FIX #17 : cibler tbody, pas table
-      let rows = Array.from(tbody.rows);
-      rows.sort((a, b) => {
-        let t1 = a.cells[n].innerText.toLowerCase();
-        let t2 = b.cells[n].innerText.toLowerCase();
-        if(n===0) return (parseFloat(t1) || 0) - (parseFloat(t2) || 0);
-        return t1.localeCompare(t2);
-      });
-      rows.forEach(r => tbody.appendChild(r)); // FIX #17 : append dans tbody
-    }
-
-    function resetNewStudent() {
-      if (!IS_SAVED && !confirm("⚠️ Modifications non enregistrées !\n\nQuitter quand même ?")) return;
-      // FIX #4 : Fallback robuste si window.close() échoue (onglet ouvert manuellement)
-      try { window.close(); } catch(e) { /* ignoré */ }
-      // Si la fenêtre est toujours ouverte après 200ms, proposer une alternative
-      setTimeout(() => {
-        if (!window.closed) {
-          if (window.opener) {
-            window.opener.focus();
-          } else if (document.referrer) {
-            window.location.href = document.referrer;
-          } else {
-            // Réinitialiser la page pour une nouvelle copie
-            document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
-            document.getElementById('statusText').innerHTML = "🔄 Retournez au Cockpit pour sélectionner une autre copie.";
-            document.getElementById('statusBanner').className = 'status-banner auth-required';
-            alert("Retournez au Cockpit pour ouvrir une autre copie.");
-          }
-        }
-      }, 200);
-    }
-
-    // ====================================================================
-    // AUTO-CORRECTION ENGINE
-    // ====================================================================
-
-    /** Normalize string for comparison: trim, lowercase, remove diacritics */
-    function normalizeForComparison(str) {
-      return String(str ?? "").trim().toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    }
-
-    /** Cherche le commentaire le plus pertinent dans la banque selon compétence + niveau */
-    function getBankComment(comp, level) {
-      const bank = window.DATA_COMMENTAIRES_COMPETENCES;
-      if (!bank || !bank[comp]) return "";
-      const compData = bank[comp];
-      // Parcourir les catégories : chercher le commentaire le plus utilisé, sinon le 1er de "Général"
-      const stats = loadCommentStats();
-      let bestTxt = "";
-      let bestUsage = -1;
-
-      for (const [catName, levelsObj] of Object.entries(compData)) {
-        const phrases = levelsObj[level];
-        if (!phrases || phrases.length === 0) continue;
-        for (const txt of phrases) {
-          const usage = getCommentUsage(comp, level, txt);
-          if (usage > bestUsage) {
-            bestUsage = usage;
-            bestTxt = txt;
-          }
-        }
-      }
-      // Si aucun n'a jamais été utilisé, prendre le 1er de "Général"
-      if (bestUsage <= 0 && compData["Général"]?.[level]?.length > 0) {
-        bestTxt = compData["Général"][level][0];
-      }
-      return bestTxt;
-    }
-
-    /** Construit le commentaire auto = banque + détail technique */
-    function buildAutoComment(comp, level, detail) {
-      const bankComment = getBankComment(comp, level);
-      if (bankComment && detail) return bankComment + "\n📖 " + detail;
-      if (bankComment) return bankComment;
-      return detail || "";
-    }
-
-    /** Compare student answer vs correct answer based on inputType */
-    function autocorrectQuestion(q, reponses) {
-      const qid = q?.qid;
-      if (!qid || !q.autocorrect) return null; // not auto-correctable
-
-      const raw = resolveAnswerForQid(reponses, qid);
-      const correct = q.reponseCorrecte;
-
-      // Not answered
-      if (raw === undefined || raw === null || raw === "" ||
-          (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
-      }
-
-      const inputType = (q.inputType || "").toLowerCase();
-      let isCorrect = false;
-
-      switch (inputType) {
-        case "qcm":
-        case "vrai_faux":
-        case "select":
-          // Strict string comparison
-          isCorrect = (String(raw).trim() === String(correct).trim());
-          break;
-
-        case "checkbox": {
-          // QRM – notation par discordance
-          let studentArr = Array.isArray(raw) ? raw : [raw];
-          studentArr = studentArr.map(v => String(v).trim()).filter(Boolean);
-          const correctArr = (Array.isArray(correct) ? correct : [correct])
-            .map(v => String(v).trim()).filter(Boolean);
-          const bareme = Number(q.bareme) || 1;
-          const corrMode = (q.correctionMode || "").toLowerCase();
-          const opts = Array.isArray(q.options) ? q.options : [];
-
-          // Helper : convertir un value d'option en label lisible
-          const valToLabel = (val) => {
-            const found = opts.find(o => String(o.value || o.id || "").trim() === val);
-            return found ? (found.label || found.text || val) : val;
-          };
-
-          // ── Guard QCU : choix unique (single_exact ou 1 seule bonne réponse) ──
-          if (corrMode === "single_exact" || correctArr.length <= 1) {
-            isCorrect = (studentArr[0] === correctArr[0]);
-            break;
-          }
-
-          // ── QRM : calcul par discordance ──
-          const correctSet = new Set(correctArr);
-          const studentSet = new Set(studentArr);
-
-          // FP = mauvaises réponses cochées (l'élève a coché mais ce n'est pas correct)
-          const fpArr = studentArr.filter(v => !correctSet.has(v));
-          const FP = fpArr.length;
-
-          // FN = bonnes réponses oubliées (correct mais non coché)
-          const fnArr = correctArr.filter(v => !studentSet.has(v));
-          const FN = fnArr.length;
-
-          const discordances = FP + FN;
-          const penalite = Number(q.penalite) || 0.5;
-
-          // Score = max(0, barème − pénalité × discordances), arrondi au demi-point
-          let score = Math.max(0, bareme - penalite * discordances);
-          score = Math.round(score * 2) / 2; // arrondi au 0.5
-
-          if (score === bareme) {
-            // Tout juste → Maîtrisé
-            return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: bareme };
-          } else if (score > 0) {
-            // Partiellement correct → Acquis
-            const fpLabels = fpArr.map(valToLabel).join(", ");
-            const fnLabels = fnArr.map(valToLabel).join(", ");
-            let detail = `Discordances : ${discordances} (FP=${FP}, FN=${FN})`;
-            if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
-            if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
-            detail += ` | Score : ${bareme} - ${penalite}×${discordances} = ${score}/${bareme}`;
-            return { level: "A", comment: buildAutoComment(q.competence, "A", detail), correct: false, points: score };
-          } else {
-            // Zéro → Insuffisant
-            const fpLabels = fpArr.map(valToLabel).join(", ");
-            const fnLabels = fnArr.map(valToLabel).join(", ");
-            let detail = `Discordances : ${discordances} (FP=${FP}, FN=${FN})`;
-            if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
-            if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
-            detail += ` | Score : 0/${bareme}`;
-            return { level: "I", comment: buildAutoComment(q.competence, "I", detail), correct: false, points: 0 };
-          }
-        }
-
-        case "tableau_classement": {
-          // reponseCorrecte is an object { subKey: expectedValue, ... }
-          // Student answers stored as reponses[qid_subKey] or as object reponses[qid]
-          if (typeof correct === "object" && correct !== null && !Array.isArray(correct)) {
-            let allMatch = true;
-            let anyFound = false;
-            for (const [subKey, expectedVal] of Object.entries(correct)) {
-              // Try qid_subKey in reponses
-              const studentVal = reponses?.[qid + "_" + subKey] ??
-                                 (typeof raw === "object" ? raw?.[subKey] : undefined);
-              if (studentVal === undefined || studentVal === null || studentVal === "") {
-                allMatch = false;
-              } else {
-                anyFound = true;
-                if (String(studentVal).trim() !== String(expectedVal).trim()) {
-                  allMatch = false;
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053064474_100",
+            "label": "2",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quel est l'effet principal de la lumière bleue des écrans sur le sommeil ?",
+            "reponseCorrecte": "q_1771053064474_100_opt2",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Elle bloque la sécrétion de mélatonine, l'hormone qui favorise l'endormissement.",
+            "options": [
+                {
+                    "value": "q_1771053064474_100_opt1",
+                    "label": "Elle aide à s'endormir plus vite"
+                },
+                {
+                    "value": "q_1771053064474_100_opt2",
+                    "label": "Elle retarde l'endormissement en bloquant la mélatonine"
+                },
+                {
+                    "value": "q_1771053064474_100_opt3",
+                    "label": "Elle améliore la qualité des rêves"
                 }
-              }
-            }
-            if (!anyFound) {
-              return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
-            }
-            isCorrect = allMatch;
-          }
-          break;
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053064828_294",
+            "label": "3",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Qu'appelle-t-on le « Text-Neck » ?",
+            "reponseCorrecte": "q_1771053064828_294_opt1",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Ce sont des douleurs cervicales causées par la posture tête penchée pour regarder l'écran.",
+            "options": [
+                {
+                    "value": "q_1771053064828_294_opt1",
+                    "label": "Des douleurs cervicales liées à la posture penchée"
+                },
+                {
+                    "value": "q_1771053064828_294_opt2",
+                    "label": "Une crampe au pouce à force d'écrire"
+                },
+                {
+                    "value": "q_1771053064828_294_opt3",
+                    "label": "Une fatigue visuelle intense"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053065085_237",
+            "label": "4",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Qu'est-ce que le « Phubbing » ?",
+            "reponseCorrecte": "q_1771053065085_237_opt3",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Le Phubbing (télé-snobisme) est le fait d'ignorer les personnes présentes physiquement pour consulter son téléphone.",
+            "options": [
+                {
+                    "value": "q_1771053065085_237_opt1",
+                    "label": "Le piratage de données personnelles"
+                },
+                {
+                    "value": "q_1771053065085_237_opt2",
+                    "label": "L'envoi de messages publicitaires"
+                },
+                {
+                    "value": "q_1771053065085_237_opt3",
+                    "label": "Le fait d'ignorer son entourage pour regarder son téléphone"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053065302_451",
+            "label": "5",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quel est un risque majeur de l'écoute prolongée de musique à fort volume avec un casque ?",
+            "reponseCorrecte": "q_1771053065302_451_opt2",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Le risque principal est la perte d'audition irréversible (surdité précoce) et les acouphènes.",
+            "options": [
+                {
+                    "value": "q_1771053065302_451_opt1",
+                    "label": "La déshydratation"
+                },
+                {
+                    "value": "q_1771053065302_451_opt2",
+                    "label": "La perte d'audition irréversible"
+                },
+                {
+                    "value": "q_1771053065302_451_opt3",
+                    "label": "L'augmentation de la vue"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053065644_345",
+            "label": "6",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quel signe peut indiquer une cyberaddiction ?",
+            "reponseCorrecte": "q_1771053065644_345_opt1",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Le repli sur soi, l'isolement social et l'abandon des autres activités sont des signes d'alerte.",
+            "options": [
+                {
+                    "value": "q_1771053065644_345_opt1",
+                    "label": "L'isolement social et le délaissement des activités"
+                },
+                {
+                    "value": "q_1771053065644_345_opt2",
+                    "label": "Une meilleure organisation du travail"
+                },
+                {
+                    "value": "q_1771053065644_345_opt3",
+                    "label": "L'augmentation de l'activité physique"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053067716_632",
+            "label": "7",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Que signifie le DAS (Débit d'Absorption Spécifique) d'un téléphone ?",
+            "reponseCorrecte": "q_1771053067716_632_opt2",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "C'est l'indice qui mesure la quantité d'énergie (ondes) absorbée par le corps lors de l'utilisation de l'appareil.",
+            "options": [
+                {
+                    "value": "q_1771053067716_632_opt1",
+                    "label": "La vitesse de connexion internet"
+                },
+                {
+                    "value": "q_1771053067716_632_opt2",
+                    "label": "La quantité d'ondes absorbées par le corps"
+                },
+                {
+                    "value": "q_1771053067716_632_opt3",
+                    "label": "La capacité de stockage de la mémoire"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053072173_189",
+            "label": "8",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "vrai_faux",
+            "autocorrect": true,
+            "questionText": "Consulter son téléphone au volant multiplie le risque d'accident par 3.",
+            "reponseCorrecte": "faux",
+            "reponseAttendue": "Faux"
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053072607_1",
+            "label": "9",
+            "competence": "C1",
+            "bareme": 1,
+            "inputType": "vrai_faux",
+            "autocorrect": true,
+            "questionText": "Le cerveau des adolescents est plus sensible aux addictions que celui des adultes.",
+            "reponseCorrecte": "vrai",
+            "reponseAttendue": "Vrai"
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053074151_115",
+            "label": "10",
+            "competence": "C5",
+            "bareme": 1,
+            "inputType": "number",
+            "autocorrect": true,
+            "questionText": "Combien d'heures avant le coucher est-il conseillé d'arrêter les écrans ?",
+            "reponseCorrecte": 1,
+            "reponseAttendue": "1",
+            "tolerance": 0
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053079684_41",
+            "label": "11",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quelle astuce permet de réduire la fatigue visuelle liée aux écrans ?",
+            "reponseCorrecte": "q_1771053079684_41_opt3",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "La règle du 20-20-20 : toutes les 20 minutes, regarder à 20 pieds (6m) pendant 20 secondes.",
+            "options": [
+                {
+                    "value": "q_1771053079684_41_opt1",
+                    "label": "Augmenter la luminosité au maximum"
+                },
+                {
+                    "value": "q_1771053079684_41_opt2",
+                    "label": "Regarder l'écran dans le noir complet"
+                },
+                {
+                    "value": "q_1771053079684_41_opt3",
+                    "label": "Faire des pauses régulières pour regarder au loin"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053080232_609",
+            "label": "12",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Comment limiter son exposition aux ondes lors d'un appel ?",
+            "reponseCorrecte": "q_1771053080232_609_opt1",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Utiliser un kit mains-libres ou le haut-parleur éloigne le téléphone de la tête.",
+            "options": [
+                {
+                    "value": "q_1771053080232_609_opt1",
+                    "label": "Utiliser un kit mains-libres"
+                },
+                {
+                    "value": "q_1771053080232_609_opt2",
+                    "label": "Coller le téléphone à l'oreille"
+                },
+                {
+                    "value": "q_1771053080232_609_opt3",
+                    "label": "Appeler uniquement dans les ascenseurs"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053088182_449",
+            "label": "13",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "vrai_faux",
+            "autocorrect": true,
+            "questionText": "Le cyberharcèlement est puni par la loi.",
+            "reponseCorrecte": "vrai",
+            "reponseAttendue": "Vrai"
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053088786_643",
+            "label": "14",
+            "competence": "C4",
+            "bareme": 1,
+            "inputType": "number",
+            "autocorrect": true,
+            "questionText": "Quel est le seuil de danger pour l'audition (en décibels) ?",
+            "reponseCorrecte": 85,
+            "reponseAttendue": "85",
+            "tolerance": 0
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053093307_270",
+            "label": "15",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "number",
+            "autocorrect": true,
+            "questionText": "Quelle distance minimale (en cm) est recommandée entre les yeux et l'écran ?",
+            "reponseCorrecte": 30,
+            "reponseAttendue": "30",
+            "tolerance": 0
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053095339_103",
+            "label": "16",
+            "competence": "C1",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quel est l'impact environnemental majeur de la fabrication des smartphones ?",
+            "reponseCorrecte": "q_1771053095339_103_opt2",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "L'extraction de métaux rares (terres rares) qui est très polluante.",
+            "options": [
+                {
+                    "value": "q_1771053095339_103_opt1",
+                    "label": "L'utilisation de papier"
+                },
+                {
+                    "value": "q_1771053095339_103_opt2",
+                    "label": "L'extraction de métaux rares et la pollution"
+                },
+                {
+                    "value": "q_1771053095339_103_opt3",
+                    "label": "La consommation d'eau potable lors de l'appel"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053099587_595",
+            "label": "17",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Quelle est une bonne pratique de « Digital Detox » ?",
+            "reponseCorrecte": "q_1771053099587_595_opt3",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "Désactiver les notifications et définir des zones « sans téléphone » (ex: à table).",
+            "options": [
+                {
+                    "value": "q_1771053099587_595_opt1",
+                    "label": "Acheter un deuxième téléphone"
+                },
+                {
+                    "value": "q_1771053099587_595_opt2",
+                    "label": "Dormir avec son téléphone"
+                },
+                {
+                    "value": "q_1771053099587_595_opt3",
+                    "label": "Désactiver les notifications non essentielles"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053105855_707",
+            "label": "18",
+            "competence": "C4",
+            "bareme": 1,
+            "inputType": "checkbox",
+            "autocorrect": true,
+            "besoinCorrectionManuelle": false,
+            "questionText": "Pourquoi est-il dangereux de marcher en regardant son téléphone (« Smombie ») ?",
+            "reponseCorrecte": "q_1771053105855_707_opt1",
+            "reponseEleve": "",
+            "correctionMode": "single_exact",
+            "reponseAttendue": "On perd la perception de l'environnement (visuelle et auditive), risquant chutes et collisions.",
+            "options": [
+                {
+                    "value": "q_1771053105855_707_opt1",
+                    "label": "Risque de chute ou de collision par inattention"
+                },
+                {
+                    "value": "q_1771053105855_707_opt2",
+                    "label": "Risque d'améliorer son endurance"
+                },
+                {
+                    "value": "q_1771053105855_707_opt3",
+                    "label": "Risque de perdre du réseau"
+                }
+            ]
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053107025_83",
+            "label": "19",
+            "competence": "C3",
+            "bareme": 1,
+            "inputType": "vrai_faux",
+            "autocorrect": true,
+            "questionText": "Le téléphone portable est autorisé en classe au lycée et en CFA sans restriction.",
+            "reponseCorrecte": "faux",
+            "reponseAttendue": "Faux"
+        },
+        {
+            "type": "question",
+            "qid": "q_1771053110503_999",
+            "label": "20",
+            "competence": "C2",
+            "bareme": 1,
+            "inputType": "vrai_faux",
+            "autocorrect": true,
+            "questionText": "Les notifications stimulent le circuit de la récompense (dopamine) dans le cerveau.",
+            "reponseCorrecte": "vrai",
+            "reponseAttendue": "Vrai"
         }
-
-        case "number": {
-          const studentNum = parseFloat(String(raw).replace(",", "."));
-          const correctNum = parseFloat(correct);
-          const tolerance = parseFloat(q.tolerance ?? 0);
-          if (!isNaN(studentNum) && !isNaN(correctNum)) {
-            isCorrect = Math.abs(studentNum - correctNum) <= tolerance;
-          }
-          break;
-        }
-
-        case "texte_exact": {
-          const studentNorm = normalizeForComparison(raw);
-          if (Array.isArray(correct)) {
-            isCorrect = correct.some(v => normalizeForComparison(v) === studentNorm);
-          } else {
-            isCorrect = normalizeForComparison(correct) === studentNorm;
-          }
-          break;
-        }
-
-        default:
-          // Unknown type, skip
-          return null;
-      }
-
-      if (isCorrect) {
-        return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: Number(q.bareme) || 0 };
-      } else {
-        const attendu = q.reponseAttendue || String(correct);
-        return { level: "I", comment: buildAutoComment(q.competence, "I", "Attendu : " + attendu), correct: false, points: 0 };
-      }
-    }
-
-    function getNormalizedInputType(q) {
-    // Normalise les anciens noms / variantes pour fiabiliser l'autocorrection
-    const t0 = (q?.inputType || q?.type || "").toString().trim().toLowerCase();
-    // Choix unique
-    if (["qcu", "radio", "single", "single_choice", "qcm_single"].includes(t0)) return "qcm";
-    // Choix multiple
-    if (["qcm_multi", "qcm_multiple", "multiple", "multi_choice"].includes(t0)) return "checkbox";
-    // Compat
-    if (t0 === "qcm") return "qcm";          // historique: qcm = choix unique
-    if (t0 === "checkbox") return "checkbox"; // historique: checkbox = multi (ou 1 seule)
-    if (t0 === "short" || t0 === "text" || t0 === "texte") return "texte_exact";
-    return t0;
+    ]
 }
-
-    function hasCorrectAnswer(q) {
-      const c = q?.reponseCorrecte;
-      if (Array.isArray(c)) return c.length > 0;
-      if (c && typeof c === "object") return Object.keys(c).length > 0;
-      return c !== undefined && c !== null && String(c).trim() !== "";
-    }
-
-    function isAutocorrectEligible(q) {
-      if (!q || q.type === "doc") return { ok: false, reason: "type non supporté" };
-      if (q.autocorrect !== true) return { ok: false, reason: "autocorrect false" };
-      const inputType = getNormalizedInputType(q);
-      const supported = new Set(["checkbox", "vrai_faux", "select", "number", "texte_exact"]);
-      if (!supported.has(inputType)) return { ok: false, reason: "type non supporté" };
-      if (!hasCorrectAnswer(q)) return { ok: false, reason: "reponseCorrecte absente" };
-      return { ok: true, reason: "" };
-    }
-
-    function updateManualIndicator(report) {
-      const badge = document.getElementById("manualIndicator");
-      const pop = document.getElementById("manualPopover");
-      const list = document.getElementById("manualList");
-      if (!badge || !pop || !list) return;
-
-      const items = report?.manualItems || [];
-      badge.textContent = `🟠 Reste : ${items.length}`;
-      badge.title = items.length ? "Cliquer pour voir le détail" : "Aucune correction manuelle restante";
-      badge.classList.toggle("hidden", items.length === 0);
-
-      list.innerHTML = "";
-      if (!items.length) {
-        pop.classList.add("hidden");
-        return;
-      }
-      items.forEach((it) => {
-        const d = document.createElement("div");
-        d.className = "manual-item";
-        d.innerHTML = `<b>${escapeHTML(it.label || "?")}</b> · ${escapeHTML(it.type || "")}<br><small>${escapeHTML(it.qid || "")} — ${escapeHTML(it.reason || "")}</small>`;
-        list.appendChild(d);
-      });
-    }
-
-    function toggleManualPopover(force) {
-      const pop = document.getElementById("manualPopover");
-      if (!pop) return;
-      if (typeof force === "boolean") {
-        pop.classList.toggle("hidden", !force);
-        return;
-      }
-      pop.classList.toggle("hidden");
-    }
-
-    function gotoNextManualItem() {
-      const items = AUTO_REPORT?.manualItems || [];
-      if (!items.length) return;
-      CURRENT_MANUAL_INDEX = (CURRENT_MANUAL_INDEX + 1) % items.length;
-      const target = items[CURRENT_MANUAL_INDEX];
-      const row = document.querySelector(`#correctionTable tbody tr[data-qid="${CSS.escape(target.qid)}"]`);
-      if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
-    /** Run auto-correction on all questions and apply to the DOM */
-    function autocorrectCopy(blueprint, reponses) {
-      const questions = extractQuestionsFromBlueprint(blueprint);
-      if (!questions.length) return;
-
-      // Check if blueprint has autocorrect flag
-      const isAutocorrect = blueprint.autocorrect === true ||
-        questions.some(q => q.autocorrect === true);
-      if (!isAutocorrect) return;
-
-      let countCorrect = 0, countIncorrect = 0, countNT = 0;
-      let nbAuto = 0, nbManuel = 0;
-      let totalAutoPts = 0, totalAutoMax = 0, totalMax = 0;
-      const manualItems = [];
-      const rows = document.querySelectorAll('#correctionTable tbody tr');
-
-      rows.forEach((row, idx) => {
-        const q = questions[idx];
-        if (!q) return;
-
-        const bareme = Number(q?.bareme) || 0;
-        totalMax += bareme;
-
-        const eligibility = isAutocorrectEligible(q);
-        if (!eligibility.ok) {
-          nbManuel++;
-          manualItems.push({
-            label: q?.label || ("Q" + (idx + 1)),
-            type: q?.inputType || q?.type || "unknown",
-            qid: q?.qid || `q_${idx}`,
-            reason: eligibility.reason
-          });
-          row.dataset.manualReason = eligibility.reason;
-          row.dataset.manual = "1";
-          const labelCell = row.cells[0];
-          if (labelCell && !labelCell.querySelector('.ac-badge.manual')) {
-            const badge = document.createElement('span');
-            badge.className = 'ac-badge manual';
-            badge.textContent = 'MANUEL';
-            badge.title = 'Correction manuelle requise';
-            labelCell.appendChild(badge);
-          }
-          return;
-        }
-
-        nbAuto++;
-        totalAutoMax += bareme;
-
-        const result = autocorrectQuestion(q, reponses);
-        if (!result) return;
-
-        // Apply level
-        row.dataset.level = result.level;
-        // Store explicit points if provided (checkbox partial)
-        if (result.points !== undefined) {
-          row.dataset.autoPoints = result.points;
-        }
-        const btn = row.querySelector(`.level-btn.${result.level.toLowerCase()}`);
-        if (btn) {
-          Array.from(btn.parentNode.children).forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        }
-
-        // Apply comment
-        if (result.comment) {
-          const commentDiv = row.querySelector('.editable-div');
-          if (commentDiv) commentDiv.innerText = result.comment;
-        }
-
-        // Add auto-correction badge to the label cell
-        const labelCell = row.cells[0];
-        if (labelCell) {
-          const badge = document.createElement('span');
-          badge.className = 'ac-badge auto-' + result.level.toLowerCase();
-          badge.textContent = result.level === "A" ? '≈' : (result.correct ? '✓' : '✗');
-          badge.title = result.level === "A" ? `Partiel (${result.points} pts)` : (result.correct ? 'Correct (auto)' : 'Incorrect (auto)');
-          labelCell.appendChild(badge);
-        }
-
-        // Count stats
-        if (result.level === "M") countCorrect++;
-        else if (result.level === "A") countCorrect++; // QRM partial credit
-        else if (result.level === "I") countIncorrect++;
-        else countNT++;
-        totalAutoPts += (Number(result.points) || 0);
-      });
-
-            // Update all competence counters and points
-      const activeComps = new Set();
-      rows.forEach(r => { if (r.dataset.comp) activeComps.add(r.dataset.comp); });
-      activeComps.forEach(comp => {
-        updateCounters(comp);
-        autoCalculatePoints(comp);
-        updateDominantLevel(comp);
-      });
-
-      AUTO_REPORT = {
-        nbAuto,
-        nbManuel,
-        totalAutoMax,
-        totalMax,
-        totalObtenu: totalAutoPts,
-        manualItems
-      };
-
-      if (DEBUG) {
-        console.log("[AUTO DEBUG]", {
-          nbAuto,
-          nbManuel,
-          totalAutoMax,
-          totalMax,
-          totalObtenu: totalAutoPts,
-          manuels: manualItems
-        });
-      }
-
-      updateManualIndicator(AUTO_REPORT);
-      calculateTotal();
-
-      // Auto-correction désactivée : pas de bannière
-    } // ✅ FIN autocorrectCopy
-
-    async function init() {
-      console.log("🚀 Grille V21 (rappel oublis avant publication) - Démarrage...");
-      loadPreferences();
-      initSummary([], {});
-      updateStatusBanner();
-
-      const rawData = localStorage.getItem("cockpit_transfert");
-      if (!rawData) {
-        document.getElementById('docTitle').innerText = "⚠️ Aucune copie";
-        document.getElementById('statusText').innerHTML = "❌ Utilisez le bouton Grille depuis le Cockpit";
-        return;
-      }
-      // FIX #2 : NE PAS supprimer tout de suite — on attend que le chargement réussisse
-
-      try {
-        const copyFromStorage = JSON.parse(rawData);
-        CURRENT_DOC_ID = copyFromStorage.id;
-        CURRENT_ELEVE_CODE = copyFromStorage.eleveCode || copyFromStorage.userCode || null;
-
-        if (!CURRENT_ELEVE_CODE && copyFromStorage.path) {
-          const parts = copyFromStorage.path.split('/');
-          if (parts[0] === 'resultats') CURRENT_ELEVE_CODE = parts[1];
-        }
-
-        let docSnap = null;
-        if (CURRENT_ELEVE_CODE && copyFromStorage.path) {
-          docSnap = await getDoc(doc(db, copyFromStorage.path));
-        }
-        if (!docSnap || !docSnap.exists()) {
-          docSnap = await getDoc(doc(db, "devoirs_rendus", CURRENT_DOC_ID));
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            CURRENT_ELEVE_CODE = CURRENT_ELEVE_CODE || data.eleve?.userCode || data.userCode || data.eleveCode;
-          }
-        }
-        if (!docSnap || !docSnap.exists()) throw new Error("Document non trouvé");
-
-        CURRENT_COPY = docSnap.data();
-        CURRENT_COPY.id = CURRENT_DOC_ID;
-        CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.raw?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.payload?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.data?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(CURRENT_COPY?.raw);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw?.reponses);
-        if (!Object.keys(CURRENT_REPONSES).length) CURRENT_REPONSES = normalizeReponsesPayload(copyFromStorage?.raw);
-        if (!CURRENT_REPONSES || typeof CURRENT_REPONSES !== "object") CURRENT_REPONSES = {};
-        syncDebugGlobals();
-        // FIX #2 : Supprimer localStorage seulement APRÈS chargement réussi
-        localStorage.removeItem("cockpit_transfert");
-        if (!CURRENT_ELEVE_CODE) CURRENT_ELEVE_CODE = CURRENT_COPY.eleve?.userCode || CURRENT_COPY.userCode || "UNKNOWN";
-
-        document.getElementById('inputNom').value = CURRENT_ELEVE_CODE || "";
-        document.getElementById('inputPrenom').value = "";
-        document.getElementById('inputClasse').value = CURRENT_COPY.eleve?.classe || CURRENT_COPY.classe || "";
-        document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
-
-        const devoirId = String(CURRENT_COPY.devoirId || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
-        if (!devoirId) throw new Error("devoirId invalide");
-
-        // ═══════════════════════════════════════════════════════════════
-        // CHARGEMENT BLUEPRINT - LOGIQUE DOUBLE (externe + fallback intégré)
-        // ═══════════════════════════════════════════════════════════════
-        
-        let blueprintLoaded = false;
-
-// ÉTAPE 1 : Priorité au blueprint intégré dans la copie
-if (CURRENT_COPY && CURRENT_COPY.blueprint && typeof CURRENT_COPY.blueprint === "object") {
-  CURRENT_BLUEPRINT = CURRENT_COPY.blueprint;
-  console.log("✅ Blueprint intégré utilisé depuis la copie");
-  blueprintLoaded = true;
-}
-
-// ÉTAPE 2 : Sinon, tentative blueprint externe (mapse.fr)
-if (!blueprintLoaded) {
-  try {
-    const url = `https://mapse.fr/devoirs/${devoirId}_blueprint.json?ts=${Date.now()}`;
-    const resp = await fetch(url, { cache: "no-store" });
-    if (resp.ok) {
-      CURRENT_BLUEPRINT = await resp.json();
-      console.log("✅ Blueprint externe chargé depuis mapse.fr");
-      blueprintLoaded = true;
-    }
-  } catch (fetchError) {
-    console.warn("⚠️ Blueprint mapse.fr non accessible:", fetchError.message);
-  }
-}
-
-// ÉTAPE 3 : Dernier fallback externe (GitHub Pages /PSE)
-if (!blueprintLoaded) {
-  try {
-    const url = `https://preventionsanteenvironnement.github.io/PSE/devoirs/${devoirId}_blueprint.json?ts=${Date.now()}`;
-    const resp = await fetch(url, { cache: "no-store" });
-    if (resp.ok) {
-      CURRENT_BLUEPRINT = await resp.json();
-      console.log("✅ Blueprint externe chargé depuis GitHub /PSE");
-      blueprintLoaded = true;
-    }
-  } catch (fetchError) {
-    console.warn("⚠️ Blueprint GitHub /PSE non accessible:", fetchError.message);
-  }
-}
-
-// ÉCHEC TOTAL : Aucun blueprint trouvé
-if (!blueprintLoaded) {
-  throw new Error("Blueprint non trouvé: " + devoirId + " (ni intégré ni externe)");
-}
-
-        document.getElementById('docTitle').innerText = "Correction : " + ((CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.titre) ? CURRENT_BLUEPRINT.titre : devoirId);
-
-        // ═══ Bannière anti-triche (focus leaves, copier-coller, tentative) ═══
-        const acBanner = document.getElementById('antiCheatBanner');
-        const acAlerts = [];
-        if (CURRENT_COPY.tentative && CURRENT_COPY.tentative >= 2) {
-          acAlerts.push(`🔄 <b>2ème tentative</b>`);
-        }
-        if (CURRENT_COPY.focus) {
-          const f = CURRENT_COPY.focus;
-          if (f.focusLeaves > 0) acAlerts.push(`👁️ <b>${f.focusLeaves}</b> sortie${f.focusLeaves > 1 ? 's' : ''} de page`);
-          if (f.copyAttempts > 0) acAlerts.push(`📋 <b>${f.copyAttempts}</b> tentative${f.copyAttempts > 1 ? 's' : ''} de copie`);
-          if (f.pasteBlocked > 0) acAlerts.push(`🚫 <b>${f.pasteBlocked}</b> coller bloqué${f.pasteBlocked > 1 ? 's' : ''}`);
-        }
-        if (CURRENT_COPY.pasteStats) {
-          const total = CURRENT_COPY.pasteStats.totalPastes || CURRENT_COPY.pasteStats.external || 0;
-          if (total > 0 && !acAlerts.some(a => a.includes('coller'))) {
-            acAlerts.push(`🚫 <b>${total}</b> copier-coller`);
-          }
-        }
-        if (acAlerts.length > 0) {
-          acBanner.innerHTML = `⚠️ Anti-triche : ${acAlerts.join(' &nbsp;|&nbsp; ')}`;
-          acBanner.style.display = 'block';
-        } else {
-          acBanner.style.display = 'none';
-        }
-
-        const questions = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
-        const qidFallbackData = buildQidFallbackMap(questions, CURRENT_REPONSES);
-        QID_FALLBACK_MAP = qidFallbackData.map || {};
-        if (qidFallbackData?.diag) {
-          const d = qidFallbackData.diag;
-          console.log("🧭 QID diag:", d);
-          if (d.ratio < 0.7) {
-            console.warn(`⚠️ Mismatch QID détecté: ${d.matched}/${d.qCount} corrélés (${Math.round(d.ratio * 100)}%). Fallback actif: ${d.mapped}.`);
-            console.warn("🧩 QID non corrélés (extrait):", (d.unresolved || []).slice(0, 12));
-            console.warn("🗂️ Clés réponses (extrait):", Object.keys(CURRENT_REPONSES || {}).slice(0, 20));
-          }
-        }
-        syncDebugGlobals();
-        renderCorrection({ questions }, CURRENT_REPONSES);
-
-        // === AUTO-CORRECTION ENGINE HOOK ===
-        let hasExistingCorrection = false;
-
-        if (CURRENT_ELEVE_CODE !== "UNKNOWN") {
-          try {
-            const evalSnap = await getDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "evaluations", devoirId + "_eval"));
-            if (evalSnap.exists()) {
-              const existingEval = evalSnap.data();
-              if (hasMeaningfulCorrection(existingEval)) {
-                CURRENT_EVALUATION = existingEval;
-                loadExistingCorrection(CURRENT_EVALUATION);
-                IS_SAVED = true;
-                hasExistingCorrection = true;
-              } else {
-                console.warn("ℹ️ Évaluation existante trouvée mais vide/incomplète: auto-correction autorisée.");
-              }
-            } else if (hasMeaningfulCorrection(CURRENT_COPY.correction)) {
-              CURRENT_EVALUATION = CURRENT_COPY.correction;
-              loadExistingCorrection(CURRENT_COPY.correction);
-              IS_SAVED = true;
-              hasExistingCorrection = true;
-            }
-          } catch(e) {
-            // FIX #3 : Signaler l'erreur au lieu de l'avaler silencieusement
-            console.warn("⚠️ Impossible de charger une correction existante:", e.message);
-            IS_SAVED = false;
-            const banner = document.getElementById('statusText');
-            if (banner) banner.innerHTML = "⚠️ Correction existante non chargée (vérifiez votre connexion)";
-            document.getElementById('statusBanner').className = 'status-banner not-saved';
-          }
-        }
-
-        // Auto-correction conditionnelle (safe): uniquement pour blueprints compatibles,
-        // sans écraser une correction déjà existante.
-        if (!hasExistingCorrection) {
-          const qs = extractQuestionsFromBlueprint(CURRENT_BLUEPRINT);
-          const hasAutocorrectMeta = CURRENT_BLUEPRINT?.autocorrect === true ||
-            qs.some(q => q?.autocorrect === true);
-          const hasAutocorrectData = qs.some(q =>
-            q && q.reponseCorrecte !== undefined && q.reponseCorrecte !== null &&
-            String(q.inputType || "").trim() !== ""
-          );
-
-          if (hasAutocorrectMeta && hasAutocorrectData) {
-            autocorrectCopy(CURRENT_BLUEPRINT, CURRENT_REPONSES);
-            IS_SAVED = false;
-          }
-        }
-
-        // Init copy navigation (Suivant + Valider&Publier buttons)
-        initCopyNavigation();
-
-        updateStatusBanner();
-        console.log("✅ Grille V21 prête !");
-      } catch (e) {
-        document.getElementById('statusText').innerHTML = "❌ " + e.message;
-        document.getElementById('statusBanner').classList.add('not-saved');
-        console.error("❌", e);
-        handleFirebaseError(e, "chargement copie"); // FIX #20
-      }
-    }
-
-    // FIX #13 : Raccourcis clavier — cliquer sur une ligne puis 1=NT, 2=I, 3=A, 4=M
-    let FOCUSED_ROW = null;
-    document.addEventListener('click', (e) => {
-      const row = e.target.closest('#correctionTable tbody tr');
-      if (row) {
-        if (FOCUSED_ROW) FOCUSED_ROW.style.outline = '';
-        FOCUSED_ROW = row;
-        row.style.outline = '2px solid #2e7bb6';
-        row.style.outlineOffset = '-2px';
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      // Ne pas intercepter si on est dans un champ de saisie
-      if (e.target.matches('input, textarea, [contenteditable="true"]')) return;
-      if (!FOCUSED_ROW) return;
-      const keyMap = { '1': 'NT', '2': 'I', '3': 'A', '4': 'M', 'Numpad1': 'NT', 'Numpad2': 'I', 'Numpad3': 'A', 'Numpad4': 'M' };
-      const level = keyMap[e.key] || keyMap[e.code];
-      if (level) {
-        e.preventDefault();
-        const btn = FOCUSED_ROW.querySelector(`.level-btn.${level.toLowerCase()}`);
-        if (btn) btn.click();
-        // Passer à la question suivante
-        const next = FOCUSED_ROW.nextElementSibling;
-        if (next && next.matches('tr')) {
-          FOCUSED_ROW.style.outline = '';
-          FOCUSED_ROW = next;
-          next.style.outline = '2px solid #2e7bb6';
-          next.style.outlineOffset = '-2px';
-          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-      // Tab = passer à la question suivante sans noter
-      if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault();
-        const next = FOCUSED_ROW.nextElementSibling;
-        if (next && next.matches('tr')) {
-          FOCUSED_ROW.style.outline = '';
-          FOCUSED_ROW = next;
-          next.style.outline = '2px solid #2e7bb6';
-          next.style.outlineOffset = '-2px';
-          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-    });
-
-    // FIX #14 : Sauvegarde auto du brouillon quand l'onglet perd le focus (mobile + desktop)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && !IS_SAVED && currentUser && CURRENT_ELEVE_CODE && CURRENT_ELEVE_CODE !== 'UNKNOWN') {
-        // Sauvegarde silencieuse en brouillon
-        try {
-          const brouillon = collecterDonneesCorrection();
-          brouillon.statut = "brouillon_auto";
-          brouillon.note_finale = parseFloat((document.getElementById('finalNote').textContent || "0").replace(",", ".")) || 0;
-          brouillon.publie = false;
-          const brouillonDocId = brouillon.devoirId + "_brouillon";
-          setDoc(doc(db, "resultats", CURRENT_ELEVE_CODE, "brouillons", brouillonDocId), brouillon)
-            .then(() => console.log("💾 Brouillon auto sauvegardé (visibilitychange)"))
-            .catch(err => console.warn("⚠️ Brouillon auto échoué:", err.message));
-        } catch(e) { console.warn("⚠️ Brouillon auto échoué:", e.message); }
-      }
-    });
-
-    window.addEventListener('beforeunload', (e) => { if (!IS_SAVED) { e.preventDefault(); e.returnValue = ''; } });
-    init();
-  </script>
-</body>
-</html>
