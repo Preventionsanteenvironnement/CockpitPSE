@@ -29,11 +29,14 @@
         .btn-secondary:hover { background: #e2e8f0; }
         .btn-export { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
         .btn-import { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+        .btn-backup { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+        .btn-backup:disabled { opacity: 0.5; cursor: not-allowed; }
         .status-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 14px; flex-wrap: wrap; }
         .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
         .badge-green { background: #dcfce7; color: #166534; }
         .badge-blue { background: #dbeafe; color: #1e40af; }
         .badge-orange { background: #fef3c7; color: #92400e; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
         .table-scroll { overflow-x: auto; margin-top: 10px; }
         .grades-table { border-collapse: collapse; font-size: 0.82em; min-width: 100%; }
         .grades-table th { background: #059669; color: #fff; padding: 8px 10px; text-align: center; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
@@ -63,20 +66,70 @@
         .file-input-wrap input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
         .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #059669; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .period-filter { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+        .period-filter label { font-weight: 600; font-size: 0.85em; color: #374151; }
+        .period-filter input[type="date"] { padding: 6px 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.85em; font-weight: 600; color: #374151; }
+        .period-filter input[type="date"]:focus { border-color: #059669; outline: none; }
+        .period-filter .arrow { color: #94a3b8; font-weight: 700; }
+        /* En-tête impression (caché normalement) */
+        .print-header { display: none; }
+
         @media (max-width: 768px) {
             .container { padding: 10px; }
             .topbar { padding: 12px 14px; }
             .topbar h1 { font-size: 1.1em; }
             .grades-table th.col-exo { height: 100px; font-size: 0.65em; }
         }
+
+        /* ══════════════════════════════════════════ */
+        /* 🖨️ STYLES IMPRESSION                      */
+        /* ══════════════════════════════════════════ */
+        @media print {
+            body { background: #fff !important; padding: 0; margin: 0; font-size: 10pt; }
+            .topbar, .auth-overlay, #authSection { display: none !important; }
+            .card { box-shadow: none; border: none; padding: 8px 0; margin-bottom: 8px; }
+            .class-grid, .period-filter, .import-section, .btn-primary, .btn-secondary,
+            .btn-export, .btn-import, .btn-backup, #btnExportTop, #btnPrint,
+            #loadStatus, .file-input-wrap, #btnCharger { display: none !important; }
+            .container { max-width: 100%; padding: 0 10px; }
+            .print-header {
+                display: block !important;
+                text-align: center; padding: 16px 0 8px; margin-bottom: 10px;
+                border-bottom: 3px solid #059669;
+            }
+            .print-header h1 { font-size: 1.4em; color: #059669; margin-bottom: 4px; }
+            .print-header .print-meta { font-size: 0.85em; color: #64748b; }
+            .status-bar { background: none; padding: 4px 0; justify-content: center; }
+            .table-scroll { overflow: visible; }
+            .grades-table { font-size: 0.7em; width: 100%; }
+            .grades-table th { position: static !important; background: #059669 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .grades-table th.col-nom { position: static !important; }
+            .grades-table td.td-nom { position: static !important; }
+            .grades-table th.col-exo { height: 100px; }
+            .grades-table td, .grades-table th { border: 1px solid #999 !important; }
+            .grades-table tr.row-avg td { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-top: 2px solid #059669 !important; }
+            .note-red { color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .note-green { color: #16a34a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            tr { page-break-inside: avoid; }
+            #tableCard h2 { display: none; }
+            /* Masquer la card Import/Export en impression */
+            .card:last-child { display: none !important; }
+        }
     </style>
 </head>
 <body>
+
+<!-- En-tête visible uniquement à l'impression -->
+<div class="print-header" id="printHeader">
+    <h1>📊 Dossier Classe — Notes & Moyennes</h1>
+    <div class="print-meta" id="printMeta"></div>
+</div>
 
 <div class="topbar">
     <h1>📊 Dossier Classe — Notes & Moyennes</h1>
     <a href="index.html" class="btn">⬅ Cockpit</a>
     <button class="btn" onclick="exportCSV()" id="btnExportTop" style="display:none;">📥 Export CSV</button>
+    <button class="btn" onclick="imprimerNotes()" id="btnPrint" style="display:none;">🖨️ Imprimer</button>
 </div>
 
 <div class="container">
@@ -100,12 +153,22 @@
                 <button class="btn-primary" onclick="chargerNotes()" id="btnCharger">📥 Charger les notes</button>
                 <span id="loadStatus" style="color:#64748b; font-size:0.85em;"></span>
             </div>
+            <!-- Filtre par période -->
+            <div class="period-filter">
+                <label>📅 Periode :</label>
+                <input type="date" id="dateFrom" title="Date de debut">
+                <span class="arrow">→</span>
+                <input type="date" id="dateTo" title="Date de fin">
+                <button class="btn-secondary" onclick="resetDates()">Tout</button>
+                <button class="btn-secondary" onclick="filterByPeriod()" id="btnFilter">🔍 Filtrer</button>
+            </div>
         </div>
 
         <div id="statusBar" class="status-bar" style="display:none;">
             <span class="status-badge badge-green" id="badgeEleves">—</span>
             <span class="status-badge badge-blue" id="badgeExos">—</span>
             <span class="status-badge badge-orange" id="badgeMoyenne">—</span>
+            <span class="status-badge badge-purple" id="badgePeriode" style="display:none;">—</span>
         </div>
 
         <div class="card" id="tableCard" style="display:none;">
@@ -119,9 +182,10 @@
         </div>
 
         <div class="card">
-            <h2>📂 Import / Export</h2>
+            <h2>📂 Import / Export / Sauvegarde</h2>
             <div class="import-section">
                 <button class="btn-export" onclick="exportCSV()" id="btnExport2" disabled>📥 Exporter CSV pour Pronote</button>
+                <button class="btn-backup" onclick="exportBackupJSON()" id="btnBackup" disabled>💾 Sauvegarde complete (JSON)</button>
                 <div class="file-input-wrap">
                     <button class="btn-import">📤 Importer CSV eleves</button>
                     <input type="file" accept=".csv,.txt" onchange="importCSV(event)">
@@ -130,6 +194,9 @@
             </div>
             <p style="color:#94a3b8; font-size:0.8em; margin-top:8px;">
                 Format import : <code>Code;Nom Prenom;Classe</code> (1 ligne par eleve, separateur <code>;</code> ou <code>,</code>). Les noms enrichissent l'annuaire du cockpit.
+            </p>
+            <p style="color:#94a3b8; font-size:0.8em; margin-top:4px;">
+                💾 La sauvegarde JSON contient toutes les donnees brutes (notes, evaluations, eleves). A conserver en cas de panne.
             </p>
         </div>
     </div>
@@ -148,7 +215,8 @@
 
     const CLE_ELEVES = 'cockpit_eleves_noms';
     const CLE_SELECTED_CLASSES = 'dossier_classe_selection';
-    let gradesData = null;
+    let gradesData = null;       // Données complètes chargées
+    let filteredGradesData = null; // Données filtrées par période (ou null = tout)
 
     function initClassGrid() {
         const grid = document.getElementById('classGrid');
@@ -178,6 +246,101 @@
         var eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
         return eleves[(code || '').toUpperCase()] || null;
     }
+
+    // ══════════════════════════════════════════════════════
+    // 📅 FILTRE PAR PÉRIODE
+    // ══════════════════════════════════════════════════════
+    window.resetDates = function() {
+        document.getElementById('dateFrom').value = '';
+        document.getElementById('dateTo').value = '';
+        filteredGradesData = null;
+        document.getElementById('badgePeriode').style.display = 'none';
+        if (gradesData) renderTable(gradesData);
+    };
+
+    window.filterByPeriod = function() {
+        if (!gradesData) { alert("Chargez les notes d'abord."); return; }
+        const fromStr = document.getElementById('dateFrom').value;
+        const toStr = document.getElementById('dateTo').value;
+
+        if (!fromStr && !toStr) {
+            filteredGradesData = null;
+            document.getElementById('badgePeriode').style.display = 'none';
+            renderTable(gradesData);
+            return;
+        }
+
+        const fromDate = fromStr ? new Date(fromStr + 'T00:00:00') : new Date('2000-01-01');
+        const toDate = toStr ? new Date(toStr + 'T23:59:59') : new Date('2099-12-31');
+
+        // Filtrer les exercices par date
+        const filteredExercises = gradesData.exercises.filter(function(ex) {
+            if (!ex.date) return true; // Si pas de date, on garde
+            const d = new Date(ex.date);
+            return d >= fromDate && d <= toDate;
+        });
+
+        // Recalculer les grades et students pour ces exercices filtrés
+        const filteredExoIds = new Set(filteredExercises.map(function(e) { return e.devoirId; }));
+        const filteredGrades = {};
+        const filteredStudentCodes = new Set();
+
+        Object.keys(gradesData.grades).forEach(function(key) {
+            const parts = key.split('_');
+            // key = devoirId_userCode — mais devoirId peut contenir _
+            // On cherche le devoirId qui match
+            for (var ex of filteredExercises) {
+                if (key.startsWith(ex.devoirId + '_')) {
+                    filteredGrades[key] = gradesData.grades[key];
+                    var userCode = key.substring(ex.devoirId.length + 1);
+                    filteredStudentCodes.add(userCode);
+                    break;
+                }
+            }
+        });
+
+        const filteredStudents = gradesData.students.filter(function(st) {
+            return filteredStudentCodes.has(st.code);
+        });
+
+        filteredGradesData = {
+            students: filteredStudents,
+            exercises: filteredExercises,
+            grades: filteredGrades
+        };
+
+        // Afficher badge période
+        const badge = document.getElementById('badgePeriode');
+        const fromLabel = fromStr || '...';
+        const toLabel = toStr || '...';
+        badge.textContent = '📅 ' + fromLabel + ' → ' + toLabel;
+        badge.style.display = 'inline-flex';
+
+        renderTable(filteredGradesData);
+    };
+
+    // ══════════════════════════════════════════════════════
+    // 🖨️ IMPRIMER
+    // ══════════════════════════════════════════════════════
+    window.imprimerNotes = function() {
+        // Préparer l'en-tête d'impression
+        const classes = getSelectedClasses();
+        const classLabels = classes.map(function(id) {
+            var found = CLASSES.find(function(c) { return c.id === id; });
+            return found ? found.label : id;
+        });
+        const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+        const fromStr = document.getElementById('dateFrom').value;
+        const toStr = document.getElementById('dateTo').value;
+
+        let meta = 'Classes : ' + classLabels.join(', ') + ' — Imprime le ' + dateStr;
+        if (fromStr || toStr) {
+            meta += ' — Periode : ' + (fromStr || '...') + ' → ' + (toStr || '...');
+        }
+        document.getElementById('printMeta').textContent = meta;
+
+        window.print();
+    };
 
     initClassGrid();
 </script>
@@ -217,7 +380,7 @@
     });
 
     // ══════════════════════════════════════════════════════
-    // CHARGER LES NOTES
+    // CHARGER LES NOTES (limit augmenté à 5000)
     // ══════════════════════════════════════════════════════
     window.chargerNotes = async function() {
         const classes = getSelectedClasses();
@@ -229,23 +392,28 @@
         status.innerHTML = '<span class="spinner"></span> Chargement...';
 
         try {
-            const qCopies = query(collectionGroup(db, "copies"), limit(500));
+            const qCopies = query(collectionGroup(db, "copies"), limit(5000));
             const snapCopies = await getDocs(qCopies);
-            const qEvals = query(collectionGroup(db, "evaluations"), limit(500));
+            const qEvals = query(collectionGroup(db, "evaluations"), limit(5000));
             const snapEvals = await getDocs(qEvals);
 
+            // Stocker les évaluations brutes pour la sauvegarde
             const evalsMap = new Map();
+            const rawEvaluations = {};
             snapEvals.forEach(docSnap => {
                 const ev = docSnap.data();
                 const pathParts = docSnap.ref.path.split('/');
                 const userCode = pathParts.length >= 2 ? pathParts[1] : ev.eleveCode;
                 const devoirId = ev.devoirId || "unknown";
-                evalsMap.set(devoirId + "_" + userCode, ev);
+                const key = devoirId + "_" + userCode;
+                evalsMap.set(key, ev);
+                rawEvaluations[key] = ev;
             });
 
             const studentsMap = new Map();
             const exercisesMap = new Map();
             const grades = {};
+            const exerciseDates = {};
 
             snapCopies.forEach(docSnap => {
                 const d = docSnap.data();
@@ -264,8 +432,19 @@
                     studentsMap.set(userCode, { code: userCode, nom: getNomEleve(userCode) || "", classe: classe });
                 }
 
+                // Extraire la date du devoir (pour le filtre par période)
+                if (!exerciseDates[devoirId]) {
+                    const dateCandidate = d.timestamp || d.date || d.meta?.date || d.meta?.timestamp || d.createdAt || null;
+                    if (dateCandidate) {
+                        // Firestore Timestamp → Date
+                        if (dateCandidate.toDate) exerciseDates[devoirId] = dateCandidate.toDate().toISOString();
+                        else if (dateCandidate.seconds) exerciseDates[devoirId] = new Date(dateCandidate.seconds * 1000).toISOString();
+                        else exerciseDates[devoirId] = new Date(dateCandidate).toISOString();
+                    }
+                }
+
                 if (!exercisesMap.has(devoirId)) {
-                    exercisesMap.set(devoirId, { devoirId: devoirId, titre: titre });
+                    exercisesMap.set(devoirId, { devoirId: devoirId, titre: titre, date: exerciseDates[devoirId] || null });
                 }
 
                 const evaluation = evalsMap.get(key);
@@ -297,9 +476,10 @@
                 return (a.nom || a.code).localeCompare(b.nom || b.code);
             });
 
-            gradesData = { students, exercises, grades };
-            renderTable();
-            status.textContent = "✅ Charge !";
+            gradesData = { students, exercises, grades, rawEvaluations };
+            filteredGradesData = null;
+            renderTable(gradesData);
+            status.textContent = "✅ " + snapCopies.size + " copies, " + snapEvals.size + " evaluations chargees !";
         } catch(e) {
             console.error("Erreur:", e);
             status.textContent = "❌ Erreur : " + e.message;
@@ -310,14 +490,17 @@
     // ══════════════════════════════════════════════════════
     // RENDER TABLE
     // ══════════════════════════════════════════════════════
-    function renderTable() {
-        if (!gradesData) return;
-        const { students, exercises, grades } = gradesData;
+    function renderTable(data) {
+        if (!data) data = filteredGradesData || gradesData;
+        if (!data) return;
+        const { students, exercises, grades } = data;
 
         document.getElementById('tableCard').style.display = 'block';
         document.getElementById('statusBar').style.display = 'flex';
         document.getElementById('btnExportTop').style.display = 'inline-flex';
+        document.getElementById('btnPrint').style.display = 'inline-flex';
         document.getElementById('btnExport2').disabled = false;
+        document.getElementById('btnBackup').disabled = false;
 
         document.getElementById('badgeEleves').textContent = '👤 ' + students.length + ' eleve' + (students.length > 1 ? 's' : '');
         document.getElementById('badgeExos').textContent = '📝 ' + exercises.length + ' exercice' + (exercises.length > 1 ? 's' : '');
@@ -406,8 +589,9 @@
     // EXPORT CSV (Pronote)
     // ══════════════════════════════════════════════════════
     window.exportCSV = function() {
-        if (!gradesData) { alert("Chargez les notes d'abord."); return; }
-        const { students, exercises, grades } = gradesData;
+        const data = filteredGradesData || gradesData;
+        if (!data) { alert("Chargez les notes d'abord."); return; }
+        const { students, exercises, grades } = data;
 
         let csv = "Code;Nom;Classe";
         exercises.forEach(function(ex) { csv += ";" + ex.titre.replace(/;/g, ","); });
@@ -434,8 +618,61 @@
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         const classes = getSelectedClasses().join("-") || "toutes";
-        a.download = 'notes_' + classes + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+        const fromStr = document.getElementById('dateFrom').value;
+        const toStr = document.getElementById('dateTo').value;
+        let period = '';
+        if (fromStr || toStr) period = '_' + (fromStr || 'debut') + '_' + (toStr || 'fin');
+        a.download = 'notes_' + classes + period + '_' + new Date().toISOString().slice(0, 10) + '.csv';
         a.click();
+    };
+
+    // ══════════════════════════════════════════════════════
+    // 💾 SAUVEGARDE COMPLÈTE (JSON)
+    // ══════════════════════════════════════════════════════
+    window.exportBackupJSON = function() {
+        const data = filteredGradesData || gradesData;
+        if (!data) { alert("Chargez les notes d'abord."); return; }
+
+        const classes = getSelectedClasses();
+        const classLabels = classes.map(function(id) {
+            var found = CLASSES.find(function(c) { return c.id === id; });
+            return found ? found.label : id;
+        });
+        const fromStr = document.getElementById('dateFrom').value;
+        const toStr = document.getElementById('dateTo').value;
+
+        const backup = {
+            meta: {
+                type: "sauvegarde_dossier_classe_PSE",
+                version: "1.0",
+                dateExport: new Date().toISOString(),
+                dateExportFR: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                classesSelectionnees: classLabels,
+                classesIds: classes,
+                periode: (fromStr || toStr) ? { du: fromStr || null, au: toStr || null } : "toute_annee",
+                nbEleves: data.students.length,
+                nbExercices: data.exercises.length
+            },
+            eleves: data.students,
+            exercices: data.exercises,
+            notes: data.grades,
+            evaluations_brutes: gradesData.rawEvaluations || {}
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const classStr = classes.join("-") || "toutes";
+        let period = '';
+        if (fromStr || toStr) period = '_' + (fromStr || 'debut') + '_' + (toStr || 'fin');
+        a.download = 'sauvegarde_notes_' + classStr + period + '_' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+
+        alert('✅ Sauvegarde JSON telechargee !\n\n' +
+            data.students.length + ' eleves, ' +
+            data.exercises.length + ' exercices\n' +
+            'Conservez ce fichier en lieu sur.');
     };
 
     // ══════════════════════════════════════════════════════
