@@ -8,6 +8,7 @@
   <script src="data_eleves.js" onerror="console.warn('⚠️ data_eleves.js non trouvé — annuaire indisponible'); window.DATA_ELEVES=window.DATA_ELEVES||{};"></script>
   <script src="data_commentaires_competences.js" onerror="console.warn('⚠️ data_commentaires_competences.js non trouvé — banque commentaires vide'); window.DATA_COMMENTAIRES_COMPETENCES=window.DATA_COMMENTAIRES_COMPETENCES||{};"></script>
   <script src="data_appreciation.js" onerror="console.warn('⚠️ data_appreciation.js non trouvé — banque appréciations vide'); window.DATA_APPRECIATION=window.DATA_APPRECIATION||{};"></script>
+  <script src="data_commentaires_auto.js" onerror="console.warn('⚠️ data_commentaires_auto.js non trouvé — commentaires auto désactivés'); window.COMMENTAIRES_AUTO=window.COMMENTAIRES_AUTO||{};"></script>
 
   <style>
     @page { size: A4; margin: 8mm; }
@@ -2297,7 +2298,16 @@ markUnsaved();
     }
 
     /** Construit le commentaire auto = banque + détail technique */
-    function buildAutoComment(comp, level, detail) {
+    function buildAutoComment(comp, level, detail, inputType) {
+      // Priorité : commentaire auto spécifique (QCU, V/F, nombre) si disponible
+      if (inputType && window.getAutoComment) {
+        const autoComment = window.getAutoComment(inputType, comp, level);
+        if (autoComment) {
+          if (detail) return autoComment + "\n📖 " + detail;
+          return autoComment;
+        }
+      }
+      // Fallback : banque commentaires générale
       const bankComment = getBankComment(comp, level);
       if (bankComment && detail) return bankComment + "\n📖 " + detail;
       if (bankComment) return bankComment;
@@ -2309,16 +2319,15 @@ markUnsaved();
       const qid = q?.qid;
       if (!qid || !q.autocorrect) return null; // not auto-correctable
 
+      const inputType = (q.inputType || "").toLowerCase();
       const raw = resolveAnswerForQid(reponses, qid);
       const correct = q.reponseCorrecte;
 
       // Not answered
       if (raw === undefined || raw === null || raw === "" ||
           (Array.isArray(raw) && raw.length === 0)) {
-        return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
+        return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu", inputType), correct: false, points: 0 };
       }
-
-      const inputType = (q.inputType || "").toLowerCase();
       let isCorrect = false;
 
       switch (inputType) {
@@ -2372,7 +2381,7 @@ markUnsaved();
 
           if (score === bareme) {
             // Tout juste → Maîtrisé
-            return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: bareme };
+            return { level: "M", comment: buildAutoComment(q.competence, "M", "", inputType), correct: true, points: bareme };
           } else if (score > 0) {
             // Partiellement correct → Acquis
             const fpLabels = fpArr.map(valToLabel).join(", ");
@@ -2381,7 +2390,7 @@ markUnsaved();
             if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
             if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
             detail += ` | Score : ${bareme} - ${penalite}×${discordances} = ${score}/${bareme}`;
-            return { level: "A", comment: buildAutoComment(q.competence, "A", detail), correct: false, points: score };
+            return { level: "A", comment: buildAutoComment(q.competence, "A", detail, inputType), correct: false, points: score };
           } else {
             // Zéro → Insuffisant
             const fpLabels = fpArr.map(valToLabel).join(", ");
@@ -2390,7 +2399,7 @@ markUnsaved();
             if (FP > 0) detail += ` | Mauvaises cochées : ${fpLabels}`;
             if (FN > 0) detail += ` | Non cochées : ${fnLabels}`;
             detail += ` | Score : 0/${bareme}`;
-            return { level: "I", comment: buildAutoComment(q.competence, "I", detail), correct: false, points: 0 };
+            return { level: "I", comment: buildAutoComment(q.competence, "I", detail, inputType), correct: false, points: 0 };
           }
         }
 
@@ -2414,7 +2423,7 @@ markUnsaved();
               }
             }
             if (!anyFound) {
-              return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu"), correct: false, points: 0 };
+              return { level: "NT", comment: buildAutoComment(q.competence, "NT", "Non répondu", inputType), correct: false, points: 0 };
             }
             isCorrect = allMatch;
           }
@@ -2447,10 +2456,10 @@ markUnsaved();
       }
 
       if (isCorrect) {
-        return { level: "M", comment: buildAutoComment(q.competence, "M", ""), correct: true, points: Number(q.bareme) || 0 };
+        return { level: "M", comment: buildAutoComment(q.competence, "M", "", inputType), correct: true, points: Number(q.bareme) || 0 };
       } else {
         const attendu = q.reponseAttendue || String(correct);
-        return { level: "I", comment: buildAutoComment(q.competence, "I", "Attendu : " + attendu), correct: false, points: 0 };
+        return { level: "I", comment: buildAutoComment(q.competence, "I", "Attendu : " + attendu, inputType), correct: false, points: 0 };
       }
     }
 
