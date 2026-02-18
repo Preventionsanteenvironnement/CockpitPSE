@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur d'Evaluations — PSE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 320px; min-width: 320px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.05rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        #btn-new-eval {
+            width: 100%; padding: 12px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #btn-new-eval:hover { opacity: 0.85; }
+
+        .eval-list { display: flex; flex-direction: column; gap: 4px; }
+        .eval-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent; position: relative;
+        }
+        .eval-list-item:hover { border-color: #475569; }
+        .eval-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .eval-list-item .ei-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; padding-right: 28px; }
+        .eval-list-item .ei-meta { font-size: 0.7rem; color: #64748b; }
+        .eval-list-item .ei-del {
+            position: absolute; top: 8px; right: 8px;
+            background: transparent; border: none; color: #64748b;
+            font-size: 0.85rem; cursor: pointer; padding: 2px 5px; border-radius: 4px;
+            opacity: 0; transition: 0.2s;
+        }
+        .eval-list-item:hover .ei-del { opacity: 1; }
+        .eval-list-item .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .ei-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.65rem; font-weight: 700; margin-right: 4px;
+        }
+        .badge-pub { background: #dcfce7; color: #166534; }
+        .badge-draft { background: #fef3c7; color: #92400e; }
+        .badge-qcount { background: #dbeafe; color: #1e40af; }
+        .badge-bareme { background: #ede9fe; color: #5b21b6; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        #main-editor { display: none; flex-direction: column; gap: 20px; max-width: 850px; width: 100%; margin: 0 auto; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .form-input, .form-textarea {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; font-family: inherit;
+        }
+        .form-textarea { resize: vertical; min-height: 60px; }
+        .form-input:focus, .form-textarea:focus { border-color: #3b82f6; }
+        .form-input::placeholder, .form-textarea::placeholder { color: #64748b; }
+        .form-select {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row > * { flex: 1; }
+
+        /* Meta section */
+        .meta-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .meta-card h3 { font-size: 1rem; margin-bottom: 16px; color: #f1f5f9; }
+
+        /* Bareme radio */
+        .bareme-toggle { display: flex; gap: 8px; }
+        .bareme-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .bareme-btn.active { border-color: #8b5cf6; background: rgba(139,92,246,0.15); color: #c4b5fd; }
+
+        /* Mode toggle */
+        .mode-toggle { display: flex; gap: 8px; }
+        .mode-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .mode-btn.active { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #93c5fd; }
+
+        /* Documents section */
+        .doc-card {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .doc-card .doc-info { flex: 1; }
+        .doc-card .doc-title { font-weight: 700; font-size: 0.9rem; }
+        .doc-card .doc-type { font-size: 0.7rem; color: #64748b; }
+        .doc-card .doc-del {
+            background: transparent; border: none; color: #64748b; font-size: 1rem;
+            cursor: pointer; padding: 4px 8px;
+        }
+        .doc-card .doc-del:hover { color: #ef4444; }
+
+        .doc-form {
+            background: #1a1a2e; border: 2px solid #8b5cf6; border-radius: 12px;
+            padding: 16px; margin-bottom: 12px; display: none;
+        }
+
+        /* Questions section */
+        .questions-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .questions-header h3 { font-size: 1.1rem; }
+        .questions-count { font-size: 0.85rem; color: #64748b; }
+
+        .add-btns { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .add-btn {
+            flex: 1; min-width: 100px; padding: 10px 8px; border: 2px dashed #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.8rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .add-btn:hover { border-color: #3b82f6; color: #3b82f6; background: rgba(59,130,246,0.05); }
+
+        /* Question cards */
+        .q-card {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 16px; margin-bottom: 10px; position: relative;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .q-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .q-card-num { font-weight: 900; font-size: 1rem; color: #3b82f6; }
+        .q-card-type-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 700; margin-left: 8px;
+        }
+        .type-qcm_single { background: #3b82f6; color: white; }
+        .type-qcm_multi { background: #06b6d4; color: white; }
+        .type-vf { background: #8b5cf6; color: white; }
+        .type-mot { background: #f59e0b; color: white; }
+        .type-nombre { background: #22c55e; color: white; }
+
+        .q-card-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        .q-card-meta span {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+        }
+        .qm-pts { background: #ede9fe; color: #5b21b6; }
+        .qm-comp { background: #dbeafe; color: #1e40af; }
+        .qm-doc { background: #fef3c7; color: #92400e; }
+
+        .q-card-actions { display: flex; gap: 4px; }
+        .q-card-actions button {
+            background: #0f172a; border: 1px solid #475569; color: #94a3b8;
+            width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .q-card-actions button:hover { background: #334155; color: white; }
+        .q-card-actions button.btn-del:hover { background: #ef4444; color: white; }
+        .q-card-actions button.btn-edit:hover { background: #3b82f6; color: white; }
+
+        .q-card-question { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+        .q-card-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+        .q-card-choice {
+            padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;
+            background: #0f172a; color: #94a3b8; border: 1px solid #334155;
+        }
+        .q-card-choice.correct { background: #166534; color: #bbf7d0; border-color: #22c55e; }
+        .q-card-answer { font-size: 0.85rem; color: #22c55e; font-weight: 600; }
+        .q-card-correction { font-size: 0.75rem; color: #64748b; margin-top: 6px; font-style: italic; }
+
+        /* Question add form */
+        .q-form {
+            background: #1a1a2e; border: 2px solid #3b82f6; border-radius: 12px;
+            padding: 20px; margin-bottom: 12px; display: none;
+        }
+        .q-form h4 { font-size: 0.95rem; margin-bottom: 14px; color: #93c5fd; }
+        .q-form .form-input, .q-form .form-textarea { background: #0f172a; }
+        .q-form-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .btn-save-q {
+            flex: 1; padding: 10px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-save-q:hover { opacity: 0.85; }
+        .btn-cancel-q {
+            padding: 10px 20px; background: #334155; color: #94a3b8;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-cancel-q:hover { background: #475569; color: white; }
+
+        /* Common question fields (points, competence, correction, explication) */
+        .q-extra-fields {
+            border-top: 1px solid #334155; margin-top: 14px; padding-top: 14px;
+        }
+
+        /* Radio/checkbox custom */
+        .radio-row, .check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .radio-row input[type="radio"], .check-row input[type="checkbox"] { accent-color: #22c55e; width: 18px; height: 18px; }
+        .radio-row input[type="text"], .check-row input[type="text"] { flex: 1; }
+        .radio-row .remove-choice, .check-row .remove-choice {
+            background: transparent; border: none; color: #ef4444; font-size: 1.2rem;
+            cursor: pointer; padding: 0 4px; opacity: 0.5;
+        }
+        .radio-row .remove-choice:hover, .check-row .remove-choice:hover { opacity: 1; }
+        .btn-add-choice {
+            padding: 6px 12px; background: #1e293b; border: 1px dashed #475569;
+            color: #64748b; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-top: 4px;
+        }
+        .btn-add-choice:hover { border-color: #3b82f6; color: #3b82f6; }
+
+        /* VF buttons */
+        .vf-toggle { display: flex; gap: 8px; }
+        .vf-btn {
+            flex: 1; padding: 12px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .vf-btn.selected-true { border-color: #22c55e; background: rgba(34,197,94,0.15); color: #22c55e; }
+        .vf-btn.selected-false { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Validation banner */
+        .validation-banner {
+            background: #7f1d1d; border: 1px solid #ef4444; border-radius: 10px;
+            padding: 14px 18px; display: none;
+        }
+        .validation-banner h4 { color: #fca5a5; font-size: 0.9rem; margin-bottom: 8px; }
+        .validation-banner ul { list-style: none; }
+        .validation-banner li { color: #fca5a5; font-size: 0.85rem; margin-bottom: 4px; }
+        .validation-banner li::before { content: "⚠️ "; }
+
+        /* Bottom actions */
+        .bottom-actions {
+            display: flex; gap: 10px; margin-top: 20px; padding-top: 20px;
+            border-top: 1px solid #334155;
+        }
+        .btn-save-eval {
+            flex: 1; padding: 14px; background: #3b82f6; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-save-eval:hover { background: #2563eb; }
+        .btn-publish-eval {
+            padding: 14px 24px; background: #22c55e; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-publish-eval:hover { background: #16a34a; }
+        .btn-delete-eval {
+            padding: 14px 20px; background: #7f1d1d; color: #fca5a5;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-delete-eval:hover { background: #ef4444; color: white; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 1000; display: none; animation: fadeIn 0.3s;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        .info-text { font-size: 0.75rem; color: #64748b; font-style: italic; margin-top: 4px; }
+        .q-card.editing { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.15); }
+        .q-form.edit-mode { border-color: #f59e0b; }
+        .q-form.edit-mode h4 { color: #fbbf24; }
+
+        /* Points total display */
+        .points-total {
+            font-size: 0.85rem; padding: 6px 12px; border-radius: 8px; font-weight: 700;
+        }
+        .points-ok { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .points-warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .points-err { background: rgba(239,68,68,0.15); color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>📋 Editeur d'Eval</h2>
+        <a href="index.html">← Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <button id="btn-new-eval" onclick="newEval()">+ Nouvelle evaluation</button>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Mes evaluations (<span id="eval-count">0</span>)</label>
+        <div class="eval-list" id="eval-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <!-- Empty state -->
+    <div id="main-empty">
+        <div class="big-icon">📋</div>
+        <h2 style="margin-bottom:8px;">Editeur d'Evaluations</h2>
+        <p>Cree une nouvelle evaluation ou selectionne-en une dans la liste.</p>
+    </div>
+
+    <!-- Editor -->
+    <div id="main-editor">
+        <!-- Metadonnees -->
+        <div class="meta-card">
+            <h3>Informations de l'evaluation</h3>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Titre *</label>
+                <input type="text" class="form-input" id="eval-titre" placeholder="Ex: Evaluation Module A2 Le sommeil">
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Classe</label>
+                    <select class="form-select" id="eval-classe">
+                        <option value="">— Toutes les classes —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Module</label>
+                    <select class="form-select" id="eval-module" disabled>
+                        <option value="">— Choisir une classe d'abord —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Bareme</label>
+                    <div class="bareme-toggle">
+                        <button class="bareme-btn" id="bareme-10" onclick="setBareme(10)">/ 10</button>
+                        <button class="bareme-btn active" id="bareme-20" onclick="setBareme(20)">/ 20</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Timer (0 = pas de limite)</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" class="form-input" id="eval-timer" value="0" min="0" max="120" step="5" style="width:80px; text-align:center;">
+                        <span style="color:#64748b; font-size:0.85rem;">minutes</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Mode</label>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="mode-libre" onclick="setModeEval('libre')">📖 Libre (a son rythme)</button>
+                    <button class="mode-btn" id="mode-sync" onclick="setModeEval('synchronise')">👨‍🏫 Synchronise (en classe)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="meta-card">
+            <h3>Documents (optionnel)</h3>
+            <p style="font-size:0.8rem; color:#64748b; margin-bottom:12px;">Ajoute des documents (textes, images) que les eleves verront pendant l'evaluation.</p>
+            <div id="documents-container"></div>
+            <div class="doc-form" id="doc-form">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Titre du document</label>
+                    <input type="text" class="form-input" id="doc-titre" placeholder="Ex: Document 1 - Le cycle du sommeil">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Type</label>
+                    <select class="form-select" id="doc-type">
+                        <option value="text">Texte</option>
+                        <option value="image">Image (URL)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label id="doc-content-label">Contenu du texte</label>
+                    <textarea class="form-textarea" id="doc-content" placeholder="Collez le texte ici..." rows="4"></textarea>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-save-q" onclick="saveDocument()" style="flex:1;">Ajouter le document</button>
+                    <button class="btn-cancel-q" onclick="hideDocForm()">Annuler</button>
+                </div>
+            </div>
+            <button class="add-btn" onclick="showDocForm()" style="width:100%; margin-top:8px;">+ Ajouter un document</button>
+        </div>
+
+        <!-- Questions -->
+        <div>
+            <div class="questions-header">
+                <h3>Questions</h3>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span class="points-total" id="points-total">0 pts</span>
+                    <span class="questions-count" id="q-count">0 question(s)</span>
+                </div>
+            </div>
+
+            <div class="add-btns">
+                <button class="add-btn" onclick="showAddForm('qcm_single')">+ QCM</button>
+                <button class="add-btn" onclick="showAddForm('qcm_multi')">+ QCM Multi</button>
+                <button class="add-btn" onclick="showAddForm('vf')">+ Vrai/Faux</button>
+                <button class="add-btn" onclick="showAddForm('mot')">+ Mot</button>
+                <button class="add-btn" onclick="showAddForm('nombre')">+ Nombre</button>
+            </div>
+
+            <!-- QCM Single Form -->
+            <div class="q-form" id="form-qcm_single">
+                <h4>Nouvelle question QCM (choix unique)</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="qcm_single-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponses (cochez la bonne)</label>
+                    <div id="qcm_single-choices"></div>
+                    <button class="btn-add-choice" id="btn-add-choice-single" onclick="addChoiceSingle()">+ Ajouter un choix</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="qcm_single-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="qcm_single-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="qcm_single-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction (affichee a l'eleve)</label>
+                        <textarea class="form-textarea" id="qcm_single-correction" placeholder="Explication de la bonne reponse..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="qcm_single-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('qcm_single')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- QCM Multi Form -->
+            <div class="q-form" id="form-qcm_multi">
+                <h4>Nouvelle question QCM (choix multiples)</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="qcm_multi-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponses (cochez toutes les bonnes)</label>
+                    <div id="qcm_multi-choices"></div>
+                    <button class="btn-add-choice" id="btn-add-choice-multi" onclick="addChoiceMulti()">+ Ajouter un choix</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="qcm_multi-points" value="2" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="qcm_multi-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="qcm_multi-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="qcm_multi-correction" placeholder="Explication de la bonne reponse..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="qcm_multi-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('qcm_multi')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- VF Form -->
+            <div class="q-form" id="form-vf">
+                <h4>Nouvelle question Vrai / Faux</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question (affirmation)</label>
+                    <textarea class="form-textarea" id="vf-question" placeholder="Tapez une affirmation..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Bonne reponse</label>
+                    <div class="vf-toggle">
+                        <button class="vf-btn selected-true" id="vf-true" onclick="setVF(true)">Vrai</button>
+                        <button class="vf-btn" id="vf-false" onclick="setVF(false)">Faux</button>
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="vf-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="vf-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="vf-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="vf-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="vf-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('vf')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Mot Form -->
+            <div class="q-form" id="form-mot">
+                <h4>Nouvelle question Reponse courte</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="mot-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponse attendue (1-2 mots)</label>
+                    <input type="text" class="form-input" id="mot-reponse" placeholder="Ex: melatonine">
+                    <div class="info-text">Les accents et majuscules seront toleres automatiquement.</div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="mot-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="mot-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="mot-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="mot-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="mot-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('mot')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Nombre Form -->
+            <div class="q-form" id="form-nombre">
+                <h4>Nouvelle question Nombre</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="nombre-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-row" style="margin-bottom:12px;">
+                    <div class="form-group">
+                        <label>Reponse attendue (nombre)</label>
+                        <input type="number" class="form-input" id="nombre-reponse" placeholder="Ex: 8" step="any">
+                    </div>
+                    <div class="form-group">
+                        <label>Tolerance (+/-)</label>
+                        <input type="number" class="form-input" id="nombre-tolerance" value="0" min="0" step="any" style="width:80px;">
+                        <div class="info-text">0 = reponse exacte requise</div>
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="nombre-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="nombre-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="nombre-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="nombre-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="nombre-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('nombre')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Questions list -->
+            <div id="questions-container"></div>
+        </div>
+
+        <!-- Validation banner -->
+        <div class="validation-banner" id="validation-banner">
+            <h4>Verifications avant publication</h4>
+            <ul id="validation-list"></ul>
+        </div>
+
+        <!-- Save / Publish / Delete -->
+        <div class="bottom-actions">
+            <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
+            <button class="btn-publish-eval" onclick="publishEval()">📢 Publier</button>
+            <button class="btn-delete-eval" id="btn-delete-eval" onclick="deleteEval()" style="display:none;">🗑️ Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="data_modules.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === STATE ===
+    let currentEvalId = null;
+    let questions = [];
+    let documents = [];
+    let vfAnswer = true;
+    let allEvals = [];
+    let editingIndex = -1;
+    let editingDocIndex = -1;
+    let currentBareme = 20;
+    let currentModeEval = 'libre';
+
+    // === POPULATE CLASSE DROPDOWN ===
+    function populateClasses() {
+        const sel = document.getElementById('eval-classe');
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label + ' (' + c.niveau.replace(/_/g, ' ') + ')';
+            sel.appendChild(opt);
+        });
+    }
+    populateClasses();
+
+    // === CLASSE -> MODULE DYNAMIC ===
+    document.getElementById('eval-classe').addEventListener('change', function() {
+        const classeId = this.value;
+        const modSel = document.getElementById('eval-module');
+        modSel.innerHTML = '';
+
+        if (!classeId) {
+            modSel.disabled = true;
+            modSel.innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
+            populateCompetenceDropdowns(null);
+            return;
+        }
+
+        modSel.disabled = false;
+        modSel.innerHTML = '<option value="">— Aucun module —</option>';
+
+        const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+        const firstClass = classesInGroup[0];
+        const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [];
+
+        let currentTheme = '';
+        modules.forEach(m => {
+            if (m.theme !== currentTheme) {
+                currentTheme = m.theme;
+                const optGroup = document.createElement('optgroup');
+                optGroup.label = 'Theme ' + m.theme;
+                modSel.appendChild(optGroup);
+            }
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.id + ' — ' + m.titre;
+            const lastGroup = modSel.querySelector('optgroup:last-of-type');
+            if (lastGroup) lastGroup.appendChild(opt);
+            else modSel.appendChild(opt);
+        });
+
+        // Update competence dropdowns based on class niveau
+        populateCompetenceDropdowns(classeId);
+    });
+
+    // === COMPETENCE DROPDOWNS ===
+    function populateCompetenceDropdowns(classeId) {
+        let comps = [];
+        if (classeId && window.getCompetencesForClasse) {
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            comps = window.getCompetencesForClasse(classesInGroup[0]) || [];
+        }
+        if (comps.length === 0 && window.COMPETENCES_PSE) {
+            // Default to CAP competences
+            comps = window.COMPETENCES_PSE['CAP'] || [];
+        }
+
+        const selectors = document.querySelectorAll('[id$="-competence"]');
+        selectors.forEach(sel => {
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">— Choisir —</option>';
+            comps.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.id + ' — ' + c.titre;
+                sel.appendChild(opt);
+            });
+            if (currentVal) sel.value = currentVal;
+        });
+    }
+    // Initial population with default comps
+    populateCompetenceDropdowns(null);
+
+    // === DOCUMENT REF DROPDOWNS ===
+    function updateDocRefDropdowns() {
+        const selectors = document.querySelectorAll('[id$="-docref"]');
+        selectors.forEach(sel => {
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">— Aucun —</option>';
+            documents.forEach((d, i) => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.titre || ('Document ' + (i + 1));
+                sel.appendChild(opt);
+            });
+            if (currentVal) sel.value = currentVal;
+        });
+    }
+
+    // === BAREME TOGGLE ===
+    window.setBareme = function(val) {
+        currentBareme = val;
+        document.getElementById('bareme-10').className = 'bareme-btn' + (val === 10 ? ' active' : '');
+        document.getElementById('bareme-20').className = 'bareme-btn' + (val === 20 ? ' active' : '');
+        updatePointsTotal();
+    };
+
+    // === MODE TOGGLE ===
+    window.setModeEval = function(mode) {
+        currentModeEval = mode;
+        document.getElementById('mode-libre').className = 'mode-btn' + (mode === 'libre' ? ' active' : '');
+        document.getElementById('mode-sync').className = 'mode-btn' + (mode === 'synchronise' ? ' active' : '');
+    };
+
+    // === DOCUMENTS MANAGEMENT ===
+    window.showDocForm = function() {
+        document.getElementById('doc-form').style.display = 'block';
+        document.getElementById('doc-titre').value = '';
+        document.getElementById('doc-type').value = 'text';
+        document.getElementById('doc-content').value = '';
+        updateDocContentLabel();
+    };
+
+    window.hideDocForm = function() {
+        document.getElementById('doc-form').style.display = 'none';
+    };
+
+    document.getElementById('doc-type').addEventListener('change', updateDocContentLabel);
+    function updateDocContentLabel() {
+        const type = document.getElementById('doc-type').value;
+        document.getElementById('doc-content-label').textContent = type === 'image' ? 'URL de l\'image' : 'Contenu du texte';
+        document.getElementById('doc-content').placeholder = type === 'image' ? 'https://...' : 'Collez le texte ici...';
+    }
+
+    window.saveDocument = function() {
+        const titre = document.getElementById('doc-titre').value.trim();
+        const type = document.getElementById('doc-type').value;
+        const content = document.getElementById('doc-content').value.trim();
+        if (!titre) { alert('Donne un titre au document !'); return; }
+        if (!content) { alert('Ajoute le contenu !'); return; }
+
+        const newDoc = {
+            id: 'doc_' + Date.now().toString(36),
+            type, titre, content
+        };
+        documents.push(newDoc);
+        renderDocuments();
+        updateDocRefDropdowns();
+        hideDocForm();
+    };
+
+    window.deleteDocument = function(index) {
+        const docId = documents[index].id;
+        documents.splice(index, 1);
+        // Remove references from questions
+        questions.forEach(q => {
+            if (q.documentRef === docId) q.documentRef = null;
+        });
+        renderDocuments();
+        updateDocRefDropdowns();
+        renderQuestions();
+    };
+
+    function renderDocuments() {
+        const container = document.getElementById('documents-container');
+        container.innerHTML = '';
+        documents.forEach((d, i) => {
+            const card = document.createElement('div');
+            card.className = 'doc-card';
+            const typeIcon = d.type === 'image' ? '🖼️' : '📄';
+            card.innerHTML = '<div class="doc-info"><div class="doc-title">' + typeIcon + ' ' + d.titre + '</div><div class="doc-type">' + d.type + '</div></div>' +
+                '<button class="doc-del" onclick="deleteDocument(' + i + ')">&times;</button>';
+            container.appendChild(card);
+        });
+    }
+
+    // === LOAD EVAL LIST (real-time) ===
+    const qBanque = query(collection(db, "eval_banque"), orderBy("updatedAt", "desc"));
+    onSnapshot(qBanque, (snap) => {
+        allEvals = [];
+        snap.forEach(d => {
+            allEvals.push({ id: d.id, ...d.data() });
+        });
+        renderEvalList();
+    });
+
+    function renderEvalList() {
+        const container = document.getElementById('eval-list');
+        container.innerHTML = '';
+        document.getElementById('eval-count').textContent = allEvals.length;
+
+        allEvals.forEach(ev => {
+            const div = document.createElement('div');
+            div.className = 'eval-list-item' + (ev.id === currentEvalId ? ' active' : '');
+            div.onclick = (e) => {
+                if (e.target.classList.contains('ei-del')) return;
+                loadEval(ev.id);
+            };
+
+            const pubBadge = ev.publie
+                ? '<span class="ei-badge badge-pub">Publie</span>'
+                : '<span class="ei-badge badge-draft">Brouillon</span>';
+            const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
+            const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
+            const classInfo = ev.classeId || 'Toutes';
+
+            div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + pubBadge + qCountBadge + baremeBadge + ' ' + classInfo + '</div>' +
+                '<button class="ei-del" onclick="deleteEvalFromSidebar(\'' + ev.id + '\', event)" title="Supprimer">🗑️</button>';
+            container.appendChild(div);
+        });
+    }
+
+    // === DELETE EVAL FROM SIDEBAR ===
+    window.deleteEvalFromSidebar = async function(evalId, event) {
+        event.stopPropagation();
+        if (!confirm("Supprimer definitivement cette evaluation ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "eval_banque", evalId));
+            if (currentEvalId === evalId) {
+                currentEvalId = null;
+                questions = [];
+                documents = [];
+                editingIndex = -1;
+                document.getElementById('main-editor').style.display = 'none';
+                document.getElementById('main-empty').style.display = 'flex';
+            }
+            showToast('Evaluation supprimee.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === NEW EVAL ===
+    window.newEval = function() {
+        currentEvalId = null;
+        questions = [];
+        documents = [];
+        editingIndex = -1;
+        currentBareme = 20;
+        currentModeEval = 'libre';
+
+        document.getElementById('eval-titre').value = '';
+        document.getElementById('eval-classe').value = '';
+        document.getElementById('eval-module').innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
+        document.getElementById('eval-module').disabled = true;
+        document.getElementById('eval-timer').value = '0';
+        setBareme(20);
+        setModeEval('libre');
+        document.getElementById('btn-delete-eval').style.display = 'none';
+        document.getElementById('validation-banner').style.display = 'none';
+        hideAddForm();
+        hideDocForm();
+        renderQuestions();
+        renderDocuments();
+        updateDocRefDropdowns();
+        updatePointsTotal();
+        showEditor();
+        populateCompetenceDropdowns(null);
+
+        document.querySelectorAll('.eval-list-item').forEach(i => i.classList.remove('active'));
+    };
+
+    // === LOAD EVAL ===
+    window.loadEval = function(evalId) {
+        const ev = allEvals.find(e => e.id === evalId);
+        if (!ev) return;
+
+        currentEvalId = evalId;
+        questions = ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [];
+        documents = ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [];
+        currentBareme = ev.bareme || 20;
+        currentModeEval = ev.mode || 'libre';
+
+        document.getElementById('eval-titre').value = ev.titre || '';
+        document.getElementById('eval-classe').value = ev.classeId || '';
+        document.getElementById('eval-classe').dispatchEvent(new Event('change'));
+        setTimeout(() => {
+            document.getElementById('eval-module').value = ev.moduleId || '';
+        }, 100);
+
+        document.getElementById('eval-timer').value = ev.timer || 0;
+        setBareme(currentBareme);
+        setModeEval(currentModeEval);
+
+        document.getElementById('btn-delete-eval').style.display = 'block';
+        document.getElementById('validation-banner').style.display = 'none';
+        hideAddForm();
+        hideDocForm();
+        renderQuestions();
+        renderDocuments();
+        updateDocRefDropdowns();
+        updatePointsTotal();
+        showEditor();
+        renderEvalList();
+    };
+
+    // === SHOW EDITOR ===
+    function showEditor() {
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+    }
+
+    // === QCM SINGLE CHOICES ===
+    function resetChoicesSingle() {
+        const container = document.getElementById('qcm_single-choices');
+        container.innerHTML = '';
+        for (let i = 0; i < 2; i++) addChoiceRowSingle(container, i);
+        updateRemoveButtonsSingle();
+        document.getElementById('btn-add-choice-single').style.display = 'block';
+    }
+
+    function addChoiceRowSingle(container, index) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const row = document.createElement('div');
+        row.className = 'radio-row';
+        row.innerHTML = '<input type="radio" name="qcm_single-correct" value="' + index + '"' + (index === 0 ? ' checked' : '') + '>' +
+            '<input type="text" class="form-input" placeholder="Reponse ' + letters[index] + '" data-choice="' + index + '">' +
+            '<button class="remove-choice" onclick="removeChoiceSingle(this)" title="Supprimer">&times;</button>';
+        container.appendChild(row);
+    }
+
+    window.addChoiceSingle = function() {
+        const container = document.getElementById('qcm_single-choices');
+        if (container.children.length >= 6) return;
+        addChoiceRowSingle(container, container.children.length);
+        updateRemoveButtonsSingle();
+        if (container.children.length >= 6) document.getElementById('btn-add-choice-single').style.display = 'none';
+    };
+
+    window.removeChoiceSingle = function(btn) {
+        const container = document.getElementById('qcm_single-choices');
+        if (container.children.length <= 2) return;
+        btn.closest('.radio-row').remove();
+        renumberRows(container, 'radio');
+        updateRemoveButtonsSingle();
+        document.getElementById('btn-add-choice-single').style.display = container.children.length < 6 ? 'block' : 'none';
+    };
+
+    function updateRemoveButtonsSingle() {
+        const container = document.getElementById('qcm_single-choices');
+        const rows = container.querySelectorAll('.radio-row');
+        rows.forEach(r => { r.querySelector('.remove-choice').style.display = rows.length > 2 ? 'block' : 'none'; });
+    }
+
+    // === QCM MULTI CHOICES ===
+    function resetChoicesMulti() {
+        const container = document.getElementById('qcm_multi-choices');
+        container.innerHTML = '';
+        for (let i = 0; i < 2; i++) addChoiceRowMulti(container, i);
+        updateRemoveButtonsMulti();
+        document.getElementById('btn-add-choice-multi').style.display = 'block';
+    }
+
+    function addChoiceRowMulti(container, index) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const row = document.createElement('div');
+        row.className = 'check-row';
+        row.innerHTML = '<input type="checkbox" name="qcm_multi-correct" value="' + index + '">' +
+            '<input type="text" class="form-input" placeholder="Reponse ' + letters[index] + '" data-choice="' + index + '">' +
+            '<button class="remove-choice" onclick="removeChoiceMulti(this)" title="Supprimer">&times;</button>';
+        container.appendChild(row);
+    }
+
+    window.addChoiceMulti = function() {
+        const container = document.getElementById('qcm_multi-choices');
+        if (container.children.length >= 6) return;
+        addChoiceRowMulti(container, container.children.length);
+        updateRemoveButtonsMulti();
+        if (container.children.length >= 6) document.getElementById('btn-add-choice-multi').style.display = 'none';
+    };
+
+    window.removeChoiceMulti = function(btn) {
+        const container = document.getElementById('qcm_multi-choices');
+        if (container.children.length <= 2) return;
+        btn.closest('.check-row').remove();
+        renumberRows(container, 'checkbox');
+        updateRemoveButtonsMulti();
+        document.getElementById('btn-add-choice-multi').style.display = container.children.length < 6 ? 'block' : 'none';
+    };
+
+    function updateRemoveButtonsMulti() {
+        const container = document.getElementById('qcm_multi-choices');
+        const rows = container.querySelectorAll('.check-row');
+        rows.forEach(r => { r.querySelector('.remove-choice').style.display = rows.length > 2 ? 'block' : 'none'; });
+    }
+
+    // === RENUMBER ROWS (shared) ===
+    function renumberRows(container, inputType) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const rows = container.children;
+        for (let i = 0; i < rows.length; i++) {
+            const inp = rows[i].querySelector('input[type="' + inputType + '"]');
+            if (inp) inp.value = i;
+            const text = rows[i].querySelector('input[type="text"]');
+            if (text) { text.dataset.choice = i; text.placeholder = 'Reponse ' + letters[i]; }
+        }
+        if (inputType === 'radio' && !container.querySelector('input[type="radio"]:checked')) {
+            const first = container.querySelector('input[type="radio"]');
+            if (first) first.checked = true;
+        }
+    }
+
+    // === VF ===
+    window.setVF = function(val) {
+        vfAnswer = val;
+        document.getElementById('vf-true').className = 'vf-btn' + (vfAnswer ? ' selected-true' : '');
+        document.getElementById('vf-false').className = 'vf-btn' + (!vfAnswer ? ' selected-false' : '');
+    };
+
+    // === SHOW/HIDE ADD FORM ===
+    window.showAddForm = function(type) {
+        hideAddForm();
+        editingIndex = -1;
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.remove('edit-mode');
+
+        const typeLabels = {
+            qcm_single: 'QCM (choix unique)',
+            qcm_multi: 'QCM (choix multiples)',
+            vf: 'Vrai / Faux',
+            mot: 'Reponse courte',
+            nombre: 'Nombre'
+        };
+        updateFormTitle(type, 'Nouvelle question ' + typeLabels[type]);
+        updateFormButtonText(type, 'Ajouter la question');
+
+        // Reset form
+        const qField = document.getElementById(type + '-question');
+        if (qField) qField.value = '';
+
+        if (type === 'qcm_single') {
+            resetChoicesSingle();
+        } else if (type === 'qcm_multi') {
+            resetChoicesMulti();
+        } else if (type === 'vf') {
+            vfAnswer = true;
+            setVF(true);
+        } else if (type === 'mot') {
+            document.getElementById('mot-reponse').value = '';
+        } else if (type === 'nombre') {
+            document.getElementById('nombre-reponse').value = '';
+            document.getElementById('nombre-tolerance').value = '0';
+        }
+
+        // Reset extra fields
+        const ptsField = document.getElementById(type + '-points');
+        if (ptsField) ptsField.value = type === 'qcm_multi' ? '2' : '1';
+        const compField = document.getElementById(type + '-competence');
+        if (compField) compField.value = '';
+        const corrField = document.getElementById(type + '-correction');
+        if (corrField) corrField.value = '';
+        const explField = document.getElementById(type + '-explication');
+        if (explField) explField.value = '';
+        const docField = document.getElementById(type + '-docref');
+        if (docField) docField.value = '';
+
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        if (qField) qField.focus();
+    };
+
+    window.hideAddForm = function() {
+        editingIndex = -1;
+        document.querySelectorAll('.q-form').forEach(f => { f.style.display = 'none'; f.classList.remove('edit-mode'); });
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+    };
+
+    function updateFormButtonText(type, text) {
+        const form = document.getElementById('form-' + type);
+        const btn = form.querySelector('.btn-save-q');
+        if (btn) btn.textContent = text;
+    }
+
+    function updateFormTitle(type, text) {
+        const form = document.getElementById('form-' + type);
+        const h4 = form.querySelector('h4');
+        if (h4) h4.textContent = text;
+    }
+
+    // === EDIT QUESTION ===
+    window.editQuestion = function(index) {
+        const q = questions[index];
+        if (!q) return;
+
+        hideAddForm();
+        editingIndex = index;
+        const type = q.type;
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.add('edit-mode');
+
+        updateFormButtonText(type, 'Enregistrer la modification');
+        updateFormTitle(type, 'Modifier Q' + (index + 1));
+
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        const cards = document.querySelectorAll('.q-card');
+        if (cards[index]) cards[index].classList.add('editing');
+
+        // Pre-fill question text
+        const qField = document.getElementById(type + '-question');
+        if (qField) qField.value = q.question || '';
+
+        // Pre-fill type-specific
+        if (type === 'qcm_single') {
+            const container = document.getElementById('qcm_single-choices');
+            container.innerHTML = '';
+            (q.choices || []).forEach((choice, ci) => {
+                addChoiceRowSingle(container, ci);
+                container.querySelectorAll('input[type="text"]')[ci].value = choice;
+                if (ci === q.correct) container.querySelectorAll('input[type="radio"]')[ci].checked = true;
+            });
+            updateRemoveButtonsSingle();
+            document.getElementById('btn-add-choice-single').style.display = (q.choices || []).length < 6 ? 'block' : 'none';
+        } else if (type === 'qcm_multi') {
+            const container = document.getElementById('qcm_multi-choices');
+            container.innerHTML = '';
+            (q.choices || []).forEach((choice, ci) => {
+                addChoiceRowMulti(container, ci);
+                container.querySelectorAll('input[type="text"]')[ci].value = choice;
+                if ((q.correct || []).includes(ci)) container.querySelectorAll('input[type="checkbox"]')[ci].checked = true;
+            });
+            updateRemoveButtonsMulti();
+            document.getElementById('btn-add-choice-multi').style.display = (q.choices || []).length < 6 ? 'block' : 'none';
+        } else if (type === 'vf') {
+            vfAnswer = q.correct;
+            setVF(q.correct);
+        } else if (type === 'mot') {
+            document.getElementById('mot-reponse').value = q.correct || q.reponse || '';
+        } else if (type === 'nombre') {
+            document.getElementById('nombre-reponse').value = q.correct;
+            document.getElementById('nombre-tolerance').value = q.tolerance || 0;
+        }
+
+        // Pre-fill extra fields
+        const ptsField = document.getElementById(type + '-points');
+        if (ptsField) ptsField.value = q.points || 1;
+        const compField = document.getElementById(type + '-competence');
+        if (compField) compField.value = q.competence || '';
+        const corrField = document.getElementById(type + '-correction');
+        if (corrField) corrField.value = q.correction || '';
+        const explField = document.getElementById(type + '-explication');
+        if (explField) explField.value = q.explication || '';
+        const docField = document.getElementById(type + '-docref');
+        if (docField) docField.value = q.documentRef || '';
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    // === SAVE QUESTION ===
+    window.saveQuestion = function(type) {
+        // Get question text
+        const qField = document.getElementById(type + '-question');
+        const questionText = qField ? qField.value.trim() : '';
+        if (!questionText) { alert('Ecris la question !'); return; }
+
+        let newQ = { type, question: questionText, id: 'q_' + Date.now().toString(36) };
+
+        // Type-specific
+        if (type === 'qcm_single') {
+            const choiceInputs = document.querySelectorAll('#qcm_single-choices input[type="text"]');
+            const choices = [];
+            let hasEmpty = false;
+            choiceInputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; choices.push(v); });
+            if (hasEmpty) { alert('Remplis toutes les reponses !'); return; }
+            const correctRadio = document.querySelector('input[name="qcm_single-correct"]:checked');
+            newQ.choices = choices;
+            newQ.correct = parseInt(correctRadio.value);
+        } else if (type === 'qcm_multi') {
+            const choiceInputs = document.querySelectorAll('#qcm_multi-choices input[type="text"]');
+            const choices = [];
+            let hasEmpty = false;
+            choiceInputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; choices.push(v); });
+            if (hasEmpty) { alert('Remplis toutes les reponses !'); return; }
+            const checked = document.querySelectorAll('input[name="qcm_multi-correct"]:checked');
+            if (checked.length === 0) { alert('Coche au moins une bonne reponse !'); return; }
+            newQ.choices = choices;
+            newQ.correct = Array.from(checked).map(c => parseInt(c.value));
+        } else if (type === 'vf') {
+            newQ.correct = vfAnswer;
+        } else if (type === 'mot') {
+            const reponse = document.getElementById('mot-reponse').value.trim();
+            if (!reponse) { alert('Ecris la reponse attendue !'); return; }
+            newQ.correct = reponse;
+        } else if (type === 'nombre') {
+            const reponse = document.getElementById('nombre-reponse').value;
+            if (reponse === '') { alert('Ecris la reponse attendue !'); return; }
+            newQ.correct = parseFloat(reponse);
+            newQ.tolerance = parseFloat(document.getElementById('nombre-tolerance').value) || 0;
+        }
+
+        // Extra fields
+        newQ.points = parseFloat(document.getElementById(type + '-points').value) || 1;
+        newQ.competence = document.getElementById(type + '-competence').value || '';
+        newQ.correction = document.getElementById(type + '-correction').value.trim();
+        newQ.explication = document.getElementById(type + '-explication').value.trim();
+        newQ.documentRef = document.getElementById(type + '-docref').value || null;
+
+        // Keep original id if editing
+        if (editingIndex >= 0 && editingIndex < questions.length) {
+            newQ.id = questions[editingIndex].id || newQ.id;
+            questions[editingIndex] = newQ;
+        } else {
+            questions.push(newQ);
+        }
+
+        editingIndex = -1;
+        hideAddForm();
+        renderQuestions();
+        updatePointsTotal();
+    };
+
+    // === UPDATE POINTS TOTAL ===
+    function updatePointsTotal() {
+        const total = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+        const el = document.getElementById('points-total');
+        el.textContent = total + ' / ' + currentBareme + ' pts';
+        if (total === currentBareme) {
+            el.className = 'points-total points-ok';
+        } else if (total > 0) {
+            el.className = 'points-total ' + (total > currentBareme ? 'points-err' : 'points-warn');
+        } else {
+            el.className = 'points-total';
+        }
+    }
+
+    // === RENDER QUESTIONS ===
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        document.getElementById('q-count').textContent = questions.length + ' question(s)';
+
+        const typeLabels = { qcm_single: 'QCM', qcm_multi: 'QCM Multi', vf: 'V/F', mot: 'Mot', nombre: 'Nombre' };
+
+        questions.forEach((q, i) => {
+            const card = document.createElement('div');
+            card.className = 'q-card';
+
+            const typeLabel = typeLabels[q.type] || q.type;
+            const typeClass = 'type-' + q.type;
+
+            // Meta badges
+            let metaHtml = '<div class="q-card-meta">';
+            if (q.points) metaHtml += '<span class="qm-pts">' + q.points + ' pt' + (q.points > 1 ? 's' : '') + '</span>';
+            if (q.competence) metaHtml += '<span class="qm-comp">' + q.competence + '</span>';
+            if (q.documentRef) {
+                const docObj = documents.find(d => d.id === q.documentRef);
+                if (docObj) metaHtml += '<span class="qm-doc">📄 ' + docObj.titre + '</span>';
+            }
+            metaHtml += '</div>';
+
+            // Answer display
+            let body = '';
+            if (q.type === 'qcm_single') {
+                body = '<div class="q-card-choices">';
+                (q.choices || []).forEach((c, ci) => {
+                    body += '<span class="q-card-choice' + (ci === q.correct ? ' correct' : '') + '">' + c + '</span>';
+                });
+                body += '</div>';
+            } else if (q.type === 'qcm_multi') {
+                body = '<div class="q-card-choices">';
+                (q.choices || []).forEach((c, ci) => {
+                    body += '<span class="q-card-choice' + ((q.correct || []).includes(ci) ? ' correct' : '') + '">' + c + '</span>';
+                });
+                body += '</div>';
+            } else if (q.type === 'vf') {
+                body = '<div class="q-card-answer">' + (q.correct ? '✅ Vrai' : '❌ Faux') + '</div>';
+            } else if (q.type === 'mot') {
+                body = '<div class="q-card-answer">Reponse : ' + (q.correct || q.reponse) + '</div>';
+            } else if (q.type === 'nombre') {
+                body = '<div class="q-card-answer">Reponse : ' + q.correct + (q.tolerance ? ' (± ' + q.tolerance + ')' : '') + '</div>';
+            }
+
+            // Correction preview
+            if (q.correction) {
+                body += '<div class="q-card-correction">📝 ' + q.correction.substring(0, 80) + (q.correction.length > 80 ? '...' : '') + '</div>';
+            }
+
+            card.innerHTML = '<div class="q-card-header">' +
+                '<div><span class="q-card-num">Q' + (i + 1) + '</span><span class="q-card-type-badge ' + typeClass + '">' + typeLabel + '</span></div>' +
+                '<div class="q-card-actions">' +
+                    '<button class="btn-edit" onclick="editQuestion(' + i + ')" title="Modifier">✏️</button>' +
+                    '<button onclick="moveQuestion(' + i + ', -1)" title="Monter"' + (i === 0 ? ' disabled style="opacity:0.3"' : '') + '>▲</button>' +
+                    '<button onclick="moveQuestion(' + i + ', 1)" title="Descendre"' + (i === questions.length - 1 ? ' disabled style="opacity:0.3"' : '') + '>▼</button>' +
+                    '<button class="btn-del" onclick="deleteQuestion(' + i + ')" title="Supprimer">&times;</button>' +
+                '</div></div>' +
+                metaHtml +
+                '<div class="q-card-question">' + q.question + '</div>' +
+                body;
+
+            container.appendChild(card);
+        });
+
+        updatePointsTotal();
+    }
+
+    // === MOVE / DELETE ===
+    window.moveQuestion = function(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= questions.length) return;
+        [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
+        renderQuestions();
+    };
+
+    window.deleteQuestion = function(index) {
+        questions.splice(index, 1);
+        renderQuestions();
+    };
+
+    // === VALIDATION ===
+    function validateEval() {
+        const warnings = [];
+        const total = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+
+        if (questions.length === 0) warnings.push('Aucune question ajoutee');
+        if (total !== currentBareme) warnings.push('Le total des points (' + total + ') ne correspond pas au bareme (/' + currentBareme + ')');
+
+        questions.forEach((q, i) => {
+            if (!q.points || q.points <= 0) warnings.push('Q' + (i + 1) + ' : pas de points attribues');
+            if (!q.competence) warnings.push('Q' + (i + 1) + ' : pas de competence associee');
+            if (!q.correction) warnings.push('Q' + (i + 1) + ' : pas de correction / explication');
+        });
+
+        return warnings;
+    }
+
+    // === SAVE EVAL ===
+    window.saveEval = async function() {
+        const titre = document.getElementById('eval-titre').value.trim();
+        if (!titre) { alert('Donne un titre a l\'evaluation !'); return; }
+        if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
+
+        const classeId = document.getElementById('eval-classe').value || null;
+        const moduleId = document.getElementById('eval-module').value || null;
+        let niveau = null;
+        if (classeId) {
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
+        }
+
+        const evalData = {
+            titre,
+            classeId,
+            moduleId,
+            niveau,
+            bareme: currentBareme,
+            timer: parseInt(document.getElementById('eval-timer').value) || 0,
+            mode: currentModeEval,
+            documents: documents,
+            questions: questions,
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            if (currentEvalId) {
+                await setDoc(doc(db, "eval_banque", currentEvalId), evalData, { merge: true });
+            } else {
+                const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                evalData.createdAt = serverTimestamp();
+                evalData.publie = false;
+                await setDoc(doc(db, "eval_banque", newId), evalData);
+                currentEvalId = newId;
+                document.getElementById('btn-delete-eval').style.display = 'block';
+            }
+            showToast('Evaluation sauvegardee (brouillon) !');
+            renderEvalList();
+        } catch(e) {
+            console.error("Erreur sauvegarde:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === PUBLISH EVAL ===
+    window.publishEval = async function() {
+        const titre = document.getElementById('eval-titre').value.trim();
+        if (!titre) { alert('Donne un titre a l\'evaluation !'); return; }
+        if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
+
+        // Validate
+        const warnings = validateEval();
+        const banner = document.getElementById('validation-banner');
+        const list = document.getElementById('validation-list');
+
+        if (warnings.length > 0) {
+            list.innerHTML = warnings.map(w => '<li>' + w + '</li>').join('');
+            banner.style.display = 'block';
+            banner.scrollIntoView({ behavior: 'smooth' });
+
+            if (!confirm('Il y a ' + warnings.length + ' avertissement(s). Publier quand meme ?')) return;
+        }
+
+        // Save first then publish
+        await saveEval();
+
+        if (currentEvalId) {
+            await setDoc(doc(db, "eval_banque", currentEvalId), { publie: true }, { merge: true });
+            showToast('Evaluation publiee ! Les eleves peuvent y acceder.');
+            banner.style.display = 'none';
+            renderEvalList();
+        }
+    };
+
+    // === DELETE EVAL ===
+    window.deleteEval = async function() {
+        if (!currentEvalId) return;
+        if (!confirm("Supprimer definitivement cette evaluation ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "eval_banque", currentEvalId));
+            currentEvalId = null;
+            questions = [];
+            documents = [];
+            document.getElementById('main-editor').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+            showToast('Evaluation supprimee.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === TOAST ===
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2500);
+    }
+</script>
+</body>
+</html>

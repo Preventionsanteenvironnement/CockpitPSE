@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultats Auto-Evaluations — Prof</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 340px; min-width: 340px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.05rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        .form-select {
+            width: 100%; padding: 8px 12px; background: #0f172a; color: white;
+            border: 1px solid #475569; border-radius: 6px; font-size: 0.85rem;
+            outline: none; cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+
+        /* Eval list in sidebar */
+        .eval-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+        .eval-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent;
+        }
+        .eval-list-item:hover { border-color: #475569; }
+        .eval-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .eval-list-item .ei-title { font-weight: 700; font-size: 0.85rem; margin-bottom: 2px; }
+        .eval-list-item .ei-meta { font-size: 0.7rem; color: #64748b; }
+        .ei-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.6rem; font-weight: 700; margin-right: 3px;
+        }
+        .badge-pub { background: #dcfce7; color: #166534; }
+        .badge-draft { background: #fef3c7; color: #92400e; }
+        .badge-qcount { background: #dbeafe; color: #1e40af; }
+        .badge-bareme { background: #ede9fe; color: #5b21b6; }
+
+        /* Session section */
+        .session-box {
+            background: #0f172a; border-radius: 8px; padding: 12px; margin-top: 10px;
+            border: 1px solid #334155;
+        }
+        .session-box h4 { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
+        .session-code {
+            font-size: 1.8rem; font-weight: 900; color: #f59e0b;
+            letter-spacing: 4px; text-align: center; padding: 8px 0;
+        }
+        .session-btns { display: flex; gap: 6px; margin-top: 8px; }
+        .session-btns button {
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            font-weight: 700; cursor: pointer; font-size: 0.75rem; color: white;
+        }
+        .btn-session-create { background: #22c55e; }
+        .btn-session-start { background: #3b82f6; }
+        .btn-session-end { background: #ef4444; }
+        .btn-session-create:hover, .btn-session-start:hover, .btn-session-end:hover { opacity: 0.85; }
+        .btn-session-create:disabled, .btn-session-start:disabled, .btn-session-end:disabled {
+            opacity: 0.3; cursor: not-allowed;
+        }
+        .session-students {
+            max-height: 150px; overflow-y: auto; margin-top: 8px;
+        }
+        .session-student {
+            display: flex; justify-content: space-between; padding: 4px 6px;
+            background: #1e293b; border-radius: 4px; margin-bottom: 3px; font-size: 0.8rem;
+        }
+        .ss-code { font-weight: 700; }
+        .ss-status { font-size: 0.7rem; }
+        .ss-waiting { color: #f59e0b; }
+        .ss-submitted { color: #22c55e; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        #main-content { display: none; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .stat-card {
+            background: #1e293b; border-radius: 12px; padding: 16px 20px;
+            border: 1px solid #334155; flex: 1; min-width: 140px; text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: 900; }
+        .stat-label { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+        .sv-blue { color: #3b82f6; }
+        .sv-green { color: #22c55e; }
+        .sv-amber { color: #f59e0b; }
+        .sv-red { color: #ef4444; }
+        .sv-purple { color: #8b5cf6; }
+
+        /* Action bar */
+        .action-bar {
+            display: flex; gap: 10px; margin-bottom: 20px; align-items: center;
+            flex-wrap: wrap;
+        }
+        .action-bar .ab-title { font-size: 1.2rem; font-weight: 800; flex: 1; }
+        .ab-btn {
+            padding: 10px 18px; border: none; border-radius: 8px; font-weight: 700;
+            cursor: pointer; font-size: 0.85rem; color: white; transition: 0.2s;
+        }
+        .ab-btn:hover { opacity: 0.85; }
+        .ab-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .ab-publish { background: #22c55e; }
+        .ab-refresh { background: #3b82f6; }
+        .ab-export { background: #8b5cf6; }
+
+        /* Results table */
+        .results-table-wrap {
+            background: #1e293b; border-radius: 12px; border: 1px solid #334155;
+            overflow-x: auto;
+        }
+        .results-table {
+            width: 100%; border-collapse: collapse; font-size: 0.85rem;
+        }
+        .results-table th {
+            text-align: left; padding: 12px 14px; background: #0f172a;
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 0.5px; border-bottom: 1px solid #334155;
+            position: sticky; top: 0; z-index: 2;
+        }
+        .results-table th.sortable { cursor: pointer; }
+        .results-table th.sortable:hover { color: #3b82f6; }
+        .results-table td {
+            padding: 10px 14px; border-bottom: 1px solid #1e293b;
+        }
+        .results-table tbody tr { transition: 0.15s; }
+        .results-table tbody tr:hover { background: #0f172a; }
+
+        .td-code { font-weight: 800; color: #f1f5f9; }
+        .td-classe { font-size: 0.8rem; color: #64748b; }
+        .td-note { font-weight: 800; font-size: 1rem; }
+        .note-high { color: #22c55e; }
+        .note-mid { color: #f59e0b; }
+        .note-low { color: #ef4444; }
+
+        .comp-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 700; min-width: 28px; text-align: center;
+        }
+        .cb-M { background: #dcfce7; color: #166534; }
+        .cb-A { background: #dbeafe; color: #1e40af; }
+        .cb-I { background: #fef3c7; color: #92400e; }
+        .cb-NT { background: #e2e8f0; color: #64748b; }
+
+        .status-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 20px;
+            font-size: 0.7rem; font-weight: 700;
+        }
+        .status-published { background: #dcfce7; color: #166534; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-pending { background: #e2e8f0; color: #64748b; }
+
+        .btn-sm {
+            padding: 4px 10px; border: none; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 700; cursor: pointer; color: white;
+            transition: 0.2s; margin-right: 3px;
+        }
+        .btn-sm:hover { opacity: 0.85; }
+        .btn-view { background: #3b82f6; }
+        .btn-pub { background: #22c55e; }
+        .btn-unpub { background: #ef4444; }
+
+        /* Detail modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal-box {
+            background: #1e293b; border-radius: 16px; padding: 24px;
+            max-width: 700px; width: 100%; max-height: 85vh; overflow-y: auto;
+            border: 1px solid #334155;
+        }
+        .modal-box::-webkit-scrollbar { width: 6px; }
+        .modal-box::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #334155;
+        }
+        .modal-header h3 { font-size: 1.1rem; }
+        .modal-close {
+            background: transparent; border: none; color: #94a3b8; font-size: 1.5rem;
+            cursor: pointer; padding: 4px 8px;
+        }
+        .modal-close:hover { color: white; }
+
+        .modal-score {
+            text-align: center; padding: 20px; margin-bottom: 16px;
+            background: #0f172a; border-radius: 12px;
+        }
+        .modal-score .ms-note { font-size: 2.5rem; font-weight: 900; }
+        .modal-score .ms-label { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+        .modal-q {
+            background: #0f172a; border-radius: 10px; padding: 14px; margin-bottom: 10px;
+            border-left: 3px solid #334155;
+        }
+        .modal-q.mq-correct { border-left-color: #22c55e; }
+        .modal-q.mq-incorrect { border-left-color: #ef4444; }
+        .modal-q.mq-nt { border-left-color: #94a3b8; }
+
+        .mq-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6px;
+        }
+        .mq-num { font-weight: 800; color: #3b82f6; font-size: 0.85rem; }
+        .mq-result { font-weight: 700; font-size: 0.8rem; }
+        .mq-correct-label { color: #22c55e; }
+        .mq-incorrect-label { color: #ef4444; }
+        .mq-nt-label { color: #94a3b8; }
+        .mq-question { font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; color: #e2e8f0; }
+        .mq-detail {
+            font-size: 0.8rem; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px;
+        }
+        .mq-student-ans { background: rgba(59,130,246,0.1); color: #93c5fd; }
+        .mq-correct-ans { background: rgba(34,197,94,0.1); color: #86efac; }
+
+        /* Empty table */
+        .table-empty { text-align: center; padding: 40px; color: #64748b; }
+        .table-empty .te-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 2000; display: none; animation: fadeIn 0.3s;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* Filter pills */
+        .filter-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+        .filter-pill {
+            padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
+            cursor: pointer; transition: 0.2s; border: 1px solid #475569;
+            background: transparent; color: #94a3b8;
+        }
+        .filter-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .filter-pill:hover { border-color: #3b82f6; color: #93c5fd; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>📊 Resultats Eval</h2>
+        <a href="index.html">← Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Selection de l'evaluation</label>
+        <select class="form-select" id="eval-selector" onchange="selectEval(this.value)">
+            <option value="">— Choisir une evaluation —</option>
+        </select>
+        <div class="eval-list" id="eval-sidebar-list"></div>
+    </div>
+
+    <div class="sidebar-section" id="session-section" style="display:none;">
+        <label>Session synchronisee</label>
+        <div class="session-box">
+            <h4>Mode synchronise</h4>
+            <div class="session-code" id="session-code-display" style="display:none;">----</div>
+            <div class="session-btns">
+                <button class="btn-session-create" id="btn-create-session" onclick="createSession()">Creer</button>
+                <button class="btn-session-start" id="btn-start-session" onclick="startSession()" disabled>Lancer</button>
+                <button class="btn-session-end" id="btn-end-session" onclick="endSession()" disabled>Terminer</button>
+            </div>
+            <div class="session-students" id="session-students"></div>
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Filtre par classe</label>
+        <div class="filter-pills" id="class-filters">
+            <button class="filter-pill active" data-classe="all" onclick="setClassFilter('all')">Toutes</button>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <!-- Empty state -->
+    <div id="main-empty">
+        <div class="big-icon">📊</div>
+        <h2 style="margin-bottom:8px;">Resultats des auto-evaluations</h2>
+        <p>Selectionne une evaluation dans la sidebar pour voir les resultats des eleves.</p>
+    </div>
+
+    <!-- Results content -->
+    <div id="main-content">
+        <!-- Stats -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value sv-blue" id="stat-soumis">0</div>
+                <div class="stat-label">Soumis</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value sv-green" id="stat-moyenne">--</div>
+                <div class="stat-label">Moyenne</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value sv-amber" id="stat-min">--</div>
+                <div class="stat-label">Min</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value sv-purple" id="stat-max">--</div>
+                <div class="stat-label">Max</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value sv-green" id="stat-publies">0</div>
+                <div class="stat-label">Publies</div>
+            </div>
+        </div>
+
+        <!-- Action bar -->
+        <div class="action-bar">
+            <div class="ab-title" id="eval-title-display">Evaluation</div>
+            <button class="ab-btn ab-refresh" onclick="refreshResults()">🔄 Actualiser</button>
+            <button class="ab-btn ab-publish" id="btn-publish-all" onclick="publishAll()">📢 Publier tout</button>
+            <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
+
+        <!-- Results table -->
+        <div class="results-table-wrap">
+            <table class="results-table" id="results-table">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortBy('code')">Eleve ⇅</th>
+                        <th>Classe</th>
+                        <th class="sortable" onclick="sortBy('note')">Note ⇅</th>
+                        <th>C1</th>
+                        <th>C2</th>
+                        <th>C3</th>
+                        <th>C4</th>
+                        <th>C5</th>
+                        <th>C6</th>
+                        <th>Statut</th>
+                        <th>Temps</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="results-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="modal-detail" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="modal-title">Detail</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="data_modules.js"></script>
+<script src="data_eleves.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+        getFirestore, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
+        collection, collectionGroup, query, where, orderBy, onSnapshot, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === STATE ===
+    let allEvals = [];
+    let currentEvalId = null;
+    let currentEvalData = null;
+    let results = []; // { eleveCode, classe, note, bareme, competences, questions, publie, tempsSecondes, evalDocId, respData }
+    let filteredResults = [];
+    let currentClassFilter = 'all';
+    let sortField = 'code';
+    let sortAsc = true;
+    let sessionId = null;
+    let sessionUnsubscribe = null;
+
+    // === LOAD ALL EVALS (real-time) ===
+    const qBanque = query(collection(db, "eval_banque"), orderBy("updatedAt", "desc"));
+    onSnapshot(qBanque, (snap) => {
+        allEvals = [];
+        snap.forEach(d => {
+            allEvals.push({ id: d.id, ...d.data() });
+        });
+        renderEvalSelector();
+        renderEvalSidebarList();
+    });
+
+    function renderEvalSelector() {
+        const sel = document.getElementById('eval-selector');
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">— Choisir une evaluation —</option>';
+        allEvals.forEach(ev => {
+            const opt = document.createElement('option');
+            opt.value = ev.id;
+            const pubLabel = ev.publie ? ' [Publie]' : ' [Brouillon]';
+            const qCount = (ev.questions || []).length;
+            opt.textContent = (ev.titre || 'Sans titre') + ' — /' + (ev.bareme || 20) + ' (' + qCount + 'Q)' + pubLabel;
+            sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
+    }
+
+    function renderEvalSidebarList() {
+        const container = document.getElementById('eval-sidebar-list');
+        container.innerHTML = '';
+        allEvals.forEach(ev => {
+            const div = document.createElement('div');
+            div.className = 'eval-list-item' + (ev.id === currentEvalId ? ' active' : '');
+            div.onclick = () => {
+                document.getElementById('eval-selector').value = ev.id;
+                selectEval(ev.id);
+            };
+
+            const pubBadge = ev.publie
+                ? '<span class="ei-badge badge-pub">Publie</span>'
+                : '<span class="ei-badge badge-draft">Brouillon</span>';
+            const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
+            const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
+
+            div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + pubBadge + qCountBadge + baremeBadge + '</div>';
+            container.appendChild(div);
+        });
+    }
+
+    // === SELECT EVAL ===
+    window.selectEval = async function(evalId) {
+        if (!evalId) {
+            currentEvalId = null;
+            currentEvalData = null;
+            results = [];
+            filteredResults = [];
+            document.getElementById('main-content').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+            renderEvalSidebarList();
+            return;
+        }
+
+        currentEvalId = evalId;
+        currentEvalData = allEvals.find(e => e.id === evalId) || null;
+
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+
+        const title = currentEvalData ? currentEvalData.titre : 'Evaluation';
+        document.getElementById('eval-title-display').textContent = title;
+
+        // Show session section if synchronise mode
+        const isSyncMode = currentEvalData && currentEvalData.mode === 'synchronise';
+        document.getElementById('session-section').style.display = isSyncMode ? 'block' : 'none';
+
+        renderEvalSidebarList();
+        await loadResults();
+    };
+
+    // === LOAD RESULTS ===
+    async function loadResults() {
+        if (!currentEvalId) return;
+        results = [];
+
+        try {
+            // Query eval_reponses for this eval
+            const qReponses = query(
+                collection(db, "eval_reponses"),
+                where("evalId", "==", currentEvalId)
+            );
+            const snap = await getDocs(qReponses);
+
+            const promises = [];
+            snap.forEach(d => {
+                const resp = d.data();
+                promises.push(loadStudentResult(resp));
+            });
+
+            results = await Promise.all(promises);
+            results = results.filter(r => r !== null);
+
+            buildClassFilters();
+            applyFilters();
+            renderStats();
+            renderTable();
+
+        } catch(e) {
+            console.error("Erreur chargement resultats:", e);
+        }
+    }
+
+    async function loadStudentResult(resp) {
+        const eleveCode = resp.eleveCode;
+        const evalDocId = currentEvalId + '_eval';
+
+        try {
+            // Load the evaluation document for this student
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", evalDocId);
+            const evalSnap = await getDoc(evalDocRef);
+
+            let evalData = {};
+            let publie = false;
+            let note = null;
+            let competences = {};
+            let questionsResult = {};
+
+            if (evalSnap.exists()) {
+                evalData = evalSnap.data();
+                publie = evalData.publie || false;
+                note = evalData.note_finale;
+                competences = evalData.competences || {};
+                questionsResult = evalData.questions || {};
+            }
+
+            return {
+                eleveCode,
+                classe: resp.classe || '',
+                note,
+                bareme: currentEvalData ? (currentEvalData.bareme || 20) : 20,
+                competences,
+                questionsResult,
+                publie,
+                tempsSecondes: resp.tempsSecondes || 0,
+                tabSwitchCount: resp.tabSwitchCount || 0,
+                submittedAt: resp.submittedAt || '',
+                reponses: resp.reponses || {},
+                evalDocId,
+                evalData
+            };
+        } catch(e) {
+            console.error("Erreur chargement eleve:", eleveCode, e);
+            return null;
+        }
+    }
+
+    // === CLASS FILTERS ===
+    function buildClassFilters() {
+        const classes = new Set();
+        results.forEach(r => { if (r.classe) classes.add(r.classe); });
+
+        const container = document.getElementById('class-filters');
+        container.innerHTML = '<button class="filter-pill' + (currentClassFilter === 'all' ? ' active' : '') + '" onclick="setClassFilter(\'all\')">Toutes</button>';
+
+        const sorted = [...classes].sort();
+        sorted.forEach(c => {
+            const pill = document.createElement('button');
+            pill.className = 'filter-pill' + (currentClassFilter === c ? ' active' : '');
+            pill.textContent = c;
+            pill.onclick = () => setClassFilter(c);
+            container.appendChild(pill);
+        });
+    }
+
+    window.setClassFilter = function(classe) {
+        currentClassFilter = classe;
+        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        event.target.classList.add('active');
+        applyFilters();
+        renderStats();
+        renderTable();
+    };
+
+    function applyFilters() {
+        filteredResults = results.filter(r => {
+            if (currentClassFilter !== 'all' && r.classe !== currentClassFilter) return false;
+            return true;
+        });
+        sortResults();
+    }
+
+    // === SORT ===
+    window.sortBy = function(field) {
+        if (sortField === field) sortAsc = !sortAsc;
+        else { sortField = field; sortAsc = true; }
+        sortResults();
+        renderTable();
+    };
+
+    function sortResults() {
+        filteredResults.sort((a, b) => {
+            let va, vb;
+            if (sortField === 'code') { va = a.eleveCode; vb = b.eleveCode; }
+            else if (sortField === 'note') { va = a.note ?? -1; vb = b.note ?? -1; }
+            else { va = a.eleveCode; vb = b.eleveCode; }
+
+            if (typeof va === 'string') {
+                return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            }
+            return sortAsc ? va - vb : vb - va;
+        });
+    }
+
+    // === RENDER STATS ===
+    function renderStats() {
+        const notes = filteredResults.filter(r => r.note !== null && !isNaN(r.note)).map(r => parseFloat(r.note));
+        const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
+        const publies = filteredResults.filter(r => r.publie).length;
+
+        document.getElementById('stat-soumis').textContent = filteredResults.length;
+        document.getElementById('stat-publies').textContent = publies;
+
+        if (notes.length > 0) {
+            const avg = (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1);
+            const min = Math.min(...notes).toFixed(1);
+            const max = Math.max(...notes).toFixed(1);
+            document.getElementById('stat-moyenne').textContent = avg + '/' + bareme;
+            document.getElementById('stat-min').textContent = min;
+            document.getElementById('stat-max').textContent = max;
+        } else {
+            document.getElementById('stat-moyenne').textContent = '--';
+            document.getElementById('stat-min').textContent = '--';
+            document.getElementById('stat-max').textContent = '--';
+        }
+    }
+
+    // === RENDER TABLE ===
+    function renderTable() {
+        const tbody = document.getElementById('results-tbody');
+
+        if (filteredResults.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12"><div class="table-empty"><div class="te-icon">📭</div><p>Aucun resultat pour cette evaluation.</p></div></td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        filteredResults.forEach((r, idx) => {
+            const tr = document.createElement('tr');
+
+            // Note coloring
+            const bareme = r.bareme || 20;
+            const pct = r.note !== null ? (r.note / bareme) * 100 : 0;
+            const noteClass = r.note === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low');
+
+            // Competence badges
+            let compsCells = '';
+            for (let c = 1; c <= 6; c++) {
+                const compKey = 'C' + c;
+                const comp = r.competences[compKey];
+                if (comp) {
+                    const compPct = comp.max > 0 ? (comp.pts / comp.max) * 100 : 0;
+                    let level = 'NT';
+                    if (compPct >= 80) level = 'M';
+                    else if (compPct >= 50) level = 'A';
+                    else if (compPct > 0) level = 'I';
+                    compsCells += '<td><span class="comp-badge cb-' + level + '">' + level + '</span></td>';
+                } else {
+                    compsCells += '<td><span class="comp-badge cb-NT">-</span></td>';
+                }
+            }
+
+            // Status
+            const statusHtml = r.publie
+                ? '<span class="status-badge status-published">Publie</span>'
+                : '<span class="status-badge status-submitted">Soumis</span>';
+
+            // Time
+            const mins = Math.floor(r.tempsSecondes / 60);
+            const secs = r.tempsSecondes % 60;
+            const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+            // Tab switch warning
+            const tabWarn = r.tabSwitchCount > 0 ? ' <span title="Sorties detectees" style="color:#ef4444; font-size:0.7rem;">⚠️' + r.tabSwitchCount + '</span>' : '';
+
+            // Publish/Unpublish button
+            const pubBtn = r.publie
+                ? '<button class="btn-sm btn-unpub" onclick="unpublishOne(\'' + r.eleveCode + '\')" title="Depublier">🔒</button>'
+                : '<button class="btn-sm btn-pub" onclick="publishOne(\'' + r.eleveCode + '\')" title="Publier">📢</button>';
+
+            tr.innerHTML =
+                '<td class="td-code">' + r.eleveCode + tabWarn + '</td>' +
+                '<td class="td-classe">' + r.classe + '</td>' +
+                '<td class="td-note ' + noteClass + '">' + (r.note !== null ? r.note + '/' + bareme : '--') + '</td>' +
+                compsCells +
+                '<td>' + statusHtml + '</td>' +
+                '<td style="font-size:0.8rem; color:#94a3b8;">' + timeStr + '</td>' +
+                '<td>' +
+                    '<button class="btn-sm btn-view" onclick="viewDetail(\'' + r.eleveCode + '\')" title="Detail">👁️</button>' +
+                    pubBtn +
+                '</td>';
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    // === PUBLISH ONE ===
+    window.publishOne = async function(eleveCode) {
+        try {
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval');
+            await updateDoc(evalDocRef, { publie: true });
+
+            const r = results.find(r => r.eleveCode === eleveCode);
+            if (r) r.publie = true;
+            applyFilters();
+            renderStats();
+            renderTable();
+            showToast('Resultat publie pour ' + eleveCode);
+        } catch(e) {
+            console.error("Erreur publication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === UNPUBLISH ONE ===
+    window.unpublishOne = async function(eleveCode) {
+        try {
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval');
+            await updateDoc(evalDocRef, { publie: false });
+
+            const r = results.find(r => r.eleveCode === eleveCode);
+            if (r) r.publie = false;
+            applyFilters();
+            renderStats();
+            renderTable();
+            showToast('Resultat depublie pour ' + eleveCode);
+        } catch(e) {
+            console.error("Erreur depublication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === PUBLISH ALL ===
+    window.publishAll = async function() {
+        const toPublish = filteredResults.filter(r => !r.publie);
+        if (toPublish.length === 0) {
+            showToast('Tous les resultats sont deja publies.');
+            return;
+        }
+        if (!confirm('Publier ' + toPublish.length + ' resultat(s) ? Les eleves les verront dans "Mes Resultats".')) return;
+
+        try {
+            const promises = toPublish.map(r => {
+                const evalDocRef = doc(db, "resultats", r.eleveCode, "evaluations", currentEvalId + '_eval');
+                return updateDoc(evalDocRef, { publie: true });
+            });
+            await Promise.all(promises);
+
+            toPublish.forEach(r => r.publie = true);
+            applyFilters();
+            renderStats();
+            renderTable();
+            showToast(toPublish.length + ' resultat(s) publie(s) !');
+        } catch(e) {
+            console.error("Erreur publication groupee:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === REFRESH ===
+    window.refreshResults = async function() {
+        if (!currentEvalId) return;
+        showToast('Actualisation...');
+        await loadResults();
+        showToast('Resultats actualises !');
+    };
+
+    // === VIEW DETAIL ===
+    window.viewDetail = function(eleveCode) {
+        const r = filteredResults.find(r => r.eleveCode === eleveCode);
+        if (!r || !currentEvalData) return;
+
+        const qs = currentEvalData.questions || [];
+        const bareme = currentEvalData.bareme || 20;
+
+        document.getElementById('modal-title').textContent = '👤 ' + eleveCode + ' — ' + (currentEvalData.titre || 'Evaluation');
+
+        let html = '';
+
+        // Score
+        const pct = r.note !== null ? (r.note / bareme) * 100 : 0;
+        const scoreClass = r.note === null ? '' : (pct >= 60 ? 'sv-green' : pct >= 40 ? 'sv-amber' : 'sv-red');
+        html += '<div class="modal-score">';
+        html += '<div class="ms-note ' + scoreClass + '">' + (r.note !== null ? r.note + ' / ' + bareme : '--') + '</div>';
+        html += '<div class="ms-label">Temps : ' + Math.floor(r.tempsSecondes / 60) + ' min ' + (r.tempsSecondes % 60) + ' sec';
+        if (r.tabSwitchCount > 0) html += ' | ⚠️ ' + r.tabSwitchCount + ' sortie(s) d\'onglet';
+        html += '</div></div>';
+
+        // Per-question detail
+        qs.forEach((q, i) => {
+            const qResult = r.questionsResult['q_' + i] || { level: 'NT' };
+            const level = qResult.level || 'NT';
+            const cardClass = level === 'M' ? 'mq-correct' : (level === 'I' ? 'mq-incorrect' : 'mq-nt');
+            const resultLabel = level === 'M' ? '✅ Correct' : (level === 'I' ? '❌ Incorrect' : '⚫ Non repondu');
+            const labelClass = level === 'M' ? 'mq-correct-label' : (level === 'I' ? 'mq-incorrect-label' : 'mq-nt-label');
+
+            html += '<div class="modal-q ' + cardClass + '">';
+            html += '<div class="mq-header"><span class="mq-num">Q' + (i + 1) + (q.competence ? ' — ' + q.competence : '') + ' (' + (q.points || 0) + ' pts)</span><span class="mq-result ' + labelClass + '">' + resultLabel + '</span></div>';
+            html += '<div class="mq-question">' + q.question + '</div>';
+
+            // Student answer
+            const studentAns = r.reponses[q.id];
+            if (studentAns !== undefined && studentAns !== null) {
+                html += '<div class="mq-detail mq-student-ans">✍️ Reponse : ' + formatStudentAnswer(q, studentAns) + '</div>';
+            }
+
+            // Correct answer
+            html += '<div class="mq-detail mq-correct-ans">✅ Attendu : ' + formatCorrectAnswer(q) + '</div>';
+
+            html += '</div>';
+        });
+
+        document.getElementById('modal-body').innerHTML = html;
+        document.getElementById('modal-detail').classList.add('visible');
+    };
+
+    window.closeModal = function() {
+        document.getElementById('modal-detail').classList.remove('visible');
+    };
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    function formatStudentAnswer(q, answer) {
+        if (answer === null || answer === undefined) return '<em>Non repondu</em>';
+        if (q.type === 'qcm_single') return (q.choices || [])[answer] || '?';
+        if (q.type === 'qcm_multi') return (Array.isArray(answer) ? answer : []).map(i => (q.choices || [])[i]).join(', ') || '?';
+        if (q.type === 'vf') return answer === true ? 'Vrai' : 'Faux';
+        if (q.type === 'mot') return String(answer);
+        if (q.type === 'nombre') return String(answer);
+        return String(answer);
+    }
+
+    function formatCorrectAnswer(q) {
+        if (q.type === 'qcm_single') return (q.choices || [])[q.correct] || '?';
+        if (q.type === 'qcm_multi') return (q.correct || []).map(i => (q.choices || [])[i]).join(', ') || '?';
+        if (q.type === 'vf') return q.correct === true ? 'Vrai' : 'Faux';
+        if (q.type === 'mot') return q.correct || q.reponse || '?';
+        if (q.type === 'nombre') return String(q.correct) + (q.tolerance ? ' (± ' + q.tolerance + ')' : '');
+        return '?';
+    }
+
+    // === EXPORT CSV ===
+    window.exportCSV = function() {
+        if (filteredResults.length === 0) {
+            showToast('Aucun resultat a exporter.');
+            return;
+        }
+
+        const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
+        const header = ['Eleve', 'Classe', 'Note/' + bareme, 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Sorties onglet'];
+
+        const rows = filteredResults.map(r => {
+            const comps = [];
+            for (let c = 1; c <= 6; c++) {
+                const comp = r.competences['C' + c];
+                if (comp) {
+                    const compPct = comp.max > 0 ? (comp.pts / comp.max) * 100 : 0;
+                    let level = 'NT';
+                    if (compPct >= 80) level = 'M';
+                    else if (compPct >= 50) level = 'A';
+                    else if (compPct > 0) level = 'I';
+                    comps.push(level);
+                } else {
+                    comps.push('-');
+                }
+            }
+            return [
+                r.eleveCode,
+                r.classe,
+                r.note !== null ? r.note : '--',
+                ...comps,
+                r.publie ? 'Publie' : 'Soumis',
+                r.tempsSecondes,
+                r.tabSwitchCount
+            ].join(';');
+        });
+
+        const csv = '\ufeff' + header.join(';') + '\n' + rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'resultats_eval_' + (currentEvalData?.titre || 'export').replace(/\s+/g, '_') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV exporte !');
+    };
+
+    // === SESSION MANAGEMENT (synchronized mode) ===
+    window.createSession = async function() {
+        if (!currentEvalId || !currentEvalData) return;
+
+        const code = generateSessionCode();
+        sessionId = 'eval_' + currentEvalId + '_' + Date.now();
+
+        try {
+            await setDoc(doc(db, "eval_sessions", sessionId), {
+                evalId: currentEvalId,
+                code: code,
+                status: 'lobby', // lobby, active, ended
+                classeId: currentEvalData.classeId || null,
+                createdAt: new Date().toISOString(),
+                students: []
+            });
+
+            document.getElementById('session-code-display').textContent = code;
+            document.getElementById('session-code-display').style.display = 'block';
+            document.getElementById('btn-create-session').disabled = true;
+            document.getElementById('btn-start-session').disabled = false;
+            document.getElementById('btn-end-session').disabled = true;
+
+            // Listen to session for student joins
+            listenToSession();
+
+            showToast('Session creee ! Code : ' + code);
+        } catch(e) {
+            console.error("Erreur creation session:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.startSession = async function() {
+        if (!sessionId) return;
+        try {
+            await updateDoc(doc(db, "eval_sessions", sessionId), { status: 'active' });
+            document.getElementById('btn-start-session').disabled = true;
+            document.getElementById('btn-end-session').disabled = false;
+            showToast('Session demarree !');
+        } catch(e) {
+            console.error("Erreur demarrage session:", e);
+        }
+    };
+
+    window.endSession = async function() {
+        if (!sessionId) return;
+        try {
+            await updateDoc(doc(db, "eval_sessions", sessionId), { status: 'ended' });
+            document.getElementById('btn-start-session').disabled = true;
+            document.getElementById('btn-end-session').disabled = true;
+
+            if (sessionUnsubscribe) { sessionUnsubscribe(); sessionUnsubscribe = null; }
+            showToast('Session terminee.');
+
+            // Refresh results
+            await loadResults();
+        } catch(e) {
+            console.error("Erreur fin session:", e);
+        }
+    };
+
+    function listenToSession() {
+        if (sessionUnsubscribe) sessionUnsubscribe();
+
+        sessionUnsubscribe = onSnapshot(doc(db, "eval_sessions", sessionId), (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
+            renderSessionStudents(data.students || []);
+        });
+    }
+
+    function renderSessionStudents(students) {
+        const container = document.getElementById('session-students');
+        if (students.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#64748b; font-size:0.8rem; padding:8px;">En attente d\'eleves...</div>';
+            return;
+        }
+        container.innerHTML = '';
+        students.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'session-student';
+            const statusClass = s.submitted ? 'ss-submitted' : 'ss-waiting';
+            const statusText = s.submitted ? '✓ Soumis' : '⏳ En cours';
+            div.innerHTML = '<span class="ss-code">' + s.code + '</span><span class="ss-status ' + statusClass + '">' + statusText + '</span>';
+            container.appendChild(div);
+        });
+    }
+
+    function generateSessionCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        return code;
+    }
+
+    // === TOAST ===
+    function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 2500);
+    }
+    window.showToast = showToast;
+</script>
+</body>
+</html>
