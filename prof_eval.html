@@ -362,6 +362,7 @@
         <!-- Action bar -->
         <div class="action-bar">
             <div class="ab-title" id="eval-title-display">Evaluation</div>
+            <button class="ab-btn" style="background:#f59e0b;color:#000;" onclick="viewEvalContent()">📋 Voir l'evaluation</button>
             <button class="ab-btn ab-refresh" onclick="refreshResults()">🔄 Actualiser</button>
             <button class="ab-btn ab-publish" id="btn-publish-all" onclick="publishAll()">📢 Publier tout</button>
             <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
@@ -400,6 +401,17 @@
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Eval preview modal -->
+<div class="modal-overlay" id="modal-eval-preview" onclick="if(event.target===this)closeEvalPreview()">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="modal-eval-title">Contenu de l'evaluation</h3>
+            <button class="modal-close" onclick="closeEvalPreview()">&times;</button>
+        </div>
+        <div id="modal-eval-body"></div>
     </div>
 </div>
 
@@ -897,10 +909,96 @@
         document.getElementById('modal-detail').classList.remove('visible');
     };
 
-    // Close modal on Escape key
+    // Close modals on Escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') { closeModal(); closeEvalPreview(); }
     });
+
+    // === PREVIEW EVAL CONTENT ===
+    window.viewEvalContent = function() {
+        if (!currentEvalData) { showToast('Selectionnez une evaluation.'); return; }
+        const ev = currentEvalData;
+        const qs = ev.questions || [];
+        const docs = ev.documents || [];
+
+        document.getElementById('modal-eval-title').textContent = '📋 ' + (ev.titre || 'Evaluation') + ' — ' + qs.length + ' question' + (qs.length > 1 ? 's' : '');
+
+        let html = '';
+        // Metadata
+        html += '<div style="background:#0f172a; border-radius:10px; padding:14px; margin-bottom:16px;">';
+        html += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">';
+        html += '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
+        const classeLabel = ev.classeId || 'Toutes les classes';
+        html += '<span class="ei-badge" style="background:#fef3c7;color:#92400e;">🎯 ' + classeLabel + '</span>';
+        if (ev.moduleId) html += '<span class="ei-badge" style="background:#dbeafe;color:#1e40af;">📘 ' + ev.moduleId + '</span>';
+        if (ev.timer > 0) html += '<span class="ei-badge" style="background:#fef3c7;color:#92400e;">⏱ ' + ev.timer + ' min</span>';
+        html += '<span class="ei-badge" style="background:#1e293b;color:#94a3b8;">Mode : ' + (ev.mode || 'libre') + '</span>';
+        html += '</div></div>';
+
+        // Documents
+        if (docs.length > 0) {
+            html += '<div style="margin-bottom:14px;">';
+            html += '<div style="font-weight:700; font-size:0.85rem; color:#94a3b8; margin-bottom:6px; text-transform:uppercase;">Documents (' + docs.length + ')</div>';
+            docs.forEach(function(d) {
+                html += '<div style="background:#0f172a; border-radius:8px; padding:10px; margin-bottom:6px; font-size:0.85rem; color:#e2e8f0;">';
+                html += (d.type === 'image' ? '🖼️' : '📄') + ' <strong>' + (d.titre || 'Document') + '</strong>';
+                if (d.type === 'image' && d.content) html += '<br><img src="' + d.content + '" style="max-width:100%;max-height:200px;margin-top:8px;border-radius:6px;" onerror="this.style.display=\'none\'">';
+                if (d.type === 'text' && d.content) html += '<div style="margin-top:6px;color:#94a3b8;font-size:0.8rem;white-space:pre-wrap;">' + d.content.substring(0, 300) + (d.content.length > 300 ? '...' : '') + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
+        // Points total
+        let totalPoints = 0;
+        qs.forEach(function(q) { totalPoints += (q.points || 0); });
+        html += '<div style="font-weight:700; font-size:0.85rem; color:#94a3b8; margin-bottom:10px; text-transform:uppercase;">Questions — Total : ' + totalPoints + ' pts</div>';
+
+        // Questions
+        qs.forEach(function(q, i) {
+            html += '<div class="modal-q" style="border-left-color:#3b82f6;">';
+            html += '<div class="mq-header">';
+            html += '<span class="mq-num">Q' + (i + 1) + '</span>';
+            html += '<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#1e293b; color:#94a3b8; margin-left:6px;">' + (q.type || '?') + '</span>';
+            if (q.competence) html += '<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#312e81; color:#a5b4fc; margin-left:4px;">' + q.competence + '</span>';
+            html += '<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:#064e3b; color:#6ee7b7; margin-left:auto;">' + (q.points || 0) + ' pt' + ((q.points || 0) > 1 ? 's' : '') + '</span>';
+            html += '</div>';
+            html += '<div class="mq-question">' + (q.question || '') + '</div>';
+
+            // Choices for QCM
+            if ((q.type === 'qcm_single' || q.type === 'qcm_multi') && q.choices) {
+                html += '<div style="margin:6px 0; font-size:0.8rem;">';
+                q.choices.forEach(function(ch, ci) {
+                    const isCorrect = q.type === 'qcm_single' ? ci === q.correct : (q.correct || []).includes(ci);
+                    html += '<div style="padding:3px 8px; margin:2px 0; border-radius:4px; ' + (isCorrect ? 'background:rgba(34,197,94,0.15); color:#22c55e;' : 'color:#94a3b8;') + '">';
+                    html += (isCorrect ? '✅' : '○') + ' ' + ch;
+                    html += '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="mq-detail mq-correct-ans">✅ Reponse : ' + formatCorrectAnswer(q) + '</div>';
+            }
+
+            if (q.correction) html += '<div class="mq-detail" style="background:rgba(245,158,11,0.1); color:#fbbf24;">📝 Correction : ' + q.correction + '</div>';
+            if (q.explication) html += '<div class="mq-detail" style="background:rgba(139,92,246,0.1); color:#c4b5fd;">💡 Explication : ' + q.explication + '</div>';
+            if (q.documentRef) html += '<div style="font-size:0.7rem; color:#64748b; margin-top:4px;">📎 Document : ' + q.documentRef + '</div>';
+            html += '</div>';
+        });
+
+        // Link to editor
+        if (currentEvalId) {
+            html += '<div style="text-align:center; margin-top:20px; padding-top:16px; border-top:1px solid #1e293b;">';
+            html += '<a href="editeur_eval.html?id=' + currentEvalId + '" style="color:#3b82f6; font-weight:700; text-decoration:none; font-size:0.9rem;">✏️ Ouvrir dans l\'editeur pour modifier</a>';
+            html += '</div>';
+        }
+
+        document.getElementById('modal-eval-body').innerHTML = html;
+        document.getElementById('modal-eval-preview').classList.add('visible');
+    };
+
+    window.closeEvalPreview = function() {
+        document.getElementById('modal-eval-preview').classList.remove('visible');
+    };
 
     function formatStudentAnswer(q, answer) {
         if (answer === null || answer === undefined) return '<em>Non repondu</em>';

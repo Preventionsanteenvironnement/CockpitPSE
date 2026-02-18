@@ -672,6 +672,7 @@
         <div class="bottom-actions">
             <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
             <button class="btn-publish-eval" onclick="publishEval()">📢 Publier</button>
+            <button class="btn-save-eval" id="btn-duplicate-eval" onclick="duplicateCurrentEval()" style="display:none; background:#f59e0b; color:#000;">📋 Dupliquer</button>
             <button class="btn-delete-eval" id="btn-delete-eval" onclick="deleteEval()" style="display:none;">🗑️ Supprimer</button>
         </div>
     </div>
@@ -882,6 +883,7 @@
     }
 
     // === LOAD EVAL LIST (real-time) ===
+    let pendingLoadId = new URLSearchParams(window.location.search).get('id');
     const qBanque = query(collection(db, "eval_banque"), orderBy("updatedAt", "desc"));
     onSnapshot(qBanque, (snap) => {
         allEvals = [];
@@ -889,6 +891,12 @@
             allEvals.push({ id: d.id, ...d.data() });
         });
         renderEvalList();
+        // Auto-load eval from URL param ?id=xxx
+        if (pendingLoadId) {
+            const ev = allEvals.find(e => e.id === pendingLoadId);
+            if (ev) loadEval(pendingLoadId);
+            pendingLoadId = null;
+        }
     });
 
     function renderEvalList() {
@@ -913,6 +921,7 @@
 
             div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
                 '<div class="ei-meta">' + pubBadge + qCountBadge + baremeBadge + ' ' + classInfo + '</div>' +
+                '<button class="ei-del" style="right:32px;" onclick="duplicateEval(\'' + ev.id + '\', event)" title="Dupliquer">📋</button>' +
                 '<button class="ei-del" onclick="deleteEvalFromSidebar(\'' + ev.id + '\', event)" title="Supprimer">🗑️</button>';
             container.appendChild(div);
         });
@@ -940,6 +949,46 @@
         }
     };
 
+    // === DUPLICATE EVAL ===
+    window.duplicateEval = async function(evalId, event) {
+        if (event && event.stopPropagation) event.stopPropagation();
+        const ev = allEvals.find(e => e.id === evalId);
+        if (!ev) return;
+
+        if (!confirm('Dupliquer "' + (ev.titre || 'Sans titre') + '" ?\nLa copie sera en brouillon, sans classe assignee.')) return;
+
+        const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        const newEvalData = {
+            titre: (ev.titre || 'Sans titre') + ' (copie)',
+            classeId: null,
+            moduleId: null,
+            niveau: null,
+            bareme: ev.bareme || 20,
+            timer: ev.timer || 0,
+            mode: ev.mode || 'libre',
+            documents: ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [],
+            questions: ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [],
+            publie: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            await setDoc(doc(db, "eval_banque", newId), newEvalData);
+            showToast('Evaluation dupliquee ! Choisis la classe et publie.');
+            // onSnapshot will update allEvals, then load the new eval
+            setTimeout(() => loadEval(newId), 500);
+        } catch(e) {
+            console.error("Erreur duplication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.duplicateCurrentEval = function() {
+        if (!currentEvalId) return;
+        duplicateEval(currentEvalId, null);
+    };
+
     // === NEW EVAL ===
     window.newEval = function() {
         currentEvalId = null;
@@ -957,6 +1006,7 @@
         setBareme(20);
         setModeEval('libre');
         document.getElementById('btn-delete-eval').style.display = 'none';
+        document.getElementById('btn-duplicate-eval').style.display = 'none';
         document.getElementById('validation-banner').style.display = 'none';
         hideAddForm();
         hideDocForm();
@@ -993,6 +1043,7 @@
         setModeEval(currentModeEval);
 
         document.getElementById('btn-delete-eval').style.display = 'block';
+        document.getElementById('btn-duplicate-eval').style.display = 'block';
         document.getElementById('validation-banner').style.display = 'none';
         hideAddForm();
         hideDocForm();
