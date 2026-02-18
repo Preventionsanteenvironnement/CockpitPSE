@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSE Quiz Live — Prof</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 360px; min-width: 360px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.1rem; }
+        .sidebar-section {
+            padding: 14px; border-bottom: 1px solid #334155;
+        }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        /* Session bar */
+        #session-bar { background: #1a1a2e; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .session-btns { display: flex; gap: 6px; margin-top: 6px; }
+        .session-btns button {
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            font-weight: 700; cursor: pointer; font-size: 0.8rem; color: white;
+        }
+        #session-code-display {
+            text-align: center; margin-top: 10px; font-size: 2rem; font-weight: 900;
+            color: #f59e0b; letter-spacing: 4px; display: none;
+        }
+        #session-id-display { font-size: 0.65rem; color: #475569; text-align: center; margin-top: 4px; }
+        #qr-section { text-align: center; margin-top: 10px; display: none; }
+        #qr-code { width: 100px; height: 100px; border-radius: 8px; background: white; padding: 3px; }
+        #qr-label { font-size: 0.6rem; color: #64748b; margin-top: 4px; }
+
+        /* Controls */
+        .ctrl-btn {
+            width: 100%; padding: 10px; border: none; border-radius: 8px;
+            font-weight: 700; cursor: pointer; font-size: 0.9rem; margin-bottom: 6px;
+            transition: opacity 0.2s;
+        }
+        .ctrl-btn:hover { opacity: 0.85; }
+        .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .ctrl-launch { background: #22c55e; color: white; }
+        .ctrl-next { background: #3b82f6; color: white; }
+        .ctrl-end { background: #ef4444; color: white; }
+
+        .timer-select {
+            width: 100%; padding: 8px; background: #0f172a; color: white;
+            border: 1px solid #475569; border-radius: 6px; font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        /* Presence list */
+        .presence-list { max-height: 200px; overflow-y: auto; }
+        .presence-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 8px; background: #0f172a; border-radius: 6px; margin-bottom: 4px;
+            font-size: 0.85rem;
+        }
+        .presence-pseudo { font-weight: 700; }
+        .presence-num { color: #64748b; font-size: 0.75rem; }
+
+        /* === MAIN AREA === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; padding: 30px;
+            overflow-y: auto; align-items: center; justify-content: center;
+        }
+
+        /* Lobby */
+        #main-lobby { text-align: center; display: flex; flex-direction: column; align-items: center; }
+        #main-lobby h1 { font-size: 3rem; margin-bottom: 10px; }
+        #main-lobby .code-giant {
+            font-size: 5rem; font-weight: 900; color: #f59e0b;
+            letter-spacing: 10px; margin: 20px 0;
+        }
+        .lobby-counter { font-size: 1.3rem; color: #94a3b8; margin-top: 10px; }
+
+        /* Question display */
+        #main-question { width: 100%; max-width: 900px; display: none; flex-direction: column; align-items: center; }
+        .main-q-text {
+            font-size: 1.8rem; font-weight: 800; text-align: center;
+            background: #1e293b; padding: 30px 40px; border-radius: 20px;
+            margin-bottom: 24px; width: 100%; line-height: 1.4;
+        }
+        .main-q-num { color: #64748b; font-size: 0.9rem; margin-bottom: 12px; }
+        .main-choices {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+            width: 100%; margin-bottom: 24px;
+        }
+        .main-choice {
+            padding: 20px; border-radius: 16px; color: white;
+            font-size: 1.2rem; font-weight: 700; text-align: center;
+            position: relative; overflow: hidden;
+        }
+        .main-choice-a { background: #3b82f6; }
+        .main-choice-b { background: #f59e0b; }
+        .main-choice-c { background: #22c55e; }
+        .main-choice-d { background: #ef4444; }
+        .main-choice .bar-fill {
+            position: absolute; bottom: 0; left: 0; height: 4px;
+            background: rgba(255,255,255,0.5); transition: width 0.5s ease-out;
+            width: 0;
+        }
+        .main-choice .pct { font-size: 2rem; font-weight: 900; display: none; }
+        .main-choice.correct-answer { border: 4px solid #fff; box-shadow: 0 0 30px rgba(34,197,94,0.5); }
+        .main-choice .correct-badge {
+            display: none; position: absolute; top: 8px; right: 12px; font-size: 1.5rem;
+        }
+        .main-choice.correct-answer .correct-badge { display: block; }
+
+        .response-counter {
+            font-size: 1.5rem; color: #94a3b8; font-weight: 700;
+            margin-bottom: 20px;
+        }
+        .main-timer {
+            font-size: 4rem; font-weight: 900; color: #22c55e;
+            margin-bottom: 16px;
+        }
+        .main-timer.warn { color: #f59e0b; }
+        .main-timer.danger { color: #ef4444; animation: pulse 0.5s infinite; }
+
+        /* Summary */
+        #main-summary { display: none; text-align: center; }
+        .summary-title { font-size: 2.5rem; font-weight: 900; margin-bottom: 20px; }
+        .summary-global { font-size: 1.5rem; color: #94a3b8; margin-bottom: 30px; }
+        .summary-bars { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 600px; }
+        .summary-bar-row { display: flex; align-items: center; gap: 12px; }
+        .summary-bar-label { width: 30px; font-weight: 700; color: #64748b; text-align: center; }
+        .summary-bar-track { flex: 1; height: 32px; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        .summary-bar-fill { height: 100%; border-radius: 8px; transition: width 1s ease-out; display: flex; align-items: center; padding-left: 12px; font-weight: 700; font-size: 0.9rem; }
+
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>🎯 Quiz Live — Prof</h2>
+    </div>
+
+    <!-- Session -->
+    <div class="sidebar-section">
+        <div id="session-bar">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session</label>
+            <div class="session-btns">
+                <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+            </div>
+            <div id="session-code-display"></div>
+            <div id="session-id-display"></div>
+            <div id="qr-section">
+                <img id="qr-code" src="" alt="QR">
+                <div id="qr-label">📱 mapse.fr/eleve_quiz.html</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="sidebar-section" id="controls-section">
+        <label>Controles</label>
+        <select class="timer-select" id="timer-select">
+            <option value="10">⏱️ 10 secondes</option>
+            <option value="15" selected>⏱️ 15 secondes</option>
+            <option value="20">⏱️ 20 secondes</option>
+            <option value="30">⏱️ 30 secondes</option>
+        </select>
+        <button class="ctrl-btn ctrl-launch" id="btn-launch" onclick="launchQuestion()">▶️ Lancer le quiz</button>
+        <button class="ctrl-btn ctrl-next" id="btn-next" onclick="nextQuestion()" disabled>⏭️ Question suivante</button>
+        <button class="ctrl-btn ctrl-end" id="btn-end" onclick="endQuiz()" disabled>🏁 Terminer le quiz</button>
+    </div>
+
+    <!-- Question en cours -->
+    <div class="sidebar-section">
+        <label>Question en cours</label>
+        <div id="sidebar-q-info" style="color:#94a3b8; font-size:0.85rem;">Aucune — Lance le quiz</div>
+    </div>
+
+    <!-- Presence -->
+    <div class="sidebar-section">
+        <label>Eleves connectes (<span id="presence-count">0</span>)</label>
+        <div class="presence-list" id="presence-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <!-- Lobby -->
+    <div id="main-lobby">
+        <h1>🎯 Quiz Live</h1>
+        <p style="color:#64748b; margin-bottom:20px;">Cree une session pour commencer</p>
+        <div class="code-giant" id="main-code" style="display:none;"></div>
+        <div class="lobby-counter" id="main-counter"></div>
+    </div>
+
+    <!-- Question -->
+    <div id="main-question">
+        <div class="main-q-num" id="main-q-num"></div>
+        <div class="main-timer" id="main-timer"></div>
+        <div class="main-q-text" id="main-q-text"></div>
+        <div class="response-counter" id="main-resp-counter"></div>
+        <div class="main-choices" id="main-choices"></div>
+    </div>
+
+    <!-- Summary -->
+    <div id="main-summary">
+        <div class="summary-title">🏁 Quiz termine !</div>
+        <div class="summary-global" id="summary-global"></div>
+        <div class="summary-bars" id="summary-bars"></div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, getDocs, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === CODES SESSION LISIBLES ===
+    const SESSION_CODES = [
+        "LION","TIGRE","PANDA","AIGLE","LOUP","REQUIN","PHENIX","DRAGON",
+        "FLASH","TORNADE","VOLCAN","NINJA","ROBOT","GALAXY","FUSEE","SOLEIL",
+        "COMETE","ECLAIR","ETOILE","PIRATE","ATLAS","COSMOS","TURBO","OXYGEN",
+        "PRISME","VORTEX","PLASMA","QUASAR","NEBULA","ZENITH"
+    ];
+
+    // === QUESTIONS DE DEMO ===
+    const DEMO_QUESTIONS = [
+        {
+            question: "Que signifie PSE ?",
+            choices: ["Prevention Sante Environnement", "Protection Sociale Europeenne", "Programme Scolaire Educatif", "Projet Sante Etudiant"],
+            correct: 0
+        },
+        {
+            question: "Quel numero appeler pour le SAMU ?",
+            choices: ["17", "15", "18", "112"],
+            correct: 1
+        },
+        {
+            question: "Le bruit au travail est un risque de type :",
+            choices: ["Mecanique", "Chimique", "Physique", "Biologique"],
+            correct: 2
+        },
+        {
+            question: "SST signifie :",
+            choices: ["Service de Sante au Travail", "Sauveteur Secouriste du Travail", "Systeme de Securite Totale", "Securite et Sante des Travailleurs"],
+            correct: 1
+        },
+        {
+            question: "Quel organisme gere les risques professionnels ?",
+            choices: ["INRS", "INSEE", "INSERM", "INRA"],
+            correct: 0
+        }
+    ];
+
+    // === STATE ===
+    let currentSessionId = null;
+    let currentSessionCode = null;
+    let currentQuestionIndex = -1;
+    let timerInterval = null;
+    let unsubPresence = null;
+    let unsubReponses = null;
+    let playerCount = 0;
+    let responsesData = [];
+
+    // === SESSION ===
+    function generateSessionId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+    }
+
+    window.newSession = async function() {
+        currentSessionId = generateSessionId();
+        currentSessionCode = SESSION_CODES[Math.floor(Math.random() * SESSION_CODES.length)];
+        currentQuestionIndex = -1;
+        responsesData = [];
+
+        localStorage.setItem('quiz_live_sessionId', currentSessionId);
+
+        // Écrire config
+        await setDoc(doc(db, "quiz_live_config", "global"), {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            phase: 'lobby',
+            currentQuestionIndex: -1,
+            questions: DEMO_QUESTIONS,
+            timer: parseInt(document.getElementById('timer-select').value),
+            isOpen: false,
+            showResults: false
+        });
+
+        // UI
+        document.getElementById('session-code-display').textContent = currentSessionCode;
+        document.getElementById('session-code-display').style.display = 'block';
+        document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+
+        // QR code (fixe, pointe vers mapse.fr)
+        const url = 'https://mapse.fr/eleve_quiz.html';
+        document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+        document.getElementById('qr-section').style.display = 'block';
+
+        // Main lobby
+        document.getElementById('main-code').textContent = currentSessionCode;
+        document.getElementById('main-code').style.display = 'block';
+        document.getElementById('main-lobby').querySelector('p').textContent = 'Les eleves rejoignent avec le code :';
+
+        // Buttons
+        document.getElementById('btn-launch').disabled = false;
+        document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
+        document.getElementById('btn-next').disabled = true;
+        document.getElementById('btn-end').disabled = false;
+
+        // Listeners
+        setupListeners();
+    };
+
+    window.resetSession = async function() {
+        if (!currentSessionId) return;
+        if (!confirm("Effacer toutes les donnees de cette session ?")) return;
+
+        const batch = writeBatch(db);
+        for (const col of ['quiz_live_reponses', 'quiz_live_presence']) {
+            const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+            const snap = await getDocs(q);
+            snap.forEach(d => batch.delete(d.ref));
+        }
+        await batch.commit();
+
+        currentQuestionIndex = -1;
+        responsesData = [];
+        await setDoc(doc(db, "quiz_live_config", "global"), {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            phase: 'lobby',
+            currentQuestionIndex: -1,
+            questions: DEMO_QUESTIONS,
+            timer: parseInt(document.getElementById('timer-select').value),
+            isOpen: false,
+            showResults: false
+        });
+
+        showMainScreen('lobby');
+        document.getElementById('btn-launch').disabled = false;
+        document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
+        document.getElementById('btn-next').disabled = true;
+    };
+
+    // === LISTENERS ===
+    function setupListeners() {
+        if (!currentSessionId) return;
+        if (unsubPresence) unsubPresence();
+        if (unsubReponses) unsubReponses();
+
+        // Presence
+        const qPres = query(collection(db, "quiz_live_presence"), where("sessionId", "==", currentSessionId));
+        unsubPresence = onSnapshot(qPres, (snap) => {
+            playerCount = snap.size;
+            document.getElementById('presence-count').textContent = playerCount;
+            document.getElementById('main-counter').textContent = playerCount + ' eleve(s) connecte(s)';
+
+            const list = document.getElementById('presence-list');
+            list.innerHTML = '';
+            snap.forEach(d => {
+                const data = d.data();
+                const item = document.createElement('div');
+                item.className = 'presence-item';
+                item.innerHTML = '<span class="presence-pseudo">' + data.pseudo + '</span><span class="presence-num">n°' + data.numero + '</span>';
+                list.appendChild(item);
+            });
+        });
+
+        // Reponses
+        const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
+        unsubReponses = onSnapshot(qResp, (snap) => {
+            responsesData = [];
+            snap.forEach(d => responsesData.push(d.data()));
+            updateResponseDisplay();
+        });
+    }
+
+    function updateResponseDisplay() {
+        if (currentQuestionIndex < 0) return;
+        const currentResponses = responsesData.filter(r => r.questionIndex === currentQuestionIndex);
+        document.getElementById('main-resp-counter').textContent = currentResponses.length + ' / ' + playerCount + ' ont repondu';
+    }
+
+    // === LANCER QUESTION ===
+    window.launchQuestion = async function() {
+        if (!currentSessionId) { alert("Cree d'abord une session !"); return; }
+
+        currentQuestionIndex++;
+        if (currentQuestionIndex >= DEMO_QUESTIONS.length) {
+            endQuiz();
+            return;
+        }
+
+        const timer = parseInt(document.getElementById('timer-select').value);
+
+        await setDoc(doc(db, "quiz_live_config", "global"), {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            phase: 'question',
+            currentQuestionIndex: currentQuestionIndex,
+            questions: DEMO_QUESTIONS,
+            timer: timer,
+            isOpen: true,
+            showResults: false
+        });
+
+        // UI
+        showMainScreen('question');
+        displayQuestion(currentQuestionIndex, timer);
+
+        document.getElementById('btn-launch').disabled = true;
+        document.getElementById('btn-next').disabled = true;
+        document.getElementById('btn-end').disabled = false;
+        document.getElementById('sidebar-q-info').textContent = 'Q' + (currentQuestionIndex + 1) + '/' + DEMO_QUESTIONS.length + ' — En cours...';
+
+        // Timer
+        startProfTimer(timer);
+    };
+
+    function displayQuestion(index, timer) {
+        const q = DEMO_QUESTIONS[index];
+        document.getElementById('main-q-num').textContent = 'Question ' + (index + 1) + ' / ' + DEMO_QUESTIONS.length;
+        document.getElementById('main-q-text').textContent = q.question;
+        document.getElementById('main-timer').textContent = timer + 's';
+        document.getElementById('main-timer').className = 'main-timer';
+        document.getElementById('main-resp-counter').textContent = '0 / ' + playerCount + ' ont repondu';
+
+        const grid = document.getElementById('main-choices');
+        grid.innerHTML = '';
+        const letters = ['A', 'B', 'C', 'D'];
+        const colors = ['main-choice-a', 'main-choice-b', 'main-choice-c', 'main-choice-d'];
+
+        q.choices.forEach((choice, i) => {
+            const div = document.createElement('div');
+            div.className = 'main-choice ' + colors[i];
+            div.id = 'main-choice-' + i;
+            div.innerHTML = '<span style="font-size:1.5rem;font-weight:900;margin-right:10px;">' + letters[i] + '</span> ' + choice +
+                '<div class="bar-fill" id="bar-' + i + '"></div>' +
+                '<div class="pct" id="pct-' + i + '"></div>' +
+                '<div class="correct-badge">✅</div>';
+            grid.appendChild(div);
+        });
+    }
+
+    function startProfTimer(seconds) {
+        if (timerInterval) clearInterval(timerInterval);
+        let remaining = seconds;
+        const el = document.getElementById('main-timer');
+
+        timerInterval = setInterval(async () => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                el.textContent = '0s';
+                // Fermer les votes et afficher résultats
+                await showResults();
+                return;
+            }
+            el.textContent = remaining + 's';
+            if (remaining <= 3) el.className = 'main-timer danger';
+            else if (remaining <= Math.floor(seconds * 0.3)) el.className = 'main-timer warn';
+        }, 1000);
+    }
+
+    async function showResults() {
+        if (timerInterval) clearInterval(timerInterval);
+
+        await setDoc(doc(db, "quiz_live_config", "global"), {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            phase: 'results',
+            currentQuestionIndex: currentQuestionIndex,
+            questions: DEMO_QUESTIONS,
+            timer: parseInt(document.getElementById('timer-select').value),
+            isOpen: false,
+            showResults: true
+        });
+
+        // Calculer résultats
+        const q = DEMO_QUESTIONS[currentQuestionIndex];
+        const currentResponses = responsesData.filter(r => r.questionIndex === currentQuestionIndex);
+        const total = currentResponses.length || 1;
+        const counts = [0, 0, 0, 0];
+        currentResponses.forEach(r => { if (r.answer >= 0 && r.answer <= 3) counts[r.answer]++; });
+
+        // Afficher barres
+        for (let i = 0; i < 4; i++) {
+            const pct = Math.round((counts[i] / total) * 100);
+            const bar = document.getElementById('bar-' + i);
+            const pctEl = document.getElementById('pct-' + i);
+            const choiceEl = document.getElementById('main-choice-' + i);
+            if (bar) bar.style.width = pct + '%';
+            if (pctEl) { pctEl.textContent = pct + '%'; pctEl.style.display = 'block'; }
+            if (i === q.correct && choiceEl) choiceEl.classList.add('correct-answer');
+        }
+
+        const correctCount = currentResponses.filter(r => r.correct).length;
+        document.getElementById('main-resp-counter').textContent = correctCount + ' / ' + currentResponses.length + ' bonnes reponses';
+        document.getElementById('sidebar-q-info').textContent = 'Q' + (currentQuestionIndex + 1) + '/' + DEMO_QUESTIONS.length + ' — Resultats';
+        document.getElementById('main-timer').textContent = '✅';
+        document.getElementById('main-timer').className = 'main-timer';
+
+        // Boutons
+        if (currentQuestionIndex < DEMO_QUESTIONS.length - 1) {
+            document.getElementById('btn-next').disabled = false;
+        } else {
+            document.getElementById('btn-next').disabled = true;
+        }
+        document.getElementById('btn-launch').disabled = true;
+    }
+
+    window.nextQuestion = function() {
+        document.getElementById('btn-next').disabled = true;
+        launchQuestion();
+    };
+
+    window.endQuiz = async function() {
+        if (timerInterval) clearInterval(timerInterval);
+
+        await setDoc(doc(db, "quiz_live_config", "global"), {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            phase: 'summary',
+            currentQuestionIndex: currentQuestionIndex,
+            questions: DEMO_QUESTIONS,
+            timer: parseInt(document.getElementById('timer-select').value),
+            isOpen: false,
+            showResults: false
+        });
+
+        showMainScreen('summary');
+        displaySummary();
+    };
+
+    function displaySummary() {
+        // Stats par question
+        let totalCorrect = 0;
+        let totalAnswered = 0;
+        const barsContainer = document.getElementById('summary-bars');
+        barsContainer.innerHTML = '';
+
+        const maxQ = Math.min(currentQuestionIndex + 1, DEMO_QUESTIONS.length);
+        for (let i = 0; i < maxQ; i++) {
+            const qResponses = responsesData.filter(r => r.questionIndex === i);
+            const correct = qResponses.filter(r => r.correct).length;
+            const total = qResponses.length || 1;
+            const pct = Math.round((correct / total) * 100);
+            totalCorrect += correct;
+            totalAnswered += qResponses.length;
+
+            const row = document.createElement('div');
+            row.className = 'summary-bar-row';
+            row.style.animation = 'fadeIn 0.5s ease ' + (i * 0.15) + 's both';
+
+            let barColor = pct >= 60 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444';
+            row.innerHTML = '<div class="summary-bar-label">Q' + (i + 1) + '</div>' +
+                '<div class="summary-bar-track"><div class="summary-bar-fill" style="width:0;background:' + barColor + ';">' + pct + '%</div></div>';
+            barsContainer.appendChild(row);
+
+            // Animer
+            setTimeout(() => {
+                row.querySelector('.summary-bar-fill').style.width = pct + '%';
+            }, 300 + i * 150);
+        }
+
+        const globalPct = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+        document.getElementById('summary-global').textContent = 'Taux de reussite global : ' + globalPct + '%';
+        document.getElementById('sidebar-q-info').textContent = 'Quiz termine — ' + globalPct + '% de reussite';
+
+        // Disable all buttons
+        document.getElementById('btn-launch').disabled = true;
+        document.getElementById('btn-next').disabled = true;
+    }
+
+    // === AFFICHAGE ===
+    function showMainScreen(name) {
+        document.getElementById('main-lobby').style.display = name === 'lobby' ? 'flex' : 'none';
+        document.getElementById('main-question').style.display = name === 'question' ? 'flex' : 'none';
+        document.getElementById('main-summary').style.display = name === 'summary' ? 'block' : 'none';
+    }
+
+    // === AUTO-RESTORE ===
+    const savedId = localStorage.getItem('quiz_live_sessionId');
+    if (savedId) {
+        // Tentative de restauration
+        (async () => {
+            try {
+                const snap = await getDocs(query(collection(db, "quiz_live_presence"), where("sessionId", "==", savedId)));
+                if (snap.size > 0) {
+                    // Session encore active
+                }
+            } catch(e) {}
+        })();
+    }
+</script>
+</body>
+</html>

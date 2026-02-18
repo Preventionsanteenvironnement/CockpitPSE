@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSE Quiz Live — Ecran</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            color: white; height: 100vh; overflow: hidden;
+        }
+
+        .screen { display: none; position: fixed; inset: 0; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+        .screen.active { display: flex; }
+
+        /* === LOBBY === */
+        #screen-lobby { text-align: center; }
+        .lobby-title { font-size: clamp(2rem, 5vw, 4rem); font-weight: 900; margin-bottom: 10px; }
+        .lobby-subtitle { font-size: clamp(1rem, 2vw, 1.5rem); color: #94a3b8; margin-bottom: 40px; }
+        .lobby-code {
+            font-size: clamp(5rem, 12vw, 10rem); font-weight: 900; color: #f59e0b;
+            letter-spacing: 15px; margin-bottom: 20px;
+            text-shadow: 0 0 40px rgba(245,158,11,0.3);
+        }
+        .lobby-qr { margin: 20px 0; }
+        .lobby-qr img { width: 180px; height: 180px; border-radius: 16px; background: white; padding: 8px; }
+        .lobby-qr-label { color: #64748b; font-size: 1rem; margin-top: 8px; }
+        .lobby-players {
+            margin-top: 30px; display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 12px; max-width: 800px;
+        }
+        .player-badge {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+            padding: 8px 16px; border-radius: 50px; font-size: 1.1rem; font-weight: 600;
+            animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .lobby-counter {
+            position: fixed; top: 30px; right: 40px;
+            font-size: 1.5rem; color: #94a3b8; font-weight: 700;
+        }
+
+        /* === QUESTION === */
+        #screen-question { text-align: center; }
+        .wall-q-num { font-size: 1.2rem; color: #64748b; margin-bottom: 10px; font-weight: 600; }
+        .wall-timer {
+            font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; color: #22c55e;
+            margin-bottom: 10px; transition: color 0.3s;
+        }
+        .wall-timer.warn { color: #f59e0b; }
+        .wall-timer.danger { color: #ef4444; animation: pulse 0.5s infinite; }
+        .wall-q-text {
+            font-size: clamp(1.5rem, 3vw, 2.5rem); font-weight: 800; line-height: 1.4;
+            max-width: 900px; margin-bottom: 30px;
+        }
+        .wall-choices {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+            width: 100%; max-width: 900px;
+        }
+        .wall-choice {
+            padding: 24px 20px; border-radius: 20px; color: white;
+            font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700;
+            text-align: center; position: relative; overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .wall-choice-a { background: #3b82f6; }
+        .wall-choice-b { background: #f59e0b; }
+        .wall-choice-c { background: #22c55e; }
+        .wall-choice-d { background: #ef4444; }
+        .wall-choice .letter {
+            font-size: 1.8rem; font-weight: 900; margin-right: 10px;
+        }
+        .wall-resp-counter {
+            position: fixed; top: 30px; right: 40px;
+            font-size: 1.5rem; color: #94a3b8; font-weight: 700;
+        }
+
+        /* === RESULTS === */
+        #screen-results { text-align: center; }
+        .results-q-text {
+            font-size: clamp(1.2rem, 2.5vw, 2rem); font-weight: 700;
+            max-width: 800px; margin-bottom: 30px; color: #94a3b8;
+        }
+        .results-bars {
+            display: flex; gap: 20px; align-items: flex-end;
+            justify-content: center; height: 300px; width: 100%; max-width: 700px;
+        }
+        .result-bar-col {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            height: 100%; justify-content: flex-end;
+        }
+        .result-bar-pct {
+            font-size: 1.8rem; font-weight: 900; margin-bottom: 8px;
+        }
+        .result-bar {
+            width: 100%; max-width: 120px; border-radius: 16px 16px 8px 8px;
+            transition: height 1s ease-out; height: 0;
+            position: relative;
+        }
+        .result-bar-a { background: #3b82f6; }
+        .result-bar-b { background: #f59e0b; }
+        .result-bar-c { background: #22c55e; }
+        .result-bar-d { background: #ef4444; }
+        .result-bar.correct { box-shadow: 0 0 30px rgba(255,255,255,0.4); border: 3px solid white; }
+        .result-bar-label {
+            margin-top: 10px; font-size: 1rem; font-weight: 600; color: #94a3b8;
+            text-align: center; max-width: 140px;
+        }
+        .result-bar-badge {
+            position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+            font-size: 2rem; display: none;
+        }
+        .result-bar.correct .result-bar-badge { display: block; animation: bounceIn 0.6s; }
+        .results-correct-text {
+            font-size: 1.5rem; color: #22c55e; font-weight: 800; margin-top: 30px;
+        }
+
+        /* === SUMMARY === */
+        #screen-summary { text-align: center; }
+        .sum-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 20px; }
+        .sum-global { font-size: clamp(1.2rem, 2.5vw, 2rem); color: #94a3b8; margin-bottom: 40px; }
+        .sum-mini-bars {
+            display: flex; gap: 16px; justify-content: center;
+            flex-wrap: wrap; max-width: 800px;
+        }
+        .sum-mini {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
+        .sum-mini-bar {
+            width: 60px; border-radius: 8px; transition: height 1s ease-out;
+            height: 0;
+        }
+        .sum-mini-label { font-size: 0.9rem; color: #64748b; font-weight: 700; }
+        .sum-mini-pct { font-size: 1.1rem; font-weight: 900; }
+        .sum-thanks { font-size: 1.2rem; color: #475569; margin-top: 30px; }
+
+        /* === JOIN INPUT (pour le wall sans URL param) === */
+        #wall-join {
+            position: fixed; inset: 0; z-index: 200;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #wall-join h1 { font-size: 2.5rem; margin-bottom: 30px; }
+        #wall-join-input {
+            padding: 20px 30px; font-size: 2.5rem; font-weight: 900;
+            text-align: center; text-transform: uppercase; letter-spacing: 8px;
+            border: 3px solid #475569; border-radius: 16px; background: #1e293b;
+            color: white; outline: none; width: 400px; max-width: 80vw;
+        }
+        #wall-join-input:focus { border-color: #f59e0b; }
+        #wall-join-btn {
+            margin-top: 20px; padding: 16px 50px; background: #f59e0b;
+            color: #1a1a2e; font-size: 1.3rem; font-weight: 800;
+            border: none; border-radius: 12px; cursor: pointer;
+        }
+        #wall-join-error { color: #ef4444; margin-top: 12px; font-weight: 600; min-height: 24px; }
+
+        /* === ANIMATIONS === */
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes bounceIn { 0% { transform: translateX(-50%) scale(0); } 50% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<!-- ÉCRAN JOIN (si pas de code en URL) -->
+<div id="wall-join">
+    <h1>🎯 Quiz Live — Ecran</h1>
+    <p style="color:#94a3b8; margin-bottom: 30px;">Entre le code session pour afficher le quiz</p>
+    <input type="text" id="wall-join-input" placeholder="CODE" maxlength="10" autocomplete="off">
+    <button id="wall-join-btn" onclick="wallJoin()">AFFICHER</button>
+    <div id="wall-join-error"></div>
+</div>
+
+<!-- LOBBY -->
+<div id="screen-lobby" class="screen">
+    <div class="lobby-title">🎯 PSE Quiz Live</div>
+    <div class="lobby-subtitle">Rejoignez avec le code :</div>
+    <div class="lobby-code" id="wall-code"></div>
+    <div class="lobby-qr">
+        <img id="wall-qr" src="" alt="QR">
+        <div class="lobby-qr-label">📱 mapse.fr/eleve_quiz.html</div>
+    </div>
+    <div class="lobby-players" id="wall-players"></div>
+    <div class="lobby-counter" id="wall-counter">0 connecte(s)</div>
+</div>
+
+<!-- QUESTION -->
+<div id="screen-question" class="screen">
+    <div class="wall-q-num" id="wall-q-num"></div>
+    <div class="wall-timer" id="wall-timer"></div>
+    <div class="wall-q-text" id="wall-q-text"></div>
+    <div class="wall-choices" id="wall-choices"></div>
+    <div class="wall-resp-counter" id="wall-resp-counter"></div>
+</div>
+
+<!-- RESULTS -->
+<div id="screen-results" class="screen">
+    <div class="wall-q-num" id="res-q-num"></div>
+    <div class="results-q-text" id="res-q-text"></div>
+    <div class="results-bars" id="res-bars"></div>
+    <div class="results-correct-text" id="res-correct-text"></div>
+</div>
+
+<!-- SUMMARY -->
+<div id="screen-summary" class="screen">
+    <div class="sum-title">🏁 Quiz termine !</div>
+    <div class="sum-global" id="sum-global"></div>
+    <div class="sum-mini-bars" id="sum-bars"></div>
+    <div class="sum-thanks">Merci d'avoir participe ! 🎉</div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === STATE ===
+    let currentSessionId = null;
+    let currentSessionCode = null;
+    let unsubConfig = null;
+    let unsubPresence = null;
+    let unsubReponses = null;
+    let playerCount = 0;
+    let responsesData = [];
+    let timerInterval = null;
+    let lastPhase = '';
+    let lastQIndex = -1;
+
+    // === CONNEXION ===
+    // Vérifier URL param
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    if (urlCode) {
+        document.getElementById('wall-join-input').value = urlCode;
+        setTimeout(() => wallJoin(), 500);
+    }
+
+    window.wallJoin = async function() {
+        const code = document.getElementById('wall-join-input').value.trim().toUpperCase();
+        if (!code) { document.getElementById('wall-join-error').textContent = "Entre un code !"; return; }
+
+        try {
+            const snap = await getDoc(doc(db, "quiz_live_config", "global"));
+            if (!snap.exists() || snap.data().sessionCode !== code) {
+                document.getElementById('wall-join-error').textContent = "Code introuvable.";
+                return;
+            }
+            currentSessionId = snap.data().sessionId;
+            currentSessionCode = code;
+
+            document.getElementById('wall-join').style.display = 'none';
+            startWallListening();
+        } catch(e) {
+            document.getElementById('wall-join-error').textContent = "Erreur de connexion.";
+        }
+    };
+
+    document.getElementById('wall-join-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') wallJoin();
+    });
+
+    // === LISTENERS ===
+    function startWallListening() {
+        // Config
+        unsubConfig = onSnapshot(doc(db, "quiz_live_config", "global"), (snap) => {
+            if (!snap.exists()) return;
+            const d = snap.data();
+            if (d.sessionId !== currentSessionId) return;
+
+            const phase = d.phase || 'lobby';
+            const qIndex = d.currentQuestionIndex ?? -1;
+            const questions = d.questions || [];
+            const timer = d.timer || 15;
+
+            if (phase === 'lobby') {
+                showWallScreen('lobby');
+                document.getElementById('wall-code').textContent = currentSessionCode;
+                const qrUrl = 'https://mapse.fr/eleve_quiz.html';
+                document.getElementById('wall-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(qrUrl);
+            } else if (phase === 'question') {
+                if (qIndex !== lastQIndex || lastPhase !== 'question') {
+                    lastQIndex = qIndex;
+                    showWallScreen('question');
+                    displayWallQuestion(questions[qIndex], qIndex, questions.length, timer);
+                }
+            } else if (phase === 'results') {
+                if (timerInterval) clearInterval(timerInterval);
+                showWallScreen('results');
+                displayWallResults(questions[qIndex], qIndex, questions.length);
+            } else if (phase === 'summary') {
+                if (timerInterval) clearInterval(timerInterval);
+                showWallScreen('summary');
+                displayWallSummary(questions);
+            }
+            lastPhase = phase;
+        });
+
+        // Presence
+        const qPres = query(collection(db, "quiz_live_presence"), where("sessionId", "==", currentSessionId));
+        unsubPresence = onSnapshot(qPres, (snap) => {
+            playerCount = snap.size;
+            document.getElementById('wall-counter').textContent = playerCount + ' connecte(s)';
+
+            const container = document.getElementById('wall-players');
+            container.innerHTML = '';
+            snap.forEach(d => {
+                const badge = document.createElement('div');
+                badge.className = 'player-badge';
+                badge.textContent = d.data().pseudo;
+                container.appendChild(badge);
+            });
+        });
+
+        // Reponses
+        const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
+        unsubReponses = onSnapshot(qResp, (snap) => {
+            responsesData = [];
+            snap.forEach(d => responsesData.push(d.data()));
+
+            // Mettre à jour compteur si en phase question
+            if (lastPhase === 'question' && lastQIndex >= 0) {
+                const current = responsesData.filter(r => r.questionIndex === lastQIndex);
+                document.getElementById('wall-resp-counter').textContent = current.length + ' / ' + playerCount + ' ont repondu';
+            }
+        });
+    }
+
+    // === QUESTION ===
+    function displayWallQuestion(q, index, total, timer) {
+        document.getElementById('wall-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
+        document.getElementById('wall-q-text').textContent = q.question;
+        document.getElementById('wall-resp-counter').textContent = '0 / ' + playerCount + ' ont repondu';
+
+        const grid = document.getElementById('wall-choices');
+        grid.innerHTML = '';
+        const letters = ['A', 'B', 'C', 'D'];
+        const colors = ['wall-choice-a', 'wall-choice-b', 'wall-choice-c', 'wall-choice-d'];
+
+        q.choices.forEach((choice, i) => {
+            const div = document.createElement('div');
+            div.className = 'wall-choice ' + colors[i];
+            div.innerHTML = '<span class="letter">' + letters[i] + '</span> ' + choice;
+            grid.appendChild(div);
+        });
+
+        // Timer
+        startWallTimer(timer);
+    }
+
+    function startWallTimer(seconds) {
+        if (timerInterval) clearInterval(timerInterval);
+        let remaining = seconds;
+        const el = document.getElementById('wall-timer');
+        el.textContent = remaining + 's';
+        el.className = 'wall-timer';
+
+        timerInterval = setInterval(() => {
+            remaining--;
+            if (remaining < 0) { clearInterval(timerInterval); return; }
+            el.textContent = remaining + 's';
+            if (remaining <= 3) el.className = 'wall-timer danger';
+            else if (remaining <= Math.floor(seconds * 0.3)) el.className = 'wall-timer warn';
+        }, 1000);
+    }
+
+    // === RESULTS ===
+    function displayWallResults(q, index, total) {
+        document.getElementById('res-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
+        document.getElementById('res-q-text').textContent = q.question;
+
+        const currentResp = responsesData.filter(r => r.questionIndex === index);
+        const totalR = currentResp.length || 1;
+        const counts = [0, 0, 0, 0];
+        currentResp.forEach(r => { if (r.answer >= 0 && r.answer <= 3) counts[r.answer]++; });
+
+        const maxCount = Math.max(...counts, 1);
+        const letters = ['A', 'B', 'C', 'D'];
+        const barColors = ['result-bar-a', 'result-bar-b', 'result-bar-c', 'result-bar-d'];
+
+        const container = document.getElementById('res-bars');
+        container.innerHTML = '';
+
+        for (let i = 0; i < 4; i++) {
+            const pct = Math.round((counts[i] / totalR) * 100);
+            const barHeight = Math.max(20, (counts[i] / maxCount) * 250);
+
+            const col = document.createElement('div');
+            col.className = 'result-bar-col';
+
+            col.innerHTML = '<div class="result-bar-pct">' + pct + '%</div>' +
+                '<div class="result-bar ' + barColors[i] + (i === q.correct ? ' correct' : '') + '" id="rbar-' + i + '" style="height:0;">' +
+                '<div class="result-bar-badge">✅</div></div>' +
+                '<div class="result-bar-label"><strong>' + letters[i] + '</strong><br>' + q.choices[i] + '</div>';
+
+            container.appendChild(col);
+
+            // Animer
+            setTimeout(() => {
+                document.getElementById('rbar-' + i).style.height = barHeight + 'px';
+            }, 200 + i * 150);
+        }
+
+        const correctCount = currentResp.filter(r => r.correct).length;
+        document.getElementById('res-correct-text').textContent = '✅ ' + correctCount + ' / ' + currentResp.length + ' bonnes reponses (' + Math.round((correctCount / totalR) * 100) + '%)';
+    }
+
+    // === SUMMARY ===
+    function displayWallSummary(questions) {
+        let totalCorrect = 0;
+        let totalAnswered = 0;
+        const container = document.getElementById('sum-bars');
+        container.innerHTML = '';
+
+        const maxQ = questions.length;
+        for (let i = 0; i < maxQ; i++) {
+            const qResp = responsesData.filter(r => r.questionIndex === i);
+            if (qResp.length === 0) continue;
+            const correct = qResp.filter(r => r.correct).length;
+            const total = qResp.length;
+            const pct = Math.round((correct / total) * 100);
+            totalCorrect += correct;
+            totalAnswered += total;
+
+            let barColor = pct >= 60 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444';
+
+            const mini = document.createElement('div');
+            mini.className = 'sum-mini';
+            mini.style.animation = 'fadeIn 0.5s ease ' + (i * 0.2) + 's both';
+            mini.innerHTML = '<div class="sum-mini-pct" style="color:' + barColor + '">' + pct + '%</div>' +
+                '<div class="sum-mini-bar" style="background:' + barColor + ';" id="sumbar-' + i + '"></div>' +
+                '<div class="sum-mini-label">Q' + (i + 1) + '</div>';
+            container.appendChild(mini);
+
+            setTimeout(() => {
+                document.getElementById('sumbar-' + i).style.height = Math.max(20, pct * 1.5) + 'px';
+            }, 400 + i * 200);
+        }
+
+        const globalPct = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+        document.getElementById('sum-global').textContent = 'Taux de reussite global : ' + globalPct + '%';
+    }
+
+    // === NAVIGATION ===
+    function showWallScreen(name) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        const el = document.getElementById('screen-' + name);
+        if (el) el.classList.add('active');
+    }
+</script>
+</body>
+</html>
