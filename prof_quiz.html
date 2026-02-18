@@ -353,6 +353,7 @@
     let presenceSnapshotData = [];
     let currentPhase = 'lobby';
     let shuffleEnabled = false;
+    let autoAdvanceTimer = null; // timer for auto-advance after results
 
     // === TOGGLE SHUFFLE ===
     window.toggleShuffle = function() {
@@ -471,7 +472,15 @@
         // LANCER : accessible en lobby, ou en résultats pour passer à la suite
         const canLaunch = hasSession && (inLobby || inResults);
         document.getElementById('btn-launch').disabled = !canLaunch;
-        document.getElementById('btn-launch').textContent = inLobby ? '▶️ Lancer le quiz' : '▶️ Lancer le quiz';
+        if (inLobby) {
+            document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
+        } else if (inResults && hasMoreQ) {
+            document.getElementById('btn-launch').textContent = '▶️ Question suivante';
+        } else if (inResults) {
+            document.getElementById('btn-launch').textContent = '🏁 Voir le bilan';
+        } else {
+            document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
+        }
 
         // PAUSE : seulement en mode Auto pendant une question
         document.getElementById('btn-pause').style.display = (!isManual && (inQuestion || isPaused)) ? 'block' : 'none';
@@ -584,6 +593,7 @@
         if (!confirm("Effacer toutes les donnees de cette session ?")) return;
 
         if (timerInterval) clearInterval(timerInterval);
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
 
         const batch = writeBatch(db);
         for (const col of ['quiz_live_reponses', 'quiz_live_presence']) {
@@ -656,6 +666,9 @@
     // === LANCER QUESTION ===
     window.launchQuestion = async function() {
         if (!currentSessionId) { alert("Cree d'abord une session !"); return; }
+
+        // Cancel any pending auto-advance
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
 
         currentQuestionIndex++;
         if (currentQuestionIndex >= ACTIVE_QUESTIONS.length) {
@@ -763,6 +776,9 @@
 
     // === PAUSE ===
     window.togglePause = async function() {
+        // Cancel any pending auto-advance
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+
         if (isPaused) {
             isPaused = false;
             await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
@@ -863,6 +879,36 @@
         document.getElementById('main-timer').className = 'main-timer';
 
         updateButtons();
+
+        // === AUTO-ADVANCE : en mode Auto, passe à la question suivante après 4s ===
+        if (currentMode === 'auto') {
+            if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+            const hasMoreQ = currentQuestionIndex < ACTIVE_QUESTIONS.length - 1;
+            const delaySeconds = 4;
+            let countdown = delaySeconds;
+            document.getElementById('main-timer').textContent = hasMoreQ ? '⏭️ ' + countdown + 's' : '🏁 ' + countdown + 's';
+            document.getElementById('main-timer').className = 'main-timer warn';
+
+            // Countdown display during results
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    return;
+                }
+                document.getElementById('main-timer').textContent = hasMoreQ ? '⏭️ ' + countdown + 's' : '🏁 ' + countdown + 's';
+            }, 1000);
+
+            autoAdvanceTimer = setTimeout(() => {
+                clearInterval(countdownInterval);
+                autoAdvanceTimer = null;
+                if (hasMoreQ) {
+                    launchQuestion(); // next question
+                } else {
+                    endQuiz(); // last question done, show summary
+                }
+            }, delaySeconds * 1000);
+        }
     }
 
     window.showResultsManual = async function() {
@@ -882,6 +928,7 @@
     window.restartQuiz = async function() {
         if (!currentSessionId) return;
         if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
         isPaused = false;
 
         const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
@@ -916,6 +963,7 @@
     // === END QUIZ ===
     window.endQuiz = async function() {
         if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
         isPaused = false;
         currentPhase = 'summary';
 
