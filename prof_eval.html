@@ -314,6 +314,14 @@
             <button class="filter-pill active" data-classe="all" onclick="setClassFilter('all')">Toutes</button>
         </div>
     </div>
+
+    <div class="sidebar-section">
+        <label>Noms des eleves (RGPD local)</label>
+        <div id="import-status" style="font-size:0.8rem; color:#94a3b8; margin-bottom:6px;"></div>
+        <input type="file" id="csv-import" accept=".csv,.txt" style="display:none;" onchange="importCSVEleves(event)">
+        <button onclick="document.getElementById('csv-import').click()" style="width:100%; padding:8px; background:#1e293b; border:1px dashed #475569; color:#94a3b8; border-radius:6px; font-size:0.8rem; cursor:pointer;">📁 Importer mes_eleves.csv</button>
+        <div style="font-size:0.65rem; color:#475569; margin-top:4px; text-align:center;">🔒 Reste sur cet appareil uniquement</div>
+    </div>
 </div>
 
 <!-- MAIN -->
@@ -418,11 +426,24 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // === NOMS ELEVES (RGPD - localStorage uniquement) ===
+    const CLE_ELEVES = 'cockpit_eleves_noms';
+    function getNomEleve(code) {
+        if (!code) return null;
+        const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+        return eleves[code.toUpperCase()] || null;
+    }
+    function afficherAvecNom(code) {
+        if (!code) return '';
+        const nom = getNomEleve(code);
+        return nom ? nom + ' (' + code + ')' : code;
+    }
+
     // === STATE ===
     let allEvals = [];
     let currentEvalId = null;
     let currentEvalData = null;
-    let results = []; // { eleveCode, classe, note, bareme, competences, questions, publie, tempsSecondes, evalDocId, respData }
+    let results = [];
     let filteredResults = [];
     let currentClassFilter = 'all';
     let sortField = 'code';
@@ -588,16 +609,27 @@
     // === CLASS FILTERS ===
     function buildClassFilters() {
         const classes = new Set();
+        // 1. Classes from results
         results.forEach(r => { if (r.classe) classes.add(r.classe); });
+        // 2. Classes from eval target (classeId can be a group)
+        if (currentEvalData && currentEvalData.classeId) {
+            const targetClasses = window.getClassesFromGroupe ? window.getClassesFromGroupe(currentEvalData.classeId) : [currentEvalData.classeId];
+            targetClasses.forEach(c => classes.add(c));
+        }
+        // 3. If no classeId (all classes), show classes from BDD_ELEVES that have results
+        if (!currentEvalData || !currentEvalData.classeId) {
+            results.forEach(r => { if (r.classe) classes.add(r.classe); });
+        }
 
         const container = document.getElementById('class-filters');
-        container.innerHTML = '<button class="filter-pill' + (currentClassFilter === 'all' ? ' active' : '') + '" onclick="setClassFilter(\'all\')">Toutes</button>';
+        container.innerHTML = '<button class="filter-pill' + (currentClassFilter === 'all' ? ' active' : '') + '" onclick="setClassFilter(\'all\')">Toutes (' + results.length + ')</button>';
 
         const sorted = [...classes].sort();
         sorted.forEach(c => {
+            const count = results.filter(r => r.classe === c).length;
             const pill = document.createElement('button');
             pill.className = 'filter-pill' + (currentClassFilter === c ? ' active' : '');
-            pill.textContent = c;
+            pill.textContent = c + (count > 0 ? ' (' + count + ')' : '');
             pill.onclick = () => setClassFilter(c);
             container.appendChild(pill);
         });
@@ -605,8 +637,8 @@
 
     window.setClassFilter = function(classe) {
         currentClassFilter = classe;
-        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-        event.target.classList.add('active');
+        // Rebuild filters to update active state
+        buildClassFilters();
         applyFilters();
         renderStats();
         renderTable();
@@ -718,8 +750,10 @@
                 ? '<button class="btn-sm btn-unpub" onclick="unpublishOne(\'' + r.eleveCode + '\')" title="Depublier">🔒</button>'
                 : '<button class="btn-sm btn-pub" onclick="publishOne(\'' + r.eleveCode + '\')" title="Publier">📢</button>';
 
+            const displayName = afficherAvecNom(r.eleveCode);
+
             tr.innerHTML =
-                '<td class="td-code">' + r.eleveCode + tabWarn + '</td>' +
+                '<td class="td-code">' + displayName + tabWarn + '</td>' +
                 '<td class="td-classe">' + r.classe + '</td>' +
                 '<td class="td-note ' + noteClass + '">' + (r.note !== null ? r.note + '/' + bareme : '--') + '</td>' +
                 compsCells +
@@ -813,7 +847,7 @@
         const qs = currentEvalData.questions || [];
         const bareme = currentEvalData.bareme || 20;
 
-        document.getElementById('modal-title').textContent = '👤 ' + eleveCode + ' — ' + (currentEvalData.titre || 'Evaluation');
+        document.getElementById('modal-title').textContent = '👤 ' + afficherAvecNom(eleveCode) + ' — ' + (currentEvalData.titre || 'Evaluation');
 
         let html = '';
 
@@ -890,7 +924,7 @@
         }
 
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
-        const header = ['Eleve', 'Classe', 'Note/' + bareme, 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Sorties onglet'];
+        const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Sorties onglet'];
 
         const rows = filteredResults.map(r => {
             const comps = [];
@@ -908,6 +942,7 @@
                 }
             }
             return [
+                getNomEleve(r.eleveCode) || r.eleveCode,
                 r.eleveCode,
                 r.classe,
                 r.note !== null ? r.note : '--',
@@ -1024,6 +1059,47 @@
         for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
         return code;
     }
+
+    // === IMPORT CSV ELEVES ===
+    window.importCSVEleves = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lignes = e.target.result.split(/\r?\n/);
+            const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+            let nb = 0;
+            lignes.forEach(ligne => {
+                ligne = ligne.trim();
+                if (!ligne) return;
+                const parts = ligne.split(/[,;]/);
+                if (parts.length >= 2) {
+                    const code = parts[0].trim().toUpperCase();
+                    const nom = parts.slice(1).join(' ').trim();
+                    if (code && nom) { eleves[code] = nom; nb++; }
+                }
+            });
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+            updateImportStatus();
+            if (results.length > 0) renderTable();
+            showToast(nb + ' eleve(s) importe(s) !');
+        };
+        reader.readAsText(file, 'UTF-8');
+    };
+
+    function updateImportStatus() {
+        const eleves = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+        const nb = Object.keys(eleves).length;
+        const el = document.getElementById('import-status');
+        if (nb > 0) {
+            el.innerHTML = '✅ ' + nb + ' eleve(s) charges';
+            el.style.color = '#22c55e';
+        } else {
+            el.innerHTML = '⚠️ Aucun nom charge — importe ton CSV';
+            el.style.color = '#f59e0b';
+        }
+    }
+    updateImportStatus();
 
     // === TOAST ===
     function showToast(msg) {
