@@ -451,22 +451,31 @@
         const hasMoreQ = currentQuestionIndex < ACTIVE_QUESTIONS.length - 1;
         const quizStarted = currentQuestionIndex >= 0;
 
-        document.getElementById('btn-launch').disabled = !hasSession || (!inLobby && !inResults);
+        // LANCER : accessible en lobby, ou en résultats pour passer à la suite
+        const canLaunch = hasSession && (inLobby || inResults);
+        document.getElementById('btn-launch').disabled = !canLaunch;
         document.getElementById('btn-launch').textContent = inLobby ? '▶️ Lancer le quiz' : '▶️ Lancer le quiz';
-        if (inResults || inLobby) {
-            document.getElementById('btn-launch').disabled = !hasSession;
-        }
-        if (inQuestion || inSummary) {
-            document.getElementById('btn-launch').disabled = true;
-        }
 
-        document.getElementById('btn-pause').style.display = (inQuestion || isPaused) ? 'block' : 'none';
+        // PAUSE : seulement en mode Auto pendant une question
+        document.getElementById('btn-pause').style.display = (!isManual && (inQuestion || isPaused)) ? 'block' : 'none';
         document.getElementById('btn-pause').disabled = !inQuestion && !isPaused;
         document.getElementById('btn-pause').textContent = isPaused ? '▶️ Reprendre' : '⏸️ Pause';
 
-        document.getElementById('btn-prev').disabled = !(hasSession && currentQuestionIndex > 0 && (isManual || inResults));
-        document.getElementById('btn-next').disabled = !(hasSession && inResults && hasMoreQ);
+        // PRECEDENT : accessible dès qu'on est sur une question ou résultats, et qu'il y a une question avant
+        if (isManual) {
+            document.getElementById('btn-prev').disabled = !(hasSession && currentQuestionIndex > 0 && (inQuestion || inResults));
+        } else {
+            document.getElementById('btn-prev').disabled = !(hasSession && currentQuestionIndex > 0 && inResults);
+        }
 
+        // SUIVANT : en mode Manuel, accessible dès qu'on est sur une question ou résultats et qu'il y a une suite
+        if (isManual) {
+            document.getElementById('btn-next').disabled = !(hasSession && (inQuestion || inResults) && hasMoreQ);
+        } else {
+            document.getElementById('btn-next').disabled = !(hasSession && inResults && hasMoreQ);
+        }
+
+        // VOIR RESULTATS : seulement en mode Manuel, pendant une question
         document.getElementById('btn-results').style.display = isManual ? 'block' : 'none';
         document.getElementById('btn-results').disabled = !(inQuestion && !isPaused);
 
