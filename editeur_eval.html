@@ -415,7 +415,7 @@
                     <textarea class="form-textarea" id="doc-content" placeholder="Collez le texte ici..." rows="4"></textarea>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn-save-q" onclick="saveDocument()" style="flex:1;">Ajouter le document</button>
+                    <button class="btn-save-q" id="btn-save-doc" onclick="saveDocument()" style="flex:1;">Ajouter le document</button>
                     <button class="btn-cancel-q" onclick="hideDocForm()">Annuler</button>
                 </div>
             </div>
@@ -822,15 +822,30 @@
 
     // === DOCUMENTS MANAGEMENT ===
     window.showDocForm = function() {
+        editingDocIndex = -1;
         document.getElementById('doc-form').style.display = 'block';
         document.getElementById('doc-titre').value = '';
         document.getElementById('doc-type').value = 'text';
         document.getElementById('doc-content').value = '';
+        document.getElementById('btn-save-doc').textContent = 'Ajouter le document';
         updateDocContentLabel();
     };
 
     window.hideDocForm = function() {
+        editingDocIndex = -1;
         document.getElementById('doc-form').style.display = 'none';
+    };
+
+    window.editDocument = function(index) {
+        const d = documents[index];
+        editingDocIndex = index;
+        document.getElementById('doc-form').style.display = 'block';
+        document.getElementById('doc-titre').value = d.titre;
+        document.getElementById('doc-type').value = d.type;
+        updateDocContentLabel();
+        document.getElementById('doc-content').value = d.content;
+        document.getElementById('btn-save-doc').textContent = 'Modifier le document';
+        document.getElementById('doc-titre').focus();
     };
 
     document.getElementById('doc-type').addEventListener('change', updateDocContentLabel);
@@ -847,11 +862,20 @@
         if (!titre) { alert('Donne un titre au document !'); return; }
         if (!content) { alert('Ajoute le contenu !'); return; }
 
-        const newDoc = {
-            id: 'doc_' + Date.now().toString(36),
-            type, titre, content
-        };
-        documents.push(newDoc);
+        if (editingDocIndex >= 0 && editingDocIndex < documents.length) {
+            // Mode edition : mettre a jour le document existant (meme ID)
+            documents[editingDocIndex].titre = titre;
+            documents[editingDocIndex].type = type;
+            documents[editingDocIndex].content = content;
+        } else {
+            // Mode ajout : creer un nouveau document
+            const newDoc = {
+                id: 'doc_' + Date.now().toString(36),
+                type, titre, content
+            };
+            documents.push(newDoc);
+        }
+        editingDocIndex = -1;
         renderDocuments();
         updateDocRefDropdowns();
         hideDocForm();
@@ -877,7 +901,10 @@
             card.className = 'doc-card';
             const typeIcon = d.type === 'image' ? '🖼️' : '📄';
             card.innerHTML = '<div class="doc-info"><div class="doc-title">' + typeIcon + ' ' + d.titre + '</div><div class="doc-type">' + d.type + '</div></div>' +
-                '<button class="doc-del" onclick="deleteDocument(' + i + ')">&times;</button>';
+                '<div style="display:flex; gap:4px;">' +
+                '<button class="doc-del" onclick="editDocument(' + i + ')" title="Modifier" style="color:#3b82f6; font-size:1rem;">✏️</button>' +
+                '<button class="doc-del" onclick="deleteDocument(' + i + ')">&times;</button>' +
+                '</div>';
             container.appendChild(card);
         });
     }
