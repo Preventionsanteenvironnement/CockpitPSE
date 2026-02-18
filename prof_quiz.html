@@ -68,11 +68,7 @@
         .ctrl-next { background: #3b82f6; color: white; }
         .ctrl-end { background: #ef4444; color: white; }
 
-        .timer-select {
-            width: 100%; padding: 8px; background: #0f172a; color: white;
-            border: 1px solid #475569; border-radius: 6px; font-size: 0.9rem;
-            margin-bottom: 8px;
-        }
+        /* timer input is styled inline */
 
         /* Mode toggle */
         .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -220,15 +216,18 @@
             <button id="mode-auto" onclick="setMode('auto')" class="mode-btn active">⏱️ Auto</button>
             <button id="mode-manual" onclick="setMode('manual')" class="mode-btn inactive">✋ Manuel</button>
         </div>
-        <div id="timer-row">
-            <select class="timer-select" id="timer-select">
-                <option value="10">⏱️ 10 secondes</option>
-                <option value="15" selected>⏱️ 15 secondes</option>
-                <option value="20">⏱️ 20 secondes</option>
-                <option value="30">⏱️ 30 secondes</option>
-            </select>
+        <div id="timer-row" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:0.85rem; color:#94a3b8;">⏱️</span>
+            <input type="number" id="timer-input" value="15" min="5" max="120" step="5" style="width:70px; padding:8px; background:#0f172a; color:white; border:1px solid #475569; border-radius:6px; font-size:0.95rem; font-weight:700; text-align:center;">
+            <span style="font-size:0.85rem; color:#94a3b8;">secondes</span>
         </div>
-        <label style="margin-top:8px;">Actions</label>
+        <div id="shuffle-row" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:8px 10px; background:#0f172a; border-radius:8px; cursor:pointer;" onclick="toggleShuffle()">
+            <div id="shuffle-toggle" style="width:40px; height:22px; border-radius:11px; background:#475569; position:relative; transition:0.3s; flex-shrink:0;">
+                <div id="shuffle-dot" style="width:18px; height:18px; border-radius:50%; background:white; position:absolute; top:2px; left:2px; transition:0.3s;"></div>
+            </div>
+            <span style="font-size:0.8rem; color:#94a3b8;" id="shuffle-label">🔀 Melanger les reponses (anti-triche)</span>
+        </div>
+        <label style="margin-top:4px;">Actions</label>
         <button class="ctrl-btn ctrl-launch" id="btn-launch" onclick="launchQuestion()">▶️ Lancer le quiz</button>
         <button class="ctrl-btn" id="btn-pause" onclick="togglePause()" disabled style="background:#f59e0b; color:white; display:none;">⏸️ Pause</button>
         <div style="display:flex; gap:6px;">
@@ -353,6 +352,24 @@
     let pausedTimeRemaining = 0;
     let presenceSnapshotData = [];
     let currentPhase = 'lobby';
+    let shuffleEnabled = false;
+
+    // === TOGGLE SHUFFLE ===
+    window.toggleShuffle = function() {
+        shuffleEnabled = !shuffleEnabled;
+        const toggle = document.getElementById('shuffle-toggle');
+        const dot = document.getElementById('shuffle-dot');
+        const label = document.getElementById('shuffle-label');
+        if (shuffleEnabled) {
+            toggle.style.background = '#22c55e';
+            dot.style.left = '20px';
+            label.style.color = '#22c55e';
+        } else {
+            toggle.style.background = '#475569';
+            dot.style.left = '2px';
+            label.style.color = '#94a3b8';
+        }
+    };
 
     // === NORMALIZE QUESTIONS FOR LIVE ===
     // V/F -> QCM with 2 choices, "mot" stays as-is with type marker
@@ -436,7 +453,7 @@
         currentMode = mode;
         document.getElementById('mode-auto').className = 'mode-btn ' + (mode === 'auto' ? 'active' : 'inactive');
         document.getElementById('mode-manual').className = 'mode-btn ' + (mode === 'manual' ? 'active' : 'inactive');
-        document.getElementById('timer-row').style.display = mode === 'auto' ? 'block' : 'none';
+        document.getElementById('timer-row').style.display = mode === 'auto' ? 'flex' : 'none';
         updateButtons();
     };
 
@@ -515,7 +532,7 @@
             sessionId: currentSessionId,
             sessionCode: currentSessionCode,
             questions: ACTIVE_QUESTIONS,
-            timer: currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-select').value),
+            timer: currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-input').value) || 15,
             mode: currentMode,
             ...overrides
         };
@@ -650,8 +667,8 @@
         currentPhase = 'question';
 
         const q = ACTIVE_QUESTIONS[currentQuestionIndex];
-        const timer = currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-select').value);
-        const shuffleMap = generateShuffleMap(q);
+        const timer = currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-input').value) || 15;
+        const shuffleMap = shuffleEnabled ? generateShuffleMap(q) : null;
 
         await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'question',
