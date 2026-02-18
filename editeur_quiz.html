@@ -47,8 +47,17 @@
         }
         .quiz-list-item:hover { border-color: #475569; }
         .quiz-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
-        .quiz-list-item .qi-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; }
+        .quiz-list-item { position: relative; }
+        .quiz-list-item .qi-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; padding-right: 28px; }
         .quiz-list-item .qi-meta { font-size: 0.7rem; color: #64748b; }
+        .quiz-list-item .qi-del {
+            position: absolute; top: 8px; right: 8px;
+            background: transparent; border: none; color: #64748b;
+            font-size: 0.85rem; cursor: pointer; padding: 2px 5px; border-radius: 4px;
+            opacity: 0; transition: 0.2s;
+        }
+        .quiz-list-item:hover .qi-del { opacity: 1; }
+        .quiz-list-item .qi-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
         .quiz-list-item .qi-badge {
             display: inline-block; padding: 2px 6px; border-radius: 4px;
             font-size: 0.65rem; font-weight: 700; margin-right: 4px;
@@ -145,6 +154,7 @@
         }
         .q-card-actions button:hover { background: #334155; color: white; }
         .q-card-actions button.btn-del:hover { background: #ef4444; color: white; }
+        .q-card-actions button.btn-edit:hover { background: #3b82f6; color: white; }
 
         .q-card-question { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
         .q-card-choices { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -228,6 +238,9 @@
         }
 
         .info-text { font-size: 0.75rem; color: #64748b; font-style: italic; margin-top: 4px; }
+        .q-card.editing { border-color: #f59e0b; background: #1e293b; box-shadow: 0 0 12px rgba(245,158,11,0.15); }
+        .q-form.edit-mode { border-color: #f59e0b; }
+        .q-form.edit-mode h4 { color: #fbbf24; }
     </style>
 </head>
 <body>
@@ -406,6 +419,7 @@
     let questions = []; // local array of question objects
     let vfAnswer = true; // for VF form
     let allQuizzes = []; // list from Firebase
+    let editingIndex = -1; // -1 = adding, >= 0 = editing question at index
 
     // === POPULATE CLASSE DROPDOWN ===
     function populateClasses() {
@@ -477,7 +491,11 @@
         allQuizzes.forEach(q => {
             const div = document.createElement('div');
             div.className = 'quiz-list-item' + (q.id === currentQuizId ? ' active' : '');
-            div.onclick = () => loadQuiz(q.id);
+            div.onclick = (e) => {
+                // Don't load if clicking the delete button
+                if (e.target.classList.contains('qi-del')) return;
+                loadQuiz(q.id);
+            };
 
             const typeBadge = q.type === 'diagnostique'
                 ? '<span class="qi-badge badge-diag">Diag</span>'
@@ -486,10 +504,33 @@
             const classInfo = q.classeId ? q.classeId : 'Libre';
 
             div.innerHTML = '<div class="qi-title">' + (q.titre || 'Sans titre') + '</div>' +
-                '<div class="qi-meta">' + typeBadge + qCountBadge + ' ' + classInfo + '</div>';
+                '<div class="qi-meta">' + typeBadge + qCountBadge + ' ' + classInfo + '</div>' +
+                '<button class="qi-del" onclick="deleteQuizFromSidebar(\'' + q.id + '\', event)" title="Supprimer ce quiz">🗑️</button>';
             container.appendChild(div);
         });
     }
+
+    // === DELETE QUIZ FROM SIDEBAR ===
+    window.deleteQuizFromSidebar = async function(quizId, event) {
+        event.stopPropagation();
+        if (!confirm("Supprimer definitivement ce quiz ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "quiz_banque", quizId));
+            // If we were editing this quiz, clear the editor
+            if (currentQuizId === quizId) {
+                currentQuizId = null;
+                questions = [];
+                editingIndex = -1;
+                document.getElementById('main-editor').style.display = 'none';
+                document.getElementById('main-empty').style.display = 'flex';
+            }
+            showToast('Quiz supprime.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
 
     // === NEW QUIZ ===
     window.newQuiz = function() {
@@ -546,7 +587,14 @@
     // === ADD QUESTION FORMS ===
     window.showAddForm = function(type) {
         hideAddForm();
-        document.getElementById('form-' + type).style.display = 'block';
+        editingIndex = -1; // new question mode
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.remove('edit-mode');
+
+        // Update button text
+        updateFormButtonText(type, 'Ajouter la question');
+        updateFormTitle(type, type === 'qcm' ? 'Nouvelle question QCM' : type === 'vf' ? 'Nouvelle question Vrai / Faux' : 'Nouvelle question Reponse courte');
 
         // Reset forms
         if (type === 'qcm') {
@@ -563,10 +611,80 @@
             document.getElementById('mot-reponse').value = '';
             document.getElementById('mot-question').focus();
         }
+
+        // Remove editing highlight from cards
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
     };
 
     window.hideAddForm = function() {
-        document.querySelectorAll('.q-form').forEach(f => f.style.display = 'none');
+        editingIndex = -1;
+        document.querySelectorAll('.q-form').forEach(f => { f.style.display = 'none'; f.classList.remove('edit-mode'); });
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+    };
+
+    function updateFormButtonText(type, text) {
+        const form = document.getElementById('form-' + type);
+        const btn = form.querySelector('.btn-save-q');
+        if (btn) btn.textContent = text;
+    }
+
+    function updateFormTitle(type, text) {
+        const form = document.getElementById('form-' + type);
+        const h4 = form.querySelector('h4');
+        if (h4) h4.textContent = text;
+    }
+
+    // === EDIT QUESTION ===
+    window.editQuestion = function(index) {
+        const q = questions[index];
+        if (!q) return;
+
+        hideAddForm();
+        editingIndex = index;
+        const type = q.type;
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.add('edit-mode');
+
+        updateFormButtonText(type, 'Enregistrer la modification');
+        updateFormTitle(type, 'Modifier Q' + (index + 1));
+
+        // Highlight the card being edited
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        const cards = document.querySelectorAll('.q-card');
+        if (cards[index]) cards[index].classList.add('editing');
+
+        // Pre-fill the form
+        if (type === 'qcm') {
+            document.getElementById('qcm-question').value = q.question;
+            // Rebuild choices
+            const container = document.getElementById('qcm-choices');
+            container.innerHTML = '';
+            q.choices.forEach((choice, ci) => {
+                addChoiceRow(container, ci);
+                const textInput = container.querySelectorAll('input[type="text"]')[ci];
+                if (textInput) textInput.value = choice;
+                if (ci === q.correct) {
+                    const radio = container.querySelectorAll('input[type="radio"]')[ci];
+                    if (radio) radio.checked = true;
+                }
+            });
+            updateRemoveButtons();
+            document.getElementById('btn-add-choice').style.display = q.choices.length < 4 ? 'block' : 'none';
+            document.getElementById('qcm-question').focus();
+        } else if (type === 'vf') {
+            document.getElementById('vf-question').value = q.question;
+            vfAnswer = q.correct;
+            updateVFButtons();
+            document.getElementById('vf-question').focus();
+        } else if (type === 'mot') {
+            document.getElementById('mot-question').value = q.question;
+            document.getElementById('mot-reponse').value = q.reponse;
+            document.getElementById('mot-question').focus();
+        }
+
+        // Scroll the form into view
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
     // === QCM CHOICES MANAGEMENT ===
@@ -641,8 +759,10 @@
         document.getElementById('vf-false').className = 'vf-btn' + (!vfAnswer ? ' selected-false' : '');
     }
 
-    // === SAVE QUESTION (add to local array) ===
+    // === SAVE QUESTION (add or edit in local array) ===
     window.saveQuestion = function(type) {
+        let newQ = null;
+
         if (type === 'qcm') {
             const question = document.getElementById('qcm-question').value.trim();
             if (!question) { alert('Ecris la question !'); return; }
@@ -660,21 +780,32 @@
             const correctRadio = document.querySelector('input[name="qcm-correct"]:checked');
             const correct = parseInt(correctRadio.value);
 
-            questions.push({ type: 'qcm', question, choices, correct });
+            newQ = { type: 'qcm', question, choices, correct };
 
         } else if (type === 'vf') {
             const question = document.getElementById('vf-question').value.trim();
             if (!question) { alert('Ecris la question !'); return; }
-            questions.push({ type: 'vf', question, correct: vfAnswer });
+            newQ = { type: 'vf', question, correct: vfAnswer };
 
         } else if (type === 'mot') {
             const question = document.getElementById('mot-question').value.trim();
             const reponse = document.getElementById('mot-reponse').value.trim();
             if (!question) { alert('Ecris la question !'); return; }
             if (!reponse) { alert('Ecris la reponse attendue !'); return; }
-            questions.push({ type: 'mot', question, reponse });
+            newQ = { type: 'mot', question, reponse };
         }
 
+        if (!newQ) return;
+
+        if (editingIndex >= 0 && editingIndex < questions.length) {
+            // Edit mode: replace the question at index
+            questions[editingIndex] = newQ;
+        } else {
+            // Add mode: append
+            questions.push(newQ);
+        }
+
+        editingIndex = -1;
         hideAddForm();
         renderQuestions();
     };
@@ -708,6 +839,7 @@
             card.innerHTML = '<div class="q-card-header">' +
                 '<div><span class="q-card-num">Q' + (i + 1) + '</span><span class="q-card-type-badge ' + typeClass + '">' + typeLabel + '</span></div>' +
                 '<div class="q-card-actions">' +
+                    '<button class="btn-edit" onclick="editQuestion(' + i + ')" title="Modifier">✏️</button>' +
                     '<button onclick="moveQuestion(' + i + ', -1)" title="Monter"' + (i === 0 ? ' disabled style="opacity:0.3"' : '') + '>▲</button>' +
                     '<button onclick="moveQuestion(' + i + ', 1)" title="Descendre"' + (i === questions.length - 1 ? ' disabled style="opacity:0.3"' : '') + '>▼</button>' +
                     '<button class="btn-del" onclick="deleteQuestion(' + i + ')" title="Supprimer">&times;</button>' +
