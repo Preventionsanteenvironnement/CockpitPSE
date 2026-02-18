@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur de Quiz — PSE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 320px; min-width: 320px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.1rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        #btn-new-quiz {
+            width: 100%; padding: 12px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #btn-new-quiz:hover { opacity: 0.85; }
+
+        .quiz-list { display: flex; flex-direction: column; gap: 4px; }
+        .quiz-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent;
+        }
+        .quiz-list-item:hover { border-color: #475569; }
+        .quiz-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .quiz-list-item .qi-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; }
+        .quiz-list-item .qi-meta { font-size: 0.7rem; color: #64748b; }
+        .quiz-list-item .qi-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.65rem; font-weight: 700; margin-right: 4px;
+        }
+        .badge-diag { background: #dbeafe; color: #1e40af; }
+        .badge-form { background: #dcfce7; color: #166534; }
+        .badge-qcount { background: #fef3c7; color: #92400e; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        #main-editor { display: none; flex-direction: column; gap: 20px; max-width: 800px; width: 100%; margin: 0 auto; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .form-input {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none;
+        }
+        .form-input:focus { border-color: #3b82f6; }
+        .form-input::placeholder { color: #64748b; }
+        .form-select {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none;
+            cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row > * { flex: 1; }
+
+        /* Meta section */
+        .meta-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .meta-card h3 { font-size: 1rem; margin-bottom: 16px; color: #f1f5f9; }
+
+        /* Questions section */
+        .questions-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .questions-header h3 { font-size: 1.1rem; }
+        .questions-count { font-size: 0.85rem; color: #64748b; }
+
+        .add-btns { display: flex; gap: 8px; margin-bottom: 16px; }
+        .add-btn {
+            flex: 1; padding: 12px; border: 2px dashed #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .add-btn:hover { border-color: #3b82f6; color: #3b82f6; background: rgba(59,130,246,0.05); }
+
+        /* Question cards */
+        .q-card {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 16px; margin-bottom: 10px; position: relative;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .q-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .q-card-num {
+            font-weight: 900; font-size: 1rem; color: #3b82f6;
+        }
+        .q-card-type-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 700; margin-left: 8px;
+        }
+        .type-qcm { background: #3b82f6; color: white; }
+        .type-vf { background: #8b5cf6; color: white; }
+        .type-mot { background: #f59e0b; color: white; }
+
+        .q-card-actions { display: flex; gap: 4px; }
+        .q-card-actions button {
+            background: #0f172a; border: 1px solid #475569; color: #94a3b8;
+            width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .q-card-actions button:hover { background: #334155; color: white; }
+        .q-card-actions button.btn-del:hover { background: #ef4444; color: white; }
+
+        .q-card-question { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+        .q-card-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+        .q-card-choice {
+            padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;
+            background: #0f172a; color: #94a3b8; border: 1px solid #334155;
+        }
+        .q-card-choice.correct { background: #166534; color: #bbf7d0; border-color: #22c55e; }
+        .q-card-answer { font-size: 0.85rem; color: #22c55e; font-weight: 600; }
+
+        /* Question add form */
+        .q-form {
+            background: #1a1a2e; border: 2px solid #3b82f6; border-radius: 12px;
+            padding: 20px; margin-bottom: 12px; display: none;
+        }
+        .q-form h4 { font-size: 0.95rem; margin-bottom: 14px; color: #93c5fd; }
+        .q-form .form-input { background: #0f172a; }
+        .q-form-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .btn-save-q {
+            flex: 1; padding: 10px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-save-q:hover { opacity: 0.85; }
+        .btn-cancel-q {
+            padding: 10px 20px; background: #334155; color: #94a3b8;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-cancel-q:hover { background: #475569; color: white; }
+
+        /* Radio custom */
+        .radio-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .radio-row input[type="radio"] { accent-color: #22c55e; width: 18px; height: 18px; }
+        .radio-row input[type="text"] { flex: 1; }
+        .radio-row .remove-choice {
+            background: transparent; border: none; color: #ef4444; font-size: 1.2rem;
+            cursor: pointer; padding: 0 4px; opacity: 0.5;
+        }
+        .radio-row .remove-choice:hover { opacity: 1; }
+        .btn-add-choice {
+            padding: 6px 12px; background: #1e293b; border: 1px dashed #475569;
+            color: #64748b; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+            margin-top: 4px;
+        }
+        .btn-add-choice:hover { border-color: #3b82f6; color: #3b82f6; }
+
+        /* VF buttons */
+        .vf-toggle { display: flex; gap: 8px; }
+        .vf-btn {
+            flex: 1; padding: 12px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .vf-btn.selected-true { border-color: #22c55e; background: rgba(34,197,94,0.15); color: #22c55e; }
+        .vf-btn.selected-false { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Bottom actions */
+        .bottom-actions {
+            display: flex; gap: 10px; margin-top: 20px; padding-top: 20px;
+            border-top: 1px solid #334155;
+        }
+        .btn-save-quiz {
+            flex: 1; padding: 14px; background: #3b82f6; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-save-quiz:hover { background: #2563eb; }
+        .btn-delete-quiz {
+            padding: 14px 20px; background: #7f1d1d; color: #fca5a5;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-delete-quiz:hover { background: #ef4444; color: white; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 1000; display: none; animation: fadeIn 0.3s;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        .info-text { font-size: 0.75rem; color: #64748b; font-style: italic; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>📝 Editeur de Quiz</h2>
+        <a href="index.html">← Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <button id="btn-new-quiz" onclick="newQuiz()">+ Nouveau quiz</button>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Mes quiz (<span id="quiz-count">0</span>)</label>
+        <div class="quiz-list" id="quiz-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <!-- Empty state -->
+    <div id="main-empty">
+        <div class="big-icon">📝</div>
+        <h2 style="margin-bottom:8px;">Editeur de Quiz</h2>
+        <p>Cree un nouveau quiz ou selectionne-en un dans la liste.</p>
+    </div>
+
+    <!-- Editor -->
+    <div id="main-editor">
+        <!-- Metadonnees -->
+        <div class="meta-card">
+            <h3>Informations du quiz</h3>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Titre du quiz *</label>
+                <input type="text" class="form-input" id="quiz-titre" placeholder="Ex: Quiz diagnostic A2 Le sommeil">
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select class="form-select" id="quiz-type">
+                        <option value="diagnostique">Diagnostique</option>
+                        <option value="formatif">Formatif</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Classe (optionnel)</label>
+                    <select class="form-select" id="quiz-classe">
+                        <option value="">— Aucune (quiz libre) —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Module (optionnel)</label>
+                <select class="form-select" id="quiz-module" disabled>
+                    <option value="">— Choisir une classe d'abord —</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Questions -->
+        <div>
+            <div class="questions-header">
+                <h3>Questions</h3>
+                <span class="questions-count" id="q-count">0 question(s)</span>
+            </div>
+
+            <div class="add-btns">
+                <button class="add-btn" onclick="showAddForm('qcm')">+ QCM</button>
+                <button class="add-btn" onclick="showAddForm('vf')">+ Vrai / Faux</button>
+                <button class="add-btn" onclick="showAddForm('mot')">+ Reponse courte</button>
+            </div>
+
+            <!-- QCM Form -->
+            <div class="q-form" id="form-qcm">
+                <h4>Nouvelle question QCM</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <input type="text" class="form-input" id="qcm-question" placeholder="Tapez la question...">
+                </div>
+                <div class="form-group">
+                    <label>Reponses (cochez la bonne)</label>
+                    <div id="qcm-choices">
+                        <div class="radio-row">
+                            <input type="radio" name="qcm-correct" value="0" checked>
+                            <input type="text" class="form-input" placeholder="Reponse A" data-choice="0">
+                            <button class="remove-choice" onclick="removeChoice(this)" title="Supprimer" style="display:none;">&times;</button>
+                        </div>
+                        <div class="radio-row">
+                            <input type="radio" name="qcm-correct" value="1">
+                            <input type="text" class="form-input" placeholder="Reponse B" data-choice="1">
+                            <button class="remove-choice" onclick="removeChoice(this)" title="Supprimer" style="display:none;">&times;</button>
+                        </div>
+                    </div>
+                    <button class="btn-add-choice" id="btn-add-choice" onclick="addChoice()">+ Ajouter un choix</button>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('qcm')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- VF Form -->
+            <div class="q-form" id="form-vf">
+                <h4>Nouvelle question Vrai / Faux</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <input type="text" class="form-input" id="vf-question" placeholder="Tapez une affirmation...">
+                </div>
+                <div class="form-group">
+                    <label>Bonne reponse</label>
+                    <div class="vf-toggle">
+                        <button class="vf-btn selected-true" id="vf-true" onclick="setVF(true)">Vrai</button>
+                        <button class="vf-btn" id="vf-false" onclick="setVF(false)">Faux</button>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('vf')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Mot Form -->
+            <div class="q-form" id="form-mot">
+                <h4>Nouvelle question Reponse courte</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <input type="text" class="form-input" id="mot-question" placeholder="Tapez la question...">
+                </div>
+                <div class="form-group">
+                    <label>Reponse attendue (1-2 mots)</label>
+                    <input type="text" class="form-input" id="mot-reponse" placeholder="Ex: melatonine">
+                    <div class="info-text">Les accents et majuscules seront toleres automatiquement.</div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('mot')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Questions list -->
+            <div id="questions-container"></div>
+        </div>
+
+        <!-- Save / Delete -->
+        <div class="bottom-actions">
+            <button class="btn-save-quiz" onclick="saveQuiz()">💾 Sauvegarder le quiz</button>
+            <button class="btn-delete-quiz" id="btn-delete-quiz" onclick="deleteQuiz()" style="display:none;">🗑️ Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="data_modules.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === STATE ===
+    let currentQuizId = null;
+    let questions = []; // local array of question objects
+    let vfAnswer = true; // for VF form
+    let allQuizzes = []; // list from Firebase
+
+    // === POPULATE CLASSE DROPDOWN ===
+    function populateClasses() {
+        const sel = document.getElementById('quiz-classe');
+        // Keep the first "aucune" option
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label + ' (' + c.niveau.replace(/_/g, ' ') + ')';
+            sel.appendChild(opt);
+        });
+    }
+    populateClasses();
+
+    // === CLASSE -> MODULE DYNAMIC ===
+    document.getElementById('quiz-classe').addEventListener('change', function() {
+        const classeId = this.value;
+        const modSel = document.getElementById('quiz-module');
+        modSel.innerHTML = '';
+
+        if (!classeId) {
+            modSel.disabled = true;
+            modSel.innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
+            return;
+        }
+
+        modSel.disabled = false;
+        modSel.innerHTML = '<option value="">— Aucun module —</option>';
+
+        // For grouped classes, get first class of group
+        const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+        const firstClass = classesInGroup[0];
+        const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [];
+
+        let currentTheme = '';
+        modules.forEach(m => {
+            if (m.theme !== currentTheme) {
+                currentTheme = m.theme;
+                const optGroup = document.createElement('optgroup');
+                optGroup.label = 'Theme ' + m.theme;
+                modSel.appendChild(optGroup);
+            }
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.id + ' — ' + m.titre;
+            // append to last optgroup
+            const lastGroup = modSel.querySelector('optgroup:last-of-type');
+            if (lastGroup) lastGroup.appendChild(opt);
+            else modSel.appendChild(opt);
+        });
+    });
+
+    // === LOAD QUIZ LIST (real-time) ===
+    const qBanque = query(collection(db, "quiz_banque"), orderBy("updatedAt", "desc"));
+    onSnapshot(qBanque, (snap) => {
+        allQuizzes = [];
+        snap.forEach(d => {
+            allQuizzes.push({ id: d.id, ...d.data() });
+        });
+        renderQuizList();
+    });
+
+    function renderQuizList() {
+        const container = document.getElementById('quiz-list');
+        container.innerHTML = '';
+        document.getElementById('quiz-count').textContent = allQuizzes.length;
+
+        allQuizzes.forEach(q => {
+            const div = document.createElement('div');
+            div.className = 'quiz-list-item' + (q.id === currentQuizId ? ' active' : '');
+            div.onclick = () => loadQuiz(q.id);
+
+            const typeBadge = q.type === 'diagnostique'
+                ? '<span class="qi-badge badge-diag">Diag</span>'
+                : '<span class="qi-badge badge-form">Form</span>';
+            const qCountBadge = '<span class="qi-badge badge-qcount">' + (q.questions ? q.questions.length : 0) + ' Q</span>';
+            const classInfo = q.classeId ? q.classeId : 'Libre';
+
+            div.innerHTML = '<div class="qi-title">' + (q.titre || 'Sans titre') + '</div>' +
+                '<div class="qi-meta">' + typeBadge + qCountBadge + ' ' + classInfo + '</div>';
+            container.appendChild(div);
+        });
+    }
+
+    // === NEW QUIZ ===
+    window.newQuiz = function() {
+        currentQuizId = null;
+        questions = [];
+        document.getElementById('quiz-titre').value = '';
+        document.getElementById('quiz-type').value = 'diagnostique';
+        document.getElementById('quiz-classe').value = '';
+        document.getElementById('quiz-module').innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
+        document.getElementById('quiz-module').disabled = true;
+        document.getElementById('btn-delete-quiz').style.display = 'none';
+        hideAddForm();
+        renderQuestions();
+        showEditor();
+
+        // Deselect in sidebar
+        document.querySelectorAll('.quiz-list-item').forEach(i => i.classList.remove('active'));
+    };
+
+    // === LOAD QUIZ ===
+    window.loadQuiz = async function(quizId) {
+        const q = allQuizzes.find(q => q.id === quizId);
+        if (!q) return;
+
+        currentQuizId = quizId;
+        questions = q.questions ? JSON.parse(JSON.stringify(q.questions)) : [];
+
+        document.getElementById('quiz-titre').value = q.titre || '';
+        document.getElementById('quiz-type').value = q.type || 'diagnostique';
+
+        // Set classe
+        document.getElementById('quiz-classe').value = q.classeId || '';
+        // Trigger change to populate modules
+        document.getElementById('quiz-classe').dispatchEvent(new Event('change'));
+
+        // Set module after a tick (wait for modules to populate)
+        setTimeout(() => {
+            document.getElementById('quiz-module').value = q.moduleId || '';
+        }, 100);
+
+        document.getElementById('btn-delete-quiz').style.display = 'block';
+        hideAddForm();
+        renderQuestions();
+        showEditor();
+        renderQuizList(); // highlight active
+    };
+
+    // === SHOW/HIDE EDITOR ===
+    function showEditor() {
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+    }
+
+    // === ADD QUESTION FORMS ===
+    window.showAddForm = function(type) {
+        hideAddForm();
+        document.getElementById('form-' + type).style.display = 'block';
+
+        // Reset forms
+        if (type === 'qcm') {
+            document.getElementById('qcm-question').value = '';
+            resetQCMChoices();
+            document.getElementById('qcm-question').focus();
+        } else if (type === 'vf') {
+            document.getElementById('vf-question').value = '';
+            vfAnswer = true;
+            updateVFButtons();
+            document.getElementById('vf-question').focus();
+        } else if (type === 'mot') {
+            document.getElementById('mot-question').value = '';
+            document.getElementById('mot-reponse').value = '';
+            document.getElementById('mot-question').focus();
+        }
+    };
+
+    window.hideAddForm = function() {
+        document.querySelectorAll('.q-form').forEach(f => f.style.display = 'none');
+    };
+
+    // === QCM CHOICES MANAGEMENT ===
+    function resetQCMChoices() {
+        const container = document.getElementById('qcm-choices');
+        container.innerHTML = '';
+        for (let i = 0; i < 2; i++) {
+            addChoiceRow(container, i);
+        }
+        updateRemoveButtons();
+        document.getElementById('btn-add-choice').style.display = 'block';
+    }
+
+    function addChoiceRow(container, index) {
+        const letters = ['A', 'B', 'C', 'D'];
+        const row = document.createElement('div');
+        row.className = 'radio-row';
+        row.innerHTML = '<input type="radio" name="qcm-correct" value="' + index + '"' + (index === 0 ? ' checked' : '') + '>' +
+            '<input type="text" class="form-input" placeholder="Reponse ' + letters[index] + '" data-choice="' + index + '">' +
+            '<button class="remove-choice" onclick="removeChoice(this)" title="Supprimer">&times;</button>';
+        container.appendChild(row);
+    }
+
+    window.addChoice = function() {
+        const container = document.getElementById('qcm-choices');
+        const currentCount = container.children.length;
+        if (currentCount >= 4) return;
+        addChoiceRow(container, currentCount);
+        updateRemoveButtons();
+        if (container.children.length >= 4) {
+            document.getElementById('btn-add-choice').style.display = 'none';
+        }
+    };
+
+    window.removeChoice = function(btn) {
+        const container = document.getElementById('qcm-choices');
+        if (container.children.length <= 2) return;
+        const row = btn.closest('.radio-row');
+        row.remove();
+        // Renumber
+        const rows = container.querySelectorAll('.radio-row');
+        const letters = ['A', 'B', 'C', 'D'];
+        rows.forEach((r, i) => {
+            r.querySelector('input[type="radio"]').value = i;
+            r.querySelector('input[type="text"]').dataset.choice = i;
+            r.querySelector('input[type="text"]').placeholder = 'Reponse ' + letters[i];
+        });
+        // Make sure at least one radio is checked
+        if (!container.querySelector('input[type="radio"]:checked')) {
+            container.querySelector('input[type="radio"]').checked = true;
+        }
+        updateRemoveButtons();
+        document.getElementById('btn-add-choice').style.display = container.children.length < 4 ? 'block' : 'none';
+    };
+
+    function updateRemoveButtons() {
+        const container = document.getElementById('qcm-choices');
+        const rows = container.querySelectorAll('.radio-row');
+        rows.forEach(r => {
+            r.querySelector('.remove-choice').style.display = rows.length > 2 ? 'block' : 'none';
+        });
+    }
+
+    // === VF ===
+    window.setVF = function(val) {
+        vfAnswer = val;
+        updateVFButtons();
+    };
+
+    function updateVFButtons() {
+        document.getElementById('vf-true').className = 'vf-btn' + (vfAnswer ? ' selected-true' : '');
+        document.getElementById('vf-false').className = 'vf-btn' + (!vfAnswer ? ' selected-false' : '');
+    }
+
+    // === SAVE QUESTION (add to local array) ===
+    window.saveQuestion = function(type) {
+        if (type === 'qcm') {
+            const question = document.getElementById('qcm-question').value.trim();
+            if (!question) { alert('Ecris la question !'); return; }
+
+            const choiceInputs = document.querySelectorAll('#qcm-choices input[type="text"]');
+            const choices = [];
+            let hasEmpty = false;
+            choiceInputs.forEach(inp => {
+                const val = inp.value.trim();
+                if (!val) hasEmpty = true;
+                choices.push(val);
+            });
+            if (hasEmpty) { alert('Remplis toutes les reponses !'); return; }
+
+            const correctRadio = document.querySelector('input[name="qcm-correct"]:checked');
+            const correct = parseInt(correctRadio.value);
+
+            questions.push({ type: 'qcm', question, choices, correct });
+
+        } else if (type === 'vf') {
+            const question = document.getElementById('vf-question').value.trim();
+            if (!question) { alert('Ecris la question !'); return; }
+            questions.push({ type: 'vf', question, correct: vfAnswer });
+
+        } else if (type === 'mot') {
+            const question = document.getElementById('mot-question').value.trim();
+            const reponse = document.getElementById('mot-reponse').value.trim();
+            if (!question) { alert('Ecris la question !'); return; }
+            if (!reponse) { alert('Ecris la reponse attendue !'); return; }
+            questions.push({ type: 'mot', question, reponse });
+        }
+
+        hideAddForm();
+        renderQuestions();
+    };
+
+    // === RENDER QUESTIONS ===
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        document.getElementById('q-count').textContent = questions.length + ' question(s)';
+
+        questions.forEach((q, i) => {
+            const card = document.createElement('div');
+            card.className = 'q-card';
+
+            const typeLabel = q.type === 'qcm' ? 'QCM' : q.type === 'vf' ? 'V/F' : 'Mot';
+            const typeClass = 'type-' + q.type;
+
+            let body = '';
+            if (q.type === 'qcm') {
+                body = '<div class="q-card-choices">';
+                q.choices.forEach((c, ci) => {
+                    body += '<span class="q-card-choice' + (ci === q.correct ? ' correct' : '') + '">' + c + '</span>';
+                });
+                body += '</div>';
+            } else if (q.type === 'vf') {
+                body = '<div class="q-card-answer">' + (q.correct ? '✅ Vrai' : '❌ Faux') + '</div>';
+            } else if (q.type === 'mot') {
+                body = '<div class="q-card-answer">Reponse : ' + q.reponse + '</div>';
+            }
+
+            card.innerHTML = '<div class="q-card-header">' +
+                '<div><span class="q-card-num">Q' + (i + 1) + '</span><span class="q-card-type-badge ' + typeClass + '">' + typeLabel + '</span></div>' +
+                '<div class="q-card-actions">' +
+                    '<button onclick="moveQuestion(' + i + ', -1)" title="Monter"' + (i === 0 ? ' disabled style="opacity:0.3"' : '') + '>▲</button>' +
+                    '<button onclick="moveQuestion(' + i + ', 1)" title="Descendre"' + (i === questions.length - 1 ? ' disabled style="opacity:0.3"' : '') + '>▼</button>' +
+                    '<button class="btn-del" onclick="deleteQuestion(' + i + ')" title="Supprimer">&times;</button>' +
+                '</div></div>' +
+                '<div class="q-card-question">' + q.question + '</div>' +
+                body;
+
+            container.appendChild(card);
+        });
+    }
+
+    // === MOVE / DELETE QUESTIONS ===
+    window.moveQuestion = function(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= questions.length) return;
+        [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
+        renderQuestions();
+    };
+
+    window.deleteQuestion = function(index) {
+        questions.splice(index, 1);
+        renderQuestions();
+    };
+
+    // === SAVE QUIZ TO FIREBASE ===
+    window.saveQuiz = async function() {
+        const titre = document.getElementById('quiz-titre').value.trim();
+        if (!titre) { alert('Donne un titre au quiz !'); return; }
+        if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
+
+        const type = document.getElementById('quiz-type').value;
+        const classeId = document.getElementById('quiz-classe').value || null;
+        const moduleId = document.getElementById('quiz-module').value || null;
+
+        // Derive niveau from classeId
+        let niveau = null;
+        if (classeId) {
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
+        }
+
+        const quizData = {
+            titre,
+            type,
+            classeId,
+            moduleId,
+            niveau,
+            questions: questions,
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            if (currentQuizId) {
+                // Update existing
+                await setDoc(doc(db, "quiz_banque", currentQuizId), quizData, { merge: true });
+            } else {
+                // Create new (auto ID)
+                const newId = 'quiz_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                quizData.createdAt = serverTimestamp();
+                await setDoc(doc(db, "quiz_banque", newId), quizData);
+                currentQuizId = newId;
+                document.getElementById('btn-delete-quiz').style.display = 'block';
+            }
+            showToast('Quiz sauvegarde !');
+            renderQuizList();
+        } catch(e) {
+            console.error("Erreur sauvegarde:", e);
+            alert("Erreur lors de la sauvegarde : " + e.message);
+        }
+    };
+
+    // === DELETE QUIZ ===
+    window.deleteQuiz = async function() {
+        if (!currentQuizId) return;
+        if (!confirm("Supprimer definitivement ce quiz ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "quiz_banque", currentQuizId));
+            currentQuizId = null;
+            questions = [];
+            document.getElementById('main-editor').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+            showToast('Quiz supprime.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === TOAST ===
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2500);
+    }
+</script>
+</body>
+</html>
