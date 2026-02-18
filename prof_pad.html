@@ -68,7 +68,20 @@
             <h2>PAD PROF</h2>
             <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓</button>
         </div>
-        
+
+        <div id="session-bar" style="padding:12px; background:#1a1a2e; border-bottom:1px solid #334155;">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session active</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button onclick="newSession()" style="flex:1; padding:7px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="flex:1; padding:7px; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display" style="font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center;"></div>
+            <div style="text-align:center; margin-top:8px;">
+                <img id="qr-code" src="" alt="QR" style="width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none;">
+                <div id="qr-label" style="font-size:0.6rem; color:#64748b; margin-top:4px; display:none;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
         <div class="sidebar-section" style="flex: 1;">
             <div class="section-title">En Attente <span onclick="clearWaiting()" style="cursor:pointer; color:#ef4444;">(Tout rejeter)</span></div>
             <div id="waiting-room"></div>
@@ -138,6 +151,108 @@
         let activeZone = 'SD';
         let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
 
+        // --- SESSION MANAGEMENT ---
+        let currentSessionId = localStorage.getItem('pad_sessionId') || null;
+        let unsubItems = null, unsubIdeas = null, unsubPresence = null;
+
+        function generateSessionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('pad_sessionId', currentSessionId);
+            await setDoc(doc(db, "pad_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').innerText = 'Session : ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_pad.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if(!confirm("⚠️ Supprimer toutes les données de cette session ?")) return;
+            if(!currentSessionId) return;
+            const batch = writeBatch(db);
+            const cols = ["pad_ideas", "pad_items", "pad_presence"];
+            for(const colName of cols) {
+                const snap = await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)));
+                snap.forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit();
+            location.reload();
+        };
+
+        function setupListeners() {
+            if(unsubItems) unsubItems();
+            if(unsubIdeas) unsubIdeas();
+            if(unsubPresence) unsubPresence();
+
+            // GESTION ITEMS (SCHEMA)
+            const itemsQ = query(collection(db, "pad_items"), where("sessionId", "==", currentSessionId));
+            unsubItems = onSnapshot(itemsQ, (snap) => {
+                ['SD','ED','D','O','DP'].forEach(c => { const z = document.getElementById('list-'+c); if(z) z.innerHTML=""; });
+                snap.forEach(d => {
+                    const data = d.data();
+                    const container = document.getElementById('list-' + data.category);
+                    if(container) {
+                        const div = document.createElement('div');
+                        div.className = 'item-tag';
+                        const delHtml = isProjection ? '' : `<span class="del-btn" onclick="delItem('${d.id}')">❌</span>`;
+                        div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
+                        container.appendChild(div);
+                    }
+                });
+            });
+
+            // SALLE D'ATTENTE
+            if(!isProjection) {
+                const ideasQ = query(collection(db, "pad_ideas"), where("sessionId", "==", currentSessionId), where("status", "==", "waiting"));
+                unsubIdeas = onSnapshot(ideasQ, (snap) => {
+                    const div = document.getElementById('waiting-room');
+                    div.innerHTML = "";
+                    if(snap.empty) div.innerHTML = "<div style='color:#64748b;text-align:center;font-size:0.8rem;'>Vide...</div>";
+
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const card = document.createElement('div');
+                        card.className = 'idea-card';
+                        card.innerHTML = `
+                            <div style="font-size:0.8rem; color:#aaa;">👤 ${escapeHtml(data.student)}</div>
+                            <div class="text-display" style="margin:5px 0; font-weight:bold;">${escapeHtml(data.text)}</div>
+                            <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
+                            <div style="display:flex;">
+                                <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
+                                <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
+                                <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
+                                <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
+                            </div>
+                        `;
+                        div.appendChild(card);
+                    });
+                });
+            }
+
+            // GESTION ELEVES
+            if(!isProjection) {
+                const presQ = query(collection(db, "pad_presence"), where("sessionId", "==", currentSessionId));
+                unsubPresence = onSnapshot(presQ, (snap) => {
+                    const list = document.getElementById('student-list'); list.innerHTML = "";
+                    let count = 0;
+                    snap.forEach(d => {
+                        count++;
+                        const div = document.createElement('div');
+                        div.className = 'student-item';
+                        div.innerHTML = `<span>👤 ${escapeHtml(d.data().name)}</span> <button class="btn-call" onclick="callStudent('${d.data().name}')">📢</button>`;
+                        list.appendChild(div);
+                    });
+                    document.getElementById('student-count').innerText = `(${count})`;
+                });
+            }
+        }
+
         // INIT
         if(isProjection) {
             document.getElementById('sidebar').classList.add('hidden');
@@ -158,50 +273,7 @@
             try { await setDoc(doc(db, "pad_config", "global"), { currentZone: code, currentLabel: labels[code] }, { merge: true }); } catch(e){}
         };
 
-        // GESTION ITEMS (SCHEMA)
-        onSnapshot(collection(db, "pad_items"), (snap) => {
-            ['SD','ED','D','O','DP'].forEach(c => { const z = document.getElementById('list-'+c); if(z) z.innerHTML=""; });
-            snap.forEach(d => {
-                const data = d.data();
-                const container = document.getElementById('list-' + data.category);
-                if(container) {
-                    const div = document.createElement('div');
-                    div.className = 'item-tag';
-                    const delHtml = isProjection ? '' : `<span class="del-btn" onclick="delItem('${d.id}')">❌</span>`;
-                    div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
-                    container.appendChild(div);
-                }
-            });
-        });
         window.delItem = async (id) => { if(confirm("Suppr?")) await deleteDoc(doc(db, "pad_items", id)); };
-
-        // SALLE D'ATTENTE
-        if(!isProjection) {
-            const q = query(collection(db, "pad_ideas"), where("status", "==", "waiting"));
-            onSnapshot(q, (snap) => {
-                const div = document.getElementById('waiting-room');
-                div.innerHTML = "";
-                if(snap.empty) div.innerHTML = "<div style='color:#64748b;text-align:center;font-size:0.8rem;'>Vide...</div>";
-                
-                snap.forEach(d => {
-                    const data = d.data();
-                    const card = document.createElement('div');
-                    card.className = 'idea-card';
-                    card.innerHTML = `
-                        <div style="font-size:0.8rem; color:#aaa;">👤 ${escapeHtml(data.student)}</div>
-                        <div class="text-display" style="margin:5px 0; font-weight:bold;">${escapeHtml(data.text)}</div>
-                        <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
-                        <div style="display:flex;">
-                            <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
-                            <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
-                            <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
-                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
-                        </div>
-                    `;
-                    div.appendChild(card);
-                });
-            });
-        }
 
         window.toggleEdit = (btn) => {
             const parent = btn.closest('.idea-card');
@@ -216,7 +288,7 @@
 
         window.doAccept = async (id, btn) => {
             const input = btn.closest('.idea-card').querySelector('.idea-input');
-            await addDoc(collection(db, "pad_items"), { text: input.value, category: activeZone });
+            await addDoc(collection(db, "pad_items"), { text: input.value, category: activeZone, sessionId: currentSessionId });
             await updateDoc(doc(db, "pad_ideas", id), { status: "accepted" });
         };
         window.doReject = async (id) => await updateDoc(doc(db, "pad_ideas", id), { status: "rejected" });
@@ -234,28 +306,17 @@
         window.resetTotal = async () => {
             if(!confirm("⚠️ ATTENTION : Cela efface TOUT (Schéma complet + Attente + Liste élèves).\n\nContinuer ?")) return;
             const batch = writeBatch(db);
-            (await getDocs(collection(db, "pad_items"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "pad_ideas"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "pad_presence"))).forEach(d => batch.delete(d.ref));
+            const cols = ["pad_items", "pad_ideas", "pad_presence"];
+            for(const colName of cols) {
+                const snap = currentSessionId
+                    ? await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)))
+                    : await getDocs(collection(db, colName));
+                snap.forEach(d => batch.delete(d.ref));
+            }
             await batch.commit();
             location.reload();
         };
 
-        // GESTION ELEVES
-        if(!isProjection) {
-            onSnapshot(collection(db, "pad_presence"), (snap) => {
-                const list = document.getElementById('student-list'); list.innerHTML = "";
-                let count = 0;
-                snap.forEach(d => {
-                    count++;
-                    const div = document.createElement('div');
-                    div.className = 'student-item';
-                    div.innerHTML = `<span>👤 ${escapeHtml(d.data().name)}</span> <button class="btn-call" onclick="callStudent('${d.data().name}')">📢</button>`;
-                    list.appendChild(div);
-                });
-                document.getElementById('student-count').innerText = `(${count})`;
-            });
-        }
         window.callStudent = (name) => {
             setDoc(doc(db, "pad_config", "global"), { solicitedStudent: name }, { merge: true });
             setTimeout(() => setDoc(doc(db, "pad_config", "global"), { solicitedStudent: null }, { merge: true }), 5000);
@@ -273,6 +334,19 @@
         window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };
         function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
         navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); }).catch(()=>{});
+
+        // --- AUTO-START SESSION ---
+        if(currentSessionId) {
+            document.getElementById('session-id-display').innerText = 'Session : ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_pad.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        } else {
+            window.newSession();
+        }
 
         function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
     </script>

@@ -26,8 +26,16 @@
         .alert-text { color: #ff0000 !important; animation: blink 0.5s infinite; text-shadow: 0 0 20px red; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
+        /* SESSION BAR */
+        #session-bar { display: flex; align-items: center; gap: 15px; padding: 8px 30px; background: #1a1a2e; border-bottom: 2px solid #333; }
+        #session-bar label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+        #session-bar button { padding: 7px 14px; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+        #session-id-display { font-size: 0.7rem; color: #64748b; white-space: nowrap; }
+        #qr-code { width: 50px; height: 50px; border-radius: 4px; background: white; padding: 2px; display: none; }
+        #qr-label { font-size: 0.6rem; color: #64748b; display: none; white-space: nowrap; }
+
         /* DASHBOARD GRID */
-        #grid { display: grid; grid-template-columns: 22% 43% 35%; height: calc(100% - 180px); width: 100%; }
+        #grid { display: grid; grid-template-columns: 22% 43% 35%; height: calc(100% - 230px); width: 100%; }
         
         .panel { border-right: 2px solid #333; padding: 20px; display: flex; flex-direction: column; align-items: center; position: relative; }
         
@@ -111,6 +119,15 @@
         <div id="sono-val">-- dB</div>
     </div>
 
+    <div id="session-bar">
+        <label>Session active</label>
+        <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+        <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+        <div id="session-id-display"></div>
+        <img id="qr-code" src="" alt="QR">
+        <div id="qr-label">📱 Scannez pour rejoindre</div>
+    </div>
+
     <div id="grid">
         <div class="panel">
             <h2>Énergie</h2>
@@ -188,7 +205,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, getDocs, deleteDoc, doc, setDoc, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // TA CLÉ
         const firebaseConfig = {
@@ -203,11 +220,50 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        let maxDb = 0; 
+
+        // ── SESSION / ROOM ──────────────────────────────
+        let currentSessionId = localStorage.getItem('meteo_sessionId') || null;
+        let unsubMeteo = null;
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('meteo_sessionId', currentSessionId);
+            await setDoc(doc(db, "meteo_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            // QR Code
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_meteo.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId) { alert("Aucune session active"); return; }
+            if (!confirm("⚠️ Effacer toutes les données de cette session ?")) return;
+            const batch = writeBatch(db);
+            const q = query(collection(db, "meteo_finale_v2"), where("sessionId", "==", currentSessionId));
+            (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            location.reload();
+        };
+
+        // Auto-démarrage si session en mémoire
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_meteo.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        }
+
+        let maxDb = 0;
         let isMonitoring = true;
-        let bubbleSlots = Array(16).fill(false); 
-        const forbiddenSlots = [5, 6, 9, 10]; 
+        let bubbleSlots = Array(16).fill(false);
+        const forbiddenSlots = [5, 6, 9, 10];
 
         // --- GESTION DU SAS (TIMER) ---
         let sasInterval;
@@ -245,7 +301,13 @@
         };
 
         // --- FIREBASE LOGIC ---
-        onSnapshot(collection(db, "meteo_finale_v2"), (snap) => {
+        function setupListeners() {
+            if (!currentSessionId) return;
+            if (unsubMeteo) unsubMeteo();
+
+            const qMeteo = query(collection(db, "meteo_finale_v2"), where("sessionId", "==", currentSessionId));
+
+            unsubMeteo = onSnapshot(qMeteo, (snap) => {
             let totalEn = 0; let count = 0;
             let postures = { solo:0, help:0, oral:0 };
             let defis = {}; let emotions = {};
@@ -293,6 +355,8 @@
                 updateCoach(avgEn, domName);
             }
         });
+
+        } // ← fin de setupListeners()
 
         function updateBar(id, val, total) {
             const pct = Math.round((val/total)*100);
@@ -419,10 +483,14 @@
             if(confirm("Effacer toutes les données ?")) {
                 const btn = document.querySelector('.btn-reset');
                 if(btn) btn.innerText = "Nettoyage...";
-                const snap = await getDocs(collection(db, "meteo_finale_v2"));
-                const promises = [];
-                snap.forEach(d => promises.push(deleteDoc(d.ref)));
-                await Promise.all(promises); 
+                const batch = writeBatch(db);
+                if (currentSessionId) {
+                    const q = query(collection(db, "meteo_finale_v2"), where("sessionId", "==", currentSessionId));
+                    (await getDocs(q)).forEach(d => batch.delete(d.ref));
+                } else {
+                    (await getDocs(collection(db, "meteo_finale_v2"))).forEach(d => batch.delete(d.ref));
+                }
+                await batch.commit();
                 location.reload();
             }
         };

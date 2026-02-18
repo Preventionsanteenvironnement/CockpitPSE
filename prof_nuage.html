@@ -67,7 +67,20 @@
             <h2 style="margin:0; font-size:1.1rem;">NUAGE PROF</h2>
             <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">🔓 Ouvert</button>
         </div>
-        
+
+        <div id="session-bar" style="padding:12px; background:#1a1a2e; border-bottom:1px solid #334155;">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session active</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button onclick="newSession()" style="flex:1; padding:7px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="flex:1; padding:7px; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display" style="font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center;"></div>
+            <div style="text-align:center; margin-top:8px;">
+                <img id="qr-code" src="" alt="QR" style="width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none;">
+                <div id="qr-label" style="font-size:0.6rem; color:#64748b; margin-top:4px; display:none;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
         <div style="padding:15px; border-bottom:1px solid #334155;">
             <input type="text" id="q-input" class="control-input" placeholder="Question..." onchange="updateQuestion()">
             <button class="btn-action btn-blue" onclick="updateQuestion()">LANCER LA QUESTION</button>
@@ -110,15 +123,58 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc, getDocs, writeBatch, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc, getDocs, writeBatch, addDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.firebasestorage.app", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const colors = ['c1', 'c2', 'c3', 'c4', 'c5'];
 
-        // --- 1. ÉCOUTE DE LA "SALLE D'ATTENTE" (nuage_attente) ---
-        onSnapshot(collection(db, "nuage_attente"), (snap) => {
+        // ── SESSION / ROOM ──────────────────────────────
+        let currentSessionId = localStorage.getItem('nuage_sessionId') || null;
+        let unsubAttente = null, unsubMots = null, unsubPresence = null;
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('nuage_sessionId', currentSessionId);
+            await setDoc(doc(db, "nuage_etat", "config"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            // QR Code
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_nuage.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId) { alert("Aucune session active"); return; }
+            if (!confirm("⚠️ Effacer toutes les données de cette session ?")) return;
+            const batch = writeBatch(db);
+            for (const col of ["nuage_mots", "nuage_attente", "nuage_presence"]) {
+                const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit();
+            document.getElementById('cloud-container').querySelectorAll('.word-tag').forEach(el => el.remove());
+            document.getElementById('wait-msg').style.display = 'block';
+        };
+
+        function setupListeners() {
+            if (!currentSessionId) return;
+            // Détacher les anciens listeners
+            if (unsubAttente) unsubAttente();
+            if (unsubMots) unsubMots();
+            if (unsubPresence) unsubPresence();
+
+            const qAttente = query(collection(db, "nuage_attente"), where("sessionId", "==", currentSessionId));
+            const qMots = query(collection(db, "nuage_mots"), where("sessionId", "==", currentSessionId));
+            const qPresence = query(collection(db, "nuage_presence"), where("sessionId", "==", currentSessionId));
+
+            // --- 1. ÉCOUTE DE LA "SALLE D'ATTENTE" ---
+            unsubAttente = onSnapshot(qAttente, (snap) => {
             const list = document.getElementById('waiting-list');
             list.innerHTML = "";
             if(snap.empty) list.innerHTML = "<div style='color:#64748b; text-align:center; margin-top:10px;'>Vide...</div>";
@@ -157,7 +213,7 @@
             const card = btn.closest('.idea-card');
             const finalTxt = card.querySelector('.idea-input').value; // Prend la valeur modifiée
             // 1. Ajouter au Nuage Public
-            await addDoc(collection(db, "nuage_mots"), { text: finalTxt, timestamp: Date.now() });
+            await addDoc(collection(db, "nuage_mots"), { text: finalTxt, timestamp: Date.now(), sessionId: currentSessionId });
             // 2. Supprimer de l'attente
             await deleteDoc(doc(db, "nuage_attente", id));
         };
@@ -166,14 +222,15 @@
 
         window.clearWaiting = async () => {
             if(!confirm("Tout rejeter ?")) return;
-            const snap = await getDocs(collection(db, "nuage_attente"));
+            const q = currentSessionId ? query(collection(db, "nuage_attente"), where("sessionId", "==", currentSessionId)) : collection(db, "nuage_attente");
+            const snap = await getDocs(q);
             const batch = writeBatch(db);
             snap.forEach(d => batch.delete(d.ref));
             await batch.commit();
         };
 
-        // --- 2. ÉCOUTE DU NUAGE PUBLIC (nuage_mots) ---
-        onSnapshot(collection(db, "nuage_mots"), (snap) => {
+            // --- 2. ÉCOUTE DU NUAGE PUBLIC (nuage_mots) ---
+            unsubMots = onSnapshot(qMots, (snap) => {
             snap.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     document.getElementById('wait-msg').style.display = "none";
@@ -211,8 +268,8 @@
             }
         }
 
-        // --- 3. GESTION PRÉSENCE (Même code qu'avant) ---
-        onSnapshot(collection(db, "nuage_presence"), (snap) => {
+            // --- 3. GESTION PRÉSENCE ---
+            unsubPresence = onSnapshot(qPresence, (snap) => {
             const list = document.getElementById('student-list');
             list.innerHTML = "";
             let count = 0;
@@ -225,6 +282,18 @@
             });
             document.getElementById('student-count').innerText = `(${count})`;
         });
+
+        } // ← fin de setupListeners()
+
+        // Auto-démarrage si session en mémoire
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_nuage.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        }
 
         window.alertStudent = async (name) => {
             await setDoc(doc(db, "nuage_etat", "config"), { solicitedStudent: name }, { merge: true });
@@ -261,10 +330,17 @@
         window.resetAll = async () => {
             if(!confirm("⚠️ ATTENTION : Cela vide TOUT (Attente, Nuage, Présents).\nConfirmer ?")) return;
             const batch = writeBatch(db);
-            (await getDocs(collection(db, "nuage_mots"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "nuage_attente"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "nuage_presence"))).forEach(d => batch.delete(d.ref));
-            batch.set(doc(db, "nuage_etat", "config"), { question: "En attente...", isOpen: true });
+            if (currentSessionId) {
+                for (const col of ["nuage_mots", "nuage_attente", "nuage_presence"]) {
+                    const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                    (await getDocs(q)).forEach(d => batch.delete(d.ref));
+                }
+            } else {
+                (await getDocs(collection(db, "nuage_mots"))).forEach(d => batch.delete(d.ref));
+                (await getDocs(collection(db, "nuage_attente"))).forEach(d => batch.delete(d.ref));
+                (await getDocs(collection(db, "nuage_presence"))).forEach(d => batch.delete(d.ref));
+            }
+            batch.set(doc(db, "nuage_etat", "config"), { question: "En attente...", isOpen: true, sessionId: currentSessionId || null });
             await batch.commit();
             location.reload();
         };

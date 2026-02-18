@@ -129,7 +129,20 @@
             <h2>ISHIKAWA V3</h2>
             <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓</button>
         </div>
-        
+
+        <div id="session-bar" style="padding:12px; background:#1a1a2e; border-bottom:1px solid #334155;">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session active</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button onclick="newSession()" style="flex:1; padding:7px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="flex:1; padding:7px; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display" style="font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center;"></div>
+            <div style="text-align:center; margin-top:8px;">
+                <img id="qr-code" src="" alt="QR" style="width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none;">
+                <div id="qr-label" style="font-size:0.6rem; color:#64748b; margin-top:4px; display:none;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
         <div class="sidebar-section" style="flex: 1;">
             <div class="section-title">En Attente <span onclick="clearAll()" style="cursor:pointer;">(Vider)</span></div>
             <div id="waiting-room"></div>
@@ -213,6 +226,38 @@
 
         let activeCatId = null;
         let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
+
+        // --- SESSION SYSTEM ---
+        let currentSessionId = localStorage.getItem('ishikawa_sessionId') || null;
+        let unsubListeners = [];
+
+        function generateSessionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('ishikawa_sessionId', currentSessionId);
+            await setDoc(doc(db, "ishikawa_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').innerText = 'Session: ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_ishikawa.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if(!confirm("Supprimer toutes les données de cette session ?")) return;
+            const cols = ["ishikawa_ideas", "ishikawa_items", "ishikawa_presence"];
+            for(const colName of cols) {
+                const snap = await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)));
+                const batch = writeBatch(db);
+                snap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+        };
 
         if(isProjection) {
             document.body.classList.add('projection'); // Ajout classe pour CSS
@@ -303,47 +348,65 @@
             }
         });
 
-        // --- ITEMS & RESTE DU CODE (Identique V2) ---
-        onSnapshot(collection(db, "ishikawa_items"), (snap) => {
-            for(let i=1; i<=6; i++) document.getElementById('list-'+i).innerHTML = "";
-            snap.forEach(d => {
-                const data = d.data();
-                const container = document.getElementById('list-' + data.category);
-                if(container) {
-                    const div = document.createElement('div');
-                    div.className = 'item-tag';
-                    const delHtml = isProjection ? '' : `<span style="color:red;cursor:pointer;margin-left:5px;" onclick="delItem('${d.id}')">×</span>`;
-                    div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
-                    container.appendChild(div);
-                }
-            });
-        });
-        window.delItem = async (id) => { if(confirm("Suppr?")) await deleteDoc(doc(db, "ishikawa_items", id)); };
+        // --- SETUP LISTENERS (session-filtered) ---
+        function setupListeners() {
+            unsubListeners.forEach(fn => fn());
+            unsubListeners = [];
 
-        if(!isProjection) {
-            const q = query(collection(db, "ishikawa_ideas"), where("status", "==", "waiting"));
-            onSnapshot(q, (snap) => {
-                const div = document.getElementById('waiting-room');
-                div.innerHTML = "";
-                if(snap.empty) div.innerHTML = "<div style='text-align:center;color:#aaa;font-size:0.8rem;'>Vide...</div>";
+            if(!currentSessionId) return;
+
+            // ITEMS
+            const unsub1 = onSnapshot(query(collection(db, "ishikawa_items"), where("sessionId", "==", currentSessionId)), (snap) => {
+                for(let i=1; i<=6; i++) document.getElementById('list-'+i).innerHTML = "";
                 snap.forEach(d => {
                     const data = d.data();
-                    const card = document.createElement('div');
-                    card.className = 'idea-card';
-                    card.innerHTML = `
-                        <div style="font-size:0.8rem; color:#aaa;">👤 ${escapeHtml(data.student)}</div>
-                        <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
-                        <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
-                        <div style="display:flex;">
-                            <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
-                            <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
-                            <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
-                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
-                        </div>
-                    `;
-                    div.appendChild(card);
+                    const container = document.getElementById('list-' + data.category);
+                    if(container) {
+                        const div = document.createElement('div');
+                        div.className = 'item-tag';
+                        const delHtml = isProjection ? '' : `<span style="color:red;cursor:pointer;margin-left:5px;" onclick="delItem('${d.id}')">×</span>`;
+                        div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
+                        container.appendChild(div);
+                    }
                 });
             });
+            unsubListeners.push(unsub1);
+
+            // SALLE D'ATTENTE
+            if(!isProjection) {
+                const unsub2 = onSnapshot(query(collection(db, "ishikawa_ideas"), where("sessionId", "==", currentSessionId), where("status", "==", "waiting")), (snap) => {
+                    const div = document.getElementById('waiting-room');
+                    div.innerHTML = "";
+                    if(snap.empty) div.innerHTML = "<div style='text-align:center;color:#aaa;font-size:0.8rem;'>Vide...</div>";
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const card = document.createElement('div');
+                        card.className = 'idea-card';
+                        card.innerHTML = `
+                            <div style="font-size:0.8rem; color:#aaa;">👤 ${escapeHtml(data.student)}</div>
+                            <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
+                            <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
+                            <div style="display:flex;">
+                                <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
+                                <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
+                                <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
+                                <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
+                            </div>
+                        `;
+                        div.appendChild(card);
+                    });
+                });
+                unsubListeners.push(unsub2);
+
+                // PRESENCE
+                const unsub3 = onSnapshot(query(collection(db, "ishikawa_presence"), where("sessionId", "==", currentSessionId)), (snap) => {
+                    const list = document.getElementById('student-list'); list.innerHTML = "";
+                    let count = 0;
+                    snap.forEach(d => { count++; list.innerHTML += `<div class="student-item"><span>${escapeHtml(d.id)}</span> <button class="btn-call" onclick="call('${d.id}')">📢</button></div>`; });
+                    document.getElementById('student-count').innerText = `(${count})`;
+                });
+                unsubListeners.push(unsub3);
+            }
         }
 
         window.toggleEdit = (btn) => {
@@ -364,7 +427,7 @@
                 alert("Sélectionne une catégorie active d'abord !");
                 return;
             }
-            await addDoc(collection(db, "ishikawa_items"), { text: input.value, category: activeCatId });
+            await addDoc(collection(db, "ishikawa_items"), { text: input.value, category: activeCatId, sessionId: currentSessionId });
             await updateDoc(doc(db, "ishikawa_ideas", id), { status: "accepted" });
         };
         window.doReject = async (id) => await updateDoc(doc(db, "ishikawa_ideas", id), { status: "rejected" });
@@ -377,14 +440,6 @@
             await batch.commit();
         };
 
-        if(!isProjection) {
-            onSnapshot(collection(db, "ishikawa_presence"), (snap) => {
-                const list = document.getElementById('student-list'); list.innerHTML = "";
-                let count = 0;
-                snap.forEach(d => { count++; list.innerHTML += `<div class="student-item"><span>${escapeHtml(d.id)}</span> <button class="btn-call" onclick="call('${d.id}')">📢</button></div>`; });
-                document.getElementById('student-count').innerText = `(${count})`;
-            });
-        }
         window.call = (name) => { setDoc(doc(db, "ishikawa_config", "global"), { solicitedStudent: name }, { merge: true }); setTimeout(()=>setDoc(doc(db, "ishikawa_config", "global"), { solicitedStudent: null }, { merge: true }), 5000); };
 
         let isLocked = false;
@@ -395,6 +450,17 @@
         function updC(s){ document.getElementById('chrono').innerText=`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
         
         navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{ const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); }).catch(()=>{});
+
+        // AUTO-START session if exists in localStorage
+        if(currentSessionId) {
+            document.getElementById('session-id-display').innerText = 'Session: ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_ishikawa.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        }
 
         function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
     </script>
