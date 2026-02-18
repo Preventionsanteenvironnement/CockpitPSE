@@ -74,7 +74,20 @@
             <h2 style="margin:0; font-size:1.1rem;">POST-IT PROF</h2>
             <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold;">🔓 Ouvert</button>
         </div>
-        
+
+        <div id="session-bar" style="padding:12px; background:#1a1a2e; border-bottom:1px solid #334155;">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session active</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button onclick="newSession()" style="flex:1; padding:7px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="flex:1; padding:7px; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display" style="font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center;"></div>
+            <div style="text-align:center; margin-top:8px;">
+                <img id="qr-code" src="" alt="QR" style="width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none;">
+                <div id="qr-label" style="font-size:0.6rem; color:#64748b; margin-top:4px; display:none;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
         <div style="padding:15px; border-bottom:1px solid #334155;">
             <input type="text" id="q-input" class="control-input" placeholder="Thème du brainstorming..." onchange="updateQuestion()">
             <button class="btn-action btn-blue" onclick="updateQuestion()">LANCER LE THÈME</button>
@@ -128,6 +141,116 @@
             document.getElementById('board').style.cursor = 'default';
         }
 
+        // --- SESSION MANAGEMENT ---
+        let currentSessionId = localStorage.getItem('postit_sessionId') || null;
+        let unsubBoard = null, unsubIdeas = null, unsubPresence = null;
+
+        function generateSessionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('postit_sessionId', currentSessionId);
+            await setDoc(doc(db, "postit_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').innerText = 'Session : ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_postit.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if(!confirm("⚠️ Supprimer toutes les données de cette session ?")) return;
+            if(!currentSessionId) return;
+            const batch = writeBatch(db);
+            const cols = ["postit_ideas", "postit_board", "postit_presence"];
+            for(const colName of cols) {
+                const snap = await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)));
+                snap.forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit();
+            location.reload();
+        };
+
+        function setupListeners() {
+            if(unsubBoard) unsubBoard();
+            if(unsubIdeas) unsubIdeas();
+            if(unsubPresence) unsubPresence();
+
+            // --- 2. GESTION DU TABLEAU (BOARD) ---
+            const boardQ = query(collection(db, "postit_board"), where("sessionId", "==", currentSessionId));
+            unsubBoard = onSnapshot(boardQ, (snap) => {
+                const currentIds = [];
+                snap.forEach(d => {
+                    currentIds.push(d.id);
+                    const data = d.data();
+                    let el = document.getElementById(d.id);
+
+                    if(!el) {
+                        el = document.createElement('div');
+                        el.id = d.id;
+                        el.className = `postit c-${data.color || 'yellow'}`;
+                        el.innerHTML = `<div class="author">${escapeHtml(data.student)}</div><div>${escapeHtml(data.text)}</div>`;
+
+                        if(!isProjection) {
+                            const del = document.createElement('div'); del.className = 'delete-pin'; del.innerText = '×';
+                            del.onclick = (e) => { e.stopPropagation(); deletePostit(d.id); };
+                            el.appendChild(del);
+                            el.onmousedown = (e) => startDrag(e, el);
+                        }
+                        document.getElementById('board').appendChild(el);
+                    }
+
+                    // Maj position si on ne drag pas
+                    if(draggedItem !== el) {
+                        el.style.left = data.x + '%';
+                        el.style.top = data.y + '%';
+                    }
+                });
+                // Nettoyage
+                document.querySelectorAll('.postit').forEach(el => { if(!currentIds.includes(el.id)) el.remove(); });
+            });
+
+            // --- 3. SALLE D'ATTENTE (WAITING) ---
+            if(!isProjection) {
+                const ideasQ = query(collection(db, "postit_ideas"), where("sessionId", "==", currentSessionId), where("status", "==", "waiting"));
+                unsubIdeas = onSnapshot(ideasQ, (snap) => {
+                    const div = document.getElementById('waiting-room');
+                    div.innerHTML = "";
+                    if(snap.empty) div.innerHTML = "<div style='text-align:center;color:#64748b;margin-top:10px;'>Vide...</div>";
+
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const card = document.createElement('div');
+                        card.className = `idea-card c-${data.color}`;
+                        card.innerHTML = `
+                            <div class="idea-info">👤 ${escapeHtml(data.student)}</div>
+                            <div class="idea-text">${escapeHtml(data.text)}</div>
+                            <div class="card-actions">
+                                <button class="btn-card" style="background:#22c55e;" onclick="acceptPostit('${d.id}', '${escapeHtml(data.text)}', '${data.color}', '${data.student}')">✔</button>
+                                <button class="btn-card" style="background:#ef4444;" onclick="rejectPostit('${d.id}')">✕</button>
+                            </div>
+                        `;
+                        div.appendChild(card);
+                    });
+                });
+            }
+
+            // --- 4. GESTION PRÉSENCE ---
+            if(!isProjection) {
+                const presQ = query(collection(db, "postit_presence"), where("sessionId", "==", currentSessionId));
+                unsubPresence = onSnapshot(presQ, (snap) => {
+                    const list = document.getElementById('student-list'); list.innerHTML = "";
+                    let count = 0;
+                    snap.forEach(d => { count++; list.innerHTML += `<div class="student-row"><span>👤 ${escapeHtml(d.data().name)}</span> <button class="mega-btn" onclick="call('${d.data().name}')">📢</button></div>`; });
+                    document.getElementById('student-count').innerText = `(${count})`;
+                });
+            }
+        }
+
         // --- 1. CONFIG & QUESTION ---
         onSnapshot(doc(db, "postit_config", "global"), (snap) => {
             if(snap.exists()){
@@ -158,39 +281,6 @@
             await setDoc(doc(db, "postit_config", "global"), { isLocked: isLocked }, {merge:true});
         };
 
-        // --- 2. GESTION DU TABLEAU (BOARD) ---
-        onSnapshot(collection(db, "postit_board"), (snap) => {
-            const currentIds = [];
-            snap.forEach(d => {
-                currentIds.push(d.id);
-                const data = d.data();
-                let el = document.getElementById(d.id);
-                
-                if(!el) {
-                    el = document.createElement('div');
-                    el.id = d.id;
-                    el.className = `postit c-${data.color || 'yellow'}`;
-                    el.innerHTML = `<div class="author">${escapeHtml(data.student)}</div><div>${escapeHtml(data.text)}</div>`;
-                    
-                    if(!isProjection) {
-                        const del = document.createElement('div'); del.className = 'delete-pin'; del.innerText = '×';
-                        del.onclick = (e) => { e.stopPropagation(); deletePostit(d.id); };
-                        el.appendChild(del);
-                        el.onmousedown = (e) => startDrag(e, el);
-                    }
-                    document.getElementById('board').appendChild(el);
-                }
-                
-                // Maj position si on ne drag pas
-                if(draggedItem !== el) {
-                    el.style.left = data.x + '%';
-                    el.style.top = data.y + '%';
-                }
-            });
-            // Nettoyage
-            document.querySelectorAll('.postit').forEach(el => { if(!currentIds.includes(el.id)) el.remove(); });
-        });
-
         // DRAG & DROP
         let draggedItem = null;
         function startDrag(e, el) { if(e.button!==0)return; draggedItem = el; el.style.zIndex = 1000; }
@@ -212,65 +302,37 @@
         });
         window.deletePostit = async(id) => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, "postit_board", id)); };
 
-        // --- 3. SALLE D'ATTENTE (WAITING) ---
-        if(!isProjection) {
-            const q = query(collection(db, "postit_ideas"), where("status", "==", "waiting"));
-            onSnapshot(q, (snap) => {
-                const div = document.getElementById('waiting-room');
-                div.innerHTML = "";
-                if(snap.empty) div.innerHTML = "<div style='text-align:center;color:#64748b;margin-top:10px;'>Vide...</div>";
-                
-                snap.forEach(d => {
-                    const data = d.data();
-                    const card = document.createElement('div');
-                    card.className = `idea-card c-${data.color}`;
-                    card.innerHTML = `
-                        <div class="idea-info">👤 ${escapeHtml(data.student)}</div>
-                        <div class="idea-text">${escapeHtml(data.text)}</div>
-                        <div class="card-actions">
-                            <button class="btn-card" style="background:#22c55e;" onclick="acceptPostit('${d.id}', '${escapeHtml(data.text)}', '${data.color}', '${data.student}')">✔</button>
-                            <button class="btn-card" style="background:#ef4444;" onclick="rejectPostit('${d.id}')">✕</button>
-                        </div>
-                    `;
-                    div.appendChild(card);
-                });
-            });
-        }
-
         window.acceptPostit = async (id, text, color, student) => {
             // Ajout au board (position random au centre)
             const randX = 40 + Math.random() * 20;
             const randY = 40 + Math.random() * 20;
-            await addDoc(collection(db, "postit_board"), { text, color, student, x: randX, y: randY });
+            await addDoc(collection(db, "postit_board"), { text, color, student, x: randX, y: randY, sessionId: currentSessionId });
             await deleteDoc(doc(db, "postit_ideas", id));
         };
         window.rejectPostit = async (id) => await deleteDoc(doc(db, "postit_ideas", id));
         window.clearWaiting = async () => {
             if(!confirm("Tout rejeter ?")) return;
-            const snap = await getDocs(query(collection(db, "postit_ideas"), where("status", "==", "waiting")));
+            const snap = currentSessionId
+                ? await getDocs(query(collection(db, "postit_ideas"), where("sessionId", "==", currentSessionId), where("status", "==", "waiting")))
+                : await getDocs(query(collection(db, "postit_ideas"), where("status", "==", "waiting")));
             const batch = writeBatch(db);
             snap.forEach(d => batch.delete(d.ref));
             await batch.commit();
         };
 
-        // --- 4. GESTION PRÉSENCE ---
-        if(!isProjection) {
-            onSnapshot(collection(db, "postit_presence"), (snap) => {
-                const list = document.getElementById('student-list'); list.innerHTML = "";
-                let count = 0;
-                snap.forEach(d => { count++; list.innerHTML += `<div class="student-row"><span>👤 ${escapeHtml(d.data().name)}</span> <button class="mega-btn" onclick="call('${d.data().name}')">📢</button></div>`; });
-                document.getElementById('student-count').innerText = `(${count})`;
-            });
-        }
         window.call = (name) => { setDoc(doc(db, "postit_config", "global"), { solicitedStudent: name }, { merge: true }); setTimeout(()=>setDoc(doc(db, "postit_config", "global"), { solicitedStudent: null }, { merge: true }), 5000); };
 
         // --- 5. RESET TOTAL ---
         window.resetAll = async () => {
             if(!confirm("⚠️ ATTENTION : Cela efface TOUT (Post-its, Attente, Présents).\nContinuer ?")) return;
             const batch = writeBatch(db);
-            (await getDocs(collection(db, "postit_board"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "postit_ideas"))).forEach(d => batch.delete(d.ref));
-            (await getDocs(collection(db, "postit_presence"))).forEach(d => batch.delete(d.ref));
+            const cols = ["postit_board", "postit_ideas", "postit_presence"];
+            for(const colName of cols) {
+                const snap = currentSessionId
+                    ? await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)))
+                    : await getDocs(collection(db, colName));
+                snap.forEach(d => batch.delete(d.ref));
+            }
             batch.set(doc(db, "postit_config", "global"), { question: "POST-IT", isLocked: false, solicitedStudent: null });
             await batch.commit();
             location.reload();
@@ -280,8 +342,21 @@
         window.toggleProjection = () => {
             const url = new URL(window.location.href); url.searchParams.set("mode", "projection"); window.open(url.toString(), "_blank");
         };
+        // --- AUTO-START SESSION ---
+        if(currentSessionId) {
+            document.getElementById('session-id-display').innerText = 'Session : ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_postit.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        } else {
+            window.newSession();
+        }
+
         function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
-        
+
         // WIDGETS
         let ti, ir=false, ts=0;
         window.handleChronoClick=()=>{ if(ir){clearInterval(ti);ir=false;document.getElementById('chrono').style.color="#3b82f6";return;} const i=prompt("Minuteur?"); clearInterval(ti); document.getElementById('chrono').classList.remove('alert'); if(i&&parseInt(i)>0){ ts=parseInt(i)*60; updC(ts); ti=setInterval(()=>{ ts--; updC(ts); if(ts<=0){clearInterval(ti);ir=false;document.getElementById('chrono').classList.add('alert');document.getElementById('chrono').innerText="FIN!";} },1000); } else { ts=0; updC(0); ti=setInterval(()=>{ ts++; updC(ts); },1000); } ir=true; };

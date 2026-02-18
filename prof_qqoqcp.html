@@ -78,7 +78,20 @@
             <h2>QQOQCP PROF</h2>
             <button onclick="toggleLock()" id="btn-lock" style="background:none; border:1px solid #22c55e; color:#22c55e; padding:3px 8px; border-radius:4px; cursor:pointer;">🔓 Ouvert</button>
         </div>
-        
+
+        <div id="session-bar" style="padding:12px; background:#1a1a2e; border-bottom:1px solid #334155;">
+            <label style="font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Session active</label>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button onclick="newSession()" style="flex:1; padding:7px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="flex:1; padding:7px; background:#e74c3c; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display" style="font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center;"></div>
+            <div style="text-align:center; margin-top:8px;">
+                <img id="qr-code" src="" alt="QR" style="width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none;">
+                <div id="qr-label" style="font-size:0.6rem; color:#64748b; margin-top:4px; display:none;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
         <div class="sidebar-section" style="flex: 1;">
             <div class="section-title">En Attente <span onclick="clearAll()" style="cursor:pointer;">(Vider)</span></div>
             <div id="waiting-room"></div>
@@ -147,6 +160,38 @@
         let activeZone = 'Qui'; // Par défaut
         let isProjection = new URLSearchParams(window.location.search).get('mode') === 'projection';
 
+        // --- SESSION SYSTEM ---
+        let currentSessionId = localStorage.getItem('qqoqcp_sessionId') || null;
+        let unsubListeners = [];
+
+        function generateSessionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('qqoqcp_sessionId', currentSessionId);
+            await setDoc(doc(db, "qqoqcp_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').innerText = 'Session: ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_qqoqcp.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if(!confirm("Supprimer toutes les données de cette session ?")) return;
+            const cols = ["qqoqcp_ideas", "qqoqcp_items", "qqoqcp_presence"];
+            for(const colName of cols) {
+                const snap = await getDocs(query(collection(db, colName), where("sessionId", "==", currentSessionId)));
+                const batch = writeBatch(db);
+                snap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+        };
+
         // INIT
         if(isProjection) {
             document.getElementById('sidebar').classList.add('hidden');
@@ -180,51 +225,75 @@
             try { await setDoc(doc(db, "qqoqcp_config", "global"), { currentZone: code, currentLabel: labels[code] }, { merge: true }); } catch(e){}
         };
 
-        // AFFICHAGE ITEMS
-        onSnapshot(collection(db, "qqoqcp_items"), (snap) => {
-            const cats = ['Qui','Quoi','Ou','Quand','Comment','Combien','Pourquoi'];
-            cats.forEach(c => { const z = document.getElementById('list-'+c); if(z) z.innerHTML=""; });
-            
-            snap.forEach(d => {
-                const data = d.data();
-                const container = document.getElementById('list-' + data.category);
-                if(container) {
-                    const div = document.createElement('div');
-                    div.className = 'item-tag';
-                    const delHtml = isProjection ? '' : `<span class="del-btn" onclick="delItem('${d.id}')">❌</span>`;
-                    div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
-                    container.appendChild(div);
-                }
-            });
-        });
-        window.delItem = async (id) => { if(confirm("Suppr?")) await deleteDoc(doc(db, "qqoqcp_items", id)); };
+        // --- SETUP LISTENERS (session-filtered) ---
+        function setupListeners() {
+            // Unsubscribe previous listeners
+            unsubListeners.forEach(fn => fn());
+            unsubListeners = [];
 
-        // SALLE D'ATTENTE (PROF)
-        if(!isProjection) {
-            const q = query(collection(db, "qqoqcp_ideas"), where("status", "==", "waiting"));
-            onSnapshot(q, (snap) => {
-                const div = document.getElementById('waiting-room');
-                div.innerHTML = "";
-                if(snap.empty) div.innerHTML = "<div style='color:#64748b;text-align:center;font-size:0.8rem;margin-top:10px;'>Vide...</div>";
-                
+            if(!currentSessionId) return;
+
+            // AFFICHAGE ITEMS
+            const unsub1 = onSnapshot(query(collection(db, "qqoqcp_items"), where("sessionId", "==", currentSessionId)), (snap) => {
+                const cats = ['Qui','Quoi','Ou','Quand','Comment','Combien','Pourquoi'];
+                cats.forEach(c => { const z = document.getElementById('list-'+c); if(z) z.innerHTML=""; });
+
                 snap.forEach(d => {
                     const data = d.data();
-                    const card = document.createElement('div');
-                    card.className = 'idea-card';
-                    card.innerHTML = `
-                        <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">👤 ${escapeHtml(data.student)}</div>
-                        <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
-                        <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
-                        <div style="display:flex;">
-                            <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
-                            <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
-                            <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
-                            <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
-                        </div>
-                    `;
-                    div.appendChild(card);
+                    const container = document.getElementById('list-' + data.category);
+                    if(container) {
+                        const div = document.createElement('div');
+                        div.className = 'item-tag';
+                        const delHtml = isProjection ? '' : `<span class="del-btn" onclick="delItem('${d.id}')">❌</span>`;
+                        div.innerHTML = `<span>${escapeHtml(data.text)}</span> ${delHtml}`;
+                        container.appendChild(div);
+                    }
                 });
             });
+            unsubListeners.push(unsub1);
+
+            // SALLE D'ATTENTE (PROF)
+            if(!isProjection) {
+                const unsub2 = onSnapshot(query(collection(db, "qqoqcp_ideas"), where("sessionId", "==", currentSessionId), where("status", "==", "waiting")), (snap) => {
+                    const div = document.getElementById('waiting-room');
+                    div.innerHTML = "";
+                    if(snap.empty) div.innerHTML = "<div style='color:#64748b;text-align:center;font-size:0.8rem;margin-top:10px;'>Vide...</div>";
+
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const card = document.createElement('div');
+                        card.className = 'idea-card';
+                        card.innerHTML = `
+                            <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">👤 ${escapeHtml(data.student)}</div>
+                            <div class="text-display" style="margin:5px 0;">${escapeHtml(data.text)}</div>
+                            <input type="text" class="idea-input" value="${escapeHtml(data.text)}">
+                            <div style="display:flex;">
+                                <button class="btn-act" style="background:#f59e0b;color:white;" onclick="toggleEdit(this)">✏️</button>
+                                <button class="btn-act" style="background:#3b82f6;color:white;" onclick="doLike('${d.id}')">👍</button>
+                                <button class="btn-act" style="background:#22c55e;color:#064e3b;" onclick="doAccept('${d.id}', this)">✅</button>
+                                <button class="btn-act" style="background:#ef4444;color:#7f1d1d;" onclick="doReject('${d.id}')">❌</button>
+                            </div>
+                        `;
+                        div.appendChild(card);
+                    });
+                });
+                unsubListeners.push(unsub2);
+
+                // GESTION ELEVES
+                const unsub3 = onSnapshot(query(collection(db, "qqoqcp_presence"), where("sessionId", "==", currentSessionId)), (snap) => {
+                    const list = document.getElementById('student-list'); list.innerHTML = "";
+                    let count = 0;
+                    snap.forEach(d => {
+                        count++;
+                        const div = document.createElement('div');
+                        div.style.cssText = "display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #333; font-size:0.8rem;";
+                        div.innerHTML = `<span>👤 ${escapeHtml(d.id)}</span> <button onclick="callStudent('${d.id}')" style="background:#eab308;border:none;border-radius:4px;cursor:pointer;">📢</button>`;
+                        list.appendChild(div);
+                    });
+                    document.getElementById('student-count').innerText = `(${count})`;
+                });
+                unsubListeners.push(unsub3);
+            }
         }
 
         window.toggleEdit = (btn) => {
@@ -240,7 +309,7 @@
 
         window.doAccept = async (id, btn) => {
             const input = btn.closest('.idea-card').querySelector('.idea-input');
-            await addDoc(collection(db, "qqoqcp_items"), { text: input.value, category: activeZone });
+            await addDoc(collection(db, "qqoqcp_items"), { text: input.value, category: activeZone, sessionId: currentSessionId });
             await updateDoc(doc(db, "qqoqcp_ideas", id), { status: "accepted" });
         };
         window.doReject = async (id) => await updateDoc(doc(db, "qqoqcp_ideas", id), { status: "rejected" });
@@ -253,21 +322,6 @@
             await batch.commit();
         };
 
-        // GESTION ELEVES
-        if(!isProjection) {
-            onSnapshot(collection(db, "qqoqcp_presence"), (snap) => {
-                const list = document.getElementById('student-list'); list.innerHTML = "";
-                let count = 0;
-                snap.forEach(d => {
-                    count++;
-                    const div = document.createElement('div');
-                    div.style.cssText = "display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #333; font-size:0.8rem;";
-                    div.innerHTML = `<span>👤 ${escapeHtml(d.id)}</span> <button onclick="callStudent('${d.id}')" style="background:#eab308;border:none;border-radius:4px;cursor:pointer;">📢</button>`;
-                    list.appendChild(div);
-                });
-                document.getElementById('student-count').innerText = `(${count})`;
-            });
-        }
         window.callStudent = (name) => {
             setDoc(doc(db, "qqoqcp_config", "global"), { solicitedStudent: name }, { merge: true });
             setTimeout(() => setDoc(doc(db, "qqoqcp_config", "global"), { solicitedStudent: null }, { merge: true }), 5000);
@@ -290,6 +344,17 @@
             const c=new(window.AudioContext||window.webkitAudioContext)(), a=c.createAnalyser(), m=c.createMediaStreamSource(s); m.connect(a); a.fftSize=256; const d=new Uint8Array(a.frequencyBinCount); 
             function dr(){ requestAnimationFrame(dr); a.getByteFrequencyData(d); let sm=0; for(let i=0;i<d.length;i++)sm+=d[i]; document.getElementById('sono-bar').style.width=Math.min(100,(sm/d.length/50)*100)+"%"; } dr(); 
         }).catch(()=>{});
+
+        // AUTO-START session if exists in localStorage
+        if(currentSessionId) {
+            document.getElementById('session-id-display').innerText = 'Session: ' + currentSessionId;
+            const qrUrl = 'https://preventionsanteenvironnement.github.io/PSE/eleve_qqoqcp.html?sessionId=' + currentSessionId;
+            const qrImg = document.getElementById('qr-code');
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+            qrImg.style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        }
 
         function escapeHtml(t) { return t ? t.replace(/&/g,"&amp;").replace(/</g,"&lt;") : ""; }
     </script>
