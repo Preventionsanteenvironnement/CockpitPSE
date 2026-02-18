@@ -135,6 +135,14 @@
         .sum-mini-pct { font-size: 1.1rem; font-weight: 900; }
         .sum-thanks { font-size: 1.2rem; color: #475569; margin-top: 30px; }
 
+        /* === PAUSE === */
+        #screen-paused {
+            text-align: center;
+        }
+        .pause-icon { font-size: clamp(4rem, 10vw, 8rem); margin-bottom: 20px; }
+        .pause-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 10px; }
+        .pause-sub { font-size: clamp(1rem, 2vw, 1.5rem); color: #94a3b8; }
+
         /* === JOIN INPUT (pour le wall sans URL param) === */
         #wall-join {
             position: fixed; inset: 0; z-index: 200;
@@ -202,6 +210,13 @@
     <div class="results-q-text" id="res-q-text"></div>
     <div class="results-bars" id="res-bars"></div>
     <div class="results-correct-text" id="res-correct-text"></div>
+</div>
+
+<!-- PAUSE -->
+<div id="screen-paused" class="screen">
+    <div class="pause-icon">⏸️</div>
+    <div class="pause-title">Quiz en pause</div>
+    <div class="pause-sub">Le prof a mis le quiz en pause</div>
 </div>
 
 <!-- SUMMARY -->
@@ -279,10 +294,19 @@
             const d = snap.data();
             if (d.sessionId !== currentSessionId) return;
 
+            // Handle pause
+            if (d.paused) {
+                if (timerInterval) clearInterval(timerInterval);
+                showWallScreen('paused');
+                lastPhase = 'paused';
+                return;
+            }
+
             const phase = d.phase || 'lobby';
             const qIndex = d.currentQuestionIndex ?? -1;
             const questions = d.questions || [];
             const timer = d.timer || 15;
+            const isManual = d.mode === 'manual';
 
             if (phase === 'lobby') {
                 showWallScreen('lobby');
@@ -293,7 +317,7 @@
                 if (qIndex !== lastQIndex || lastPhase !== 'question') {
                     lastQIndex = qIndex;
                     showWallScreen('question');
-                    displayWallQuestion(questions[qIndex], qIndex, questions.length, timer);
+                    displayWallQuestion(questions[qIndex], qIndex, questions.length, isManual ? 0 : timer);
                 }
             } else if (phase === 'results') {
                 if (timerInterval) clearInterval(timerInterval);
@@ -361,8 +385,16 @@
 
     function startWallTimer(seconds) {
         if (timerInterval) clearInterval(timerInterval);
-        let remaining = seconds;
         const el = document.getElementById('wall-timer');
+
+        // Manual mode — no timer
+        if (seconds <= 0) {
+            el.textContent = '✋';
+            el.className = 'wall-timer';
+            return;
+        }
+
+        let remaining = seconds;
         el.textContent = remaining + 's';
         el.className = 'wall-timer';
 
