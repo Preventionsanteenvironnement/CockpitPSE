@@ -357,16 +357,6 @@
             padding: 7px 12px; font-size: 0.75rem; min-width: 70px; flex: 0;
         }
 
-        .flow-insert-doc {
-            width: 100%; padding: 10px; border: 2px dashed #7c3aed; border-radius: 10px;
-            background: rgba(124, 58, 237, 0.05); color: #a78bfa; font-weight: 700;
-            font-size: 0.8rem; cursor: pointer; transition: 0.2s; text-align: center;
-            margin: 8px 0;
-        }
-        .flow-insert-doc:hover {
-            border-color: #a78bfa; background: rgba(124, 58, 237, 0.12); color: #c4b5fd;
-        }
-
         .flow-orphan-docs {
             border: 2px dashed #f59e0b; border-radius: 10px; padding: 14px;
             margin-top: 12px; background: rgba(245, 158, 11, 0.05);
@@ -486,6 +476,10 @@
                 <div class="form-group" style="margin-bottom:10px;">
                     <label id="doc-content-label">Contenu du texte</label>
                     <textarea class="form-textarea" id="doc-content" placeholder="Collez le texte ici..." rows="4"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label id="doc-description-label">Description (optionnel)</label>
+                    <textarea class="form-textarea" id="doc-description" placeholder="Ajoutez une description ou un texte sous le document..." rows="2"></textarea>
                 </div>
                 <div style="display:flex; gap:8px;">
                     <button class="btn-save-q" id="btn-save-doc" onclick="saveDocument()" style="flex:1;">Ajouter le document</button>
@@ -762,7 +756,6 @@
     let currentModeEval = 'libre';
     let insertAfterDocRef = null;       // doc context for new questions from flow buttons
     let insertAtIndex = null;           // position in questions[] for insertion
-    let docInsertAtQuestionIndex = null; // position for a new document in the flow
 
     const DOC_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#10b981', '#e11d48'];
 
@@ -905,13 +898,13 @@
     };
 
     // === DOCUMENTS MANAGEMENT ===
-    window.showDocForm = function(atQuestionIndex) {
+    window.showDocForm = function() {
         editingDocIndex = -1;
-        docInsertAtQuestionIndex = (typeof atQuestionIndex === 'number') ? atQuestionIndex : null;
         document.getElementById('doc-form').style.display = 'block';
         document.getElementById('doc-titre').value = '';
         document.getElementById('doc-type').value = 'text';
         document.getElementById('doc-content').value = '';
+        document.getElementById('doc-description').value = '';
         document.getElementById('btn-save-doc').textContent = 'Ajouter le document';
         updateDocContentLabel();
         document.getElementById('doc-titre').focus();
@@ -919,7 +912,6 @@
 
     window.hideDocForm = function() {
         editingDocIndex = -1;
-        docInsertAtQuestionIndex = null;
         document.getElementById('doc-form').style.display = 'none';
     };
 
@@ -931,6 +923,7 @@
         document.getElementById('doc-type').value = d.type;
         updateDocContentLabel();
         document.getElementById('doc-content').value = d.content;
+        document.getElementById('doc-description').value = d.description || '';
         document.getElementById('btn-save-doc').textContent = 'Modifier le document';
         document.getElementById('doc-titre').focus();
     };
@@ -940,12 +933,17 @@
         const type = document.getElementById('doc-type').value;
         document.getElementById('doc-content-label').textContent = type === 'image' ? 'URL de l\'image' : 'Contenu du texte';
         document.getElementById('doc-content').placeholder = type === 'image' ? 'https://...' : 'Collez le texte ici...';
+        const descLabel = document.getElementById('doc-description-label');
+        if (descLabel) {
+            descLabel.textContent = type === 'image' ? 'Texte sous l\'image (optionnel)' : 'Description supplementaire (optionnel)';
+        }
     }
 
     window.saveDocument = function() {
         const titre = document.getElementById('doc-titre').value.trim();
         const type = document.getElementById('doc-type').value;
         const content = document.getElementById('doc-content').value.trim();
+        const description = document.getElementById('doc-description').value.trim();
         if (!titre) { alert('Donne un titre au document !'); return; }
         if (!content) { alert('Ajoute le contenu !'); return; }
 
@@ -954,23 +952,17 @@
             documents[editingDocIndex].titre = titre;
             documents[editingDocIndex].type = type;
             documents[editingDocIndex].content = content;
+            documents[editingDocIndex].description = description;
         } else {
-            // Mode ajout : creer un nouveau document
+            // Mode ajout : creer un nouveau document (toujours en fin de liste)
             const newDoc = {
                 id: 'doc_' + Date.now().toString(36),
-                type, titre, content
+                type, titre, content, description
             };
             documents.push(newDoc);
-
-            // If inserted at a position in the flow, assign the next questions at that position to this doc
-            // (the user will add questions via the flow buttons under the doc header)
-            // Set insertAfterDocRef so subsequent question adds are linked
             insertAfterDocRef = newDoc.id;
-
-            // Don't auto-link existing questions — the user will add questions via flow buttons
         }
         editingDocIndex = -1;
-        docInsertAtQuestionIndex = null;
         updateDocRefDropdowns();
         hideDocForm();
         renderFlow();
@@ -997,12 +989,17 @@
         const segments = computeEditorSegments();
         const colorMap = buildDocColorMap();
         const typeLabels = { qcm_single: 'QCM', qcm_multi: 'QCM Multi', vf: 'V/F', mot: 'Mot', nombre: 'Nombre' };
+        const qTypes = [
+            { t: 'qcm_single', label: '+ QCM' },
+            { t: 'qcm_multi', label: '+ QCM Multi' },
+            { t: 'vf', label: '+ V/F' },
+            { t: 'mot', label: '+ Mot' },
+            { t: 'nombre', label: '+ Nombre' }
+        ];
         const referencedDocIds = new Set();
         questions.forEach(q => { if (q.documentRef) referencedDocIds.add(q.documentRef); });
 
-        // Insert document button at the very top
-        container.appendChild(makeInsertDocButton(0));
-
+        // Render each segment
         segments.forEach((seg, si) => {
             const docRef = seg.documentRef;
             const docObj = docRef ? documents.find(d => d.id === docRef) : null;
@@ -1010,29 +1007,13 @@
 
             if (docObj) {
                 // Document header
-                const docIndex = documents.indexOf(docObj);
-                const header = document.createElement('div');
-                header.className = 'flow-doc-header';
-                header.style.setProperty('--seg-color', color);
-                const typeIcon = docObj.type === 'image' ? '🖼️' : '📄';
-                header.innerHTML = '<div class="flow-doc-info">' +
-                    '<span class="flow-doc-icon">' + typeIcon + '</span>' +
-                    '<span class="flow-doc-title">' + escHtml(docObj.titre) + '</span>' +
-                    '<span class="flow-doc-type">(' + docObj.type + ')</span>' +
-                    '</div>' +
-                    '<div class="flow-doc-actions">' +
-                    '<button onclick="editDocument(' + docIndex + ')" title="Modifier">✏️</button>' +
-                    '<button class="btn-del" onclick="deleteDocument(' + docIndex + ')" title="Supprimer">&times;</button>' +
-                    '</div>';
-                container.appendChild(header);
-            } else if (!docRef) {
-                // Independent questions label (only if not first segment or if there's a doc segment before)
-                if (si > 0) {
-                    const label = document.createElement('div');
-                    label.className = 'flow-section-label';
-                    label.textContent = 'Questions independantes';
-                    container.appendChild(label);
-                }
+                container.appendChild(buildDocHeader(docObj, color));
+            } else if (!docRef && si > 0) {
+                // Independent questions label
+                const label = document.createElement('div');
+                label.className = 'flow-section-label';
+                label.textContent = 'Questions independantes';
+                container.appendChild(label);
             }
 
             // Render question cards for this segment
@@ -1042,88 +1023,93 @@
                 container.appendChild(card);
             });
 
-            // Add question buttons for this segment
-            const lastQIndex = seg.questionIndices[seg.questionIndices.length - 1];
-            const addBtnsRow = document.createElement('div');
-            addBtnsRow.className = 'flow-add-btns';
-            const types = [
-                { t: 'qcm_single', label: '+ QCM' },
-                { t: 'qcm_multi', label: '+ QCM Multi' },
-                { t: 'vf', label: '+ V/F' },
-                { t: 'mot', label: '+ Mot' },
-                { t: 'nombre', label: '+ Nombre' }
-            ];
-            types.forEach(item => {
-                const btn = document.createElement('button');
-                btn.className = 'add-btn';
-                btn.textContent = item.label;
-                btn.onclick = () => showAddForm(item.t, docRef || null, lastQIndex + 1);
-                addBtnsRow.appendChild(btn);
-            });
-            container.appendChild(addBtnsRow);
-
-            // Insert document button between segments
-            container.appendChild(makeInsertDocButton(lastQIndex + 1));
+            // Contextual add-question buttons ONLY for document-linked segments
+            if (docRef) {
+                const lastQIndex = seg.questionIndices[seg.questionIndices.length - 1];
+                const addBtnsRow = document.createElement('div');
+                addBtnsRow.className = 'flow-add-btns';
+                qTypes.forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.className = 'add-btn';
+                    btn.textContent = item.label;
+                    btn.onclick = () => showAddForm(item.t, docRef, lastQIndex + 1);
+                    addBtnsRow.appendChild(btn);
+                });
+                container.appendChild(addBtnsRow);
+            }
         });
 
-        // If no questions at all, show global add buttons
-        if (questions.length === 0) {
+        // Orphan documents: show as normal doc headers with add-question buttons (in-flow, not as errors)
+        const orphanDocs = documents.filter(d => !referencedDocIds.has(d.id));
+        orphanDocs.forEach(d => {
+            const color = colorMap[d.id] || '#64748b';
+            container.appendChild(buildDocHeader(d, color));
+
+            // Add-question buttons linked to this orphan document
             const addBtnsRow = document.createElement('div');
             addBtnsRow.className = 'flow-add-btns';
-            addBtnsRow.style.marginTop = '8px';
-            const types = [
-                { t: 'qcm_single', label: '+ QCM' },
-                { t: 'qcm_multi', label: '+ QCM Multi' },
-                { t: 'vf', label: '+ V/F' },
-                { t: 'mot', label: '+ Mot' },
-                { t: 'nombre', label: '+ Nombre' }
-            ];
-            types.forEach(item => {
+            qTypes.forEach(item => {
                 const btn = document.createElement('button');
                 btn.className = 'add-btn';
                 btn.textContent = item.label;
-                btn.onclick = () => showAddForm(item.t, null, null);
+                btn.onclick = () => showAddForm(item.t, d.id, questions.length);
                 addBtnsRow.appendChild(btn);
             });
             container.appendChild(addBtnsRow);
-        }
+        });
 
-        // Orphan documents (referenced by no question)
-        const orphanDocs = documents.filter(d => !referencedDocIds.has(d.id));
-        if (orphanDocs.length > 0) {
-            const orphanDiv = document.createElement('div');
-            orphanDiv.className = 'flow-orphan-docs';
-            orphanDiv.innerHTML = '<div class="orphan-title">Documents non utilises</div>';
-            orphanDocs.forEach(d => {
-                const di = documents.indexOf(d);
-                const card = document.createElement('div');
-                card.className = 'doc-card';
-                const typeIcon = d.type === 'image' ? '🖼️' : '📄';
-                card.innerHTML = '<div class="doc-info"><div class="doc-title">' + typeIcon + ' ' + escHtml(d.titre) + '</div><div class="doc-type">' + d.type + ' — non reference par aucune question</div></div>' +
-                    '<div style="display:flex; gap:4px;">' +
-                    '<button class="doc-del" onclick="editDocument(' + di + ')" title="Modifier" style="color:#3b82f6;">✏️</button>' +
-                    '<button class="doc-del" onclick="deleteDocument(' + di + ')" title="Supprimer">&times;</button>' +
-                    '</div>';
-                orphanDiv.appendChild(card);
-            });
-            container.appendChild(orphanDiv);
-        }
+        // === BOTTOM ADD SECTION (always present) ===
+        const bottomSection = document.createElement('div');
+        bottomSection.style.cssText = 'margin-top: 20px; padding-top: 16px; border-top: 2px dashed #334155;';
+
+        // "Add document" button
+        const addDocBtn = document.createElement('button');
+        addDocBtn.className = 'add-btn';
+        addDocBtn.style.cssText = 'width: 100%; margin-bottom: 10px; padding: 12px; font-size: 0.85rem; border-color: #7c3aed; color: #a78bfa;';
+        addDocBtn.textContent = '+ Ajouter un document';
+        addDocBtn.onclick = () => showDocForm();
+        bottomSection.appendChild(addDocBtn);
+
+        // "Add question" buttons row (independent questions at end)
+        const addQRow = document.createElement('div');
+        addQRow.className = 'flow-add-btns';
+        qTypes.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'add-btn';
+            btn.textContent = item.label;
+            btn.onclick = () => showAddForm(item.t, null, null);
+            addQRow.appendChild(btn);
+        });
+        bottomSection.appendChild(addQRow);
+        container.appendChild(bottomSection);
 
         updatePointsTotal();
+    }
+
+    // Helper: build a document header element for the flow
+    function buildDocHeader(docObj, color) {
+        const docIndex = documents.indexOf(docObj);
+        const header = document.createElement('div');
+        header.className = 'flow-doc-header';
+        header.style.setProperty('--seg-color', color);
+        const typeIcon = docObj.type === 'image' ? '🖼️' : '📄';
+        const descPreview = docObj.description ? ' — ' + escHtml(docObj.description.substring(0, 40)) + (docObj.description.length > 40 ? '...' : '') : '';
+        header.innerHTML = '<div class="flow-doc-info">' +
+            '<span class="flow-doc-icon">' + typeIcon + '</span>' +
+            '<span class="flow-doc-title">' + escHtml(docObj.titre) + '</span>' +
+            '<span class="flow-doc-type">(' + docObj.type + descPreview + ')</span>' +
+            '</div>' +
+            '<div class="flow-doc-actions">' +
+            '<button onclick="editDocument(' + docIndex + ')" title="Modifier">✏️</button>' +
+            '<button class="btn-del" onclick="deleteDocument(' + docIndex + ')" title="Supprimer">&times;</button>' +
+            '</div>';
+        return header;
     }
 
     function escHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
-    }
-
-    function makeInsertDocButton(atQuestionIndex) {
-        const btn = document.createElement('button');
-        btn.className = 'flow-insert-doc';
-        btn.textContent = '+ Inserer un document ici';
-        btn.onclick = () => showDocForm(atQuestionIndex);
-        return btn;
     }
 
     function buildQuestionCard(q, i, typeLabels, borderColor, docRef) {
