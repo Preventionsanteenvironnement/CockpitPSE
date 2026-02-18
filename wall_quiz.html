@@ -75,6 +75,11 @@
             position: fixed; top: 30px; right: 40px;
             font-size: 1.5rem; color: #94a3b8; font-weight: 700;
         }
+        .wall-mot-info {
+            background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 20px; padding: 40px; width: 100%; max-width: 700px;
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem); color: #94a3b8; font-weight: 600;
+        }
 
         /* === RESULTS === */
         #screen-results { text-align: center; }
@@ -115,6 +120,14 @@
         .results-correct-text {
             font-size: 1.5rem; color: #22c55e; font-weight: 800; margin-top: 30px;
         }
+        /* Mot result */
+        .results-mot-answer {
+            font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; color: #22c55e;
+            margin-bottom: 20px;
+        }
+        .results-mot-stat {
+            font-size: 1.3rem; color: #94a3b8; font-weight: 600;
+        }
 
         /* === SUMMARY === */
         #screen-summary { text-align: center; }
@@ -143,7 +156,7 @@
         .pause-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; margin-bottom: 10px; }
         .pause-sub { font-size: clamp(1rem, 2vw, 1.5rem); color: #94a3b8; }
 
-        /* === JOIN INPUT (pour le wall sans URL param) === */
+        /* === JOIN INPUT === */
         #wall-join {
             position: fixed; inset: 0; z-index: 200;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
@@ -173,7 +186,7 @@
 </head>
 <body>
 
-<!-- ÉCRAN JOIN (si pas de code en URL) -->
+<!-- ECRAN JOIN -->
 <div id="wall-join">
     <h1>🎯 Quiz Live — Ecran</h1>
     <p style="color:#94a3b8; margin-bottom: 30px;">Entre le code session pour afficher le quiz</p>
@@ -201,6 +214,7 @@
     <div class="wall-timer" id="wall-timer"></div>
     <div class="wall-q-text" id="wall-q-text"></div>
     <div class="wall-choices" id="wall-choices"></div>
+    <div class="wall-mot-info" id="wall-mot-info" style="display:none;"></div>
     <div class="wall-resp-counter" id="wall-resp-counter"></div>
 </div>
 
@@ -255,7 +269,6 @@
     let lastQIndex = -1;
 
     // === CONNEXION ===
-    // Vérifier URL param
     const urlCode = new URLSearchParams(window.location.search).get('code');
     if (urlCode) {
         document.getElementById('wall-join-input').value = urlCode;
@@ -288,7 +301,6 @@
 
     // === LISTENERS ===
     function startWallListening() {
-        // Config
         unsubConfig = onSnapshot(doc(db, "quiz_live_config", "global"), (snap) => {
             if (!snap.exists()) return;
             const d = snap.data();
@@ -353,7 +365,6 @@
             responsesData = [];
             snap.forEach(d => responsesData.push(d.data()));
 
-            // Mettre à jour compteur si en phase question
             if (lastPhase === 'question' && lastQIndex >= 0) {
                 const current = responsesData.filter(r => r.questionIndex === lastQIndex);
                 document.getElementById('wall-resp-counter').textContent = current.length + ' / ' + playerCount + ' ont repondu';
@@ -363,23 +374,36 @@
 
     // === QUESTION ===
     function displayWallQuestion(q, index, total, timer) {
+        const qType = q.type || 'qcm';
+
         document.getElementById('wall-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
         document.getElementById('wall-q-text').textContent = q.question;
         document.getElementById('wall-resp-counter').textContent = '0 / ' + playerCount + ' ont repondu';
 
         const grid = document.getElementById('wall-choices');
-        grid.innerHTML = '';
-        const letters = ['A', 'B', 'C', 'D'];
-        const colors = ['wall-choice-a', 'wall-choice-b', 'wall-choice-c', 'wall-choice-d'];
+        const motInfo = document.getElementById('wall-mot-info');
 
-        q.choices.forEach((choice, i) => {
-            const div = document.createElement('div');
-            div.className = 'wall-choice ' + colors[i];
-            div.innerHTML = '<span class="letter">' + letters[i] + '</span> ' + choice;
-            grid.appendChild(div);
-        });
+        if (qType === 'mot') {
+            grid.style.display = 'none';
+            motInfo.style.display = 'block';
+            motInfo.innerHTML = '✏️ Les eleves tapent leur reponse...';
+        } else {
+            grid.style.display = 'grid';
+            motInfo.style.display = 'none';
+            grid.innerHTML = '';
 
-        // Timer
+            const letters = ['A', 'B', 'C', 'D'];
+            const colors = ['wall-choice-a', 'wall-choice-b', 'wall-choice-c', 'wall-choice-d'];
+            const numChoices = q.choices.length;
+
+            for (let i = 0; i < numChoices; i++) {
+                const div = document.createElement('div');
+                div.className = 'wall-choice ' + colors[i];
+                div.innerHTML = '<span class="letter">' + letters[i] + '</span> ' + q.choices[i];
+                grid.appendChild(div);
+            }
+        }
+
         startWallTimer(timer);
     }
 
@@ -387,7 +411,6 @@
         if (timerInterval) clearInterval(timerInterval);
         const el = document.getElementById('wall-timer');
 
-        // Manual mode — no timer
         if (seconds <= 0) {
             el.textContent = '✋';
             el.className = 'wall-timer';
@@ -409,43 +432,56 @@
 
     // === RESULTS ===
     function displayWallResults(q, index, total) {
+        const qType = q.type || 'qcm';
+
         document.getElementById('res-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
         document.getElementById('res-q-text').textContent = q.question;
 
         const currentResp = responsesData.filter(r => r.questionIndex === index);
         const totalR = currentResp.length || 1;
-        const counts = [0, 0, 0, 0];
-        currentResp.forEach(r => { if (r.answer >= 0 && r.answer <= 3) counts[r.answer]++; });
-
-        const maxCount = Math.max(...counts, 1);
-        const letters = ['A', 'B', 'C', 'D'];
-        const barColors = ['result-bar-a', 'result-bar-b', 'result-bar-c', 'result-bar-d'];
+        const correctCount = currentResp.filter(r => r.correct).length;
 
         const container = document.getElementById('res-bars');
         container.innerHTML = '';
 
-        for (let i = 0; i < 4; i++) {
-            const pct = Math.round((counts[i] / totalR) * 100);
-            const barHeight = Math.max(20, (counts[i] / maxCount) * 250);
+        if (qType === 'mot') {
+            // Short answer: show the answer big + correct count
+            container.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:20px;">' +
+                '<div class="results-mot-answer">✅ ' + q.reponse + '</div>' +
+                '<div class="results-mot-stat">' + correctCount + ' / ' + currentResp.length + ' bonnes reponses</div>' +
+                '</div>';
+            document.getElementById('res-correct-text').textContent = '';
+        } else {
+            // QCM / V/F: show bars
+            const numChoices = q.choices.length;
+            const counts = new Array(numChoices).fill(0);
+            currentResp.forEach(r => { if (r.answer >= 0 && r.answer < numChoices) counts[r.answer]++; });
 
-            const col = document.createElement('div');
-            col.className = 'result-bar-col';
+            const maxCount = Math.max(...counts, 1);
+            const letters = ['A', 'B', 'C', 'D'];
+            const barColors = ['result-bar-a', 'result-bar-b', 'result-bar-c', 'result-bar-d'];
 
-            col.innerHTML = '<div class="result-bar-pct">' + pct + '%</div>' +
-                '<div class="result-bar ' + barColors[i] + (i === q.correct ? ' correct' : '') + '" id="rbar-' + i + '" style="height:0;">' +
-                '<div class="result-bar-badge">✅</div></div>' +
-                '<div class="result-bar-label"><strong>' + letters[i] + '</strong><br>' + q.choices[i] + '</div>';
+            for (let i = 0; i < numChoices; i++) {
+                const pct = Math.round((counts[i] / totalR) * 100);
+                const barHeight = Math.max(20, (counts[i] / maxCount) * 250);
 
-            container.appendChild(col);
+                const col = document.createElement('div');
+                col.className = 'result-bar-col';
 
-            // Animer
-            setTimeout(() => {
-                document.getElementById('rbar-' + i).style.height = barHeight + 'px';
-            }, 200 + i * 150);
+                col.innerHTML = '<div class="result-bar-pct">' + pct + '%</div>' +
+                    '<div class="result-bar ' + barColors[i] + (i === q.correct ? ' correct' : '') + '" id="rbar-' + i + '" style="height:0;">' +
+                    '<div class="result-bar-badge">✅</div></div>' +
+                    '<div class="result-bar-label"><strong>' + letters[i] + '</strong><br>' + q.choices[i] + '</div>';
+
+                container.appendChild(col);
+
+                setTimeout(() => {
+                    document.getElementById('rbar-' + i).style.height = barHeight + 'px';
+                }, 200 + i * 150);
+            }
+
+            document.getElementById('res-correct-text').textContent = '✅ ' + correctCount + ' / ' + currentResp.length + ' bonnes reponses (' + Math.round((correctCount / totalR) * 100) + '%)';
         }
-
-        const correctCount = currentResp.filter(r => r.correct).length;
-        document.getElementById('res-correct-text').textContent = '✅ ' + correctCount + ' / ' + currentResp.length + ' bonnes reponses (' + Math.round((correctCount / totalR) * 100) + '%)';
     }
 
     // === SUMMARY ===
