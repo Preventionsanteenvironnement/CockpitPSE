@@ -194,6 +194,34 @@
         .btn-view { background: #3b82f6; }
         .btn-pub { background: #22c55e; }
         .btn-unpub { background: #ef4444; }
+        .btn-del { background: #dc2626; }
+        .btn-del:hover { opacity: 0.85; }
+        .btn-edit-note {
+            background: transparent; border: none; cursor: pointer;
+            font-size: 0.75rem; color: #64748b; padding: 2px;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        tr:hover .btn-edit-note { opacity: 1; }
+        .btn-edit-note:hover { color: #3b82f6; }
+        .note-adjusted-badge {
+            font-size: 0.55rem; background: #fef3c7; color: #92400e;
+            padding: 1px 4px; border-radius: 3px; font-weight: 700;
+            vertical-align: super; margin-left: 2px;
+        }
+        .note-edit-inline {
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .note-edit-inline input {
+            width: 50px; padding: 3px 6px; border: 1px solid #3b82f6;
+            border-radius: 4px; background: #0f172a; color: white;
+            font-size: 0.9rem; font-weight: 800; text-align: center;
+        }
+        .note-edit-inline button {
+            padding: 3px 6px; border: none; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 700; cursor: pointer; color: white;
+        }
+        .note-edit-ok { background: #22c55e; }
+        .note-edit-cancel { background: #64748b; }
 
         /* Detail modal */
         .modal-overlay {
@@ -284,6 +312,22 @@
     <div class="sidebar-header">
         <h2>📊 Resultats Eval</h2>
         <a href="index.html">← Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Filtrer les evaluations</label>
+        <div style="margin-bottom:6px;">
+            <span style="font-size:0.65rem; color:#475569; text-transform:uppercase;">Par classe</span>
+            <div class="filter-pills" id="sidebar-class-pills">
+                <button class="filter-pill active" onclick="setSidebarClassFilter('all')">Toutes</button>
+            </div>
+        </div>
+        <div>
+            <span style="font-size:0.65rem; color:#475569; text-transform:uppercase;">Par module</span>
+            <div class="filter-pills" id="sidebar-module-pills">
+                <button class="filter-pill active" onclick="setSidebarModuleFilter('all')">Tous</button>
+            </div>
+        </div>
     </div>
 
     <div class="sidebar-section">
@@ -384,6 +428,7 @@
                         <th>C6</th>
                         <th>Statut</th>
                         <th>Temps</th>
+                        <th class="sortable" onclick="sortBy('date')">Date ⇅</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -462,6 +507,8 @@
     let sortAsc = true;
     let sessionId = null;
     let sessionUnsubscribe = null;
+    let sidebarClassFilter = 'all';
+    let sidebarModuleFilter = 'all';
 
     // === LOAD ALL EVALS (real-time) ===
     const qBanque = query(collection(db, "eval_banque"), orderBy("updatedAt", "desc"));
@@ -470,15 +517,54 @@
         snap.forEach(d => {
             allEvals.push({ id: d.id, ...d.data() });
         });
+        buildSidebarFilters();
         renderEvalSelector();
         renderEvalSidebarList();
     });
+
+    // === SIDEBAR EVAL FILTERS ===
+    function buildSidebarFilters() {
+        // Class pills
+        const classContainer = document.getElementById('sidebar-class-pills');
+        const classes = new Set();
+        allEvals.forEach(ev => { if (ev.classeId) classes.add(ev.classeId); });
+        classContainer.innerHTML = '<button class="filter-pill' + (sidebarClassFilter === 'all' ? ' active' : '') + '" onclick="setSidebarClassFilter(\'all\')">Toutes</button>';
+        [...classes].sort().forEach(c => {
+            const pill = document.createElement('button');
+            pill.className = 'filter-pill' + (sidebarClassFilter === c ? ' active' : '');
+            pill.textContent = c;
+            pill.onclick = () => setSidebarClassFilter(c);
+            classContainer.appendChild(pill);
+        });
+        // Module pills
+        const moduleContainer = document.getElementById('sidebar-module-pills');
+        const modules = new Set();
+        allEvals.forEach(ev => { if (ev.moduleId) modules.add(ev.moduleId); });
+        moduleContainer.innerHTML = '<button class="filter-pill' + (sidebarModuleFilter === 'all' ? ' active' : '') + '" onclick="setSidebarModuleFilter(\'all\')">Tous</button>';
+        [...modules].sort().forEach(m => {
+            const pill = document.createElement('button');
+            pill.className = 'filter-pill' + (sidebarModuleFilter === m ? ' active' : '');
+            pill.textContent = m;
+            pill.onclick = () => setSidebarModuleFilter(m);
+            moduleContainer.appendChild(pill);
+        });
+    }
+    window.setSidebarClassFilter = function(v) { sidebarClassFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
+    window.setSidebarModuleFilter = function(v) { sidebarModuleFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
+
+    function getFilteredEvals() {
+        return allEvals.filter(ev => {
+            if (sidebarClassFilter !== 'all' && ev.classeId && ev.classeId !== sidebarClassFilter) return false;
+            if (sidebarModuleFilter !== 'all' && ev.moduleId !== sidebarModuleFilter) return false;
+            return true;
+        });
+    }
 
     function renderEvalSelector() {
         const sel = document.getElementById('eval-selector');
         const currentVal = sel.value;
         sel.innerHTML = '<option value="">— Choisir une evaluation —</option>';
-        allEvals.forEach(ev => {
+        getFilteredEvals().forEach(ev => {
             const opt = document.createElement('option');
             opt.value = ev.id;
             const pubLabel = ev.publie ? ' [Publie]' : ' [Brouillon]';
@@ -492,7 +578,7 @@
     function renderEvalSidebarList() {
         const container = document.getElementById('eval-sidebar-list');
         container.innerHTML = '';
-        allEvals.forEach(ev => {
+        getFilteredEvals().forEach(ev => {
             const div = document.createElement('div');
             div.className = 'eval-list-item' + (ev.id === currentEvalId ? ' active' : '');
             div.onclick = () => {
@@ -563,6 +649,7 @@
             const promises = [];
             snap.forEach(d => {
                 const resp = d.data();
+                resp._reponseDocId = d.id;
                 promises.push(loadStudentResult(resp));
             });
 
@@ -606,6 +693,7 @@
                 eleveCode,
                 classe: resp.classe || '',
                 note,
+                note_ajustee: evalData.note_ajustee ?? null,
                 bareme: currentEvalData ? (currentEvalData.bareme || 20) : 20,
                 competences,
                 questionsResult,
@@ -615,7 +703,8 @@
                 submittedAt: resp.submittedAt || '',
                 reponses: resp.reponses || {},
                 evalDocId,
-                evalData
+                evalData,
+                reponseDocId: resp._reponseDocId || null
             };
         } catch(e) {
             console.error("Erreur chargement eleve:", eleveCode, e);
@@ -677,11 +766,34 @@
         renderTable();
     };
 
+    function getDisplayNote(r) {
+        return (r.note_ajustee !== null && r.note_ajustee !== undefined) ? r.note_ajustee : r.note;
+    }
+
+    function formatDate(submittedAt) {
+        if (!submittedAt) return '--';
+        try {
+            const dt = submittedAt.toDate ? submittedAt.toDate() : new Date(submittedAt);
+            if (isNaN(dt.getTime())) return '--';
+            return dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) { return '--'; }
+    }
+
+    function getTimestamp(submittedAt) {
+        if (!submittedAt) return 0;
+        try {
+            const dt = submittedAt.toDate ? submittedAt.toDate() : new Date(submittedAt);
+            return isNaN(dt.getTime()) ? 0 : dt.getTime();
+        } catch(e) { return 0; }
+    }
+
     function sortResults() {
         filteredResults.sort((a, b) => {
             let va, vb;
             if (sortField === 'code') { va = a.eleveCode; vb = b.eleveCode; }
-            else if (sortField === 'note') { va = a.note ?? -1; vb = b.note ?? -1; }
+            else if (sortField === 'note') { va = getDisplayNote(a) ?? -1; vb = getDisplayNote(b) ?? -1; }
+            else if (sortField === 'date') { va = getTimestamp(a.submittedAt); vb = getTimestamp(b.submittedAt); }
             else { va = a.eleveCode; vb = b.eleveCode; }
 
             if (typeof va === 'string') {
@@ -693,7 +805,7 @@
 
     // === RENDER STATS ===
     function renderStats() {
-        const notes = filteredResults.filter(r => r.note !== null && !isNaN(r.note)).map(r => parseFloat(r.note));
+        const notes = filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n));
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
         const publies = filteredResults.filter(r => r.publie).length;
 
@@ -719,7 +831,7 @@
         const tbody = document.getElementById('results-tbody');
 
         if (filteredResults.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12"><div class="table-empty"><div class="te-icon">📭</div><p>Aucun resultat pour cette evaluation.</p></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13"><div class="table-empty"><div class="te-icon">📭</div><p>Aucun resultat pour cette evaluation.</p></div></td></tr>';
             return;
         }
 
@@ -727,10 +839,23 @@
         filteredResults.forEach((r, idx) => {
             const tr = document.createElement('tr');
 
-            // Note coloring
+            // Note coloring — use display note (ajustee if exists)
             const bareme = r.bareme || 20;
-            const pct = r.note !== null ? (r.note / bareme) * 100 : 0;
-            const noteClass = r.note === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low');
+            const displayNote = getDisplayNote(r);
+            const pct = displayNote !== null ? (displayNote / bareme) * 100 : 0;
+            const noteClass = displayNote === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low');
+
+            // Note cell content with adjusted badge + edit button
+            let noteHtml = '';
+            if (displayNote !== null) {
+                noteHtml = displayNote + '/' + bareme;
+                if (r.note_ajustee !== null && r.note_ajustee !== undefined) {
+                    noteHtml += ' <span class="note-adjusted-badge">ajuste</span>';
+                }
+                noteHtml += ' <button class="btn-edit-note" onclick="editNote(\'' + r.eleveCode + '\', event)" title="Modifier la note">✏️</button>';
+            } else {
+                noteHtml = '--';
+            }
 
             // Competence badges
             let compsCells = '';
@@ -762,23 +887,31 @@
             // Tab switch warning
             const tabWarn = r.tabSwitchCount > 0 ? ' <span title="Sorties detectees" style="color:#ef4444; font-size:0.7rem;">⚠️' + r.tabSwitchCount + '</span>' : '';
 
+            // Date
+            const dateStr = formatDate(r.submittedAt);
+
             // Publish/Unpublish button
             const pubBtn = r.publie
                 ? '<button class="btn-sm btn-unpub" onclick="unpublishOne(\'' + r.eleveCode + '\')" title="Depublier">🔒</button>'
                 : '<button class="btn-sm btn-pub" onclick="publishOne(\'' + r.eleveCode + '\')" title="Publier">📢</button>';
+
+            // Delete button
+            const delBtn = '<button class="btn-sm btn-del" onclick="deleteResult(\'' + r.eleveCode + '\')" title="Supprimer ce resultat">🗑️</button>';
 
             const displayName = afficherAvecNom(r.eleveCode);
 
             tr.innerHTML =
                 '<td class="td-code">' + displayName + tabWarn + '</td>' +
                 '<td class="td-classe">' + r.classe + '</td>' +
-                '<td class="td-note ' + noteClass + '">' + (r.note !== null ? r.note + '/' + bareme : '--') + '</td>' +
+                '<td class="td-note ' + noteClass + '">' + noteHtml + '</td>' +
                 compsCells +
                 '<td>' + statusHtml + '</td>' +
                 '<td style="font-size:0.8rem; color:#94a3b8;">' + timeStr + '</td>' +
+                '<td style="font-size:0.75rem; color:#94a3b8;">' + dateStr + '</td>' +
                 '<td>' +
                     '<button class="btn-sm btn-view" onclick="viewDetail(\'' + r.eleveCode + '\')" title="Detail">👁️</button>' +
                     pubBtn +
+                    delBtn +
                 '</td>';
 
             tbody.appendChild(tr);
@@ -856,6 +989,104 @@
         showToast('Resultats actualises !');
     };
 
+    // === DELETE RESULT ===
+    window.deleteResult = async function(eleveCode) {
+        const r = results.find(r => r.eleveCode === eleveCode);
+        if (!r) return;
+        const displayName = afficherAvecNom(eleveCode);
+        if (!confirm('Supprimer le resultat de ' + displayName + ' ?\n\nCette action est irreversible.')) return;
+
+        try {
+            // 1. Delete from resultats/{eleveCode}/evaluations/{evalId}_eval
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval');
+            await deleteDoc(evalDocRef);
+
+            // 2. Delete from eval_reponses if we have the doc ID
+            if (r.reponseDocId) {
+                const reponseDocRef = doc(db, "eval_reponses", r.reponseDocId);
+                await deleteDoc(reponseDocRef);
+            }
+
+            // 3. Remove from local arrays
+            const idx = results.indexOf(r);
+            if (idx > -1) results.splice(idx, 1);
+
+            applyFilters();
+            buildClassFilters();
+            renderStats();
+            renderTable();
+            showToast('Resultat supprime pour ' + displayName);
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === EDIT NOTE (inline) ===
+    window.editNote = function(eleveCode, event) {
+        if (event) event.stopPropagation();
+        const r = filteredResults.find(r => r.eleveCode === eleveCode);
+        if (!r) return;
+
+        const bareme = r.bareme || 20;
+        const currentNote = getDisplayNote(r);
+
+        // Find the note cell in the table row
+        const rows = document.querySelectorAll('#results-tbody tr');
+        for (const row of rows) {
+            if (row.innerHTML.includes("editNote('" + eleveCode + "'")) {
+                const noteCell = row.querySelector('.td-note');
+                if (noteCell) {
+                    noteCell.innerHTML =
+                        '<div class="note-edit-inline">' +
+                            '<input type="number" id="note-input-' + eleveCode + '" value="' + (currentNote !== null ? currentNote : '') + '" min="0" max="' + bareme + '" step="0.5" onkeydown="if(event.key===\'Enter\')saveNote(\'' + eleveCode + '\');if(event.key===\'Escape\')cancelEditNote();">' +
+                            '/' + bareme +
+                            ' <button class="note-edit-ok" onclick="saveNote(\'' + eleveCode + '\')">OK</button>' +
+                            ' <button class="note-edit-cancel" onclick="cancelEditNote()">✕</button>' +
+                        '</div>';
+                    const input = document.getElementById('note-input-' + eleveCode);
+                    if (input) { input.focus(); input.select(); }
+                }
+                break;
+            }
+        }
+    };
+
+    window.saveNote = async function(eleveCode) {
+        const input = document.getElementById('note-input-' + eleveCode);
+        if (!input) return;
+
+        const newNote = parseFloat(input.value);
+        const r = results.find(r => r.eleveCode === eleveCode);
+        if (!r) return;
+
+        const bareme = r.bareme || 20;
+        if (isNaN(newNote) || newNote < 0 || newNote > bareme) {
+            alert('Note invalide. Entrez une valeur entre 0 et ' + bareme + '.');
+            return;
+        }
+
+        try {
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval');
+            await updateDoc(evalDocRef, { note_ajustee: newNote });
+
+            // Update local data
+            r.note_ajustee = newNote;
+
+            applyFilters();
+            renderStats();
+            renderTable();
+            showToast('Note ajustee a ' + newNote + '/' + bareme + ' pour ' + afficherAvecNom(eleveCode));
+        } catch(e) {
+            console.error("Erreur sauvegarde note:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.cancelEditNote = function() {
+        renderTable();
+    };
+
     // === VIEW DETAIL ===
     window.viewDetail = function(eleveCode) {
         const r = filteredResults.find(r => r.eleveCode === eleveCode);
@@ -868,11 +1099,15 @@
 
         let html = '';
 
-        // Score
-        const pct = r.note !== null ? (r.note / bareme) * 100 : 0;
-        const scoreClass = r.note === null ? '' : (pct >= 60 ? 'sv-green' : pct >= 40 ? 'sv-amber' : 'sv-red');
+        // Score — show adjusted note if exists
+        const displayNote = getDisplayNote(r);
+        const pct = displayNote !== null ? (displayNote / bareme) * 100 : 0;
+        const scoreClass = displayNote === null ? '' : (pct >= 60 ? 'sv-green' : pct >= 40 ? 'sv-amber' : 'sv-red');
         html += '<div class="modal-score">';
-        html += '<div class="ms-note ' + scoreClass + '">' + (r.note !== null ? r.note + ' / ' + bareme : '--') + '</div>';
+        html += '<div class="ms-note ' + scoreClass + '">' + (displayNote !== null ? displayNote + ' / ' + bareme : '--') + '</div>';
+        if (r.note_ajustee !== null && r.note_ajustee !== undefined) {
+            html += '<div style="font-size:0.8rem; color:#fbbf24; margin-top:4px;"><span class="note-adjusted-badge">ajuste</span> Auto-correction : ' + r.note + '/' + bareme + ' → Note ajustee : ' + r.note_ajustee + '/' + bareme + '</div>';
+        }
         html += '<div class="ms-label">Temps : ' + Math.floor(r.tempsSecondes / 60) + ' min ' + (r.tempsSecondes % 60) + ' sec';
         if (r.tabSwitchCount > 0) html += ' | ⚠️ ' + r.tabSwitchCount + ' sortie(s) d\'onglet';
         html += '</div></div>';
@@ -940,10 +1175,17 @@
             html += '<div style="margin-bottom:14px;">';
             html += '<div style="font-weight:700; font-size:0.85rem; color:#94a3b8; margin-bottom:6px; text-transform:uppercase;">Documents (' + docs.length + ')</div>';
             docs.forEach(function(d) {
+                const icon = d.type === 'image' ? '🖼️' : (d.type === 'video' ? '🎬' : '📄');
                 html += '<div style="background:#0f172a; border-radius:8px; padding:10px; margin-bottom:6px; font-size:0.85rem; color:#e2e8f0;">';
-                html += (d.type === 'image' ? '🖼️' : '📄') + ' <strong>' + (d.titre || 'Document') + '</strong>';
+                html += icon + ' <strong>' + (d.titre || 'Document') + '</strong>';
                 if (d.type === 'image' && d.content) html += '<br><img src="' + d.content + '" style="max-width:100%;max-height:200px;margin-top:8px;border-radius:6px;" onerror="this.style.display=\'none\'">';
                 if (d.type === 'text' && d.content) html += '<div style="margin-top:6px;color:#94a3b8;font-size:0.8rem;white-space:pre-wrap;">' + d.content.substring(0, 300) + (d.content.length > 300 ? '...' : '') + '</div>';
+                if (d.type === 'video' && d.content) {
+                    const embedUrl = extractYouTubeEmbed(d.content);
+                    if (embedUrl) html += '<iframe src="' + embedUrl + '" style="width:100%;aspect-ratio:16/9;max-height:200px;border:none;border-radius:8px;margin-top:8px;" allowfullscreen></iframe>';
+                    else html += '<div style="margin-top:6px;color:#ef4444;font-size:0.8rem;">URL video invalide</div>';
+                }
+                if (d.description) html += '<div style="margin-top:6px;color:#94a3b8;font-size:0.8rem;white-space:pre-wrap;">' + d.description + '</div>';
                 html += '</div>';
             });
             html += '</div>';
@@ -1010,6 +1252,32 @@
         return String(answer);
     }
 
+    function extractYouTubeEmbed(url) {
+        if (!url) return null;
+        let videoId = null;
+        try {
+            // youtube.com/watch?v=ID
+            const u = new URL(url);
+            if (u.hostname.includes('youtube.com') && u.searchParams.get('v')) {
+                videoId = u.searchParams.get('v');
+            }
+            // youtu.be/ID
+            else if (u.hostname === 'youtu.be') {
+                videoId = u.pathname.slice(1);
+            }
+            // youtube.com/embed/ID
+            else if (u.hostname.includes('youtube.com') && u.pathname.startsWith('/embed/')) {
+                videoId = u.pathname.split('/embed/')[1];
+            }
+        } catch(e) {}
+        // Fallback regex
+        if (!videoId) {
+            const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+            if (m) videoId = m[1];
+        }
+        return videoId ? 'https://www.youtube.com/embed/' + videoId : null;
+    }
+
     function formatCorrectAnswer(q) {
         if (q.type === 'qcm_single') return (q.choices || [])[q.correct] || '?';
         if (q.type === 'qcm_multi') return (q.correct || []).map(i => (q.choices || [])[i]).join(', ') || '?';
@@ -1027,7 +1295,7 @@
         }
 
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
-        const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Sorties onglet'];
+        const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'Note auto', 'Note ajustee', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Date', 'Sorties onglet'];
 
         const rows = filteredResults.map(r => {
             const comps = [];
@@ -1044,14 +1312,18 @@
                     comps.push('-');
                 }
             }
+            const displayNote = getDisplayNote(r);
             return [
                 getNomEleve(r.eleveCode) || r.eleveCode,
                 r.eleveCode,
                 r.classe,
+                displayNote !== null ? displayNote : '--',
                 r.note !== null ? r.note : '--',
+                (r.note_ajustee !== null && r.note_ajustee !== undefined) ? r.note_ajustee : '',
                 ...comps,
                 r.publie ? 'Publie' : 'Soumis',
                 r.tempsSecondes,
+                formatDate(r.submittedAt),
                 r.tabSwitchCount
             ].join(';');
         });
