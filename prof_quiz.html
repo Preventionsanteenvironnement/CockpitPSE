@@ -168,6 +168,53 @@
 
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         @keyframes fadeIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+
+        /* Game mode toggle */
+        .game-mode-toggle { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+        .game-mode-btn {
+            flex: 1; min-width: 70px; padding: 6px 4px; border: 2px solid #475569; border-radius: 8px;
+            background: transparent; color: #94a3b8; font-size: 0.7rem; font-weight: 700;
+            cursor: pointer; text-align: center; transition: 0.2s;
+        }
+        .game-mode-btn.active { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.1); }
+        .game-mode-btn:hover { border-color: #f59e0b; }
+
+        /* Teams section */
+        .team-card {
+            background: #0f172a; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+            border-left: 4px solid #475569;
+        }
+        .team-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-weight: 700; font-size: 0.85rem; }
+        .team-card-members { display: flex; flex-wrap: wrap; gap: 4px; }
+        .team-member-badge {
+            font-size: 0.65rem; padding: 2px 6px; border-radius: 4px;
+            background: rgba(255,255,255,0.1); color: #e2e8f0;
+        }
+
+        /* Team scores in main area */
+        .team-score-strip { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+        .team-score-pill {
+            padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 1rem;
+            display: flex; align-items: center; gap: 6px; color: white;
+        }
+        /* Battle tug of war */
+        .tug-container { width: 80%; max-width: 600px; margin: 20px auto; }
+        .tug-labels { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 900; font-size: 1.2rem; }
+        .tug-track { height: 40px; background: #1e293b; border-radius: 20px; overflow: hidden; position: relative; border: 2px solid rgba(255,255,255,0.15); }
+        .tug-fill-a { position: absolute; top: 0; left: 0; height: 100%; background: #3b82f6; transition: width 0.8s ease-out; border-radius: 20px 0 0 20px; }
+        .tug-fill-b { position: absolute; top: 0; right: 0; height: 100%; background: #ef4444; transition: width 0.8s ease-out; border-radius: 0 20px 20px 0; }
+        .tug-score { text-align: center; margin-top: 8px; font-size: 1.5rem; font-weight: 900; }
+
+        /* Team podium in summary */
+        .team-podium { display: flex; gap: 12px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
+        .podium-card {
+            background: #1e293b; border-radius: 12px; padding: 16px 20px; text-align: center;
+            min-width: 120px; border: 2px solid transparent;
+        }
+        .podium-card.gold { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
+        .podium-rank { font-size: 1.5rem; font-weight: 900; }
+        .podium-name { font-size: 0.9rem; font-weight: 700; margin: 4px 0; }
+        .podium-score { font-size: 1.1rem; color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -207,6 +254,31 @@
             <option value="demo">🎮 Questions demo (5 QCM)</option>
         </select>
         <div class="quiz-info" id="quiz-info"></div>
+    </div>
+
+    <!-- Mode de jeu -->
+    <div class="sidebar-section">
+        <label>Mode de jeu</label>
+        <div class="game-mode-toggle">
+            <button class="game-mode-btn active" id="gm-solo" onclick="setGameMode('solo')">👤 Solo</button>
+            <button class="game-mode-btn" id="gm-equipe" onclick="setGameMode('equipe')">👥 Equipe</button>
+            <button class="game-mode-btn" id="gm-battle" onclick="setGameMode('battle')">⚔️ Battle</button>
+            <button class="game-mode-btn" id="gm-duo" onclick="setGameMode('duo')">🤝 Duo</button>
+        </div>
+        <!-- Team formation (hidden by default) -->
+        <div id="team-section" style="display:none;">
+            <div id="team-size-row" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="font-size:0.8rem; color:#94a3b8;">Taille</span>
+                <select id="team-size" class="quiz-select" style="width:auto; flex:1;">
+                    <option value="2">Duos (2)</option>
+                    <option value="3">Trios (3)</option>
+                    <option value="4" selected>Equipes de 4</option>
+                    <option value="5">Equipes de 5</option>
+                </select>
+            </div>
+            <button class="ctrl-btn" style="background:#8b5cf6; color:white;" onclick="formTeams()">🎲 Former les equipes</button>
+            <div id="teams-display" style="margin-top:8px;"></div>
+        </div>
     </div>
 
     <!-- Controles -->
@@ -359,6 +431,151 @@
     let currentPhase = 'lobby';
     let shuffleEnabled = false;
     let autoAdvanceTimer = null; // timer for auto-advance after results
+
+    // === GAME MODE (Solo / Equipe / Battle / Duo) ===
+    let gameMode = 'solo';
+    let teams = [];
+
+    const TEAM_IDENTITIES = [
+        { name: "Requins", emoji: "🦈", color: "#3b82f6" },
+        { name: "Phoenix", emoji: "🔥", color: "#ef4444" },
+        { name: "Pandas", emoji: "🐼", color: "#22c55e" },
+        { name: "Dragons", emoji: "🐉", color: "#f59e0b" },
+        { name: "Loups", emoji: "🐺", color: "#8b5cf6" },
+        { name: "Aigles", emoji: "🦅", color: "#06b6d4" },
+        { name: "Tigres", emoji: "🐯", color: "#f97316" },
+        { name: "Lions", emoji: "🦁", color: "#eab308" }
+    ];
+
+    window.setGameMode = function(mode) {
+        gameMode = mode;
+        teams = [];
+        ['solo','equipe','battle','duo'].forEach(m => {
+            document.getElementById('gm-' + m).className = 'game-mode-btn' + (m === mode ? ' active' : '');
+        });
+        const teamSection = document.getElementById('team-section');
+        const teamSizeRow = document.getElementById('team-size-row');
+        if (mode === 'equipe') {
+            teamSection.style.display = 'block';
+            teamSizeRow.style.display = 'flex';
+        } else if (mode === 'battle') {
+            teamSection.style.display = 'block';
+            teamSizeRow.style.display = 'none'; // battle = always 2 teams
+        } else if (mode === 'duo') {
+            teamSection.style.display = 'block';
+            teamSizeRow.style.display = 'none'; // duo = always pairs
+        } else {
+            teamSection.style.display = 'none';
+        }
+        document.getElementById('teams-display').innerHTML = '';
+    };
+
+    window.formTeams = function() {
+        if (presenceSnapshotData.length < 2) {
+            alert("Il faut au moins 2 eleves connectes !");
+            return;
+        }
+        const shuffled = [...presenceSnapshotData].sort(() => Math.random() - 0.5);
+        teams = [];
+
+        let numTeams, teamSize;
+        if (gameMode === 'battle') {
+            numTeams = 2;
+            teamSize = Math.ceil(shuffled.length / 2);
+        } else if (gameMode === 'duo') {
+            numTeams = Math.ceil(shuffled.length / 2);
+            teamSize = 2;
+        } else {
+            teamSize = parseInt(document.getElementById('team-size').value) || 4;
+            numTeams = Math.ceil(shuffled.length / teamSize);
+        }
+
+        for (let i = 0; i < numTeams; i++) {
+            const identity = TEAM_IDENTITIES[i % TEAM_IDENTITIES.length];
+            teams.push({
+                teamId: 'team_' + i,
+                teamName: gameMode === 'duo' ? 'Duo ' + (i + 1) : (gameMode === 'battle' ? (i === 0 ? 'Equipe Bleue' : 'Equipe Rouge') : identity.name),
+                teamEmoji: gameMode === 'battle' ? (i === 0 ? '🔵' : '🔴') : identity.emoji,
+                teamColor: gameMode === 'battle' ? (i === 0 ? '#3b82f6' : '#ef4444') : identity.color,
+                members: []
+            });
+        }
+
+        // Distribute students round-robin
+        shuffled.forEach((student, idx) => {
+            const teamIdx = idx % numTeams;
+            teams[teamIdx].members.push({
+                visitorId: student.visitorId,
+                pseudo: student.pseudo
+            });
+        });
+
+        // For duo mode, name duos with member pseudos
+        if (gameMode === 'duo') {
+            teams.forEach((t, i) => {
+                const names = t.members.map(m => m.pseudo.split(' ')[0]).join(' + ');
+                t.teamName = names;
+                t.teamEmoji = t.members.length === 2 ? '🤝' : '👥';
+                t.teamColor = TEAM_IDENTITIES[i % TEAM_IDENTITIES.length].color;
+            });
+        }
+
+        renderTeamsInSidebar();
+        // Write teams to config so students and wall can read them
+        if (currentSessionId) {
+            setDoc(doc(db, "quiz_live_config", "global"), { teams: teams, gameMode: gameMode }, { merge: true });
+        }
+    };
+
+    function renderTeamsInSidebar() {
+        const container = document.getElementById('teams-display');
+        container.innerHTML = '';
+        teams.forEach(t => {
+            const card = document.createElement('div');
+            card.className = 'team-card';
+            card.style.borderLeftColor = t.teamColor;
+            const membersHtml = t.members.map(m => '<span class="team-member-badge">' + m.pseudo + '</span>').join('');
+            card.innerHTML = '<div class="team-card-header" style="color:' + t.teamColor + ';">' + t.teamEmoji + ' ' + t.teamName + ' <span style="font-size:0.65rem;color:#64748b;">(' + t.members.length + ')</span></div>' +
+                '<div class="team-card-members">' + membersHtml + '</div>';
+            container.appendChild(card);
+        });
+    }
+
+    function getTeamForVisitor(visitorId) {
+        return teams.find(t => t.members.some(m => m.visitorId === visitorId)) || null;
+    }
+
+    function computeTeamScores(questionIndex) {
+        if (!teams.length) return [];
+        const qResponses = questionIndex >= 0
+            ? responsesData.filter(r => r.questionIndex === questionIndex)
+            : responsesData; // all responses for summary
+
+        return teams.map(t => {
+            const memberIds = t.members.map(m => m.visitorId);
+            const teamResp = qResponses.filter(r => memberIds.includes(r.visitorId));
+            const correct = teamResp.filter(r => r.correct).length;
+            const total = t.members.length;
+            const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+            return { ...t, correct, total, pct, answered: teamResp.length };
+        });
+    }
+
+    function computeTeamCumulativeScores() {
+        if (!teams.length) return [];
+        const maxQ = Math.min(currentQuestionIndex + 1, ACTIVE_QUESTIONS.length);
+        return teams.map(t => {
+            const memberIds = t.members.map(m => m.visitorId);
+            let totalCorrect = 0, totalPossible = 0;
+            for (let i = 0; i < maxQ; i++) {
+                const qResp = responsesData.filter(r => r.questionIndex === i && memberIds.includes(r.visitorId));
+                totalCorrect += qResp.filter(r => r.correct).length;
+                totalPossible += t.members.length;
+            }
+            const pct = totalPossible > 0 ? Math.round((totalCorrect / totalPossible) * 100) : 0;
+            return { ...t, totalCorrect, totalPossible, pct };
+        }).sort((a, b) => b.pct - a.pct);
+    }
 
     // === TOGGLE SHUFFLE ===
     window.toggleShuffle = function() {
@@ -549,6 +766,8 @@
             questions: ACTIVE_QUESTIONS,
             timer: currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-input').value) || 15,
             mode: currentMode,
+            gameMode: gameMode,
+            teams: teams,
             ...overrides
         };
     }
@@ -650,7 +869,9 @@
                 item.className = 'presence-item';
                 const switches = data.tabSwitches || 0;
                 const alertBadge = switches > 0 ? ' <span style="color:#ef4444;font-size:0.7rem;" title="' + switches + ' sortie(s) de page">⚠️' + switches + '</span>' : '';
-                item.innerHTML = '<span class="presence-pseudo">' + data.pseudo + alertBadge + '</span><span class="presence-num">n°' + data.numero + '</span>';
+                const team = getTeamForVisitor(data.visitorId);
+                const teamBadge = team ? '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:' + team.teamColor + ';color:white;margin-left:4px;">' + team.teamEmoji + '</span>' : '';
+                item.innerHTML = '<span class="presence-pseudo">' + data.pseudo + teamBadge + alertBadge + '</span><span class="presence-num">n°' + data.numero + '</span>';
                 list.appendChild(item);
             });
         });
@@ -697,6 +918,10 @@
             paused: false,
             shuffleMap: shuffleMap
         }));
+
+        // Clean up previous team display
+        const oldTeamStrip = document.getElementById('team-results-strip');
+        if (oldTeamStrip) oldTeamStrip.remove();
 
         showMainScreen('question');
         displayQuestion(currentQuestionIndex, timer);
@@ -884,6 +1109,9 @@
         document.getElementById('main-timer').textContent = '✅';
         document.getElementById('main-timer').className = 'main-timer';
 
+        // === TEAM SCORES IN RESULTS ===
+        displayTeamScoresForQuestion();
+
         updateButtons();
 
         // === AUTO-ADVANCE : en mode Auto, passe à la question suivante après 4s ===
@@ -993,6 +1221,21 @@
         const barsContainer = document.getElementById('summary-bars');
         barsContainer.innerHTML = '';
 
+        // Team podium if in team mode
+        if (gameMode !== 'solo' && teams.length > 0) {
+            const cumulative = computeTeamCumulativeScores();
+            let podiumHtml = '<div class="team-podium">';
+            const medals = ['🥇', '🥈', '🥉'];
+            cumulative.forEach((t, i) => {
+                podiumHtml += '<div class="podium-card' + (i === 0 ? ' gold' : '') + '" style="border-color:' + (i === 0 ? t.teamColor : 'transparent') + ';">' +
+                    '<div class="podium-rank">' + (medals[i] || '#' + (i + 1)) + '</div>' +
+                    '<div class="podium-name" style="color:' + t.teamColor + ';">' + t.teamEmoji + ' ' + t.teamName + '</div>' +
+                    '<div class="podium-score">' + t.pct + '%</div></div>';
+            });
+            podiumHtml += '</div>';
+            barsContainer.insertAdjacentHTML('beforebegin', podiumHtml);
+        }
+
         const maxQ = Math.min(currentQuestionIndex + 1, ACTIVE_QUESTIONS.length);
         for (let i = 0; i < maxQ; i++) {
             const qResponses = responsesData.filter(r => r.questionIndex === i);
@@ -1022,6 +1265,51 @@
         const globalPct = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
         document.getElementById('summary-global').textContent = 'Taux de reussite global : ' + globalPct + '%';
         document.getElementById('sidebar-q-info').textContent = 'Quiz termine — ' + globalPct + '% de reussite';
+    }
+
+    // === TEAM SCORE DISPLAY (after each question result) ===
+    function displayTeamScoresForQuestion() {
+        // Remove previous team display
+        const old = document.getElementById('team-results-strip');
+        if (old) old.remove();
+
+        if (gameMode === 'solo' || !teams.length) return;
+
+        const teamScores = computeTeamScores(currentQuestionIndex);
+        const cumulative = computeTeamCumulativeScores();
+        const container = document.createElement('div');
+        container.id = 'team-results-strip';
+        container.style.cssText = 'margin-top:16px; width:100%;';
+
+        if (gameMode === 'battle' && teams.length === 2) {
+            // TUG OF WAR display
+            const a = cumulative.find(t => t.teamId === teams[0].teamId) || { pct: 0 };
+            const b = cumulative.find(t => t.teamId === teams[1].teamId) || { pct: 0 };
+            const qA = teamScores.find(t => t.teamId === teams[0].teamId) || { pct: 0 };
+            const qB = teamScores.find(t => t.teamId === teams[1].teamId) || { pct: 0 };
+            const total = (a.pct + b.pct) || 1;
+            const pctA = Math.round((a.pct / total) * 100);
+
+            container.innerHTML = '<div class="tug-container">' +
+                '<div class="tug-labels"><span style="color:' + teams[0].teamColor + ';">' + teams[0].teamEmoji + ' ' + teams[0].teamName + ' <span style="font-size:0.8rem;">(+' + qA.pct + '%)</span></span>' +
+                '<span style="color:' + teams[1].teamColor + ';">' + teams[1].teamEmoji + ' ' + teams[1].teamName + ' <span style="font-size:0.8rem;">(+' + qB.pct + '%)</span></span></div>' +
+                '<div class="tug-track"><div class="tug-fill-a" style="width:' + pctA + '%;"></div><div class="tug-fill-b" style="width:' + (100 - pctA) + '%;"></div></div>' +
+                '<div class="tug-score">' + a.pct + '% vs ' + b.pct + '%</div></div>';
+        } else {
+            // TEAM SCORE PILLS (equipe / duo)
+            const sorted = [...teamScores].sort((a, b) => b.pct - a.pct);
+            let html = '<div class="team-score-strip">';
+            sorted.forEach(t => {
+                const cum = cumulative.find(c => c.teamId === t.teamId);
+                html += '<div class="team-score-pill" style="background:' + t.teamColor + ';">' +
+                    t.teamEmoji + ' ' + t.teamName + ' <strong>' + t.pct + '%</strong>' +
+                    '<span style="font-size:0.65rem; opacity:0.7;">(cumul: ' + (cum ? cum.pct : 0) + '%)</span></div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        document.getElementById('main-question').appendChild(container);
     }
 
     // === AFFICHAGE ===
