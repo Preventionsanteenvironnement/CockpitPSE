@@ -66,6 +66,16 @@
             margin-bottom: 8px;
         }
 
+        /* Mode toggle */
+        .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+        .mode-btn {
+            flex: 1; padding: 8px; border: none; border-radius: 8px;
+            font-weight: 700; cursor: pointer; font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .mode-btn.active { background: #3b82f6; color: white; }
+        .mode-btn.inactive { background: #1e293b; color: #64748b; border: 1px solid #475569; }
+
         /* Presence list */
         .presence-list { max-height: 200px; overflow-y: auto; }
         .presence-item {
@@ -181,16 +191,29 @@
 
     <!-- Controles -->
     <div class="sidebar-section" id="controls-section">
-        <label>Controles</label>
-        <select class="timer-select" id="timer-select">
-            <option value="10">⏱️ 10 secondes</option>
-            <option value="15" selected>⏱️ 15 secondes</option>
-            <option value="20">⏱️ 20 secondes</option>
-            <option value="30">⏱️ 30 secondes</option>
-        </select>
+        <label>Mode</label>
+        <div class="mode-toggle">
+            <button id="mode-auto" onclick="setMode('auto')" class="mode-btn active">⏱️ Auto</button>
+            <button id="mode-manual" onclick="setMode('manual')" class="mode-btn inactive">✋ Manuel</button>
+        </div>
+        <div id="timer-row">
+            <select class="timer-select" id="timer-select">
+                <option value="10">⏱️ 10 secondes</option>
+                <option value="15" selected>⏱️ 15 secondes</option>
+                <option value="20">⏱️ 20 secondes</option>
+                <option value="30">⏱️ 30 secondes</option>
+            </select>
+        </div>
+        <label style="margin-top:8px;">Actions</label>
         <button class="ctrl-btn ctrl-launch" id="btn-launch" onclick="launchQuestion()">▶️ Lancer le quiz</button>
-        <button class="ctrl-btn ctrl-next" id="btn-next" onclick="nextQuestion()" disabled>⏭️ Question suivante</button>
-        <button class="ctrl-btn ctrl-end" id="btn-end" onclick="endQuiz()" disabled>🏁 Terminer le quiz</button>
+        <button class="ctrl-btn" id="btn-pause" onclick="togglePause()" disabled style="background:#f59e0b; color:white; display:none;">⏸️ Pause</button>
+        <div style="display:flex; gap:6px;">
+            <button class="ctrl-btn" id="btn-prev" onclick="prevQuestion()" disabled style="flex:1; background:#6366f1; color:white;">◀️ Prec.</button>
+            <button class="ctrl-btn ctrl-next" id="btn-next" onclick="nextQuestion()" disabled style="flex:1;">⏭️ Suivante</button>
+        </div>
+        <button class="ctrl-btn" id="btn-results" onclick="showResultsManual()" disabled style="background:#8b5cf6; color:white;">📊 Voir resultats</button>
+        <button class="ctrl-btn" id="btn-restart" onclick="restartQuiz()" disabled style="background:#64748b; color:white;">🔄 Recommencer</button>
+        <button class="ctrl-btn ctrl-end" id="btn-end" onclick="endQuiz()" disabled>🏁 Terminer</button>
     </div>
 
     <!-- Question en cours -->
@@ -294,6 +317,63 @@
     let unsubReponses = null;
     let playerCount = 0;
     let responsesData = [];
+    let currentMode = 'auto'; // 'auto' or 'manual'
+    let isPaused = false;
+    let pausedTimeRemaining = 0;
+    let presenceSnapshotData = [];
+    let currentPhase = 'lobby';
+
+    // === MODE TOGGLE ===
+    window.setMode = function(mode) {
+        currentMode = mode;
+        document.getElementById('mode-auto').className = 'mode-btn ' + (mode === 'auto' ? 'active' : 'inactive');
+        document.getElementById('mode-manual').className = 'mode-btn ' + (mode === 'manual' ? 'active' : 'inactive');
+        document.getElementById('timer-row').style.display = mode === 'auto' ? 'block' : 'none';
+        updateButtons();
+    };
+
+    // === BUTTON STATE MANAGEMENT ===
+    function updateButtons() {
+        const hasSession = !!currentSessionId;
+        const inLobby = currentPhase === 'lobby';
+        const inQuestion = currentPhase === 'question';
+        const inResults = currentPhase === 'results';
+        const inSummary = currentPhase === 'summary';
+        const isManual = currentMode === 'manual';
+        const hasMoreQ = currentQuestionIndex < DEMO_QUESTIONS.length - 1;
+        const quizStarted = currentQuestionIndex >= 0;
+
+        // Lancer : visible in lobby, or as "Suivante" in results
+        document.getElementById('btn-launch').disabled = !hasSession || (!inLobby && !inResults);
+        document.getElementById('btn-launch').textContent = inLobby ? '▶️ Lancer le quiz' : '▶️ Lancer le quiz';
+        if (inResults || inLobby) {
+            document.getElementById('btn-launch').disabled = !hasSession;
+        }
+        if (inQuestion || inSummary) {
+            document.getElementById('btn-launch').disabled = true;
+        }
+
+        // Pause : only during question phase
+        document.getElementById('btn-pause').style.display = (inQuestion || isPaused) ? 'block' : 'none';
+        document.getElementById('btn-pause').disabled = !inQuestion && !isPaused;
+        document.getElementById('btn-pause').textContent = isPaused ? '▶️ Reprendre' : '⏸️ Pause';
+
+        // Previous : only in manual mode or results, and not at Q1
+        document.getElementById('btn-prev').disabled = !(hasSession && currentQuestionIndex > 0 && (isManual || inResults));
+
+        // Next : during results with more questions
+        document.getElementById('btn-next').disabled = !(hasSession && inResults && hasMoreQ);
+
+        // Results (manual) : only in manual mode during question phase
+        document.getElementById('btn-results').style.display = isManual ? 'block' : 'none';
+        document.getElementById('btn-results').disabled = !(inQuestion && !isPaused);
+
+        // Restart : when quiz has started
+        document.getElementById('btn-restart').disabled = !(hasSession && quizStarted);
+
+        // End : when quiz has started
+        document.getElementById('btn-end').disabled = !(hasSession && quizStarted && !inSummary);
+    }
 
     // === OUVRIR L'ÉCRAN ===
     window.openWall = function() {
@@ -301,6 +381,33 @@
         const url = 'wall_quiz.html' + (code ? '?code=' + code : '');
         window.open(url, 'quiz_wall', 'width=1280,height=720');
     };
+
+    // === SHUFFLE MAP (anti-triche) ===
+    function generateShuffleMap() {
+        const map = {};
+        presenceSnapshotData.forEach(p => {
+            // Fisher-Yates shuffle for [0,1,2,3]
+            const arr = [0, 1, 2, 3];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            map[p.visitorId] = arr;
+        });
+        return map;
+    }
+
+    // === HELPER: build config object ===
+    function buildConfig(overrides) {
+        return {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            questions: DEMO_QUESTIONS,
+            timer: currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-select').value),
+            mode: currentMode,
+            ...overrides
+        };
+    }
 
     // === SESSION ===
     function generateSessionId() {
@@ -312,20 +419,20 @@
         currentSessionCode = SESSION_CODES[Math.floor(Math.random() * SESSION_CODES.length)];
         currentQuestionIndex = -1;
         responsesData = [];
+        currentPhase = 'lobby';
+        isPaused = false;
 
         localStorage.setItem('quiz_live_sessionId', currentSessionId);
 
-        // Écrire config
-        await setDoc(doc(db, "quiz_live_config", "global"), {
-            sessionId: currentSessionId,
-            sessionCode: currentSessionCode,
+        // Ecrire config
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'lobby',
             currentQuestionIndex: -1,
-            questions: DEMO_QUESTIONS,
-            timer: parseInt(document.getElementById('timer-select').value),
             isOpen: false,
-            showResults: false
-        });
+            showResults: false,
+            paused: false,
+            shuffleMap: null
+        }));
 
         // UI
         document.getElementById('session-code-display').textContent = currentSessionCode;
@@ -342,11 +449,8 @@
         document.getElementById('main-code').style.display = 'block';
         document.getElementById('main-lobby').querySelector('p').textContent = 'Les eleves rejoignent avec le code :';
 
-        // Buttons
-        document.getElementById('btn-launch').disabled = false;
-        document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
-        document.getElementById('btn-next').disabled = true;
-        document.getElementById('btn-end').disabled = false;
+        showMainScreen('lobby');
+        updateButtons();
 
         // Listeners
         setupListeners();
@@ -355,6 +459,8 @@
     window.resetSession = async function() {
         if (!currentSessionId) return;
         if (!confirm("Effacer toutes les donnees de cette session ?")) return;
+
+        if (timerInterval) clearInterval(timerInterval);
 
         const batch = writeBatch(db);
         for (const col of ['quiz_live_reponses', 'quiz_live_presence']) {
@@ -366,21 +472,21 @@
 
         currentQuestionIndex = -1;
         responsesData = [];
-        await setDoc(doc(db, "quiz_live_config", "global"), {
-            sessionId: currentSessionId,
-            sessionCode: currentSessionCode,
+        currentPhase = 'lobby';
+        isPaused = false;
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'lobby',
             currentQuestionIndex: -1,
-            questions: DEMO_QUESTIONS,
-            timer: parseInt(document.getElementById('timer-select').value),
             isOpen: false,
-            showResults: false
-        });
+            showResults: false,
+            paused: false,
+            shuffleMap: null
+        }));
 
         showMainScreen('lobby');
-        document.getElementById('btn-launch').disabled = false;
-        document.getElementById('btn-launch').textContent = '▶️ Lancer le quiz';
-        document.getElementById('btn-next').disabled = true;
+        document.getElementById('sidebar-q-info').textContent = 'Aucune — Lance le quiz';
+        updateButtons();
     };
 
     // === LISTENERS ===
@@ -396,10 +502,13 @@
             document.getElementById('presence-count').textContent = playerCount;
             document.getElementById('main-counter').textContent = playerCount + ' eleve(s) connecte(s)';
 
+            // Cache presence data for shuffleMap generation
+            presenceSnapshotData = [];
             const list = document.getElementById('presence-list');
             list.innerHTML = '';
             snap.forEach(d => {
                 const data = d.data();
+                presenceSnapshotData.push(data);
                 const item = document.createElement('div');
                 item.className = 'presence-item';
                 const switches = data.tabSwitches || 0;
@@ -434,38 +543,46 @@
             return;
         }
 
-        const timer = parseInt(document.getElementById('timer-select').value);
+        isPaused = false;
+        currentPhase = 'question';
 
-        await setDoc(doc(db, "quiz_live_config", "global"), {
-            sessionId: currentSessionId,
-            sessionCode: currentSessionCode,
+        const timer = currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-select').value);
+        const shuffleMap = generateShuffleMap();
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'question',
             currentQuestionIndex: currentQuestionIndex,
-            questions: DEMO_QUESTIONS,
-            timer: timer,
             isOpen: true,
-            showResults: false
-        });
+            showResults: false,
+            paused: false,
+            shuffleMap: shuffleMap
+        }));
 
         // UI
         showMainScreen('question');
         displayQuestion(currentQuestionIndex, timer);
+        updateButtons();
 
-        document.getElementById('btn-launch').disabled = true;
-        document.getElementById('btn-next').disabled = true;
-        document.getElementById('btn-end').disabled = false;
         document.getElementById('sidebar-q-info').textContent = 'Q' + (currentQuestionIndex + 1) + '/' + DEMO_QUESTIONS.length + ' — En cours...';
 
-        // Timer
-        startProfTimer(timer);
+        // Timer only in auto mode
+        if (currentMode === 'auto') {
+            startProfTimer(timer);
+        } else {
+            // Manual mode: no timer
+            document.getElementById('main-timer').textContent = '✋';
+            document.getElementById('main-timer').className = 'main-timer';
+        }
     };
 
     function displayQuestion(index, timer) {
         const q = DEMO_QUESTIONS[index];
         document.getElementById('main-q-num').textContent = 'Question ' + (index + 1) + ' / ' + DEMO_QUESTIONS.length;
         document.getElementById('main-q-text').textContent = q.question;
-        document.getElementById('main-timer').textContent = timer + 's';
-        document.getElementById('main-timer').className = 'main-timer';
+        if (currentMode === 'auto') {
+            document.getElementById('main-timer').textContent = timer + 's';
+            document.getElementById('main-timer').className = 'main-timer';
+        }
         document.getElementById('main-resp-counter').textContent = '0 / ' + playerCount + ' ont repondu';
 
         const grid = document.getElementById('main-choices');
@@ -488,14 +605,17 @@
     function startProfTimer(seconds) {
         if (timerInterval) clearInterval(timerInterval);
         let remaining = seconds;
+        pausedTimeRemaining = seconds;
         const el = document.getElementById('main-timer');
 
         timerInterval = setInterval(async () => {
             remaining--;
+            pausedTimeRemaining = remaining;
             if (remaining <= 0) {
                 clearInterval(timerInterval);
+                timerInterval = null;
                 el.textContent = '0s';
-                // Fermer les votes et afficher résultats
+                // Fermer les votes et afficher resultats
                 await showResults();
                 return;
             }
@@ -505,21 +625,69 @@
         }, 1000);
     }
 
-    async function showResults() {
-        if (timerInterval) clearInterval(timerInterval);
+    // === PAUSE FUNCTIONALITY ===
+    window.togglePause = async function() {
+        if (isPaused) {
+            // Resume
+            isPaused = false;
 
-        await setDoc(doc(db, "quiz_live_config", "global"), {
-            sessionId: currentSessionId,
-            sessionCode: currentSessionCode,
+            await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+                phase: 'question',
+                currentQuestionIndex: currentQuestionIndex,
+                isOpen: true,
+                showResults: false,
+                paused: false,
+                shuffleMap: null
+            }));
+
+            if (currentMode === 'auto' && pausedTimeRemaining > 0) {
+                startProfTimer(pausedTimeRemaining);
+            }
+
+            currentPhase = 'question';
+            updateButtons();
+            document.getElementById('sidebar-q-info').textContent = 'Q' + (currentQuestionIndex + 1) + '/' + DEMO_QUESTIONS.length + ' — En cours...';
+        } else {
+            // Pause
+            isPaused = true;
+
+            if (currentMode === 'auto' && timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+                phase: 'question',
+                currentQuestionIndex: currentQuestionIndex,
+                isOpen: true,
+                showResults: false,
+                paused: true,
+                shuffleMap: null
+            }));
+
+            document.getElementById('main-timer').textContent = '⏸️';
+            document.getElementById('main-timer').className = 'main-timer warn';
+            document.getElementById('sidebar-q-info').textContent = 'Q' + (currentQuestionIndex + 1) + '/' + DEMO_QUESTIONS.length + ' — En pause';
+            updateButtons();
+        }
+    };
+
+    // === SHOW RESULTS ===
+    async function showResults() {
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        isPaused = false;
+        currentPhase = 'results';
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'results',
             currentQuestionIndex: currentQuestionIndex,
-            questions: DEMO_QUESTIONS,
-            timer: parseInt(document.getElementById('timer-select').value),
             isOpen: false,
-            showResults: true
-        });
+            showResults: true,
+            paused: false,
+            shuffleMap: null
+        }));
 
-        // Calculer résultats
+        // Calculer resultats
         const q = DEMO_QUESTIONS[currentQuestionIndex];
         const currentResponses = responsesData.filter(r => r.questionIndex === currentQuestionIndex);
         const total = currentResponses.length || 1;
@@ -543,36 +711,85 @@
         document.getElementById('main-timer').textContent = '✅';
         document.getElementById('main-timer').className = 'main-timer';
 
-        // Boutons
-        if (currentQuestionIndex < DEMO_QUESTIONS.length - 1) {
-            document.getElementById('btn-next').disabled = false;
-        } else {
-            document.getElementById('btn-next').disabled = true;
-        }
-        document.getElementById('btn-launch').disabled = true;
+        updateButtons();
     }
 
+    // === SHOW RESULTS MANUAL ===
+    window.showResultsManual = async function() {
+        if (currentPhase !== 'question') return;
+        await showResults();
+    };
+
+    // === NEXT QUESTION ===
     window.nextQuestion = function() {
-        document.getElementById('btn-next').disabled = true;
         launchQuestion();
     };
 
-    window.endQuiz = async function() {
-        if (timerInterval) clearInterval(timerInterval);
+    // === PREVIOUS QUESTION ===
+    window.prevQuestion = async function() {
+        if (currentQuestionIndex <= 0) return;
+        currentQuestionIndex -= 2; // will be incremented by launchQuestion
+        await launchQuestion();
+    };
 
-        await setDoc(doc(db, "quiz_live_config", "global"), {
-            sessionId: currentSessionId,
-            sessionCode: currentSessionCode,
+    // === RESTART QUIZ ===
+    window.restartQuiz = async function() {
+        if (!currentSessionId) return;
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+        isPaused = false;
+
+        // Delete all responses for this session
+        const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
+        const snap = await getDocs(qResp);
+        if (snap.size > 0) {
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        currentQuestionIndex = -1;
+        responsesData = [];
+        currentPhase = 'lobby';
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+            phase: 'lobby',
+            currentQuestionIndex: -1,
+            isOpen: false,
+            showResults: false,
+            paused: false,
+            shuffleMap: null
+        }));
+
+        showMainScreen('lobby');
+        document.getElementById('sidebar-q-info').textContent = 'Aucune — Lance le quiz';
+
+        // Keep session info visible
+        document.getElementById('main-code').textContent = currentSessionCode;
+        document.getElementById('main-code').style.display = 'block';
+        document.getElementById('main-lobby').querySelector('p').textContent = 'Les eleves rejoignent avec le code :';
+
+        updateButtons();
+    };
+
+    // === END QUIZ ===
+    window.endQuiz = async function() {
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        isPaused = false;
+        currentPhase = 'summary';
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'summary',
             currentQuestionIndex: currentQuestionIndex,
-            questions: DEMO_QUESTIONS,
-            timer: parseInt(document.getElementById('timer-select').value),
             isOpen: false,
-            showResults: false
-        });
+            showResults: false,
+            paused: false,
+            shuffleMap: null
+        }));
 
         showMainScreen('summary');
         displaySummary();
+        updateButtons();
     };
 
     function displaySummary() {
@@ -609,10 +826,6 @@
         const globalPct = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
         document.getElementById('summary-global').textContent = 'Taux de reussite global : ' + globalPct + '%';
         document.getElementById('sidebar-q-info').textContent = 'Quiz termine — ' + globalPct + '% de reussite';
-
-        // Disable all buttons
-        document.getElementById('btn-launch').disabled = true;
-        document.getElementById('btn-next').disabled = true;
     }
 
     // === AFFICHAGE ===
@@ -622,7 +835,7 @@
         document.getElementById('main-summary').style.display = name === 'summary' ? 'block' : 'none';
     }
 
-    // Prêt — clique "Nouvelle session" pour commencer
+    // Pret -- clique "Nouvelle session" pour commencer
 </script>
 </body>
 </html>
