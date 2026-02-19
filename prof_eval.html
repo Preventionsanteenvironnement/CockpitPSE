@@ -223,6 +223,28 @@
         .note-edit-ok { background: #22c55e; }
         .note-edit-cancel { background: #64748b; }
 
+        /* Delete eval modal buttons */
+        .del-eval-btn {
+            display: block; width: 100%; padding: 14px; margin: 8px 0;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; color: white; transition: 0.2s; text-align: center;
+        }
+        .del-eval-full { background: #dc2626; }
+        .del-eval-full:hover { background: #b91c1c; }
+        .del-eval-keep { background: #f59e0b; color: #000; }
+        .del-eval-keep:hover { background: #d97706; }
+        .del-eval-cancel { background: #475569; }
+        .del-eval-cancel:hover { background: #334155; }
+        .del-eval-info {
+            font-size: 0.8rem; color: #94a3b8; margin: 12px 0; padding: 10px;
+            background: #0f172a; border-radius: 8px; text-align: left;
+        }
+        .del-eval-pdf-link {
+            display: inline-block; margin-top: 12px; font-size: 0.85rem;
+            color: #8b5cf6; cursor: pointer; text-decoration: underline;
+        }
+        .del-eval-pdf-link:hover { color: #a78bfa; }
+
         /* Detail modal */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -410,6 +432,8 @@
             <button class="ab-btn ab-refresh" onclick="refreshResults()">🔄 Actualiser</button>
             <button class="ab-btn ab-publish" id="btn-publish-all" onclick="publishAll()">📢 Publier tout</button>
             <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
+            <button class="ab-btn" style="background:#8b5cf6;" onclick="exportResultsPDF()">📄 PDF</button>
+            <button class="ab-btn" style="background:#dc2626;" onclick="deleteEvaluation()">🗑️ Supprimer eval</button>
         </div>
 
         <!-- Results table -->
@@ -457,6 +481,17 @@
             <button class="modal-close" onclick="closeEvalPreview()">&times;</button>
         </div>
         <div id="modal-eval-body"></div>
+    </div>
+</div>
+
+<!-- Delete eval modal -->
+<div class="modal-overlay" id="modal-delete-eval" onclick="if(event.target===this)closeDeleteModal()">
+    <div class="modal-box" style="max-width:480px;">
+        <div class="modal-header">
+            <h3 id="modal-delete-title">Supprimer l'evaluation</h3>
+            <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        <div id="modal-delete-body"></div>
     </div>
 </div>
 
@@ -1146,7 +1181,7 @@
 
     // Close modals on Escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { closeModal(); closeEvalPreview(); }
+        if (e.key === 'Escape') { closeModal(); closeEvalPreview(); closeDeleteModal(); }
     });
 
     // === PREVIEW EVAL CONTENT ===
@@ -1338,6 +1373,211 @@
         URL.revokeObjectURL(url);
         showToast('CSV exporte !');
     };
+
+    // === EXPORT PDF ===
+    window.exportResultsPDF = function() {
+        if (!currentEvalData) { showToast('Selectionnez une evaluation.'); return; }
+        if (filteredResults.length === 0) { showToast('Aucun resultat a exporter.'); return; }
+
+        const bareme = currentEvalData.bareme || 20;
+        const titre = currentEvalData.titre || 'Evaluation';
+        const now = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        // Stats
+        const notes = filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n));
+        const avg = notes.length > 0 ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1) : '--';
+        const min = notes.length > 0 ? Math.min(...notes).toFixed(1) : '--';
+        const max = notes.length > 0 ? Math.max(...notes).toFixed(1) : '--';
+        const publies = filteredResults.filter(r => r.publie).length;
+
+        // Build table rows
+        let tableRows = '';
+        filteredResults.forEach(r => {
+            const displayNote = getDisplayNote(r);
+            const noteStr = displayNote !== null ? displayNote + '/' + bareme : '--';
+            const adjusted = (r.note_ajustee !== null && r.note_ajustee !== undefined) ? ' (ajuste)' : '';
+            let comps = '';
+            for (let c = 1; c <= 6; c++) {
+                const comp = r.competences['C' + c];
+                if (comp) {
+                    const compPct = comp.max > 0 ? (comp.pts / comp.max) * 100 : 0;
+                    let level = 'NT';
+                    if (compPct >= 80) level = 'M';
+                    else if (compPct >= 50) level = 'A';
+                    else if (compPct > 0) level = 'I';
+                    comps += '<td>' + level + '</td>';
+                } else {
+                    comps += '<td>-</td>';
+                }
+            }
+            const dateStr = formatDate(r.submittedAt);
+            const displayName = getNomEleve(r.eleveCode) ? (getNomEleve(r.eleveCode) + ' (' + r.eleveCode + ')') : r.eleveCode;
+            tableRows += '<tr>' +
+                '<td>' + displayName + '</td>' +
+                '<td>' + r.classe + '</td>' +
+                '<td style="font-weight:bold;">' + noteStr + adjusted + '</td>' +
+                comps +
+                '<td>' + (r.publie ? 'Publie' : 'Soumis') + '</td>' +
+                '<td>' + dateStr + '</td>' +
+                '</tr>';
+        });
+
+        const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Resultats — ' + titre + '</title>' +
+            '<style>' +
+            'body { font-family: Arial, sans-serif; padding: 30px; color: #000; }' +
+            'h1 { font-size: 1.4rem; margin-bottom: 4px; }' +
+            '.meta { font-size: 0.85rem; color: #555; margin-bottom: 16px; }' +
+            '.stats { display: flex; gap: 20px; margin-bottom: 20px; padding: 12px; background: #f5f5f5; border-radius: 8px; font-size: 0.85rem; }' +
+            '.stats strong { color: #000; }' +
+            'table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }' +
+            'th { background: #1e293b; color: white; padding: 8px 6px; text-align: left; font-size: 0.75rem; }' +
+            'td { padding: 6px; border-bottom: 1px solid #ddd; }' +
+            'tr:nth-child(even) { background: #f9f9f9; }' +
+            '@media print { body { padding: 10px; } }' +
+            '</style></head><body>' +
+            '<h1>Resultats : ' + titre + '</h1>' +
+            '<div class="meta">Exporte le ' + now + ' | Bareme : /' + bareme + '</div>' +
+            '<div class="stats">' +
+                '<span><strong>' + filteredResults.length + '</strong> soumis</span>' +
+                '<span>Moyenne : <strong>' + avg + '/' + bareme + '</strong></span>' +
+                '<span>Min : <strong>' + min + '</strong></span>' +
+                '<span>Max : <strong>' + max + '</strong></span>' +
+                '<span><strong>' + publies + '</strong> publies</span>' +
+            '</div>' +
+            '<table><thead><tr>' +
+                '<th>Eleve</th><th>Classe</th><th>Note</th>' +
+                '<th>C1</th><th>C2</th><th>C3</th><th>C4</th><th>C5</th><th>C6</th>' +
+                '<th>Statut</th><th>Date</th>' +
+            '</tr></thead><tbody>' + tableRows + '</tbody></table>' +
+            '<script>window.onload=function(){window.print();}<\/script>' +
+            '</body></html>';
+
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+    };
+
+    // === DELETE EVALUATION ===
+    window.deleteEvaluation = function() {
+        if (!currentEvalId || !currentEvalData) {
+            showToast('Selectionnez une evaluation.');
+            return;
+        }
+
+        const titre = currentEvalData.titre || 'Evaluation';
+        const nbResults = results.length;
+        const nbPublies = results.filter(r => r.publie).length;
+
+        let bodyHtml = '';
+        bodyHtml += '<div class="del-eval-info">';
+        bodyHtml += '<strong>' + titre + '</strong><br>';
+        bodyHtml += nbResults + ' resultat(s) dont ' + nbPublies + ' publie(s)';
+        bodyHtml += '</div>';
+
+        bodyHtml += '<button class="del-eval-btn del-eval-full" onclick="deleteEvalFull()">🗑️ Tout supprimer (eval + resultats eleves)</button>';
+        bodyHtml += '<button class="del-eval-btn del-eval-keep" onclick="deleteEvalKeepResults()">📋 Supprimer eval, garder les notes</button>';
+        bodyHtml += '<button class="del-eval-btn del-eval-cancel" onclick="closeDeleteModal()">Annuler</button>';
+        bodyHtml += '<span class="del-eval-pdf-link" onclick="exportResultsPDF()">📄 Exporter en PDF avant de supprimer</span>';
+
+        document.getElementById('modal-delete-title').textContent = 'Supprimer : ' + titre;
+        document.getElementById('modal-delete-body').innerHTML = bodyHtml;
+        document.getElementById('modal-delete-eval').classList.add('visible');
+    };
+
+    window.closeDeleteModal = function() {
+        document.getElementById('modal-delete-eval').classList.remove('visible');
+    };
+
+    window.deleteEvalFull = async function() {
+        const nbResults = results.length;
+        if (!confirm('ATTENTION : Cela va supprimer l\'evaluation ET tous les resultats de ' + nbResults + ' eleve(s).\n\nCette action est IRREVERSIBLE. Confirmer ?')) return;
+
+        closeDeleteModal();
+        showToast('Suppression en cours...');
+
+        try {
+            // 1. Delete all eval_reponses for this eval
+            const qReponses = query(collection(db, "eval_reponses"), where("evalId", "==", currentEvalId));
+            const reponseSnap = await getDocs(qReponses);
+            const deleteTasks = [];
+            const eleveCodes = new Set();
+
+            reponseSnap.forEach(d => {
+                deleteTasks.push(deleteDoc(doc(db, "eval_reponses", d.id)));
+                const data = d.data();
+                if (data.eleveCode) eleveCodes.add(data.eleveCode);
+            });
+
+            // 2. Delete resultats/{eleveCode}/evaluations/{evalId}_eval for each student
+            eleveCodes.forEach(code => {
+                deleteTasks.push(deleteDoc(doc(db, "resultats", code, "evaluations", currentEvalId + '_eval')));
+            });
+
+            // 3. Delete resultats/{eleveCode}/copies/{evalId}_autoeval for each student
+            eleveCodes.forEach(code => {
+                deleteTasks.push(deleteDoc(doc(db, "resultats", code, "copies", currentEvalId + '_autoeval')));
+            });
+
+            // 4. Delete eval_sessions for this eval
+            const qSessions = query(collection(db, "eval_sessions"), where("evalId", "==", currentEvalId));
+            const sessionSnap = await getDocs(qSessions);
+            sessionSnap.forEach(d => {
+                deleteTasks.push(deleteDoc(doc(db, "eval_sessions", d.id)));
+            });
+
+            // 5. Delete the evaluation itself
+            deleteTasks.push(deleteDoc(doc(db, "eval_banque", currentEvalId)));
+
+            await Promise.all(deleteTasks);
+
+            // 6. Clean up local state
+            resetAfterEvalDelete();
+            showToast('Evaluation et ' + eleveCodes.size + ' resultat(s) supprimes !');
+        } catch(e) {
+            console.error("Erreur suppression totale:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.deleteEvalKeepResults = async function() {
+        if (!confirm('Supprimer l\'evaluation de la banque ?\n\nLes notes des eleves seront conservees dans "Mes Resultats". Confirmer ?')) return;
+
+        closeDeleteModal();
+        showToast('Suppression en cours...');
+
+        try {
+            await deleteDoc(doc(db, "eval_banque", currentEvalId));
+            resetAfterEvalDelete();
+            showToast('Evaluation supprimee (notes conservees)');
+        } catch(e) {
+            console.error("Erreur suppression partielle:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    function resetAfterEvalDelete() {
+        // Remove from local list
+        const idx = allEvals.findIndex(e => e.id === currentEvalId);
+        if (idx > -1) allEvals.splice(idx, 1);
+
+        // Reset current state
+        currentEvalId = null;
+        currentEvalData = null;
+        results = [];
+        filteredResults = [];
+
+        // Re-render UI
+        buildSidebarFilters();
+        renderEvalSelector();
+        renderEvalSidebarList();
+        document.getElementById('eval-title-display').textContent = 'Evaluation';
+        document.getElementById('results-tbody').innerHTML = '<tr><td colspan="13"><div class="table-empty"><div class="te-icon">📭</div><p>Selectionnez une evaluation dans la sidebar.</p></div></td></tr>';
+        document.getElementById('stat-soumis').textContent = '0';
+        document.getElementById('stat-moyenne').textContent = '--';
+        document.getElementById('stat-min').textContent = '--';
+        document.getElementById('stat-max').textContent = '--';
+        document.getElementById('stat-publies').textContent = '0';
+    }
 
     // === SESSION MANAGEMENT (synchronized mode) ===
     window.createSession = async function() {
