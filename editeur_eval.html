@@ -99,6 +99,17 @@
         .form-row { display: flex; gap: 12px; }
         .form-row > * { flex: 1; }
 
+        /* Class pills */
+        .classes-pills-container { display: flex; flex-wrap: wrap; gap: 6px; }
+        .class-pill {
+            padding: 5px 14px; border-radius: 20px; border: 2px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer; font-size: 0.8rem;
+            font-weight: 600; transition: all 0.2s; user-select: none;
+        }
+        .class-pill:hover { border-color: #3b82f6; color: #e2e8f0; }
+        .class-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .class-pill.pill-all { font-style: italic; }
+
         /* Meta section */
         .meta-card {
             background: #1e293b; border-radius: 12px; padding: 20px;
@@ -287,6 +298,12 @@
             cursor: pointer; transition: 0.2s;
         }
         .btn-publish-eval:hover { background: #16a34a; }
+        .btn-unpublish-eval {
+            padding: 14px 24px; background: #f59e0b; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-unpublish-eval:hover { background: #d97706; }
         .btn-delete-eval {
             padding: 14px 20px; background: #7f1d1d; color: #fca5a5;
             border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
@@ -390,7 +407,7 @@
             .add-btns { gap:8px; }
             .add-btn { min-width:calc(50% - 8px); }
             .bottom-actions { flex-direction:column; gap:8px; }
-            .btn-save-eval, .btn-publish-eval, .btn-delete-eval { width:100%; text-align:center; }
+            .btn-save-eval, .btn-publish-eval, .btn-unpublish-eval, .btn-delete-eval { width:100%; text-align:center; }
             .q-card { padding:12px; }
             .q-form { padding:14px; }
             .bareme-toggle { flex-wrap:wrap; }
@@ -446,19 +463,17 @@
                 <label>Titre *</label>
                 <input type="text" class="form-input" id="eval-titre" placeholder="Ex: Evaluation Module A2 Le sommeil">
             </div>
-            <div class="form-row" style="margin-bottom:12px;">
-                <div class="form-group">
-                    <label>Classe</label>
-                    <select class="form-select" id="eval-classe">
-                        <option value="">— Toutes les classes —</option>
-                    </select>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Classe(s)</label>
+                <div id="eval-classes-container" class="classes-pills-container">
+                    <!-- Pills generated dynamically -->
                 </div>
-                <div class="form-group">
-                    <label>Module</label>
-                    <select class="form-select" id="eval-module" disabled>
-                        <option value="">— Choisir une classe d'abord —</option>
-                    </select>
-                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Module</label>
+                <select class="form-select" id="eval-module" disabled>
+                    <option value="">— Choisir une classe d'abord —</option>
+                </select>
             </div>
             <div class="form-row" style="margin-bottom:12px;">
                 <div class="form-group">
@@ -754,7 +769,8 @@
         <!-- Save / Publish / Delete -->
         <div class="bottom-actions">
             <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
-            <button class="btn-publish-eval" onclick="publishEval()">📢 Publier</button>
+            <button class="btn-publish-eval" id="btn-publish" onclick="publishEval()">📢 Publier</button>
+            <button class="btn-unpublish-eval" id="btn-unpublish" onclick="unpublishEval()" style="display:none;">⏸️ Depublier</button>
             <button class="btn-save-eval" id="btn-duplicate-eval" onclick="duplicateCurrentEval()" style="display:none; background:#f59e0b; color:#000;">📋 Dupliquer</button>
             <button class="btn-delete-eval" id="btn-delete-eval" onclick="deleteEval()" style="display:none;">🗑️ Supprimer</button>
         </div>
@@ -826,57 +842,139 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     // === POPULATE CLASSE DROPDOWN ===
-    function populateClasses() {
-        const sel = document.getElementById('eval-classe');
+    // === CLASS PILLS ===
+    function renderClassPills() {
+        const container = document.getElementById('eval-classes-container');
+        container.innerHTML = '';
         const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+
+        // "Toutes les classes" pill
+        const allPill = document.createElement('span');
+        allPill.className = 'class-pill pill-all active';
+        allPill.dataset.classeId = '';
+        allPill.textContent = 'Toutes les classes';
+        allPill.onclick = () => toggleClassPill(allPill);
+        container.appendChild(allPill);
+
         classes.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = c.label + ' (' + c.niveau.replace(/_/g, ' ') + ')';
-            sel.appendChild(opt);
+            const pill = document.createElement('span');
+            pill.className = 'class-pill';
+            pill.dataset.classeId = c.id;
+            pill.textContent = c.label;
+            pill.title = c.niveau.replace(/_/g, ' ');
+            pill.onclick = () => toggleClassPill(pill);
+            container.appendChild(pill);
         });
     }
-    populateClasses();
 
-    // === CLASSE -> MODULE DYNAMIC ===
-    document.getElementById('eval-classe').addEventListener('change', function() {
-        const classeId = this.value;
+    function toggleClassPill(el) {
+        const isAllPill = el.dataset.classeId === '';
+        const container = document.getElementById('eval-classes-container');
+        const allPills = container.querySelectorAll('.class-pill');
+        const allPillEl = container.querySelector('.pill-all');
+
+        if (isAllPill) {
+            // Clicking "Toutes" -> deselect others, activate "Toutes"
+            allPills.forEach(p => p.classList.remove('active'));
+            allPillEl.classList.add('active');
+        } else {
+            // Clicking a class -> toggle it, deselect "Toutes"
+            el.classList.toggle('active');
+            allPillEl.classList.remove('active');
+
+            // If no class selected -> reactivate "Toutes"
+            const activeClasses = container.querySelectorAll('.class-pill.active:not(.pill-all)');
+            if (activeClasses.length === 0) {
+                allPillEl.classList.add('active');
+            }
+        }
+
+        // Update module dropdown
+        updateModuleFromPills();
+    }
+
+    function getSelectedClasseIds() {
+        const container = document.getElementById('eval-classes-container');
+        const allPillEl = container.querySelector('.pill-all');
+        if (allPillEl && allPillEl.classList.contains('active')) return [];
+
+        const ids = [];
+        container.querySelectorAll('.class-pill.active:not(.pill-all)').forEach(p => {
+            ids.push(p.dataset.classeId);
+        });
+        return ids;
+    }
+
+    function setClassPillsActive(ids) {
+        const container = document.getElementById('eval-classes-container');
+        const allPills = container.querySelectorAll('.class-pill');
+        allPills.forEach(p => p.classList.remove('active'));
+
+        if (!ids || ids.length === 0) {
+            container.querySelector('.pill-all').classList.add('active');
+        } else {
+            ids.forEach(id => {
+                const pill = container.querySelector('.class-pill[data-classe-id="' + id + '"]');
+                if (pill) pill.classList.add('active');
+            });
+        }
+        updateModuleFromPills();
+    }
+
+    function resetClassPills() {
+        setClassPillsActive([]);
+    }
+
+    function updateModuleFromPills() {
+        const ids = getSelectedClasseIds();
         const modSel = document.getElementById('eval-module');
         modSel.innerHTML = '';
 
-        if (!classeId) {
-            modSel.disabled = true;
-            modSel.innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
+        if (ids.length === 0) {
+            // "Toutes les classes" or none -> module disabled with "Aucun module" option
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
             populateCompetenceDropdowns(null);
             return;
         }
 
-        modSel.disabled = false;
-        modSel.innerHTML = '<option value="">— Aucun module —</option>';
+        if (ids.length === 1) {
+            // Single class -> load its modules
+            const classeId = ids[0];
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
 
-        const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
-        const firstClass = classesInGroup[0];
-        const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [];
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const firstClass = classesInGroup[0];
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [];
 
-        let currentTheme = '';
-        modules.forEach(m => {
-            if (m.theme !== currentTheme) {
-                currentTheme = m.theme;
-                const optGroup = document.createElement('optgroup');
-                optGroup.label = 'Theme ' + m.theme;
-                modSel.appendChild(optGroup);
-            }
-            const opt = document.createElement('option');
-            opt.value = m.id;
-            opt.textContent = m.id + ' — ' + m.titre;
-            const lastGroup = modSel.querySelector('optgroup:last-of-type');
-            if (lastGroup) lastGroup.appendChild(opt);
-            else modSel.appendChild(opt);
-        });
+            let currentTheme = '';
+            modules.forEach(m => {
+                if (m.theme !== currentTheme) {
+                    currentTheme = m.theme;
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = 'Theme ' + m.theme;
+                    modSel.appendChild(optGroup);
+                }
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.id + ' — ' + m.titre;
+                const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                if (lastGroup) lastGroup.appendChild(opt);
+                else modSel.appendChild(opt);
+            });
 
-        // Update competence dropdowns based on class niveau
-        populateCompetenceDropdowns(classeId);
-    });
+            populateCompetenceDropdowns(classeId);
+        } else {
+            // Multiple classes -> module disabled
+            modSel.disabled = true;
+            modSel.innerHTML = '<option value="">— Plusieurs classes (pas de module) —</option>';
+            // Use first class for competences
+            populateCompetenceDropdowns(ids[0]);
+        }
+    }
+
+    renderClassPills();
 
     // === COMPETENCE DROPDOWNS ===
     function populateCompetenceDropdowns(classeId) {
@@ -1257,7 +1355,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 : '<span class="ei-badge badge-draft">Brouillon</span>';
             const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
             const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
-            const classInfo = ev.classeId || 'Toutes';
+            const classIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+            const classInfo = classIds.length > 0 ? classIds.join(', ') : 'Toutes';
 
             div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
                 '<div class="ei-meta">' + pubBadge + qCountBadge + baremeBadge + ' ' + classInfo + '</div>' +
@@ -1339,15 +1438,16 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         currentModeEval = 'libre';
 
         document.getElementById('eval-titre').value = '';
-        document.getElementById('eval-classe').value = '';
-        document.getElementById('eval-module').innerHTML = '<option value="">— Choisir une classe d\'abord —</option>';
-        document.getElementById('eval-module').disabled = true;
+        resetClassPills();
+        document.getElementById('eval-module').innerHTML = '<option value="">— Aucun module —</option>';
+        document.getElementById('eval-module').disabled = false;
         document.getElementById('eval-timer').value = '0';
         setBareme(20);
         setModeEval('libre');
         document.getElementById('btn-delete-eval').style.display = 'none';
         document.getElementById('btn-duplicate-eval').style.display = 'none';
         document.getElementById('validation-banner').style.display = 'none';
+        updatePublishButtons(false);
         hideAddForm();
         hideDocForm();
         updateDocRefDropdowns();
@@ -1371,8 +1471,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         currentModeEval = ev.mode || 'libre';
 
         document.getElementById('eval-titre').value = ev.titre || '';
-        document.getElementById('eval-classe').value = ev.classeId || '';
-        document.getElementById('eval-classe').dispatchEvent(new Event('change'));
+        const loadedClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+        setClassPillsActive(loadedClasseIds);
         setTimeout(() => {
             document.getElementById('eval-module').value = ev.moduleId || '';
         }, 100);
@@ -1384,6 +1484,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('btn-delete-eval').style.display = 'block';
         document.getElementById('btn-duplicate-eval').style.display = 'block';
         document.getElementById('validation-banner').style.display = 'none';
+        updatePublishButtons(ev.publie === true);
         hideAddForm();
         hideDocForm();
         updateDocRefDropdowns();
@@ -1776,7 +1877,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (!titre) { alert('Donne un titre a l\'evaluation !'); return; }
         if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
 
-        const classeId = document.getElementById('eval-classe').value || null;
+        const classeIds = getSelectedClasseIds();
+        const classeId = classeIds.length > 0 ? classeIds[0] : null; // backward compat
         const moduleId = document.getElementById('eval-module').value || null;
         let niveau = null;
         if (classeId) {
@@ -1787,6 +1889,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const evalData = {
             titre,
             classeId,
+            classeIds,
             moduleId,
             niveau,
             bareme: currentBareme,
@@ -1842,9 +1945,39 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             await setDoc(doc(db, "eval_banque", currentEvalId), { publie: true }, { merge: true });
             showToast('Evaluation publiee ! Les eleves peuvent y acceder.');
             banner.style.display = 'none';
+            updatePublishButtons(true);
             renderEvalList();
         }
     };
+
+    // === UNPUBLISH EVAL ===
+    window.unpublishEval = async function() {
+        if (!currentEvalId) return;
+        if (!confirm('Depublier cette evaluation ? Les eleves ne la verront plus.')) return;
+
+        try {
+            await setDoc(doc(db, "eval_banque", currentEvalId), { publie: false }, { merge: true });
+            showToast('Evaluation depubliee. Les eleves ne la voient plus.');
+            updatePublishButtons(false);
+            renderEvalList();
+        } catch(e) {
+            console.error("Erreur depublication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === UPDATE PUBLISH/UNPUBLISH BUTTONS ===
+    function updatePublishButtons(isPublished) {
+        const btnPublish = document.getElementById('btn-publish');
+        const btnUnpublish = document.getElementById('btn-unpublish');
+        if (isPublished) {
+            btnPublish.style.display = 'none';
+            btnUnpublish.style.display = '';
+        } else {
+            btnPublish.style.display = '';
+            btnUnpublish.style.display = 'none';
+        }
+    }
 
     // === DELETE EVAL ===
     window.deleteEval = async function() {
