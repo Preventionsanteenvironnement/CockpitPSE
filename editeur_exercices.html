@@ -1019,19 +1019,16 @@
             document.getElementById('ec-questions').innerHTML = '';
             (contenu.questions || []).forEach(q => addEtudeCasQuestion(q));
         } else if (type === 'pad') {
+            document.getElementById('pad-titre').value = contenu.titre || '';
             document.getElementById('pad-situation').value = contenu.situation || '';
             document.getElementById('pad-danger').value = contenu.danger || '';
-            document.getElementById('pad-dist-danger').value = (contenu.distracteurs_danger || []).join(', ');
+            document.getElementById('pad-dist-danger').value = (contenu.distracteurs_danger || []).join(' | ');
             document.getElementById('pad-sitdang').value = contenu.situation_dangereuse || '';
-            document.getElementById('pad-dist-sitdang').value = (contenu.distracteurs_situation_dangereuse || []).join(', ');
+            document.getElementById('pad-dist-sitdang').value = (contenu.distracteurs_situation_dangereuse || []).join(' | ');
             document.getElementById('pad-event').value = contenu.evenement_declencheur || '';
-            document.getElementById('pad-dist-event').value = (contenu.distracteurs_evenement_declencheur || []).join(', ');
+            document.getElementById('pad-dist-event').value = (contenu.distracteurs_evenement_declencheur || []).join(' | ');
             document.getElementById('pad-dommage').value = contenu.dommage || '';
-            document.getElementById('pad-dist-dommage').value = (contenu.distracteurs_dommage || []).join(', ');
-            document.getElementById('pad-type-risque').value = contenu.type_risque || 'accident';
-            document.getElementById('pad-gravite').value = contenu.gravite || 3;
-            document.getElementById('pad-probabilite').value = contenu.probabilite || 3;
-            document.getElementById('pad-mesures').value = contenu.mesures_prevention || '';
+            document.getElementById('pad-dist-dommage').value = (contenu.distracteurs_dommage || []).join(' | ');
         }
     }
 
@@ -1060,6 +1057,7 @@
         document.getElementById('ec-consigne').value = 'Lisez le cas et repondez aux questions';
         document.getElementById('ec-scenario').value = '';
         document.getElementById('ec-questions').innerHTML = '';
+        document.getElementById('pad-titre').value = '';
         document.getElementById('pad-situation').value = '';
         document.getElementById('pad-danger').value = '';
         document.getElementById('pad-dist-danger').value = '';
@@ -1069,10 +1067,6 @@
         document.getElementById('pad-dist-event').value = '';
         document.getElementById('pad-dommage').value = '';
         document.getElementById('pad-dist-dommage').value = '';
-        document.getElementById('pad-type-risque').value = 'accident';
-        document.getElementById('pad-gravite').value = '3';
-        document.getElementById('pad-probabilite').value = '3';
-        document.getElementById('pad-mesures').value = '';
     }
 
     // ========== SIDEBAR LIST ==========
@@ -1171,6 +1165,38 @@
             niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
         }
         const contenu = getContenuFromForm();
+        // === VALIDATION PAD ===
+        if (type === 'pad') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre PAD est obligatoire');
+            if (!c.situation || c.situation.length < 20) errors.push('La situation doit faire au moins 20 caracteres');
+            if (c.situation && c.situation.length > 500) errors.push('La situation depasse 500 caracteres');
+            const fields = [
+                { key: 'danger', label: 'Danger', maxLen: 80 },
+                { key: 'situation_dangereuse', label: 'Situation dangereuse', maxLen: 120 },
+                { key: 'evenement_declencheur', label: 'Evenement declencheur', maxLen: 120 },
+                { key: 'dommage', label: 'Dommage', maxLen: 120 }
+            ];
+            fields.forEach(f => {
+                if (!c[f.key]) errors.push(f.label + ' est obligatoire');
+                if (c[f.key] && c[f.key].length > f.maxLen) errors.push(f.label + ' depasse ' + f.maxLen + ' caracteres');
+                const distKey = 'distracteurs_' + f.key;
+                if (!c[distKey] || c[distKey].length !== 3) errors.push(f.label + ' : il faut exactement 3 distracteurs (separes par |)');
+                if (c[distKey]) {
+                    c[distKey].forEach((d, i) => {
+                        if (d.length > 80) errors.push(f.label + ' distracteur ' + (i+1) + ' depasse 80 caracteres');
+                        if (d.toLowerCase() === (c[f.key] || '').toLowerCase()) errors.push(f.label + ' distracteur ' + (i+1) + ' identique a la bonne reponse');
+                    });
+                    const unique = new Set(c[distKey].map(d => d.toLowerCase()));
+                    if (unique.size < c[distKey].length) errors.push(f.label + ' : les distracteurs doivent etre tous differents');
+                }
+            });
+            if (errors.length > 0) {
+                showToast('⚠️ ' + errors[0]);
+                return;
+            }
+        }
         const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
@@ -1238,7 +1264,7 @@
         qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "questions": [{ "image": "", "question": "...", "choix": ["A","B","C","D"], "correct": 0, "explication": "..." }] }\nLaisse image vide. 3 a 5 questions.\nATTENTION : "correct" est un index 0-based. Pour 4 choix, les index valides sont 0, 1, 2, 3.',
         tableau: 'Genere un exercice "tableau" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "colonnes": ["Col1","Col2"], "lignes": [{ "cellules": ["val", "{{trou}}"] }] }\nCellules entre {{ }} = trous. 4-6 lignes, 3-4 colonnes.',
         etude_cas: 'Genere une "etude de cas" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "scenario": "...", "questions": [{ "question": "...", "type": "qcm", "choix": ["A","B"], "correct": 0 }, { "question": "...", "type": "texte", "reponse": "..." }] }\n3 a 5 questions.',
-        pad: 'Genere un exercice PAD (Processus d\'Apparition du Dommage) pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes).\nFormat :\n{\n  "situation": "...",\n  "danger": "...",\n  "distracteurs_danger": ["dist1", "dist2", "dist3"],\n  "situation_dangereuse": "...",\n  "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],\n  "evenement_declencheur": "...",\n  "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],\n  "dommage": "...",\n  "distracteurs_dommage": ["dist1", "dist2", "dist3"],\n  "type_risque": "accident" ou "maladie_pro",\n  "gravite": 1-4,\n  "probabilite": 1-4,\n  "mesures_prevention": "mesure1, mesure2, mesure3"\n}\nLes distracteurs doivent etre credibles mais incorrects pour cette situation precise. 3 distracteurs par champ.'
+        pad: 'Genere un exercice PAD (Processus d\'Apparition du Dommage) pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes, max 500 caracteres).\nFormat STRICT :\n{\n  "titre": "PAD - [metier/situation]",\n  "situation": "...",\n  "danger": "..." (max 80 car),\n  "distracteurs_danger": ["dist1", "dist2", "dist3"],\n  "situation_dangereuse": "..." (max 120 car),\n  "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],\n  "evenement_declencheur": "..." (max 120 car),\n  "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],\n  "dommage": "..." (max 120 car),\n  "distracteurs_dommage": ["dist1", "dist2", "dist3"]\n}\nREGLES :\n- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)\n- Distracteurs credibles dans le meme univers professionnel mais faux pour CETTE situation\n- Distracteurs tous differents entre eux et differents de la bonne reponse\n- Chaque distracteur max 80 caracteres\n- Vocabulaire simple adapte a des eleves de Bac Pro\n- Coherence PAD : Danger → exposition = Situation dangereuse → bascule = Evenement declencheur → consequence = Dommage'
     };
 
     window.openImportModal = function() {
