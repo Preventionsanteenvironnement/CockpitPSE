@@ -736,6 +736,34 @@
         updateModuleFromPills();
     }
 
+    function populateModuleDropdown(modSel, classeId) {
+        modSel.disabled = false;
+        modSel.innerHTML = '<option value="">— Aucun module —</option>';
+        const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+        const firstClass = classesInGroup[0];
+        const groups = window.getModulesForRevision
+            ? window.getModulesForRevision(firstClass)
+            : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+        const isMultiYear = groups.length > 1;
+        groups.forEach(group => {
+            let currentTheme = '';
+            group.modules.forEach(m => {
+                if (m.theme !== currentTheme) {
+                    currentTheme = m.theme;
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = isMultiYear ? group.niveauLabel + ' — Theme ' + m.theme : 'Theme ' + m.theme;
+                    modSel.appendChild(optGroup);
+                }
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.id + ' — ' + m.titre;
+                const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                if (lastGroup) lastGroup.appendChild(opt);
+                else modSel.appendChild(opt);
+            });
+        });
+    }
+
     function updateModuleFromPills() {
         const ids = getSelectedClasseIds();
         const modSel = document.getElementById('exo-module');
@@ -745,48 +773,43 @@
             modSel.innerHTML = '<option value="">— Aucun module —</option>';
             return;
         }
-        if (ids.length === 1) {
-            const classeId = ids[0];
-            modSel.disabled = false;
-            modSel.innerHTML = '<option value="">— Aucun module —</option>';
-            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
-            const firstClass = classesInGroup[0];
-            const groups = window.getModulesForRevision
-                ? window.getModulesForRevision(firstClass)
-                : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
-            const isMultiYear = groups.length > 1;
-            groups.forEach(group => {
-                let currentTheme = '';
-                group.modules.forEach(m => {
-                    if (m.theme !== currentTheme) {
-                        currentTheme = m.theme;
-                        const optGroup = document.createElement('optgroup');
-                        optGroup.label = isMultiYear ? group.niveauLabel + ' — Theme ' + m.theme : 'Theme ' + m.theme;
-                        modSel.appendChild(optGroup);
-                    }
-                    const opt = document.createElement('option');
-                    opt.value = m.id;
-                    opt.textContent = m.id + ' — ' + m.titre;
-                    const lastGroup = modSel.querySelector('optgroup:last-of-type');
-                    if (lastGroup) lastGroup.appendChild(opt);
-                    else modSel.appendChild(opt);
-                });
-            });
+        // Verifier si toutes les classes partagent le meme niveau
+        const niveauxSet = new Set();
+        ids.forEach(id => {
+            const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(id) : [id];
+            const niv = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
+            if (niv) niveauxSet.add(niv);
+        });
+        if (niveauxSet.size === 1) {
+            // Meme niveau → activer dropdown et remplir avec les modules partages
+            populateModuleDropdown(modSel, ids[0]);
         } else {
+            // Niveaux differents → desactiver
             modSel.disabled = true;
-            modSel.innerHTML = '<option value="">— Plusieurs classes —</option>';
+            modSel.innerHTML = '<option value="">— Niveaux différents —</option>';
         }
     }
 
     renderClassPills();
 
     // ========== TYPE CHANGE ==========
+    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque'];
+
     window.onTypeChange = function() {
         const type = document.getElementById('exo-type').value;
         document.querySelectorAll('.content-type-section').forEach(s => s.classList.remove('active'));
         const section = document.getElementById('ct-' + type);
         if (section) section.classList.add('active');
         document.getElementById('content-title').textContent = 'Contenu — ' + (TYPE_LABELS[type] || type);
+        // Auto-set TRANSVERSAL pour PAD, Prevention, Estimation du risque
+        const modSel = document.getElementById('exo-module');
+        if (TRANSVERSAL_TYPES.includes(type)) {
+            modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
+            modSel.value = 'TRANSVERSAL';
+            modSel.disabled = true;
+        } else if (modSel.disabled && modSel.value === 'TRANSVERSAL') {
+            updateModuleFromPills();
+        }
     };
 
     // ========== PREVIEW TEXTE A TROUS ==========
