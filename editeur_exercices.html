@@ -997,6 +997,22 @@
         allExercices = [];
         snap.forEach(d => { allExercices.push({ id: d.id, ...d.data() }); });
         renderExoList();
+        console.log("✅ Exercices charges:", allExercices.length);
+    }, (error) => {
+        console.warn("⚠️ orderBy echoue, fallback sans tri:", error.message);
+        // Fallback : charger sans orderBy (evite le besoin d'un index composite)
+        const qFallback = collection(db, "exercices_banque");
+        onSnapshot(qFallback, (snap2) => {
+            allExercices = [];
+            snap2.forEach(d => { allExercices.push({ id: d.id, ...d.data() }); });
+            allExercices.sort((a, b) => {
+                const ta = a.updatedAt ? (a.updatedAt.seconds || 0) : 0;
+                const tb = b.updatedAt ? (b.updatedAt.seconds || 0) : 0;
+                return tb - ta;
+            });
+            renderExoList();
+            console.log("✅ Exercices charges (fallback):", allExercices.length);
+        });
     });
 
     // ========== NEW / LOAD / SAVE / PUBLISH / DELETE ==========
