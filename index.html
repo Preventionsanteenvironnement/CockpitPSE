@@ -2496,14 +2496,17 @@ QN80,Wael HWORI</pre>
     // Load Foucher pack (Prevention + PAD)
     window.loadPackFoucher = async function() {
         try {
-            const [respPrev, respPad] = await Promise.all([
+            const [respPrev, respPad, respEst] = await Promise.all([
                 fetch('bibliotheque_prevention.json'),
-                fetch('bibliotheque_pad.json')
+                fetch('bibliotheque_pad.json'),
+                fetch('bibliotheque_estimation.json')
             ]);
             if (!respPrev.ok) throw new Error('Fichier prevention non trouvé');
             if (!respPad.ok) throw new Error('Fichier PAD non trouvé');
+            if (!respEst.ok) throw new Error('Fichier estimation non trouvé');
             const prevItems = await respPrev.json();
             const padItems = await respPad.json();
+            const estItems = await respEst.json();
 
             // Deduplication par titre (tous types confondus)
             const existingTitres = new Set(allBiblioItems.map(i => i.titre));
@@ -2541,7 +2544,23 @@ QN80,Wael HWORI</pre>
                 await new Promise(r => setTimeout(r, 50));
             }
 
-            showToast('📦 ' + added + ' exercice(s) ajouté(s) (Prevention + PAD) !');
+            // Estimation du risque exercises
+            for (const item of estItems) {
+                if (existingTitres.has(item.titre)) continue;
+                const newId = 'bib_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                await setDoc(doc(db, 'bibliotheque', newId), {
+                    categorie: 'exercice',
+                    type: 'estimation_risque',
+                    moduleId: null,
+                    titre: item.titre,
+                    contenu: item,
+                    createdAt: serverTimestamp()
+                });
+                added++;
+                await new Promise(r => setTimeout(r, 50));
+            }
+
+            showToast('📦 ' + added + ' exercice(s) ajouté(s) (Prevention + PAD + Estimation) !');
         } catch(e) {
             showToast('❌ Erreur : ' + e.message);
         }
