@@ -939,29 +939,39 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
 
         if (ids.length === 1) {
-            // Single class -> load its modules
+            // Single class -> load its modules (revision-aware for Bac Pro)
             const classeId = ids[0];
             modSel.disabled = false;
             modSel.innerHTML = '<option value="">— Aucun module —</option>';
 
             const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
             const firstClass = classesInGroup[0];
-            const modules = window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [];
 
-            let currentTheme = '';
-            modules.forEach(m => {
-                if (m.theme !== currentTheme) {
-                    currentTheme = m.theme;
-                    const optGroup = document.createElement('optgroup');
-                    optGroup.label = 'Theme ' + m.theme;
-                    modSel.appendChild(optGroup);
-                }
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = m.id + ' — ' + m.titre;
-                const lastGroup = modSel.querySelector('optgroup:last-of-type');
-                if (lastGroup) lastGroup.appendChild(opt);
-                else modSel.appendChild(opt);
+            // Use revision-aware function (shows all cursus years for Bac Pro)
+            const groups = window.getModulesForRevision
+                ? window.getModulesForRevision(firstClass)
+                : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+
+            const isMultiYear = groups.length > 1;
+
+            groups.forEach(group => {
+                let currentTheme = '';
+                group.modules.forEach(m => {
+                    if (m.theme !== currentTheme) {
+                        currentTheme = m.theme;
+                        const optGroup = document.createElement('optgroup');
+                        optGroup.label = isMultiYear
+                            ? group.niveauLabel + ' — Theme ' + m.theme
+                            : 'Theme ' + m.theme;
+                        modSel.appendChild(optGroup);
+                    }
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.id + ' — ' + m.titre;
+                    const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                    if (lastGroup) lastGroup.appendChild(opt);
+                    else modSel.appendChild(opt);
+                });
             });
 
             populateCompetenceDropdowns(classeId);

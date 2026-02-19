@@ -280,6 +280,45 @@ window.getModulesForClasse = function(classeId) {
 };
 
 /**
+ * Modules revision Bac Pro : pour Premiere → Seconde + Premiere, pour Terminale → tout le cursus
+ */
+window.BAC_PRO_REVISION_MAP = {
+    "BAC_PRO_1ERE": ["BAC_PRO_2NDE", "BAC_PRO_1ERE"],
+    "BAC_PRO_TERM": ["BAC_PRO_2NDE", "BAC_PRO_1ERE", "BAC_PRO_TERM"]
+};
+
+window.BAC_PRO_NIVEAU_LABELS = {
+    "BAC_PRO_2NDE": "Seconde Bac Pro",
+    "BAC_PRO_1ERE": "Premiere Bac Pro",
+    "BAC_PRO_TERM": "Terminale Bac Pro"
+};
+
+/**
+ * Obtenir les modules groupes par annee pour revision
+ * Retourne: [{ niveauKey, niveauLabel, modules: [] }, ...]
+ */
+window.getModulesForRevision = function(classeId) {
+    const niveau = window.getNiveauClasse(classeId);
+    if (!niveau) return [];
+
+    const niveauxToLoad = window.BAC_PRO_REVISION_MAP[niveau];
+    if (!niveauxToLoad) {
+        // Pas un Bac Pro multi-annee → retourner un seul groupe
+        return [{
+            niveauKey: niveau,
+            niveauLabel: niveau.replace(/_/g, ' '),
+            modules: window.MODULES_PSE[niveau] || []
+        }];
+    }
+
+    return niveauxToLoad.map(nk => ({
+        niveauKey: nk,
+        niveauLabel: window.BAC_PRO_NIVEAU_LABELS[nk] || nk.replace(/_/g, ' '),
+        modules: window.MODULES_PSE[nk] || []
+    }));
+};
+
+/**
  * Obtenir les compétences pour une classe
  */
 window.getCompetencesForClasse = function(classeId) {
