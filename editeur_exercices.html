@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur d'Exercices — PSE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 320px; min-width: 320px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.05rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        #btn-new-exo {
+            width: 100%; padding: 12px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #btn-new-exo:hover { opacity: 0.85; }
+
+        .exo-list { display: flex; flex-direction: column; gap: 4px; }
+        .exo-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent; position: relative;
+        }
+        .exo-list-item:hover { border-color: #475569; }
+        .exo-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .exo-list-item .ei-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; padding-right: 28px; }
+        .exo-list-item .ei-meta { font-size: 0.7rem; color: #64748b; }
+        .exo-list-item .ei-del {
+            position: absolute; top: 8px; right: 8px;
+            background: transparent; border: none; color: #64748b;
+            font-size: 0.85rem; cursor: pointer; padding: 2px 5px; border-radius: 4px;
+            opacity: 0; transition: 0.2s;
+        }
+        .exo-list-item:hover .ei-del { opacity: 1; }
+        .exo-list-item .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .ei-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.65rem; font-weight: 700; margin-right: 4px;
+        }
+        .badge-pub { background: #dcfce7; color: #166534; }
+        .badge-draft { background: #fef3c7; color: #92400e; }
+        .badge-texte_trous { background: #dbeafe; color: #1e40af; }
+        .badge-relier { background: #dcfce7; color: #166534; }
+        .badge-ordre { background: #ffedd5; color: #9a3412; }
+        .badge-intrus { background: #fce7f3; color: #9d174d; }
+        .badge-pendu { background: #fef3c7; color: #92400e; }
+        .badge-mots_croises { background: #e0e7ff; color: #3730a3; }
+        .badge-swipe_vf { background: #d1fae5; color: #065f46; }
+        .badge-qcm_image { background: #fce7f3; color: #be185d; }
+        .badge-tableau { background: #f1f5f9; color: #475569; }
+        .badge-etude_cas { background: #ede9fe; color: #5b21b6; }
+        .badge-facile { background: #d1fae5; color: #065f46; }
+        .badge-moyen { background: #fef3c7; color: #92400e; }
+        .badge-difficile { background: #fee2e2; color: #991b1b; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+        #main-editor { display: none; flex-direction: column; gap: 20px; max-width: 850px; width: 100%; margin: 0 auto; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .form-input, .form-textarea {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; font-family: inherit;
+        }
+        .form-textarea { resize: vertical; min-height: 80px; }
+        .form-input:focus, .form-textarea:focus { border-color: #3b82f6; }
+        .form-input::placeholder, .form-textarea::placeholder { color: #64748b; }
+        .form-select {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row > * { flex: 1; }
+
+        /* Class pills */
+        .classes-pills-container { display: flex; flex-wrap: wrap; gap: 6px; }
+        .class-pill {
+            padding: 5px 14px; border-radius: 20px; border: 2px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer; font-size: 0.8rem;
+            font-weight: 600; transition: all 0.2s; user-select: none;
+        }
+        .class-pill:hover { border-color: #3b82f6; color: #e2e8f0; }
+        .class-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .class-pill.pill-all { font-style: italic; }
+
+        /* Difficulty toggle */
+        .diff-toggle { display: flex; gap: 6px; }
+        .diff-btn {
+            flex: 1; padding: 8px; border: 2px solid #334155; border-radius: 8px;
+            background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 700;
+            font-size: 0.85rem; text-align: center; transition: 0.2s;
+        }
+        .diff-btn.active-facile { border-color: #22c55e; color: #22c55e; background: rgba(34,197,94,0.1); }
+        .diff-btn.active-moyen { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.1); }
+        .diff-btn.active-difficile { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.1); }
+
+        /* Meta card */
+        .meta-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .meta-card h3 { font-size: 1rem; margin-bottom: 16px; color: #e2e8f0; }
+
+        /* Content card */
+        .content-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .content-card h3 { font-size: 1rem; margin-bottom: 16px; color: #e2e8f0; }
+        .content-type-section { display: none; }
+        .content-type-section.active { display: block; }
+
+        /* Dynamic list (paires, items, etc.) */
+        .dyn-list { display: flex; flex-direction: column; gap: 8px; }
+        .dyn-row {
+            display: flex; gap: 8px; align-items: center; background: #0f172a;
+            padding: 10px; border-radius: 8px;
+        }
+        .dyn-row input { flex: 1; }
+        .dyn-row .dyn-arrow { color: #64748b; font-weight: 700; flex-shrink: 0; }
+        .dyn-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .dyn-row-actions button {
+            width: 30px; height: 30px; border: none; border-radius: 6px;
+            background: #334155; color: #94a3b8; cursor: pointer; font-size: 0.85rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .dyn-row-actions button:hover { background: #475569; color: white; }
+        .dyn-row-actions .btn-del:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .btn-add-row {
+            padding: 8px 16px; background: #334155; color: #94a3b8; border: 2px dashed #475569;
+            border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+            transition: 0.2s; text-align: center;
+        }
+        .btn-add-row:hover { border-color: #3b82f6; color: white; }
+
+        /* Series (intrus) */
+        .serie-card {
+            background: #0f172a; border-radius: 10px; padding: 14px;
+            border: 1px solid #334155; margin-bottom: 10px;
+        }
+        .serie-card h4 { font-size: 0.8rem; color: #64748b; margin-bottom: 8px; }
+        .serie-items { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .serie-item-input { width: calc(50% - 3px); }
+
+        /* Preview */
+        .preview-box {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 14px; margin-top: 10px; min-height: 60px;
+            color: #e2e8f0; font-size: 0.9rem; line-height: 1.6;
+        }
+        .preview-box .trou { display: inline-block; border-bottom: 2px solid #3b82f6; min-width: 80px; padding: 2px 4px; color: #3b82f6; font-weight: 700; }
+
+        /* Bottom actions */
+        .bottom-actions { display: flex; gap: 12px; padding-top: 10px; }
+        .btn-save { padding: 12px 24px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; flex: 1; }
+        .btn-save:hover { opacity: 0.85; }
+        .btn-publish { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+        .btn-publish:hover { opacity: 0.85; }
+        .btn-unpublish { padding: 12px 24px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: none; }
+        .btn-unpublish:hover { opacity: 0.85; }
+        .btn-delete { padding: 12px 24px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: none; }
+        .btn-delete:hover { opacity: 0.85; }
+        .btn-import {
+            padding: 10px 20px; background: #334155; color: #e2e8f0; border: 2px solid #475569;
+            border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.2s;
+        }
+        .btn-import:hover { border-color: #3b82f6; color: white; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #1e293b; border-radius: 16px; padding: 24px; width: 90%; max-width: 650px;
+            max-height: 85vh; overflow-y: auto; border: 1px solid #334155;
+        }
+        .modal h3 { margin-bottom: 12px; }
+        .modal .json-guide {
+            background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px;
+            font-size: 0.8rem; color: #94a3b8; white-space: pre-wrap; font-family: monospace;
+            max-height: 200px; overflow-y: auto; border: 1px solid #334155;
+        }
+        .modal .prompt-guide {
+            background: #1a1a2e; border-radius: 8px; padding: 12px; margin-bottom: 12px;
+            font-size: 0.8rem; color: #a78bfa; border-left: 3px solid #7c3aed;
+        }
+        .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
+        .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 3000; display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        /* === HAMBURGER === */
+        .menu-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); z-index:999; }
+        .menu-btn { display:none; border:none; background:#1e293b; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); }
+        body.menu-open #sidebar { transform:translateX(0); }
+        body.menu-open .menu-overlay { display:block; }
+        .close-sidebar-btn { display:none; }
+
+        @media (max-width:768px) {
+            body { height:auto; overflow:auto; display:block; }
+            #sidebar { position:fixed; top:0; left:0; bottom:0; height:100vh; width:min(86vw,320px); min-width:0; transform:translateX(-110%); transition:transform 0.25s ease; z-index:1000; overflow-y:auto; }
+            #main { padding:16px; min-height:100vh; }
+            .menu-btn { display:inline-flex; margin-bottom:12px; }
+            .close-sidebar-btn { display:block; position:absolute; top:15px; right:15px; background:none; border:none; color:white; font-size:24px; cursor:pointer; z-index:1002; }
+            .form-row { flex-direction:column; gap:10px; }
+            .bottom-actions { flex-direction:column; gap:8px; }
+            .bottom-actions button { width:100%; text-align:center; }
+            .dyn-row { flex-direction: column; gap: 6px; }
+            .dyn-row input { width: 100%; }
+        }
+        @media (max-width:480px) {
+            #main { padding:10px; }
+        }
+    </style>
+</head>
+<body>
+
+<button class="menu-btn" onclick="toggleMenu()">☰</button>
+<div class="menu-overlay" onclick="closeMenu()"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <button class="close-sidebar-btn" onclick="closeMenu()">✕</button>
+    <div class="sidebar-header">
+        <h2>🧩 Exercices</h2>
+        <a href="index.html">← Cockpit</a>
+    </div>
+    <div class="sidebar-section">
+        <button id="btn-new-exo" onclick="newExercice()">+ Nouvel exercice</button>
+    </div>
+    <div class="sidebar-section">
+        <label>Mes exercices (<span id="exo-count">0</span>)</label>
+        <div class="exo-list" id="exo-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <div id="main-empty">
+        <div class="big-icon">🧩</div>
+        <h2>Editeur d'exercices</h2>
+        <p style="margin-top:8px; color:#64748b;">Selectionnez ou creez un exercice interactif</p>
+    </div>
+
+    <div id="main-editor">
+        <!-- META CARD -->
+        <div class="meta-card">
+            <h3>Informations</h3>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Titre de l'exercice</label>
+                <input type="text" class="form-input" id="exo-titre" placeholder="Ex: Vocabulaire energie — B5">
+            </div>
+            <div class="form-row" style="margin-bottom:14px;">
+                <div class="form-group">
+                    <label>Type d'exercice</label>
+                    <select class="form-select" id="exo-type" onchange="onTypeChange()">
+                        <option value="texte_trous">📝 Texte a trous</option>
+                        <option value="relier">🔗 Relier / Associer</option>
+                        <option value="ordre">📋 Remettre dans l'ordre</option>
+                        <option value="intrus">🔍 Jeu de l'intrus</option>
+                        <option value="pendu">🎯 Pendu</option>
+                        <option value="mots_croises">✏️ Mots croises</option>
+                        <option value="swipe_vf">👆 Swipe Vrai/Faux</option>
+                        <option value="qcm_image">🖼️ QCM Image</option>
+                        <option value="tableau">📊 Tableau a completer</option>
+                        <option value="etude_cas">📖 Etude de cas</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Difficulte</label>
+                    <div class="diff-toggle">
+                        <div class="diff-btn active-facile" data-diff="facile" onclick="setDifficulty('facile')">Facile</div>
+                        <div class="diff-btn" data-diff="moyen" onclick="setDifficulty('moyen')">Moyen</div>
+                        <div class="diff-btn" data-diff="difficile" onclick="setDifficulty('difficile')">Difficile</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Classes</label>
+                <div class="classes-pills-container" id="exo-classes-container"></div>
+            </div>
+            <div class="form-group">
+                <label>Module</label>
+                <select class="form-select" id="exo-module" disabled>
+                    <option value="">— Aucun module —</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- CONTENT CARD -->
+        <div class="content-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3 id="content-title">Contenu</h3>
+                <button class="btn-import" onclick="openImportModal()">📋 Importer JSON</button>
+            </div>
+
+            <!-- TEXTE A TROUS -->
+            <div class="content-type-section active" id="ct-texte_trous">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="tt-consigne" placeholder="Completez le texte suivant" value="Completez le texte suivant">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Texte (entourez les mots a deviner avec {{ }})</label>
+                    <textarea class="form-textarea" id="tt-texte" rows="5" placeholder="Les energies {{renouvelables}} sont inepuisables contrairement aux energies {{fossiles}}." oninput="previewTexteTrous()"></textarea>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:#94a3b8;">
+                    <input type="checkbox" id="tt-indice"> Afficher les lettres melangees comme indice
+                </label>
+                <div class="preview-box" id="tt-preview" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- RELIER -->
+            <div class="content-type-section" id="ct-relier">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="rel-consigne" placeholder="Reliez chaque element a sa definition" value="Reliez chaque element a sa definition">
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Paires (gauche ↔ droite)</label>
+                <div class="dyn-list" id="rel-list"></div>
+                <button class="btn-add-row" onclick="addRelierPair()" style="margin-top:8px;">+ Ajouter une paire</button>
+            </div>
+
+            <!-- ORDRE -->
+            <div class="content-type-section" id="ct-ordre">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="ord-consigne" placeholder="Remettez dans le bon ordre" value="Remettez les etapes dans le bon ordre">
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Elements (dans le BON ordre — le systeme melangera)</label>
+                <div class="dyn-list" id="ord-list"></div>
+                <button class="btn-add-row" onclick="addOrdreItem()" style="margin-top:8px;">+ Ajouter un element</button>
+            </div>
+
+            <!-- INTRUS -->
+            <div class="content-type-section" id="ct-intrus">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="int-consigne" placeholder="Trouvez l'intrus" value="Trouvez l'intrus dans chaque serie">
+                </div>
+                <div id="int-series"></div>
+                <button class="btn-add-row" onclick="addIntrusSerie()" style="margin-top:8px;">+ Ajouter une serie</button>
+            </div>
+
+            <!-- PENDU -->
+            <div class="content-type-section" id="ct-pendu">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="pen-consigne" placeholder="Devinez les mots" value="Devinez les mots de la PSE">
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Mots + indices</label>
+                <div class="dyn-list" id="pen-list"></div>
+                <button class="btn-add-row" onclick="addPenduMot()" style="margin-top:8px;">+ Ajouter un mot</button>
+            </div>
+
+            <!-- MOTS CROISES -->
+            <div class="content-type-section" id="ct-mots_croises">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="mc-consigne" placeholder="Completez la grille" value="Completez la grille de mots croises">
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Mots + definitions</label>
+                <div class="dyn-list" id="mc-list"></div>
+                <button class="btn-add-row" onclick="addMotsCroisesMot()" style="margin-top:8px;">+ Ajouter un mot</button>
+            </div>
+
+            <!-- SWIPE V/F -->
+            <div class="content-type-section" id="ct-swipe_vf">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="svf-consigne" placeholder="Vrai ou Faux ?" value="Indiquez Vrai ou Faux pour chaque affirmation">
+                </div>
+                <div class="dyn-list" id="svf-list"></div>
+                <button class="btn-add-row" onclick="addSwipeAffirmation()" style="margin-top:8px;">+ Ajouter une affirmation</button>
+            </div>
+
+            <!-- QCM IMAGE -->
+            <div class="content-type-section" id="ct-qcm_image">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="qimg-consigne" placeholder="Observez et repondez" value="Observez l'image et repondez">
+                </div>
+                <div id="qimg-questions"></div>
+                <button class="btn-add-row" onclick="addQcmImageQuestion()" style="margin-top:8px;">+ Ajouter une question</button>
+            </div>
+
+            <!-- TABLEAU -->
+            <div class="content-type-section" id="ct-tableau">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="tab-consigne" placeholder="Completez le tableau" value="Completez le tableau">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Colonnes (separees par des virgules)</label>
+                    <input type="text" class="form-input" id="tab-colonnes" placeholder="Energie, Source, Renouvelable ?">
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Lignes (cellules avec {{ }} = trous)</label>
+                <div class="dyn-list" id="tab-list"></div>
+                <button class="btn-add-row" onclick="addTableauLigne()" style="margin-top:8px;">+ Ajouter une ligne</button>
+            </div>
+
+            <!-- ETUDE DE CAS -->
+            <div class="content-type-section" id="ct-etude_cas">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="ec-consigne" placeholder="Lisez le cas et repondez" value="Lisez le cas et repondez aux questions">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Scenario / Texte du cas</label>
+                    <textarea class="form-textarea" id="ec-scenario" rows="4" placeholder="M. Dupont, 45 ans, travaille dans un atelier..."></textarea>
+                </div>
+                <div id="ec-questions"></div>
+                <button class="btn-add-row" onclick="addEtudeCasQuestion()" style="margin-top:8px;">+ Ajouter une question</button>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="bottom-actions">
+            <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
+            <button class="btn-publish" id="btn-publish" onclick="publishExercice()">🚀 Publier</button>
+            <button class="btn-unpublish" id="btn-unpublish" onclick="unpublishExercice()">⏸️ Depublier</button>
+            <button class="btn-delete" id="btn-delete" onclick="deleteExercice()">🗑️ Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- IMPORT JSON MODAL -->
+<div class="modal-overlay" id="import-modal">
+    <div class="modal">
+        <h3>📋 Importer du JSON</h3>
+        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:12px;">Collez le JSON genere par ChatGPT / Claude ci-dessous.</p>
+        <div class="prompt-guide" id="import-prompt-guide"></div>
+        <div class="json-guide" id="import-json-guide"></div>
+        <textarea class="form-textarea" id="import-json-input" rows="8" placeholder="Collez votre JSON ici..."></textarea>
+        <div id="import-error" style="color:#ef4444; font-size:0.85rem; margin-top:6px; display:none;"></div>
+        <div class="modal-actions">
+            <button onclick="closeImportModal()" style="background:#334155; color:white;">Annuler</button>
+            <button onclick="doImportJSON()" style="background:#3b82f6; color:white;">Importer</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="data_modules.js"></script>
+<script>
+    function toggleMenu(){ document.body.classList.toggle('menu-open'); }
+    function closeMenu(){ document.body.classList.remove('menu-open'); }
+
+    // Current difficulty
+    var currentDifficulty = 'facile';
+
+    window.setDifficulty = function(d) {
+        currentDifficulty = d;
+        document.querySelectorAll('.diff-btn').forEach(b => {
+            b.className = 'diff-btn';
+            if (b.dataset.diff === d) b.classList.add('active-' + d);
+        });
+    };
+</script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let currentExoId = null;
+    let allExercices = [];
+
+    // ========== TYPE LABELS ==========
+    const TYPE_LABELS = {
+        texte_trous: '📝 Texte a trous', relier: '🔗 Relier', ordre: '📋 Ordre',
+        intrus: '🔍 Intrus', pendu: '🎯 Pendu', mots_croises: '✏️ Mots croises',
+        swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau',
+        etude_cas: '📖 Etude de cas'
+    };
+
+    // ========== CLASS PILLS ==========
+    function renderClassPills() {
+        const container = document.getElementById('exo-classes-container');
+        container.innerHTML = '';
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        const allPill = document.createElement('span');
+        allPill.className = 'class-pill pill-all active';
+        allPill.dataset.classeId = '';
+        allPill.textContent = 'Toutes les classes';
+        allPill.onclick = () => toggleClassPill(allPill);
+        container.appendChild(allPill);
+        classes.forEach(c => {
+            const pill = document.createElement('span');
+            pill.className = 'class-pill';
+            pill.dataset.classeId = c.id;
+            pill.textContent = c.label;
+            pill.title = c.niveau.replace(/_/g, ' ');
+            pill.onclick = () => toggleClassPill(pill);
+            container.appendChild(pill);
+        });
+    }
+
+    function toggleClassPill(el) {
+        const isAllPill = el.dataset.classeId === '';
+        const container = document.getElementById('exo-classes-container');
+        const allPills = container.querySelectorAll('.class-pill');
+        const allPillEl = container.querySelector('.pill-all');
+        if (isAllPill) {
+            allPills.forEach(p => p.classList.remove('active'));
+            allPillEl.classList.add('active');
+        } else {
+            el.classList.toggle('active');
+            allPillEl.classList.remove('active');
+            const activeClasses = container.querySelectorAll('.class-pill.active:not(.pill-all)');
+            if (activeClasses.length === 0) allPillEl.classList.add('active');
+        }
+        updateModuleFromPills();
+    }
+
+    function getSelectedClasseIds() {
+        const container = document.getElementById('exo-classes-container');
+        const allPillEl = container.querySelector('.pill-all');
+        if (allPillEl && allPillEl.classList.contains('active')) return [];
+        const ids = [];
+        container.querySelectorAll('.class-pill.active:not(.pill-all)').forEach(p => ids.push(p.dataset.classeId));
+        return ids;
+    }
+
+    function setClassPillsActive(ids) {
+        const container = document.getElementById('exo-classes-container');
+        container.querySelectorAll('.class-pill').forEach(p => p.classList.remove('active'));
+        if (!ids || ids.length === 0) {
+            container.querySelector('.pill-all').classList.add('active');
+        } else {
+            ids.forEach(id => {
+                const pill = container.querySelector('.class-pill[data-classe-id="' + id + '"]');
+                if (pill) pill.classList.add('active');
+            });
+        }
+        updateModuleFromPills();
+    }
+
+    function updateModuleFromPills() {
+        const ids = getSelectedClasseIds();
+        const modSel = document.getElementById('exo-module');
+        modSel.innerHTML = '';
+        if (ids.length === 0) {
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
+            return;
+        }
+        if (ids.length === 1) {
+            const classeId = ids[0];
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const firstClass = classesInGroup[0];
+            const groups = window.getModulesForRevision
+                ? window.getModulesForRevision(firstClass)
+                : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+            const isMultiYear = groups.length > 1;
+            groups.forEach(group => {
+                let currentTheme = '';
+                group.modules.forEach(m => {
+                    if (m.theme !== currentTheme) {
+                        currentTheme = m.theme;
+                        const optGroup = document.createElement('optgroup');
+                        optGroup.label = isMultiYear ? group.niveauLabel + ' — Theme ' + m.theme : 'Theme ' + m.theme;
+                        modSel.appendChild(optGroup);
+                    }
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.id + ' — ' + m.titre;
+                    const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                    if (lastGroup) lastGroup.appendChild(opt);
+                    else modSel.appendChild(opt);
+                });
+            });
+        } else {
+            modSel.disabled = true;
+            modSel.innerHTML = '<option value="">— Plusieurs classes —</option>';
+        }
+    }
+
+    renderClassPills();
+
+    // ========== TYPE CHANGE ==========
+    window.onTypeChange = function() {
+        const type = document.getElementById('exo-type').value;
+        document.querySelectorAll('.content-type-section').forEach(s => s.classList.remove('active'));
+        const section = document.getElementById('ct-' + type);
+        if (section) section.classList.add('active');
+        document.getElementById('content-title').textContent = 'Contenu — ' + (TYPE_LABELS[type] || type);
+    };
+
+    // ========== PREVIEW TEXTE A TROUS ==========
+    window.previewTexteTrous = function() {
+        const texte = document.getElementById('tt-texte').value;
+        const preview = document.getElementById('tt-preview');
+        if (!texte.trim()) { preview.innerHTML = '<span style="color:#64748b; font-style:italic;">Apercu...</span>'; return; }
+        const html = texte.replace(/\{\{([^}]+)\}\}/g, '<span class="trou">$1</span>');
+        preview.innerHTML = html;
+    };
+
+    // ========== DYNAMIC ROW HELPERS ==========
+
+    // --- RELIER ---
+    window.addRelierPair = function(gauche, droite) {
+        const list = document.getElementById('rel-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = '<input type="text" class="form-input" placeholder="Gauche" value="' + (gauche || '') + '">' +
+            '<span class="dyn-arrow">↔</span>' +
+            '<input type="text" class="form-input" placeholder="Droite" value="' + (droite || '') + '">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
+    // --- ORDRE ---
+    window.addOrdreItem = function(val) {
+        const list = document.getElementById('ord-list');
+        const idx = list.children.length + 1;
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = '<span style="color:#64748b; font-weight:700; min-width:24px;">' + idx + '.</span>' +
+            '<input type="text" class="form-input" placeholder="Element" value="' + (val || '') + '">' +
+            '<div class="dyn-row-actions">' +
+            '<button onclick="moveRow(this,-1)" title="Monter">▲</button>' +
+            '<button onclick="moveRow(this,1)" title="Descendre">▼</button>' +
+            '<button class="btn-del" onclick="removeOrdreItem(this)">&times;</button></div>';
+        list.appendChild(row);
+    };
+    window.removeOrdreItem = function(btn) {
+        btn.closest('.dyn-row').remove();
+        renumberOrdre();
+    };
+    window.moveRow = function(btn, dir) {
+        const row = btn.closest('.dyn-row');
+        const list = row.parentElement;
+        const rows = [...list.children];
+        const idx = rows.indexOf(row);
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= rows.length) return;
+        if (dir === -1) list.insertBefore(row, rows[newIdx]);
+        else list.insertBefore(rows[newIdx], row);
+        renumberOrdre();
+    };
+    function renumberOrdre() {
+        const list = document.getElementById('ord-list');
+        [...list.children].forEach((row, i) => {
+            row.querySelector('span').textContent = (i + 1) + '.';
+        });
+    }
+
+    // --- INTRUS ---
+    window.addIntrusSerie = function(items, intrusIdx, explication) {
+        const container = document.getElementById('int-series');
+        const num = container.children.length + 1;
+        const card = document.createElement('div');
+        card.className = 'serie-card';
+        const itemsArr = items || ['', '', '', ''];
+        let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h4>Serie ' + num + '</h4>' +
+            '<button style="background:none; border:none; color:#64748b; cursor:pointer; font-size:1rem;" onclick="this.closest(\'.serie-card\').remove()">&times;</button></div>';
+        html += '<div class="serie-items">';
+        itemsArr.forEach((it, i) => {
+            html += '<input type="text" class="form-input serie-item-input" placeholder="Element ' + (i + 1) + '" value="' + (it || '') + '">';
+        });
+        html += '</div>';
+        html += '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Index de l\'intrus (0-based)</label>' +
+            '<input type="number" class="form-input" min="0" max="' + (itemsArr.length - 1) + '" value="' + (intrusIdx != null ? intrusIdx : 0) + '" style="width:80px;"></div>';
+        html += '<div class="form-group"><label style="font-size:0.7rem;">Explication</label>' +
+            '<input type="text" class="form-input" placeholder="Pourquoi c\'est l\'intrus ?" value="' + (explication || '') + '"></div>';
+        card.innerHTML = html;
+        container.appendChild(card);
+    };
+
+    // --- PENDU ---
+    window.addPenduMot = function(mot, indice) {
+        const list = document.getElementById('pen-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = '<input type="text" class="form-input" placeholder="MOT (majuscules)" value="' + (mot || '') + '" style="text-transform:uppercase;">' +
+            '<input type="text" class="form-input" placeholder="Indice / Definition" value="' + (indice || '') + '">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
+    // --- MOTS CROISES ---
+    window.addMotsCroisesMot = function(mot, definition) {
+        const list = document.getElementById('mc-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = '<input type="text" class="form-input" placeholder="MOT (majuscules)" value="' + (mot || '') + '" style="text-transform:uppercase;">' +
+            '<input type="text" class="form-input" placeholder="Definition" value="' + (definition || '') + '">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
+    // --- SWIPE V/F ---
+    window.addSwipeAffirmation = function(texte, reponse, explication) {
+        const list = document.getElementById('svf-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.style.flexWrap = 'wrap';
+        row.innerHTML = '<input type="text" class="form-input" placeholder="Affirmation" value="' + (texte || '') + '" style="flex:2; min-width:200px;">' +
+            '<select class="form-select" style="width:auto; min-width:80px;"><option value="true"' + (reponse === true ? ' selected' : '') + '>Vrai</option><option value="false"' + (reponse === false ? ' selected' : '') + '>Faux</option></select>' +
+            '<input type="text" class="form-input" placeholder="Explication" value="' + (explication || '') + '" style="flex:2; min-width:200px;">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
+    // --- QCM IMAGE ---
+    window.addQcmImageQuestion = function(data) {
+        const container = document.getElementById('qimg-questions');
+        const num = container.children.length + 1;
+        const d = data || {};
+        const card = document.createElement('div');
+        card.className = 'serie-card';
+        card.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h4>Question ' + num + '</h4>' +
+            '<button style="background:none; border:none; color:#64748b; cursor:pointer; font-size:1rem;" onclick="this.closest(\'.serie-card\').remove()">&times;</button></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">URL Image</label><input type="text" class="form-input qimg-url" placeholder="https://..." value="' + (d.image || '') + '"></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Question</label><input type="text" class="form-input qimg-question" value="' + (d.question || '') + '"></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Choix (1 par ligne)</label><textarea class="form-textarea qimg-choix" rows="4" placeholder="Choix A\nChoix B\nChoix C\nChoix D">' + ((d.choix || []).join('\n')) + '</textarea></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Index correct (0-based)</label><input type="number" class="form-input qimg-correct" min="0" value="' + (d.correct || 0) + '" style="width:80px;"></div>' +
+            '<div class="form-group"><label style="font-size:0.7rem;">Explication</label><input type="text" class="form-input qimg-explication" value="' + (d.explication || '') + '"></div>';
+        container.appendChild(card);
+    };
+
+    // --- TABLEAU ---
+    window.addTableauLigne = function(cellules) {
+        const list = document.getElementById('tab-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        row.innerHTML = '<input type="text" class="form-input" placeholder="Cellule1, Cellule2, {{trou}}, ..." value="' + (cellules || '') + '" style="flex:1;">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
+    // --- ETUDE DE CAS ---
+    window.addEtudeCasQuestion = function(data) {
+        const container = document.getElementById('ec-questions');
+        const num = container.children.length + 1;
+        const d = data || {};
+        const card = document.createElement('div');
+        card.className = 'serie-card';
+        card.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h4>Question ' + num + '</h4>' +
+            '<button style="background:none; border:none; color:#64748b; cursor:pointer; font-size:1rem;" onclick="this.closest(\'.serie-card\').remove()">&times;</button></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Question</label><input type="text" class="form-input ec-question" value="' + (d.question || '') + '"></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Type</label>' +
+            '<select class="form-select ec-type" style="width:auto;" onchange="toggleEcType(this)"><option value="qcm"' + (d.type === 'texte' ? '' : ' selected') + '>QCM</option><option value="texte"' + (d.type === 'texte' ? ' selected' : '') + '>Texte libre</option></select></div>' +
+            '<div class="ec-qcm-area" style="' + (d.type === 'texte' ? 'display:none;' : '') + '">' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Choix (1 par ligne)</label><textarea class="form-textarea ec-choix" rows="3">' + ((d.choix || []).join('\n')) + '</textarea></div>' +
+            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Index correct (0-based)</label><input type="number" class="form-input ec-correct" min="0" value="' + (d.correct || 0) + '" style="width:80px;"></div></div>' +
+            '<div class="ec-texte-area" style="' + (d.type === 'texte' ? '' : 'display:none;') + '">' +
+            '<div class="form-group"><label style="font-size:0.7rem;">Reponse attendue</label><input type="text" class="form-input ec-reponse" value="' + (d.reponse || '') + '"></div></div>';
+        container.appendChild(card);
+    };
+    window.toggleEcType = function(sel) {
+        const card = sel.closest('.serie-card');
+        card.querySelector('.ec-qcm-area').style.display = sel.value === 'qcm' ? '' : 'none';
+        card.querySelector('.ec-texte-area').style.display = sel.value === 'texte' ? '' : 'none';
+    };
+
+    // ========== GET CONTENU FROM FORM ==========
+    function getContenuFromForm() {
+        const type = document.getElementById('exo-type').value;
+        if (type === 'texte_trous') {
+            return { consigne: document.getElementById('tt-consigne').value, texte: document.getElementById('tt-texte').value, indice: document.getElementById('tt-indice').checked };
+        } else if (type === 'relier') {
+            const paires = [];
+            document.querySelectorAll('#rel-list .dyn-row').forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                if (inputs[0].value.trim() || inputs[1].value.trim()) paires.push({ gauche: inputs[0].value.trim(), droite: inputs[1].value.trim() });
+            });
+            return { consigne: document.getElementById('rel-consigne').value, paires };
+        } else if (type === 'ordre') {
+            const items = [];
+            document.querySelectorAll('#ord-list .dyn-row input').forEach(inp => { if (inp.value.trim()) items.push(inp.value.trim()); });
+            return { consigne: document.getElementById('ord-consigne').value, items };
+        } else if (type === 'intrus') {
+            const series = [];
+            document.querySelectorAll('#int-series .serie-card').forEach(card => {
+                const items = [...card.querySelectorAll('.serie-item-input')].map(i => i.value.trim());
+                const inputs = card.querySelectorAll('.form-input');
+                series.push({ items, intrus: parseInt(inputs[inputs.length - 2].value) || 0, explication: inputs[inputs.length - 1].value });
+            });
+            return { consigne: document.getElementById('int-consigne').value, series };
+        } else if (type === 'pendu') {
+            const mots = [];
+            document.querySelectorAll('#pen-list .dyn-row').forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                if (inputs[0].value.trim()) mots.push({ mot: inputs[0].value.trim().toUpperCase(), indice: inputs[1].value.trim() });
+            });
+            return { consigne: document.getElementById('pen-consigne').value, mots };
+        } else if (type === 'mots_croises') {
+            const mots = [];
+            document.querySelectorAll('#mc-list .dyn-row').forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                if (inputs[0].value.trim()) mots.push({ mot: inputs[0].value.trim().toUpperCase(), definition: inputs[1].value.trim() });
+            });
+            return { consigne: document.getElementById('mc-consigne').value, mots };
+        } else if (type === 'swipe_vf') {
+            const affirmations = [];
+            document.querySelectorAll('#svf-list .dyn-row').forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                const sel = r.querySelector('select');
+                if (inputs[0].value.trim()) affirmations.push({ texte: inputs[0].value.trim(), reponse: sel.value === 'true', explication: inputs[1].value.trim() });
+            });
+            return { consigne: document.getElementById('svf-consigne').value, affirmations };
+        } else if (type === 'qcm_image') {
+            const questions = [];
+            document.querySelectorAll('#qimg-questions .serie-card').forEach(card => {
+                questions.push({
+                    image: card.querySelector('.qimg-url').value.trim(),
+                    question: card.querySelector('.qimg-question').value.trim(),
+                    choix: card.querySelector('.qimg-choix').value.split('\n').map(s => s.trim()).filter(Boolean),
+                    correct: parseInt(card.querySelector('.qimg-correct').value) || 0,
+                    explication: card.querySelector('.qimg-explication').value.trim()
+                });
+            });
+            return { consigne: document.getElementById('qimg-consigne').value, questions };
+        } else if (type === 'tableau') {
+            const colonnes = document.getElementById('tab-colonnes').value.split(',').map(s => s.trim()).filter(Boolean);
+            const lignes = [];
+            document.querySelectorAll('#tab-list .dyn-row input').forEach(inp => {
+                const cellules = inp.value.split(',').map(s => s.trim());
+                if (cellules.length > 0) lignes.push({ cellules });
+            });
+            return { consigne: document.getElementById('tab-consigne').value, colonnes, lignes };
+        } else if (type === 'etude_cas') {
+            const questions = [];
+            document.querySelectorAll('#ec-questions .serie-card').forEach(card => {
+                const t = card.querySelector('.ec-type').value;
+                const q = { question: card.querySelector('.ec-question').value.trim(), type: t };
+                if (t === 'qcm') {
+                    q.choix = card.querySelector('.ec-choix').value.split('\n').map(s => s.trim()).filter(Boolean);
+                    q.correct = parseInt(card.querySelector('.ec-correct').value) || 0;
+                } else {
+                    q.reponse = card.querySelector('.ec-reponse').value.trim();
+                }
+                questions.push(q);
+            });
+            return { consigne: document.getElementById('ec-consigne').value, scenario: document.getElementById('ec-scenario').value, questions };
+        }
+        return {};
+    }
+
+    // ========== SET CONTENU IN FORM ==========
+    function setContenuInForm(type, contenu) {
+        if (!contenu) return;
+        if (type === 'texte_trous') {
+            document.getElementById('tt-consigne').value = contenu.consigne || '';
+            document.getElementById('tt-texte').value = contenu.texte || '';
+            document.getElementById('tt-indice').checked = !!contenu.indice;
+            previewTexteTrous();
+        } else if (type === 'relier') {
+            document.getElementById('rel-consigne').value = contenu.consigne || '';
+            document.getElementById('rel-list').innerHTML = '';
+            (contenu.paires || []).forEach(p => addRelierPair(p.gauche, p.droite));
+        } else if (type === 'ordre') {
+            document.getElementById('ord-consigne').value = contenu.consigne || '';
+            document.getElementById('ord-list').innerHTML = '';
+            (contenu.items || []).forEach(it => addOrdreItem(it));
+        } else if (type === 'intrus') {
+            document.getElementById('int-consigne').value = contenu.consigne || '';
+            document.getElementById('int-series').innerHTML = '';
+            (contenu.series || []).forEach(s => addIntrusSerie(s.items, s.intrus, s.explication));
+        } else if (type === 'pendu') {
+            document.getElementById('pen-consigne').value = contenu.consigne || '';
+            document.getElementById('pen-list').innerHTML = '';
+            (contenu.mots || []).forEach(m => addPenduMot(m.mot, m.indice));
+        } else if (type === 'mots_croises') {
+            document.getElementById('mc-consigne').value = contenu.consigne || '';
+            document.getElementById('mc-list').innerHTML = '';
+            (contenu.mots || []).forEach(m => addMotsCroisesMot(m.mot, m.definition));
+        } else if (type === 'swipe_vf') {
+            document.getElementById('svf-consigne').value = contenu.consigne || '';
+            document.getElementById('svf-list').innerHTML = '';
+            (contenu.affirmations || []).forEach(a => addSwipeAffirmation(a.texte, a.reponse, a.explication));
+        } else if (type === 'qcm_image') {
+            document.getElementById('qimg-consigne').value = contenu.consigne || '';
+            document.getElementById('qimg-questions').innerHTML = '';
+            (contenu.questions || []).forEach(q => addQcmImageQuestion(q));
+        } else if (type === 'tableau') {
+            document.getElementById('tab-consigne').value = contenu.consigne || '';
+            document.getElementById('tab-colonnes').value = (contenu.colonnes || []).join(', ');
+            document.getElementById('tab-list').innerHTML = '';
+            (contenu.lignes || []).forEach(l => addTableauLigne((l.cellules || []).join(', ')));
+        } else if (type === 'etude_cas') {
+            document.getElementById('ec-consigne').value = contenu.consigne || '';
+            document.getElementById('ec-scenario').value = contenu.scenario || '';
+            document.getElementById('ec-questions').innerHTML = '';
+            (contenu.questions || []).forEach(q => addEtudeCasQuestion(q));
+        }
+    }
+
+    function clearAllForms() {
+        document.getElementById('tt-texte').value = '';
+        document.getElementById('tt-consigne').value = 'Completez le texte suivant';
+        document.getElementById('tt-indice').checked = false;
+        document.getElementById('tt-preview').innerHTML = '';
+        document.getElementById('rel-consigne').value = 'Reliez chaque element a sa definition';
+        document.getElementById('rel-list').innerHTML = '';
+        document.getElementById('ord-consigne').value = 'Remettez les etapes dans le bon ordre';
+        document.getElementById('ord-list').innerHTML = '';
+        document.getElementById('int-consigne').value = 'Trouvez l\'intrus dans chaque serie';
+        document.getElementById('int-series').innerHTML = '';
+        document.getElementById('pen-consigne').value = 'Devinez les mots de la PSE';
+        document.getElementById('pen-list').innerHTML = '';
+        document.getElementById('mc-consigne').value = 'Completez la grille de mots croises';
+        document.getElementById('mc-list').innerHTML = '';
+        document.getElementById('svf-consigne').value = 'Indiquez Vrai ou Faux pour chaque affirmation';
+        document.getElementById('svf-list').innerHTML = '';
+        document.getElementById('qimg-consigne').value = 'Observez l\'image et repondez';
+        document.getElementById('qimg-questions').innerHTML = '';
+        document.getElementById('tab-consigne').value = 'Completez le tableau';
+        document.getElementById('tab-colonnes').value = '';
+        document.getElementById('tab-list').innerHTML = '';
+        document.getElementById('ec-consigne').value = 'Lisez le cas et repondez aux questions';
+        document.getElementById('ec-scenario').value = '';
+        document.getElementById('ec-questions').innerHTML = '';
+    }
+
+    // ========== SIDEBAR LIST ==========
+    function renderExoList() {
+        const list = document.getElementById('exo-list');
+        list.innerHTML = '';
+        document.getElementById('exo-count').textContent = allExercices.length;
+        allExercices.forEach(ex => {
+            const item = document.createElement('div');
+            item.className = 'exo-list-item' + (ex.id === currentExoId ? ' active' : '');
+            const typeBadge = '<span class="ei-badge badge-' + ex.type + '">' + (TYPE_LABELS[ex.type] || ex.type) + '</span>';
+            const pubBadge = ex.publie ? '<span class="ei-badge badge-pub">Publie</span>' : '<span class="ei-badge badge-draft">Brouillon</span>';
+            const diffBadge = ex.difficulte ? '<span class="ei-badge badge-' + ex.difficulte + '">' + ex.difficulte + '</span>' : '';
+            item.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + '</div>' +
+                '<button class="ei-del" onclick="event.stopPropagation(); deleteExerciceById(\'' + ex.id + '\')">&times;</button>';
+            item.onclick = () => loadExercice(ex.id);
+            list.appendChild(item);
+        });
+    }
+
+    // ========== FIREBASE SNAPSHOT ==========
+    const qExos = query(collection(db, "exercices_banque"), orderBy("updatedAt", "desc"));
+    onSnapshot(qExos, (snap) => {
+        allExercices = [];
+        snap.forEach(d => { allExercices.push({ id: d.id, ...d.data() }); });
+        renderExoList();
+    });
+
+    // ========== NEW / LOAD / SAVE / PUBLISH / DELETE ==========
+    window.newExercice = function() {
+        currentExoId = null;
+        document.getElementById('exo-titre').value = '';
+        document.getElementById('exo-type').value = 'texte_trous';
+        setClassPillsActive([]);
+        document.getElementById('exo-module').value = '';
+        window.setDifficulty('facile');
+        clearAllForms();
+        onTypeChange();
+        document.getElementById('btn-delete').style.display = 'none';
+        document.getElementById('btn-unpublish').style.display = 'none';
+        document.getElementById('btn-publish').style.display = '';
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+        if (window.innerWidth <= 768) closeMenu();
+    };
+
+    function loadExercice(id) {
+        const ex = allExercices.find(e => e.id === id);
+        if (!ex) return;
+        currentExoId = id;
+        document.getElementById('exo-titre').value = ex.titre || '';
+        document.getElementById('exo-type').value = ex.type || 'texte_trous';
+        setClassPillsActive(ex.classeIds || (ex.classeId ? [ex.classeId] : []));
+        setTimeout(() => { document.getElementById('exo-module').value = ex.moduleId || ''; }, 100);
+        window.setDifficulty(ex.difficulte || 'facile');
+        clearAllForms();
+        onTypeChange();
+        setContenuInForm(ex.type, ex.contenu);
+        document.getElementById('btn-delete').style.display = 'block';
+        updatePublishButtons(!!ex.publie);
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+        renderExoList();
+        if (window.innerWidth <= 768) closeMenu();
+    }
+
+    window.saveExercice = async function() {
+        const titre = document.getElementById('exo-titre').value.trim();
+        if (!titre) { alert('Donne un titre !'); return; }
+        const type = document.getElementById('exo-type').value;
+        const classeIds = getSelectedClasseIds();
+        const classeId = classeIds.length > 0 ? classeIds[0] : null;
+        const moduleId = document.getElementById('exo-module').value || null;
+        let niveau = null;
+        if (classeId) {
+            const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
+        }
+        const contenu = getContenuFromForm();
+        const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, updatedAt: serverTimestamp() };
+        try {
+            if (currentExoId) {
+                await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
+            } else {
+                const newId = 'exo_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                data.createdAt = serverTimestamp();
+                data.publie = false;
+                await setDoc(doc(db, "exercices_banque", newId), data);
+                currentExoId = newId;
+                document.getElementById('btn-delete').style.display = 'block';
+            }
+            showToast('Exercice sauvegarde !');
+        } catch(e) { alert('Erreur : ' + e.message); }
+    };
+
+    window.publishExercice = async function() {
+        await saveExercice();
+        if (currentExoId) {
+            await setDoc(doc(db, "exercices_banque", currentExoId), { publie: true }, { merge: true });
+            showToast('Exercice publie !');
+            updatePublishButtons(true);
+        }
+    };
+    window.unpublishExercice = async function() {
+        if (!currentExoId) return;
+        await setDoc(doc(db, "exercices_banque", currentExoId), { publie: false }, { merge: true });
+        showToast('Exercice depublie.');
+        updatePublishButtons(false);
+    };
+    function updatePublishButtons(isPublished) {
+        document.getElementById('btn-publish').style.display = isPublished ? 'none' : '';
+        document.getElementById('btn-unpublish').style.display = isPublished ? '' : 'none';
+    }
+
+    window.deleteExercice = async function() {
+        if (!currentExoId) return;
+        if (!confirm('Supprimer cet exercice ?')) return;
+        await deleteDoc(doc(db, "exercices_banque", currentExoId));
+        currentExoId = null;
+        document.getElementById('main-editor').style.display = 'none';
+        document.getElementById('main-empty').style.display = 'flex';
+        showToast('Exercice supprime.');
+    };
+    window.deleteExerciceById = async function(id) {
+        if (!confirm('Supprimer cet exercice ?')) return;
+        await deleteDoc(doc(db, "exercices_banque", id));
+        if (id === currentExoId) {
+            currentExoId = null;
+            document.getElementById('main-editor').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+        }
+        showToast('Exercice supprime.');
+    };
+
+    // ========== IMPORT JSON ==========
+    const PROMPTS = {
+        texte_trous: 'Genere un exercice "texte a trous" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "texte": "Phrase avec {{mot}} entre doubles accolades.", "indice": false }\nMets 5 a 10 mots entre {{ }}. Texte de 3 a 5 phrases.',
+        relier: 'Genere un exercice "relier" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "paires": [{ "gauche": "Terme", "droite": "Definition" }] }\nCree 5 a 8 paires.',
+        ordre: 'Genere un exercice "remettre dans l\'ordre" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"] }\nItems dans le BON ordre. 4 a 8 etapes.',
+        intrus: 'Genere un exercice "intrus" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "series": [{ "items": ["A","B","C","D"], "intrus": 2, "explication": "..." }] }\n5 a 8 series de 4 elements.',
+        pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "..." }] }\n8 a 12 mots en MAJUSCULES sans accents.',
+        mots_croises: 'Genere un exercice "mots croises" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "definition": "..." }] }\n6 a 10 mots MAJUSCULES sans accents.',
+        swipe_vf: 'Genere un exercice "vrai/faux" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "affirmations": [{ "texte": "...", "reponse": true/false, "explication": "..." }] }\n10 a 15 affirmations.',
+        qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "questions": [{ "image": "", "question": "...", "choix": ["A","B","C","D"], "correct": 0, "explication": "..." }] }\nLaisse image vide. 3 a 5 questions.',
+        tableau: 'Genere un exercice "tableau" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "colonnes": ["Col1","Col2"], "lignes": [{ "cellules": ["val", "{{trou}}"] }] }\nCellules entre {{ }} = trous. 4-6 lignes, 3-4 colonnes.',
+        etude_cas: 'Genere une "etude de cas" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "scenario": "...", "questions": [{ "question": "...", "type": "qcm", "choix": ["A","B"], "correct": 0 }, { "question": "...", "type": "texte", "reponse": "..." }] }\n3 a 5 questions.'
+    };
+
+    window.openImportModal = function() {
+        const type = document.getElementById('exo-type').value;
+        document.getElementById('import-prompt-guide').textContent = '💡 Prompt a copier dans ChatGPT/Claude :\n\n' + (PROMPTS[type] || '');
+        document.getElementById('import-json-guide').textContent = 'Format JSON attendu pour "' + (TYPE_LABELS[type] || type) + '"';
+        document.getElementById('import-json-input').value = '';
+        document.getElementById('import-error').style.display = 'none';
+        document.getElementById('import-modal').classList.add('show');
+    };
+    window.closeImportModal = function() {
+        document.getElementById('import-modal').classList.remove('show');
+    };
+    window.doImportJSON = function() {
+        const raw = document.getElementById('import-json-input').value.trim();
+        const errorEl = document.getElementById('import-error');
+        try {
+            const data = JSON.parse(raw);
+            const type = document.getElementById('exo-type').value;
+            setContenuInForm(type, data);
+            closeImportModal();
+            showToast('JSON importe !');
+        } catch(e) {
+            errorEl.textContent = 'JSON invalide : ' + e.message;
+            errorEl.style.display = 'block';
+        }
+    };
+
+    // ========== TOAST ==========
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2500);
+    }
+</script>
+</body>
+</html>
