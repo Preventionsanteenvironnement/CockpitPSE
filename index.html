@@ -2481,17 +2481,24 @@ QN80,Wael HWORI</pre>
         }
     };
 
-    // Load Foucher pack
+    // Load Foucher pack (Prevention + PAD)
     window.loadPackFoucher = async function() {
         try {
-            const resp = await fetch('bibliotheque_prevention.json');
-            if (!resp.ok) throw new Error('Fichier non trouvé');
-            const items = await resp.json();
+            const [respPrev, respPad] = await Promise.all([
+                fetch('bibliotheque_prevention.json'),
+                fetch('bibliotheque_pad.json')
+            ]);
+            if (!respPrev.ok) throw new Error('Fichier prevention non trouvé');
+            if (!respPad.ok) throw new Error('Fichier PAD non trouvé');
+            const prevItems = await respPrev.json();
+            const padItems = await respPad.json();
 
-            // Check existing to avoid duplicates
-            const existingTitres = new Set(allBiblioItems.filter(i => i.type === 'prevention').map(i => i.titre));
+            // Deduplication par titre (tous types confondus)
+            const existingTitres = new Set(allBiblioItems.map(i => i.titre));
             let added = 0;
-            for (const item of items) {
+
+            // Prevention exercises
+            for (const item of prevItems) {
                 if (existingTitres.has(item.titre)) continue;
                 const newId = 'bib_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
                 await setDoc(doc(db, 'bibliotheque', newId), {
@@ -2503,10 +2510,26 @@ QN80,Wael HWORI</pre>
                     createdAt: serverTimestamp()
                 });
                 added++;
-                // Small delay to avoid timestamp collisions
                 await new Promise(r => setTimeout(r, 50));
             }
-            showToast('📦 ' + added + ' exercice(s) Prevention ajouté(s) !');
+
+            // PAD exercises
+            for (const item of padItems) {
+                if (existingTitres.has(item.titre)) continue;
+                const newId = 'bib_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                await setDoc(doc(db, 'bibliotheque', newId), {
+                    categorie: 'exercice',
+                    type: 'pad',
+                    moduleId: null,
+                    titre: item.titre,
+                    contenu: item,
+                    createdAt: serverTimestamp()
+                });
+                added++;
+                await new Promise(r => setTimeout(r, 50));
+            }
+
+            showToast('📦 ' + added + ' exercice(s) ajouté(s) (Prevention + PAD) !');
         } catch(e) {
             showToast('❌ Erreur : ' + e.message);
         }
