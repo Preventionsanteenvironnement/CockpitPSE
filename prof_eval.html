@@ -606,7 +606,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         // Class pills
         const classContainer = document.getElementById('sidebar-class-pills');
         const classes = new Set();
-        allEvals.forEach(ev => { if (ev.classeId) classes.add(ev.classeId); });
+        allEvals.forEach(ev => {
+            const ids = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+            ids.forEach(id => classes.add(id));
+        });
         classContainer.innerHTML = '<button class="filter-pill' + (sidebarClassFilter === 'all' ? ' active' : '') + '" onclick="setSidebarClassFilter(\'all\')">Toutes</button>';
         [...classes].sort().forEach(c => {
             const pill = document.createElement('button');
@@ -633,7 +636,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     function getFilteredEvals() {
         return allEvals.filter(ev => {
-            if (sidebarClassFilter !== 'all' && ev.classeId && ev.classeId !== sidebarClassFilter) return false;
+            if (sidebarClassFilter !== 'all') {
+                const ids = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+                if (ids.length > 0 && !ids.includes(sidebarClassFilter)) return false;
+            }
             if (sidebarModuleFilter !== 'all' && ev.moduleId !== sidebarModuleFilter) return false;
             return true;
         });
@@ -671,8 +677,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
             const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
 
-            const classeBadge = ev.classeId
-                ? '<span class="ei-badge" style="background:#fef3c7;color:#92400e;">' + ev.classeId + '</span>'
+            const evClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+            const classeBadge = evClasseIds.length > 0
+                ? '<span class="ei-badge" style="background:#fef3c7;color:#92400e;">' + evClasseIds.join(', ') + '</span>'
                 : '<span class="ei-badge" style="background:#e2e8f0;color:#64748b;">Toutes</span>';
 
             div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
@@ -701,7 +708,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('main-content').style.display = 'block';
 
         const title = currentEvalData ? currentEvalData.titre : 'Evaluation';
-        const classeInfo = currentEvalData && currentEvalData.classeId ? ' — Classe : ' + currentEvalData.classeId : ' — Toutes classes';
+        const evalClasseIds = currentEvalData ? (currentEvalData.classeIds || (currentEvalData.classeId ? [currentEvalData.classeId] : [])) : [];
+        const classeInfo = evalClasseIds.length > 0 ? ' — Classe(s) : ' + evalClasseIds.join(', ') : ' — Toutes classes';
         document.getElementById('eval-title-display').textContent = title + classeInfo;
 
         // Show session section if synchronise mode
@@ -780,6 +788,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 publie,
                 tempsSecondes: resp.tempsSecondes || 0,
                 tabSwitchCount: resp.tabSwitchCount || 0,
+                copyPasteCount: resp.copyPasteCount || 0,
+                rightClickCount: resp.rightClickCount || 0,
                 submittedAt: resp.submittedAt || '',
                 reponses: resp.reponses || {},
                 evalDocId,
@@ -797,13 +807,17 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const classes = new Set();
         // 1. Classes from results
         results.forEach(r => { if (r.classe) classes.add(r.classe); });
-        // 2. Classes from eval target (classeId can be a group)
-        if (currentEvalData && currentEvalData.classeId) {
-            const targetClasses = window.getClassesFromGroupe ? window.getClassesFromGroupe(currentEvalData.classeId) : [currentEvalData.classeId];
-            targetClasses.forEach(c => classes.add(c));
+        // 2. Classes from eval target (classeIds or classeId, can be groups)
+        if (currentEvalData) {
+            const targetIds = currentEvalData.classeIds || (currentEvalData.classeId ? [currentEvalData.classeId] : []);
+            targetIds.forEach(id => {
+                const expanded = window.getClassesFromGroupe ? window.getClassesFromGroupe(id) : [id];
+                expanded.forEach(c => classes.add(c));
+            });
         }
-        // 3. If no classeId (all classes), show classes from BDD_ELEVES that have results
-        if (!currentEvalData || !currentEvalData.classeId) {
+        // 3. If no classes targeted (all classes), show classes from results
+        const targetIds = currentEvalData ? (currentEvalData.classeIds || (currentEvalData.classeId ? [currentEvalData.classeId] : [])) : [];
+        if (targetIds.length === 0) {
             results.forEach(r => { if (r.classe) classes.add(r.classe); });
         }
 
@@ -964,8 +978,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const secs = r.tempsSecondes % 60;
             const timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
 
-            // Tab switch warning
+            // Anti-cheat warnings
             const tabWarn = r.tabSwitchCount > 0 ? ' <span title="Sorties detectees" style="color:#ef4444; font-size:0.7rem;">⚠️' + r.tabSwitchCount + '</span>' : '';
+            const copyWarn = r.copyPasteCount > 0 ? ' <span title="Copier-coller detecte" style="color:#f59e0b; font-size:0.7rem;">📋' + r.copyPasteCount + '</span>' : '';
+            const rightWarn = r.rightClickCount > 0 ? ' <span title="Clics droit detectes" style="color:#f97316; font-size:0.7rem;">🖱️' + r.rightClickCount + '</span>' : '';
 
             // Date
             const dateStr = formatDate(r.submittedAt);
@@ -981,7 +997,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const displayName = afficherAvecNom(r.eleveCode);
 
             tr.innerHTML =
-                '<td class="td-code">' + displayName + tabWarn + '</td>' +
+                '<td class="td-code">' + displayName + tabWarn + copyWarn + rightWarn + '</td>' +
                 '<td class="td-classe">' + r.classe + '</td>' +
                 '<td class="td-note ' + noteClass + '">' + noteHtml + '</td>' +
                 compsCells +
@@ -1190,6 +1206,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
         html += '<div class="ms-label">Temps : ' + Math.floor(r.tempsSecondes / 60) + ' min ' + (r.tempsSecondes % 60) + ' sec';
         if (r.tabSwitchCount > 0) html += ' | ⚠️ ' + r.tabSwitchCount + ' sortie(s) d\'onglet';
+        if (r.copyPasteCount > 0) html += ' | 📋 ' + r.copyPasteCount + ' copier-coller';
+        if (r.rightClickCount > 0) html += ' | 🖱️ ' + r.rightClickCount + ' clic(s) droit';
         html += '</div></div>';
 
         // Per-question detail
@@ -1375,7 +1393,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
 
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
-        const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'Note auto', 'Note ajustee', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Date', 'Sorties onglet'];
+        const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'Note auto', 'Note ajustee', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Date', 'Sorties onglet', 'Copier-coller', 'Clics droit'];
 
         const rows = filteredResults.map(r => {
             const comps = [];
@@ -1404,7 +1422,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 r.publie ? 'Publie' : 'Soumis',
                 r.tempsSecondes,
                 formatDate(r.submittedAt),
-                r.tabSwitchCount
+                r.tabSwitchCount,
+                r.copyPasteCount || 0,
+                r.rightClickCount || 0
             ].join(';');
         });
 
@@ -1457,6 +1477,12 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             }
             const dateStr = formatDate(r.submittedAt);
             const displayName = getNomEleve(r.eleveCode) ? (getNomEleve(r.eleveCode) + ' (' + r.eleveCode + ')') : r.eleveCode;
+            // Anti-cheat alerts summary
+            let alertParts = [];
+            if (r.tabSwitchCount > 0) alertParts.push(r.tabSwitchCount + ' sortie(s)');
+            if (r.copyPasteCount > 0) alertParts.push(r.copyPasteCount + ' copier-coller');
+            if (r.rightClickCount > 0) alertParts.push(r.rightClickCount + ' clic(s) droit');
+            const alertStr = alertParts.length > 0 ? alertParts.join(', ') : '-';
             tableRows += '<tr>' +
                 '<td>' + displayName + '</td>' +
                 '<td>' + r.classe + '</td>' +
@@ -1464,6 +1490,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 comps +
                 '<td>' + (r.publie ? 'Publie' : 'Soumis') + '</td>' +
                 '<td>' + dateStr + '</td>' +
+                '<td style="font-size:0.7rem;color:#dc2626;">' + alertStr + '</td>' +
                 '</tr>';
         });
 
@@ -1492,7 +1519,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             '<table><thead><tr>' +
                 '<th>Eleve</th><th>Classe</th><th>Note</th>' +
                 '<th>C1</th><th>C2</th><th>C3</th><th>C4</th><th>C5</th><th>C6</th>' +
-                '<th>Statut</th><th>Date</th>' +
+                '<th>Statut</th><th>Date</th><th>Alertes</th>' +
             '</tr></thead><tbody>' + tableRows + '</tbody></table>' +
             '<script>window.onload=function(){window.print();}<\/script>' +
             '</body></html>';
