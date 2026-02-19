@@ -1474,6 +1474,38 @@
         }
     };
 
+    // ========== IMPORT DEPUIS BIBLIOTHEQUE (sessionStorage) ==========
+    (function checkBiblioImport() {
+        const importData = sessionStorage.getItem('biblio_import');
+        if (!importData) return;
+        const cat = sessionStorage.getItem('biblio_categorie');
+        sessionStorage.removeItem('biblio_import');
+        sessionStorage.removeItem('biblio_categorie');
+        if (cat !== 'exercice') return;
+        try {
+            const data = JSON.parse(importData);
+            // Detect type from JSON keys
+            let type = 'prevention';
+            if (data.niveaux && data.danger) type = 'prevention';
+            else if (data.distracteurs_danger) type = 'pad';
+            else if (data.texte && data.texte.includes('{{')) type = 'texte_trous';
+            else if (data.paires) type = 'relier';
+            else if (data.items && !data.questions) type = 'ordre';
+            else if (data.series) type = 'intrus';
+            else if (data.mots && data.mots[0] && data.mots[0].indice !== undefined) type = 'pendu';
+            else if (data.mots && data.mots[0] && data.mots[0].definition !== undefined) type = 'mots_croises';
+            else if (data.affirmations) type = 'swipe_vf';
+            else if (data.questions && data.questions[0] && data.questions[0].image !== undefined) type = 'qcm_image';
+            else if (data.colonnes && data.lignes) type = 'tableau';
+            else if (data.scenario) type = 'etude_cas';
+            // Set type and populate form
+            document.getElementById('exo-type').value = type;
+            onTypeChange();
+            setContenuInForm(type, data);
+            showToast('📚 Importé depuis la bibliothèque !');
+        } catch(e) { console.error('Erreur import biblio:', e); }
+    })();
+
     // ========== TOAST ==========
     function showToast(msg) {
         const t = document.getElementById('toast');
