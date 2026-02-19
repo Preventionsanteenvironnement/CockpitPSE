@@ -234,10 +234,17 @@
             .summary-bars { gap:8px; }
         }
 
+        /* === MEDIA QUESTION === */
+        .q-media-container { width: 100%; max-width: 700px; margin: 0 auto 16px auto; text-align: center; }
+        .q-media-container img { max-width: 100%; max-height: 260px; border-radius: 12px; object-fit: contain; }
+        .q-media-container iframe { width: 100%; max-width: 560px; height: 315px; border: none; border-radius: 12px; }
+        .q-media-container .media-texte { background: #1e293b; border-left: 4px solid #3b82f6; padding: 16px 20px; border-radius: 0 12px 12px 0; color: #e2e8f0; font-style: italic; line-height: 1.6; text-align: left; white-space: pre-wrap; font-size: 1rem; }
+
         /* === PHONE 480px === */
         @media (max-width:480px) {
             #main { padding:10px; }
             .code-giant { font-size:2rem !important; }
+            .q-media-container iframe { height: 200px; }
         }
     </style>
 </head>
@@ -372,6 +379,7 @@
     <div id="main-question">
         <div class="main-q-num" id="main-q-num"></div>
         <div class="main-timer" id="main-timer"></div>
+        <div class="q-media-container" id="main-q-media"></div>
         <div class="main-q-text" id="main-q-text"></div>
         <div class="response-counter" id="main-resp-counter"></div>
         <div class="main-choices" id="main-choices"></div>
@@ -632,26 +640,52 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     function normalizeQuestionsForLive(questions) {
         return questions.map(q => {
             const type = q.type || 'qcm';
+            const media = q.media || null;
             if (type === 'vf') {
                 // Convert to QCM with 2 choices
-                return {
+                const out = {
                     type: 'qcm',
                     originalType: 'vf',
                     question: q.question,
                     choices: ['Vrai', 'Faux'],
                     correct: q.correct === true ? 0 : 1
                 };
+                if (media) out.media = media;
+                return out;
             } else if (type === 'mot') {
-                return {
+                const out = {
                     type: 'mot',
                     question: q.question,
                     reponse: q.reponse
                 };
+                if (media) out.media = media;
+                return out;
             } else {
                 // QCM — ensure type is set
                 return { ...q, type: 'qcm' };
             }
         });
+    }
+
+    // === RENDER MEDIA HTML ===
+    function renderMediaHtml(media) {
+        if (!media || !media.type || !media.content) return '';
+        if (media.type === 'image') {
+            return '<img src="' + media.content + '" alt="Media" onerror="this.style.display=\'none\'">';
+        } else if (media.type === 'video') {
+            const vid = extractYouTubeId(media.content);
+            if (!vid) return '';
+            return '<iframe src="https://www.youtube-nocookie.com/embed/' + vid + '" allowfullscreen></iframe>';
+        } else if (media.type === 'texte') {
+            return '<div class="media-texte">' + media.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+        }
+        return '';
+    }
+
+    function extractYouTubeId(url) {
+        if (!url) return null;
+        const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/);
+        return m ? m[1] : null;
     }
 
     // === QUIZ SELECTOR ===
@@ -666,7 +700,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const opt = document.createElement('option');
             opt.value = d.id;
             const qCount = data.questions ? data.questions.length : 0;
-            const typeTag = data.type === 'diagnostique' ? '[Diag]' : '[Form]';
+            let typeTag = '[Form]';
+            if (data.type === 'diagnostique') typeTag = '[Diag]';
+            else if (data.type === 'sommatif') typeTag = '[Somm]';
+            else if (data.type && data.type.startsWith('autre:')) typeTag = '[' + data.type.substring(6) + ']';
+            else if (data.type === 'autre') typeTag = '[Autre]';
             opt.textContent = typeTag + ' ' + (data.titre || 'Sans titre') + ' (' + qCount + ' Q)';
             opt.dataset.quizData = JSON.stringify(data);
             sel.appendChild(opt);
@@ -975,6 +1013,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const qType = q.type || 'qcm';
 
         document.getElementById('main-q-num').textContent = 'Question ' + (index + 1) + ' / ' + ACTIVE_QUESTIONS.length;
+        // Media
+        const mediaEl = document.getElementById('main-q-media');
+        mediaEl.innerHTML = q.media ? renderMediaHtml(q.media) : '';
+        mediaEl.style.display = q.media ? 'block' : 'none';
         document.getElementById('main-q-text').textContent = q.question;
         if (currentMode === 'auto') {
             document.getElementById('main-timer').textContent = timer + 's';

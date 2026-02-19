@@ -257,6 +257,12 @@
             font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; text-align: center;
         }
 
+        /* === MEDIA QUESTION (projecteur) === */
+        .q-media-container { width: 100%; max-width: 900px; margin: 0 auto 20px auto; text-align: center; }
+        .q-media-container img { max-width: 100%; max-height: 350px; border-radius: 16px; object-fit: contain; }
+        .q-media-container iframe { width: 100%; max-width: 720px; height: 405px; border: none; border-radius: 16px; }
+        .q-media-container .media-texte { background: rgba(255,255,255,0.08); border-left: 5px solid #3b82f6; padding: 20px 24px; border-radius: 0 16px 16px 0; color: #e2e8f0; font-style: italic; line-height: 1.7; text-align: left; white-space: pre-wrap; font-size: 1.2rem; max-width: 800px; margin: 0 auto; }
+
         /* === ANIMATIONS === */
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes bounceIn { 0% { transform: translateX(-50%) scale(0); } 50% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
@@ -293,6 +299,7 @@
 <div id="screen-question" class="screen">
     <div class="wall-q-num" id="wall-q-num"></div>
     <div class="wall-timer" id="wall-timer"></div>
+    <div class="q-media-container" id="wall-q-media" style="display:none;"></div>
     <div class="wall-q-text" id="wall-q-text"></div>
     <div class="wall-choices" id="wall-choices"></div>
     <div class="wall-mot-info" id="wall-mot-info" style="display:none;"></div>
@@ -302,6 +309,7 @@
 <!-- RESULTS -->
 <div id="screen-results" class="screen">
     <div class="wall-q-num" id="res-q-num"></div>
+    <div class="q-media-container" id="res-q-media" style="display:none;"></div>
     <div class="results-q-text" id="res-q-text"></div>
     <div class="results-bars" id="res-bars"></div>
     <div class="results-correct-text" id="res-correct-text"></div>
@@ -515,11 +523,40 @@
         });
     }
 
+    // === MEDIA HELPERS ===
+    function extractYouTubeId(url) {
+        if (!url) return null;
+        const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/);
+        return m ? m[1] : null;
+    }
+    function renderMediaHtml(media) {
+        if (!media || !media.type || !media.content) return '';
+        if (media.type === 'image') {
+            return '<img src="' + media.content + '" alt="Media" onerror="this.style.display=\'none\'">';
+        } else if (media.type === 'video') {
+            const vid = extractYouTubeId(media.content);
+            if (!vid) return '';
+            return '<iframe src="https://www.youtube-nocookie.com/embed/' + vid + '" allowfullscreen></iframe>';
+        } else if (media.type === 'texte') {
+            return '<div class="media-texte">' + media.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+        }
+        return '';
+    }
+
     // === QUESTION ===
     function displayWallQuestion(q, index, total, timer) {
         const qType = q.type || 'qcm';
 
         document.getElementById('wall-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
+        // Media
+        const mediaEl = document.getElementById('wall-q-media');
+        if (q.media) {
+            mediaEl.innerHTML = renderMediaHtml(q.media);
+            mediaEl.style.display = 'block';
+        } else {
+            mediaEl.innerHTML = '';
+            mediaEl.style.display = 'none';
+        }
         document.getElementById('wall-q-text').textContent = q.question;
         document.getElementById('wall-resp-counter').textContent = '0 / ' + playerCount + ' ont repondu';
 
@@ -578,6 +615,15 @@
         const qType = q.type || 'qcm';
 
         document.getElementById('res-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
+        // Media
+        const resMediaEl = document.getElementById('res-q-media');
+        if (q.media) {
+            resMediaEl.innerHTML = renderMediaHtml(q.media);
+            resMediaEl.style.display = 'block';
+        } else {
+            resMediaEl.innerHTML = '';
+            resMediaEl.style.display = 'none';
+        }
         document.getElementById('res-q-text').textContent = q.question;
 
         const currentResp = responsesData.filter(r => r.questionIndex === index);
