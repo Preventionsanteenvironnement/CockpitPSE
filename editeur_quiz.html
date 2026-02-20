@@ -292,6 +292,18 @@
             #main { padding:10px; }
             .add-btn { min-width:100%; }
         }
+
+        /* === IMPORT JSON MODAL === */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1100; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1e293b; border-radius: 16px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; border: 1px solid #334155; }
+        .modal-content h3 { margin: 0 0 12px; color: #e2e8f0; }
+        .modal-textarea { width: 100%; font-family: monospace; font-size: 0.85rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: vertical; box-sizing: border-box; }
+        .import-prompt-details { margin: 12px 0; }
+        .import-prompt-details summary { cursor: pointer; color: #94a3b8; font-size: 0.85rem; }
+        .import-prompt-details pre { white-space: pre-wrap; font-size: 0.7rem; max-height: 300px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; color: #94a3b8; margin-top: 8px; }
+        .btn-import-json { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+        .btn-import-json:hover { background: #4f46e5; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -366,7 +378,10 @@
         <div>
             <div class="questions-header">
                 <h3>Questions</h3>
-                <span class="questions-count" id="q-count">0 question(s)</span>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button type="button" class="btn-import-json" onclick="openImportModal()">📥 Importer JSON</button>
+                    <span class="questions-count" id="q-count">0 question(s)</span>
+                </div>
             </div>
 
             <div class="add-btns">
@@ -1214,6 +1229,202 @@ function resetMediaForm(prefix) {
             showToast('📚 Quiz importé depuis la bibliothèque !');
         } catch(e) { console.error('Erreur import biblio quiz:', e); }
     })();
+
+    // ========== IMPORT JSON SYSTEM ==========
+
+    const QUIZ_IMPORT_PROMPT = `Tu es un generateur de quiz PSE (Prevention Sante Environnement). Genere un JSON strictement valide au format suivant.
+
+FORMAT JSON :
+{
+  "titre": "Quiz diagnostique — [Module]",
+  "type": "diagnostique",
+  "questions": [
+    {
+      "type": "qcm",
+      "question": "Texte de la question",
+      "choices": ["Choix A", "Choix B", "Choix C", "Choix D"],
+      "correct": 0
+    },
+    {
+      "type": "vf",
+      "question": "Affirmation a evaluer",
+      "correct": true
+    },
+    {
+      "type": "mot",
+      "question": "Question a reponse courte",
+      "reponse": "reponse attendue"
+    }
+  ]
+}
+
+TYPES DE QUESTIONS (3 types uniquement) :
+- "qcm" : QCM choix unique. choices (tableau 3-4 choix, tous differents), correct (index 0-based : 0 pour le 1er choix, 1 pour le 2e, etc.)
+- "vf" : Vrai/Faux. correct (BOOLEAN STRICT : true ou false, JAMAIS 0/1 ni "vrai"/"faux")
+- "mot" : Reponse courte (1-3 mots). reponse (string non vide, courte et univoque)
+
+TYPES DE QUIZ :
+- "diagnostique" : debut de module, evaluer les representations prealables. Questions accessibles, culture generale, pas de vocabulaire technique. 8-10 questions. Inclure 2-3 idees recues.
+- "formatif" : fin de module, verifier les acquis. Questions ciblant les notions cles du cours. Vocabulaire technique autorise. 10-12 questions.
+
+REGLES STRICTES :
+- 8 a 12 questions
+- Alterner les types (pas plus de 3 d'affilee du meme type)
+- Equilibrer les VF (moitie vraies, moitie fausses)
+- Les choix QCM doivent etre plausibles mais clairement faux
+- Pas d'accents dans le JSON (pas de e accent, a accent, etc.)
+- Le JSON doit etre valide et parsable directement
+- Le champ "type" du quiz vaut "diagnostique" ou "formatif"
+- Ne pas ajouter de champs supplementaires (pas de "explication", "points", "scenario")`;
+
+    window.openImportModal = function() {
+        document.getElementById('quiz-import-modal').style.display = 'flex';
+        document.getElementById('quiz-import-json').value = '';
+        document.getElementById('quiz-import-errors').style.display = 'none';
+        document.getElementById('quiz-import-errors').textContent = '';
+        document.getElementById('quiz-import-prompt-text').textContent = QUIZ_IMPORT_PROMPT;
+    };
+
+    window.closeImportModal = function() {
+        document.getElementById('quiz-import-modal').style.display = 'none';
+    };
+
+    window.copyImportPrompt = function() {
+        navigator.clipboard.writeText(QUIZ_IMPORT_PROMPT).then(() => {
+            showToast('📋 Prompt copié !');
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = QUIZ_IMPORT_PROMPT;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('📋 Prompt copié !');
+        });
+    };
+
+    function validateQuizJSON(jsonString) {
+        const errors = [];
+        let data;
+
+        // Nettoyage guillemets courbes (ChatGPT/Word)
+        let cleaned = jsonString
+            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+
+        try {
+            data = JSON.parse(cleaned);
+        } catch(e) {
+            return { ok: false, data: null, errors: ['JSON invalide : ' + e.message] };
+        }
+
+        if (!data.questions || !Array.isArray(data.questions)) {
+            return { ok: false, data, errors: ['Le champ "questions" est manquant ou n\'est pas un tableau.'] };
+        }
+        if (data.questions.length === 0) {
+            errors.push('Le tableau "questions" est vide.');
+        }
+        if (data.questions.length > 30) {
+            errors.push('Trop de questions (' + data.questions.length + '). Maximum 30.');
+        }
+
+        const validTypes = ['qcm', 'vf', 'mot'];
+
+        data.questions.forEach((q, i) => {
+            const n = 'Question ' + (i + 1);
+            if (!q.type || !validTypes.includes(q.type)) {
+                errors.push(n + ' : type invalide "' + q.type + '". Types autorises : qcm, vf, mot.');
+                return;
+            }
+            if (!q.question || typeof q.question !== 'string' || !q.question.trim()) {
+                errors.push(n + ' : le champ "question" est vide ou manquant.');
+            }
+
+            if (q.type === 'qcm') {
+                if (!Array.isArray(q.choices) || q.choices.length < 2 || q.choices.length > 6) {
+                    errors.push(n + ' (QCM) : "choices" doit contenir 2 a 6 choix.');
+                }
+                if (typeof q.correct !== 'number' || q.correct < 0 || q.correct >= (q.choices || []).length) {
+                    errors.push(n + ' (QCM) : "correct" doit etre un index valide (0 a ' + ((q.choices || []).length - 1) + ').');
+                }
+                // Verifier unicite des choix
+                const unique = new Set((q.choices || []).map(c => (c || '').trim().toLowerCase()));
+                if (unique.size < (q.choices || []).length) {
+                    errors.push(n + ' (QCM) : les choix doivent etre tous differents.');
+                }
+            }
+
+            if (q.type === 'vf') {
+                if (typeof q.correct !== 'boolean') {
+                    errors.push(n + ' (V/F) : "correct" doit etre true ou false (boolean), pas ' + JSON.stringify(q.correct) + '.');
+                }
+            }
+
+            if (q.type === 'mot') {
+                if (!q.reponse || typeof q.reponse !== 'string' || !q.reponse.trim()) {
+                    errors.push(n + ' (Mot) : le champ "reponse" est vide ou manquant.');
+                }
+            }
+        });
+
+        return { ok: errors.length === 0, data, errors };
+    }
+
+    window.executeQuizImport = function() {
+        const jsonStr = document.getElementById('quiz-import-json').value.trim();
+        const errDiv = document.getElementById('quiz-import-errors');
+
+        if (!jsonStr) {
+            errDiv.textContent = 'Collez le JSON dans le champ ci-dessus.';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        const result = validateQuizJSON(jsonStr);
+
+        if (!result.ok) {
+            errDiv.textContent = '❌ Erreurs detectees :\n' + result.errors.join('\n');
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        // Import reussi
+        const data = result.data;
+        currentQuizId = null;
+        questions = data.questions || [];
+        editingIndex = -1;
+
+        const titreEl = document.getElementById('quiz-titre');
+        if (titreEl && data.titre) titreEl.value = data.titre;
+
+        const typeEl = document.getElementById('quiz-type');
+        if (typeEl && data.type) typeEl.value = data.type;
+
+        renderQuestions();
+        showEditor();
+        closeImportModal();
+        showToast('✅ Quiz importé ! ' + questions.length + ' question(s) chargées.');
+    };
 </script>
+
+<!-- Import JSON Modal -->
+<div class="modal-overlay" id="quiz-import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
+    <div class="modal-content">
+        <h3>📥 Importer un quiz (JSON)</h3>
+        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:12px;">Collez le JSON genere par ChatGPT ou Claude. L'import cree un nouveau quiz avec les questions importees.</p>
+        <details class="import-prompt-details">
+            <summary>📋 Voir le prompt IA</summary>
+            <pre id="quiz-import-prompt-text"></pre>
+            <button type="button" onclick="copyImportPrompt()" style="margin-top:6px;" class="btn-import-json">📋 Copier le prompt</button>
+        </details>
+        <textarea id="quiz-import-json" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="quiz-import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-save-q" onclick="executeQuizImport()">✅ Importer</button>
+            <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
