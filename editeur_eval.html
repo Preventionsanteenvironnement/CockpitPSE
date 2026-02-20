@@ -1034,9 +1034,71 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
             populateCompetenceDropdowns(classeId);
         } else {
-            // Multiple classes -> module disabled
-            modSel.disabled = true;
-            modSel.innerHTML = '<option value="">— Plusieurs classes (pas de module) —</option>';
+            // Multiple classes -> check if they share the same curriculum
+            const niveaux = new Set();
+            ids.forEach(cid => {
+                const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(cid) : [cid];
+                const niv = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
+                if (niv) niveaux.add(niv);
+            });
+
+            // All same niveau, OR all Bac Pro (same programme)
+            const allBacPro = [...niveaux].every(n => n.startsWith('BAC_PRO'));
+            const allCap = [...niveaux].every(n => n === 'CAP');
+            const allSameNiveau = niveaux.size === 1;
+
+            if (allSameNiveau || allBacPro || allCap) {
+                // Shared curriculum -> show modules using the highest level class
+                modSel.disabled = false;
+                modSel.innerHTML = '<option value="">— Aucun module —</option>';
+
+                // Pick representative class (highest year for Bac Pro)
+                let refClasseId = ids[0];
+                if (allBacPro) {
+                    const order = { 'BAC_PRO_TERM': 3, 'BAC_PRO_1ERE': 2, 'BAC_PRO_2NDE': 1 };
+                    ids.forEach(cid => {
+                        const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(cid) : [cid];
+                        const niv = window.getNiveauClasse(cig[0]);
+                        const refNiv = window.getNiveauClasse(
+                            (window.getClassesFromGroupe ? window.getClassesFromGroupe(refClasseId) : [refClasseId])[0]
+                        );
+                        if ((order[niv] || 0) > (order[refNiv] || 0)) refClasseId = cid;
+                    });
+                }
+
+                const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(refClasseId) : [refClasseId];
+                const firstClass = classesInGroup[0];
+
+                const groups = window.getModulesForRevision
+                    ? window.getModulesForRevision(firstClass)
+                    : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+
+                const isMultiYear = groups.length > 1;
+
+                groups.forEach(group => {
+                    let currentTheme = '';
+                    group.modules.forEach(m => {
+                        if (m.theme !== currentTheme) {
+                            currentTheme = m.theme;
+                            const optGroup = document.createElement('optgroup');
+                            optGroup.label = isMultiYear
+                                ? group.niveauLabel + ' — Theme ' + m.theme
+                                : 'Theme ' + m.theme;
+                            modSel.appendChild(optGroup);
+                        }
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.textContent = m.id + ' — ' + m.titre;
+                        const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                        if (lastGroup) lastGroup.appendChild(opt);
+                        else modSel.appendChild(opt);
+                    });
+                });
+            } else {
+                // Mix CAP + Bac Pro -> cannot determine common modules
+                modSel.disabled = true;
+                modSel.innerHTML = '<option value="">— Programmes differents (pas de module commun) —</option>';
+            }
             // Use first class for competences
             populateCompetenceDropdowns(ids[0]);
         }
