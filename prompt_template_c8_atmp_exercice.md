@@ -95,12 +95,14 @@ ATTENTION : Ce JSON est destine a l'editeur d'exercices (type "Etude de cas"), P
       "question": "Texte de la question",
       "type": "qcm",
       "choix": ["Choix A", "Choix B", "Choix C", "Choix D"],
-      "correct": 0
+      "correct": 0,
+      "explication": "Explication pedagogique : pourquoi cette reponse est correcte..."
     },
     {
       "question": "Texte de la question",
       "type": "texte",
-      "reponse": "Reponse attendue"
+      "reponse": "Reponse attendue",
+      "explication": "Explication pedagogique : rappel de la notion ou du calcul..."
     }
   ]
 }
@@ -157,6 +159,14 @@ Il n'y a que 2 types possibles :
 - VERIFIER chaque calcul avant de generer le JSON
 - Pour simplifier : choisir un salaire brut qui donne un salaire journalier avec peu de decimales (ex: 1 800 euros -> 59,17 euros/jour)
 
+**Explications pedagogiques (TRES IMPORTANT) :**
+- Chaque question DOIT avoir un champ "explication" avec une explication claire et pedagogique
+- L'explication s'affiche a l'eleve apres correction (qu'il ait bon ou faux) pour l'aider a comprendre
+- Pour les calculs : rappeler la formule et le detail du calcul
+- Pour les QCM : expliquer pourquoi la bonne reponse est correcte et/ou pourquoi les autres sont fausses
+- Pour les definitions : rappeler la definition officielle et les criteres cles
+- S'appuyer sur le programme officiel et les manuels scolaires (Foucher, Delagrave)
+
 **Texte :**
 - Pas d'accents dans le JSON (utiliser "e" au lieu de "e accent", "a" au lieu de "a accent", etc.)
 - Pas de caracteres speciaux (pas de symbole euro -> ecrire "euros")
@@ -177,77 +187,91 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
       "question": "L'evenement subi par Marc est-il un accident du travail, un accident de trajet ou une maladie professionnelle ?",
       "type": "qcm",
       "choix": ["Un accident de trajet", "Un accident du travail", "Une maladie professionnelle"],
-      "correct": 1
+      "correct": 1,
+      "explication": "C'est un AT car il remplit les 3 conditions : fait soudain (choc), lesion corporelle (fracture), survenu au temps et au lieu de travail."
     },
     {
       "question": "Citez deux elements de la situation qui prouvent qu'il s'agit d'un accident du travail.",
       "type": "texte",
-      "reponse": "Le fait est soudain (choc d'une piece metallique) et il s'est produit pendant le temps de travail sur le lieu de travail"
+      "reponse": "Le fait est soudain (choc d'une piece metallique) et il s'est produit pendant le temps de travail sur le lieu de travail",
+      "explication": "Un AT se definit par 3 criteres : une action soudaine et violente, une lesion corporelle, un lien avec le travail (lieu + temps)."
     },
     {
       "question": "Dans quel delai Marc doit-il informer son employeur de l'accident ?",
       "type": "qcm",
       "choix": ["12 heures", "24 heures", "48 heures", "15 jours"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Le salarie dispose de 24 heures pour informer son employeur. L'employeur a ensuite 48 heures pour declarer a la CPAM. Le delai de 15 jours concerne la declaration de maladie professionnelle."
     },
     {
       "question": "Dans quel delai l'employeur doit-il declarer l'accident a la CPAM ?",
       "type": "texte",
-      "reponse": "48 heures"
+      "reponse": "48 heures",
+      "explication": "L'employeur doit envoyer la Declaration d'Accident du Travail (DAT) a la CPAM dans les 48 heures suivant la connaissance de l'accident."
     },
     {
       "question": "Comment s'appelle le document etabli par le medecin qui constate les lesions de Marc ?",
       "type": "texte",
-      "reponse": "Le certificat medical initial (CMI)"
+      "reponse": "Le certificat medical initial (CMI)",
+      "explication": "Le CMI (Certificat Medical Initial) comporte 4 volets : 2 pour la CPAM, 1 pour l'employeur, 1 pour le salarie. Il decrit les lesions constatees."
     },
     {
       "question": "Quelle est la difference entre les prestations en nature et les prestations en especes ?",
       "type": "qcm",
       "choix": ["Les prestations en nature sont des remboursements de soins a 100%, les prestations en especes compensent la perte de salaire", "Les prestations en nature sont versees en liquide, les prestations en especes sont des cheques", "Les prestations en nature concernent les MP, les prestations en especes les AT", "Il n'y a aucune difference"],
-      "correct": 0
+      "correct": 0,
+      "explication": "Prestations en nature = prise en charge des soins a 100% (medecin, pharmacie, reeducation). Prestations en especes = compensation financiere (indemnites journalieres, rente)."
     },
     {
       "question": "Calculez le salaire journalier de base de Marc (salaire brut 1 800 euros / 30,42). Arrondissez a 2 decimales.",
       "type": "texte",
-      "reponse": "59,17 euros"
+      "reponse": "59,17 euros",
+      "explication": "Calcul : 1 800 / 30,42 = 59,17 euros. Le diviseur 30,42 correspond au nombre moyen de jours par mois (365/12)."
     },
     {
       "question": "Calculez le montant de l'indemnite journaliere de Marc durant les 28 premiers jours d'arret (60% du salaire journalier). Arrondissez a 2 decimales.",
       "type": "texte",
-      "reponse": "35,50 euros"
+      "reponse": "35,50 euros",
+      "explication": "Calcul : 59,17 x 60% = 59,17 x 0,60 = 35,50 euros par jour. Du 1er au 28e jour, l'IJ est de 60% du salaire journalier de base."
     },
     {
       "question": "A partir du 29e jour, quel pourcentage du salaire journalier Marc percoit-il en indemnites journalieres ?",
       "type": "qcm",
       "choix": ["50%", "60%", "80%", "100%"],
-      "correct": 2
+      "correct": 2,
+      "explication": "A partir du 29e jour d'arret, l'IJ passe de 60% a 80% du salaire journalier de base. Cette augmentation compense la duree prolongee de l'arret."
     },
     {
       "question": "Calculez le montant de l'indemnite journaliere de Marc a partir du 29e jour (80% du salaire journalier). Arrondissez a 2 decimales.",
       "type": "texte",
-      "reponse": "47,34 euros"
+      "reponse": "47,34 euros",
+      "explication": "Calcul : 59,17 x 80% = 59,17 x 0,80 = 47,34 euros par jour. Ce montant s'applique du 29e jour jusqu'a la fin de l'arret."
     },
     {
       "question": "Quel type de responsabilite vise a reparer le prejudice subi par la victime en versant des dommages et interets ?",
       "type": "qcm",
       "choix": ["La responsabilite penale", "La responsabilite civile", "La responsabilite administrative"],
-      "correct": 1
+      "correct": 1,
+      "explication": "La responsabilite civile vise a REPARER (dommages et interets pour la victime). La responsabilite penale vise a PUNIR (amende, prison pour l'employeur)."
     },
     {
       "question": "Pourquoi peut-on parler de faute inexcusable de l'employeur dans cette situation ?",
       "type": "texte",
-      "reponse": "Parce que les salaries avaient signale le danger (pont elevateur defectueux) et l'employeur n'a pas pris les mesures necessaires"
+      "reponse": "Parce que les salaries avaient signale le danger (pont elevateur defectueux) et l'employeur n'a pas pris les mesures necessaires",
+      "explication": "La faute inexcusable est reconnue quand l'employeur avait conscience du danger (ici : signalement par les salaries) et n'a pas agi. La victime obtient alors une indemnisation complementaire."
     },
     {
       "question": "Quel est l'interet pour Marc de faire reconnaitre la faute inexcusable de son employeur ?",
       "type": "qcm",
       "choix": ["Obtenir un licenciement de l'employeur", "Obtenir une indemnisation complementaire a celle de la Securite sociale", "Changer de metier", "Reduire son arret de travail"],
-      "correct": 1
+      "correct": 1,
+      "explication": "La faute inexcusable permet a la victime d'obtenir une indemnisation COMPLEMENTAIRE en plus des prestations normales de la Securite sociale. Le delai pour engager la procedure est de 2 ans."
     },
     {
       "question": "Proposez une mesure de prevention que l'employeur aurait du mettre en place pour eviter cet accident.",
       "type": "texte",
-      "reponse": "Faire reparer ou remplacer le pont elevateur defectueux signale par les salaries"
+      "reponse": "Faire reparer ou remplacer le pont elevateur defectueux signale par les salaries",
+      "explication": "L'employeur a une obligation de securite de resultat. Suite au signalement, il aurait du agir : reparer/remplacer l'equipement, interdire son utilisation, ou mettre en place des mesures de protection."
     }
   ]
 }
@@ -269,6 +293,7 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
 - [ ] Les delais reglementaires sont corrects (24h, 48h, 15 jours, 120 jours, 2 ans)
 - [ ] La difference AT / MP / accident de trajet est clairement exploitee
 - [ ] Pas d'accents dans le JSON
+- [ ] Chaque question a un champ "explication" pedagogique
 - [ ] Le personnage et les circonstances sont DIFFERENTS de l'exemple
 
 Genere maintenant une etude de cas complete avec les parametres personnalises ci-dessus. Fournis UNIQUEMENT le JSON brut, sans commentaires avant ou apres.
