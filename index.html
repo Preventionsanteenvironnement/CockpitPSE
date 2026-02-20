@@ -656,6 +656,13 @@
         <button class="biblio-tab active" onclick="switchBiblioTab('exercice', this)">🧩 Exercices</button>
         <button class="biblio-tab" onclick="switchBiblioTab('quiz', this)">🎯 Quiz</button>
         <button class="biblio-tab" onclick="switchBiblioTab('evaluation', this)">📝 Évaluations</button>
+        <button class="biblio-tab" onclick="switchBiblioTab('prompts', this)">📋 Prompts IA</button>
+      </div>
+
+      <!-- SECTION PROMPTS (visible uniquement quand onglet prompts actif) -->
+      <div id="biblio-prompts-section" style="display:none;">
+        <p style="color:#94a3b8; margin-bottom:16px; font-size:0.85rem;">Prompts a copier-coller dans ChatGPT ou Claude pour generer des exercices JSON importables.</p>
+        <div class="biblio-grid" id="biblio-prompts-grid"></div>
       </div>
 
       <!-- FILTRES + ACTIONS -->
@@ -2372,8 +2379,95 @@ QN80,Wael HWORI</pre>
         document.querySelectorAll('.biblio-tab').forEach(t => t.classList.remove('active'));
         if (btn) btn.classList.add('active');
         else document.querySelectorAll('.biblio-tab').forEach(t => { if (t.textContent.toLowerCase().includes(cat === 'exercice' ? 'exercice' : cat)) t.classList.add('active'); });
+
+        // Toggle prompts section vs normal biblio
+        const promptsSection = document.getElementById('biblio-prompts-section');
+        const toolbar = document.querySelector('.biblio-toolbar');
+        const count = document.getElementById('biblio-count');
+        const grid = document.getElementById('biblio-grid');
+        if (cat === 'prompts') {
+            if (promptsSection) promptsSection.style.display = '';
+            if (toolbar) toolbar.style.display = 'none';
+            if (count) count.style.display = 'none';
+            if (grid) grid.style.display = 'none';
+            renderPrompts();
+            return;
+        } else {
+            if (promptsSection) promptsSection.style.display = 'none';
+            if (toolbar) toolbar.style.display = '';
+            if (count) count.style.display = '';
+            if (grid) grid.style.display = '';
+        }
+
         updateBiblioTypeFilter();
         renderBiblio();
+    };
+
+    // Prompts data
+    const promptTemplates = [
+        {
+            id: 'prompt_d2_budget',
+            titre: 'D2 — Le budget (Etude de cas)',
+            module: 'D2',
+            description: 'Genere un mini-cas complet sur le budget (18 questions, 20 pts). Couvre les 4 objectifs du programme : revenus/depenses, gestion budget, epargne, credit. Personnage jeune avec situation realiste.',
+            usage: 'Copiez le prompt, collez dans ChatGPT/Claude, modifiez les parametres (prenom, metier, salaire, projet), et importez le JSON genere dans l\'editeur d\'evaluations.',
+            fichier: 'prompt_template_d2_budget.md'
+        }
+    ];
+
+    // Render prompts grid
+    function renderPrompts() {
+        const grid = document.getElementById('biblio-prompts-grid');
+        if (!grid) return;
+        if (promptTemplates.length === 0) {
+            grid.innerHTML = '<div class="biblio-empty">Aucun prompt disponible pour le moment.</div>';
+            return;
+        }
+        grid.innerHTML = promptTemplates.map(p => {
+            return '<div class="biblio-card" style="border-left:3px solid #a78bfa;">' +
+                '<div class="biblio-card-header">' +
+                    '<span class="biblio-badge biblio-badge-module">' + p.module + '</span>' +
+                    '<span class="biblio-badge biblio-badge-type">📋 Prompt IA</span>' +
+                '</div>' +
+                '<h4>' + p.titre + '</h4>' +
+                '<p class="biblio-preview">' + p.description + '</p>' +
+                '<p style="color:#94a3b8; font-size:0.7rem; margin-top:6px; font-style:italic;">' + p.usage + '</p>' +
+                '<div class="biblio-card-actions">' +
+                    '<button onclick="viewPrompt(\'' + p.id + '\')">👁️ Voir</button>' +
+                    '<button onclick="copyPrompt(\'' + p.id + '\')">📋 Copier</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // View prompt in preview modal
+    window.viewPrompt = async function(id) {
+        const p = promptTemplates.find(t => t.id === id);
+        if (!p) return;
+        try {
+            const resp = await fetch(p.fichier);
+            if (!resp.ok) throw new Error('Fichier non trouve');
+            const text = await resp.text();
+            document.getElementById('biblio-preview-json').textContent = text;
+            document.getElementById('biblio-preview-overlay').style.display = 'flex';
+        } catch(e) {
+            showToast('❌ Erreur : ' + e.message);
+        }
+    };
+
+    // Copy prompt to clipboard
+    window.copyPrompt = async function(id) {
+        const p = promptTemplates.find(t => t.id === id);
+        if (!p) return;
+        try {
+            const resp = await fetch(p.fichier);
+            if (!resp.ok) throw new Error('Fichier non trouve');
+            const text = await resp.text();
+            await navigator.clipboard.writeText(text);
+            showToast('📋 Prompt copie dans le presse-papiers ! Collez-le dans ChatGPT.');
+        } catch(e) {
+            showToast('❌ Erreur : ' + e.message);
+        }
     };
 
     // Update type filter options based on category
