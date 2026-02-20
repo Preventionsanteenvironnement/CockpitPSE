@@ -474,6 +474,7 @@
             <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
             <button class="ab-btn" style="background:#8b5cf6;" onclick="exportResultsPDF()">📄 PDF</button>
             <button class="ab-btn" style="background:#dc2626;" onclick="deleteEvaluation()">🗑️ Supprimer eval</button>
+            <button id="authBtn" class="ab-btn" style="background:#dbeafe;color:#1d4ed8;" onclick="connexionProf()">🔐 Connexion</button>
         </div>
 
         <!-- Results table -->
@@ -550,6 +551,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         getFirestore, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
         collection, collectionGroup, query, where, orderBy, onSnapshot, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -561,6 +563,42 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    let currentAuthUser = null;
+
+    // === AUTHENTIFICATION PROF (requise pour suppression) ===
+    onAuthStateChanged(auth, (user) => {
+        currentAuthUser = user;
+        updateAuthButton();
+        if (user) console.log("✅ Prof connecte:", user.email);
+    });
+
+    window.connexionProf = async function() {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            currentAuthUser = result.user;
+            updateAuthButton();
+            showToast('✅ Connecte : ' + currentAuthUser.email);
+        } catch (error) {
+            console.error("Erreur connexion:", error);
+            alert("Erreur : " + error.message);
+        }
+    };
+
+    function updateAuthButton() {
+        const btn = document.getElementById('authBtn');
+        if (!btn) return;
+        if (currentAuthUser) {
+            btn.textContent = "✅ " + currentAuthUser.email.split('@')[0];
+            btn.style.background = "#dcfce7";
+            btn.style.color = "#166534";
+        } else {
+            btn.textContent = "🔐 Connexion";
+            btn.style.background = "#dbeafe";
+            btn.style.color = "#1d4ed8";
+        }
+    }
 
     // === NOMS ELEVES (RGPD - localStorage uniquement) ===
     const CLE_ELEVES = 'cockpit_eleves_noms';
@@ -1087,6 +1125,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     // === DELETE RESULT ===
     window.deleteResult = async function(eleveCode) {
+        if (!currentAuthUser) {
+            showToast('🔐 Connectez-vous pour supprimer');
+            connexionProf();
+            return;
+        }
         const r = results.find(r => r.eleveCode === eleveCode);
         if (!r) return;
         const displayName = afficherAvecNom(eleveCode);
@@ -1561,6 +1604,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     };
 
     window.deleteEvalFull = async function() {
+        if (!currentAuthUser) {
+            showToast('🔐 Connectez-vous pour supprimer');
+            connexionProf();
+            return;
+        }
         const nbResults = results.length;
         if (!confirm('ATTENTION : Cela va supprimer l\'evaluation ET tous les resultats de ' + nbResults + ' eleve(s).\n\nCette action est IRREVERSIBLE. Confirmer ?')) return;
 
