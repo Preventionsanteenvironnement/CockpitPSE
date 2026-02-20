@@ -192,6 +192,7 @@
         .type-vf { background: #8b5cf6; color: white; }
         .type-mot { background: #f59e0b; color: white; }
         .type-nombre { background: #22c55e; color: white; }
+        .type-ordonner { background: #e11d48; color: white; }
 
         .q-card-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
         .q-card-meta span {
@@ -332,6 +333,20 @@
         .points-ok { background: rgba(34,197,94,0.15); color: #22c55e; }
         .points-warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
         .points-err { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Import JSON modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1e293b; border-radius: 16px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; border: 1px solid #334155; }
+        .modal-content h3 { margin: 0 0 12px; color: #e2e8f0; }
+        .modal-textarea { width: 100%; font-family: monospace; font-size: 0.85rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: vertical; box-sizing: border-box; }
+        .import-prompt-details { margin: 12px 0; }
+        .import-prompt-details summary { cursor: pointer; color: #94a3b8; font-size: 0.85rem; }
+        .import-prompt-details pre { white-space: pre-wrap; font-size: 0.7rem; max-height: 300px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; color: #94a3b8; margin-top: 8px; }
+        .import-checkboxes { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+        .import-checkboxes label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #e2e8f0; font-size: 0.85rem; }
+        .btn-import-json { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+        .btn-import-json:hover { background: #4f46e5; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
 
         /* === FLOW MODE === */
         .flow-segment-doc {
@@ -505,6 +520,7 @@
             <div class="questions-header">
                 <h3>Contenu de l'evaluation</h3>
                 <div style="display:flex; align-items:center; gap:12px;">
+                    <button type="button" class="btn-import-json" onclick="openImportModal()">📥 Importer JSON</button>
                     <span class="points-total" id="points-total">0 pts</span>
                     <span class="questions-count" id="q-count">0 question(s)</span>
                 </div>
@@ -753,6 +769,48 @@
                 <div class="q-form-actions">
                     <button class="btn-save-q" onclick="saveQuestion('nombre')">Ajouter la question</button>
                     <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Ordonner Form -->
+            <div class="q-form" id="form-ordonner">
+                <h4>Nouvelle question Ordonner</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question (consigne)</label>
+                    <textarea class="form-textarea" id="ordonner-question" placeholder="Ex: Remets dans l'ordre les étapes de la PLS..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Éléments (dans l'ordre correct, du 1er au dernier)</label>
+                    <div id="ordonner-items"></div>
+                    <button type="button" class="btn-add-choice" onclick="addOrdonnerItem()">+ Ajouter un élément</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="ordonner-points" value="2" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="ordonner-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="ordonner-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="ordonner-correction" placeholder="Explication de l'ordre correct..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="ordonner-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button type="button" class="btn-save-q" onclick="saveQuestion('ordonner')">Ajouter la question</button>
+                    <button type="button" class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
                 </div>
             </div>
 
@@ -1144,13 +1202,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         const segments = computeEditorSegments();
         const colorMap = buildDocColorMap();
-        const typeLabels = { qcm_single: 'QCM', qcm_multi: 'QCM Multi', vf: 'V/F', mot: 'Mot', nombre: 'Nombre' };
+        const typeLabels = { qcm_single: 'QCM', qcm_multi: 'QCM Multi', vf: 'V/F', mot: 'Mot', nombre: 'Nombre', ordonner: 'Ordonner' };
         const qTypes = [
             { t: 'qcm_single', label: '+ QCM' },
             { t: 'qcm_multi', label: '+ QCM Multi' },
             { t: 'vf', label: '+ V/F' },
             { t: 'mot', label: '+ Mot' },
-            { t: 'nombre', label: '+ Nombre' }
+            { t: 'nombre', label: '+ Nombre' },
+            { t: 'ordonner', label: '+ Ordonner' }
         ];
         const referencedDocIds = new Set();
         questions.forEach(q => { if (q.documentRef) referencedDocIds.add(q.documentRef); });
@@ -1309,6 +1368,12 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             body = '<div class="q-card-answer">Reponse : ' + escHtml(q.correct || q.reponse || '') + '</div>';
         } else if (q.type === 'nombre') {
             body = '<div class="q-card-answer">Reponse : ' + q.correct + (q.tolerance ? ' (+/- ' + q.tolerance + ')' : '') + '</div>';
+        } else if (q.type === 'ordonner') {
+            body = '<div class="q-card-choices">';
+            (q.items || []).forEach((item, ii) => {
+                body += '<span class="q-card-choice">' + (ii + 1) + '. ' + escHtml(item) + '</span>';
+            });
+            body += '</div>';
         }
 
         if (q.correction) {
@@ -1610,6 +1675,44 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
     }
 
+    // === ORDONNER ===
+    window.addOrdonnerItem = function(text) {
+        const container = document.getElementById('ordonner-items');
+        const idx = container.children.length;
+        const row = document.createElement('div');
+        row.className = 'ord-item-row';
+        row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        row.innerHTML = '<span class="ord-row-num" style="min-width:24px; font-weight:600; color:#94a3b8;">' + (idx + 1) + '.</span>' +
+            '<input type="text" class="form-input" placeholder="Élément ' + (idx + 1) + '" value="' + escHtml(text || '') + '" style="flex:1;">' +
+            '<button type="button" class="remove-choice" onclick="removeOrdonnerItem(this)" title="Supprimer" style="display:' + (container.children.length >= 3 ? 'block' : 'none') + ';">&times;</button>';
+        container.appendChild(row);
+        updateOrdonnerRemoveButtons();
+    };
+
+    window.removeOrdonnerItem = function(btn) {
+        const container = document.getElementById('ordonner-items');
+        if (container.children.length <= 3) return;
+        btn.closest('.ord-item-row').remove();
+        // Renumber
+        Array.from(container.children).forEach((row, i) => {
+            row.querySelector('.ord-row-num').textContent = (i + 1) + '.';
+            row.querySelector('input[type="text"]').placeholder = 'Élément ' + (i + 1);
+        });
+        updateOrdonnerRemoveButtons();
+    };
+
+    function updateOrdonnerRemoveButtons() {
+        const container = document.getElementById('ordonner-items');
+        const rows = container.querySelectorAll('.ord-item-row');
+        rows.forEach(r => { const btn = r.querySelector('.remove-choice'); if (btn) btn.style.display = rows.length > 3 ? 'block' : 'none'; });
+    }
+
+    function resetOrdonnerItems() {
+        const container = document.getElementById('ordonner-items');
+        container.innerHTML = '';
+        for (let i = 0; i < 3; i++) addOrdonnerItem('');
+    }
+
     // === VF ===
     window.setVF = function(val) {
         vfAnswer = val;
@@ -1633,7 +1736,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             qcm_multi: 'QCM (choix multiples)',
             vf: 'Vrai / Faux',
             mot: 'Reponse courte',
-            nombre: 'Nombre'
+            nombre: 'Nombre',
+            ordonner: 'Ordonner'
         };
         updateFormTitle(type, 'Nouvelle question ' + typeLabels[type]);
         updateFormButtonText(type, 'Ajouter la question');
@@ -1654,6 +1758,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         } else if (type === 'nombre') {
             document.getElementById('nombre-reponse').value = '';
             document.getElementById('nombre-tolerance').value = '0';
+        } else if (type === 'ordonner') {
+            resetOrdonnerItems();
         }
 
         // Reset extra fields
@@ -1745,6 +1851,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         } else if (type === 'nombre') {
             document.getElementById('nombre-reponse').value = q.correct;
             document.getElementById('nombre-tolerance').value = q.tolerance || 0;
+        } else if (type === 'ordonner') {
+            const container = document.getElementById('ordonner-items');
+            container.innerHTML = '';
+            (q.items || []).forEach(item => addOrdonnerItem(item));
         }
 
         // Pre-fill extra fields
@@ -1802,6 +1912,17 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             if (reponse === '') { alert('Ecris la reponse attendue !'); return; }
             newQ.correct = parseFloat(reponse);
             newQ.tolerance = parseFloat(document.getElementById('nombre-tolerance').value) || 0;
+        } else if (type === 'ordonner') {
+            const inputs = document.querySelectorAll('#ordonner-items input[type="text"]');
+            const items = [];
+            let hasEmpty = false;
+            inputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; items.push(v); });
+            if (items.length < 3) { alert('Ajoute au moins 3 éléments !'); return; }
+            if (hasEmpty) { alert('Remplis tous les éléments !'); return; }
+            const unique = new Set(items);
+            if (unique.size !== items.length) { alert('Les éléments doivent être tous différents !'); return; }
+            newQ.items = items;
+            newQ.correct = items.map((_, i) => i);
         }
 
         // Extra fields
@@ -2046,6 +2167,383 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             showToast('📚 Évaluation importée depuis la bibliothèque !');
         } catch(e) { console.error('Erreur import biblio eval:', e); }
     })();
+</script>
+
+<!-- Import JSON Modal -->
+<div class="modal-overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
+    <div class="modal-content">
+        <h3>📥 Importer une évaluation (JSON)</h3>
+        <p class="info-text" style="margin-bottom:8px;">Collez le JSON généré par l'IA ou créé manuellement. L'import remplace les documents et questions existants.</p>
+        <details class="import-prompt-details">
+            <summary>📋 Voir le prompt IA</summary>
+            <pre id="import-prompt-text"></pre>
+            <button type="button" onclick="copyImportPrompt()" style="margin-top:6px;" class="btn-import-json">📋 Copier le prompt</button>
+        </details>
+        <div class="import-checkboxes">
+            <label><input type="checkbox" id="import-opt-titre"> Importer le titre</label>
+            <label><input type="checkbox" id="import-opt-bareme"> Importer le barème</label>
+            <label><input type="checkbox" id="import-opt-contenu" checked disabled> Importer les documents et questions</label>
+        </div>
+        <textarea id="import-json-input" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-save-q" onclick="executeImport()">✅ Importer</button>
+            <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== IMPORT JSON SYSTEM ==========
+
+const IMPORT_PROMPT = `Tu es un générateur d'évaluations PSE (Prévention Santé Environnement). Génère un JSON strictement valide au format suivant.
+
+FORMAT JSON :
+{
+  "titre": "Titre de l'évaluation",
+  "bareme": 20,
+  "documents": [
+    { "id": "doc1", "type": "texte", "titre": "Document 1", "contenu": "Texte du document..." },
+    { "id": "doc2", "type": "image", "titre": "Schéma", "image_url": "https://...", "alt": "Description", "description": "Légende", "credit": "Source" }
+  ],
+  "questions": [
+    {
+      "type": "qcm",
+      "consigne": "Identifier le principal risque lié à...",
+      "choix": ["Risque A", "Risque B", "Risque C", "Risque D"],
+      "reponse": 0,
+      "points": 1,
+      "competence": "C1",
+      "correction": "La bonne réponse est A parce que...",
+      "explication": "Ce point est important car...",
+      "document_id": "doc1"
+    }
+  ]
+}
+
+TYPES DE QUESTIONS AUTORISÉS :
+- "qcm" : QCM choix unique. choix (tableau 2-6, tous différents), reponse (index 0-based)
+- "qcm_multi" : QCM choix multiples. choix (tableau 2-6, tous différents), reponse (tableau d'indices, non vide)
+- "vf" : Vrai/Faux. reponse (true ou false, boolean strict)
+- "mot" : Réponse courte. reponse (string non vide)
+- "nombre" : Réponse numérique. reponse (number), tolerance (optionnel, number >= 0)
+- "ordonner" : Remettre dans l'ordre. elements (tableau >= 3 éléments, tous différents, dans l'ordre correct)
+
+TYPES DE DOCUMENTS :
+- "texte" : champs obligatoires = id, type, titre, contenu
+- "image" : champs obligatoires = id, type, titre, image_url. Optionnels : alt, description, credit
+
+COMPÉTENCES PSE (C1 à C6 UNIQUEMENT) :
+- C1 – Traiter une information
+- C2 – Appliquer une démarche d'analyse dans une situation donnée
+- C3 – Expliquer un phénomène physiologique, un enjeu environnemental, une disposition réglementaire, en lien avec une mesure de prévention (UNIQUEMENT si la question relie phénomène/règle → prévention précise)
+- C4 – Proposer une solution pour résoudre un problème
+- C5 – Argumenter un choix
+- C6 – Communication à l'écrit et à l'oral avec une syntaxe claire et adaptée
+
+RÈGLES BLOOM :
+Chaque consigne respecte la taxonomie de Bloom et commence par un seul verbe d'action unique (définir, identifier, appliquer, analyser, justifier, proposer, etc.). Pas de consignes floues ou doubles. Un seul verbe d'action par question. La compétence est choisie selon le verbe et la production attendue.
+
+RÈGLES ANTI-HALLUCINATION :
+- Ne pas inventer de document image si aucune image_url n'est fournie
+- Ne pas inventer de document_id : utiliser uniquement les ids définis dans documents[]
+- Si aucun document pertinent pour une question, mettre document_id: null
+- competence est OBLIGATOIRE pour chaque question (C1 à C6)
+
+RÈGLES STRICTES :
+- Tous les choix d'un QCM doivent être différents
+- Tous les éléments d'un ordonner doivent être différents
+- Le JSON doit être valide et parsable directement
+- points doit être un nombre > 0
+- Ne pas ajouter de commentaires dans le JSON`;
+
+window.openImportModal = function() {
+    document.getElementById('import-modal').style.display = 'flex';
+    document.getElementById('import-json-input').value = '';
+    document.getElementById('import-errors').style.display = 'none';
+    document.getElementById('import-errors').textContent = '';
+    document.getElementById('import-opt-titre').checked = false;
+    document.getElementById('import-opt-bareme').checked = false;
+    document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+};
+
+window.closeImportModal = function() {
+    document.getElementById('import-modal').style.display = 'none';
+};
+
+window.copyImportPrompt = function() {
+    navigator.clipboard.writeText(IMPORT_PROMPT).then(() => {
+        showToast('📋 Prompt copié !');
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = IMPORT_PROMPT;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('📋 Prompt copié !');
+    });
+};
+
+// === VALIDATE IMPORT JSON ===
+function validateImportJSON(jsonString) {
+    const errors = [];
+    let data;
+
+    // 1. Parse
+    try {
+        data = JSON.parse(jsonString);
+    } catch (e) {
+        return { ok: false, data: null, errors: ['❌ JSON invalide : ' + e.message] };
+    }
+
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        return { ok: false, data: null, errors: ['❌ Le JSON doit être un objet { ... }'] };
+    }
+
+    // 2. Bareme
+    if (data.bareme !== undefined && data.bareme !== 10 && data.bareme !== 20) {
+        errors.push('⚠️ bareme doit être 10 ou 20 (reçu : ' + data.bareme + ')');
+    }
+
+    // 3. Documents
+    const docIds = new Set();
+    if (data.documents !== undefined) {
+        if (!Array.isArray(data.documents)) {
+            errors.push('❌ documents doit être un tableau');
+        } else {
+            data.documents.forEach((doc, di) => {
+                const prefix = 'Doc ' + (di + 1) + ' : ';
+                if (!doc.id || typeof doc.id !== 'string') { errors.push(prefix + 'id manquant ou invalide'); return; }
+                if (docIds.has(doc.id)) { errors.push(prefix + 'id "' + doc.id + '" dupliqué'); return; }
+                docIds.add(doc.id);
+                if (!doc.titre || typeof doc.titre !== 'string') errors.push(prefix + 'titre manquant');
+                const docType = doc.type;
+                if (docType !== 'texte' && docType !== 'image') {
+                    errors.push(prefix + 'type doit être "texte" ou "image" (reçu : "' + docType + '")');
+                } else if (docType === 'texte') {
+                    if (!doc.contenu || typeof doc.contenu !== 'string') errors.push(prefix + 'contenu manquant pour doc texte');
+                } else if (docType === 'image') {
+                    if (!doc.image_url || typeof doc.image_url !== 'string') errors.push(prefix + 'image_url manquant pour doc image');
+                }
+            });
+        }
+    }
+
+    // 4. Questions
+    if (!Array.isArray(data.questions) || data.questions.length === 0) {
+        errors.push('❌ questions doit être un tableau non vide');
+        return { ok: false, data, errors };
+    }
+
+    const validComps = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+
+    data.questions.forEach((q, qi) => {
+        const prefix = 'Q' + (qi + 1) + ' : ';
+
+        // Type
+        if (!q.type) { errors.push(prefix + 'type manquant'); return; }
+        let mappedType = q.type === 'qcm' ? 'qcm_single' : q.type;
+        const validTypes = ['qcm_single', 'qcm_multi', 'vf', 'mot', 'nombre', 'ordonner'];
+        if (!validTypes.includes(mappedType)) { errors.push(prefix + 'type "' + q.type + '" non reconnu'); return; }
+
+        // Consigne
+        if (!q.consigne || typeof q.consigne !== 'string' || !q.consigne.trim()) {
+            errors.push(prefix + 'consigne manquante ou vide');
+        }
+
+        // Points
+        if (q.points !== undefined && (typeof q.points !== 'number' || q.points <= 0)) {
+            errors.push(prefix + 'points doit être un nombre > 0');
+        }
+
+        // Competence
+        if (!q.competence || !validComps.includes(q.competence)) {
+            errors.push(prefix + 'competence obligatoire et doit être C1, C2, C3, C4, C5 ou C6 (reçu : "' + (q.competence || '') + '")');
+        }
+
+        // document_id
+        if (q.document_id !== undefined && q.document_id !== null) {
+            if (typeof q.document_id !== 'string' || q.document_id === '') {
+                errors.push(prefix + 'document_id doit être null ou une string non vide');
+            } else if (!docIds.has(q.document_id)) {
+                errors.push(prefix + 'document_id "' + q.document_id + '" ne correspond à aucun document');
+            }
+        }
+
+        // Type-specific validation
+        if (mappedType === 'qcm_single') {
+            if (!Array.isArray(q.choix) || q.choix.length < 2 || q.choix.length > 6) {
+                errors.push(prefix + 'choix doit contenir 2 à 6 éléments');
+            } else {
+                const trimmed = q.choix.map(c => String(c).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les choix doivent être tous différents');
+                if (typeof q.reponse !== 'number' || q.reponse < 0 || q.reponse >= q.choix.length) {
+                    errors.push(prefix + 'reponse doit être un index valide (0 à ' + (q.choix.length - 1) + ')');
+                }
+            }
+        } else if (mappedType === 'qcm_multi') {
+            if (!Array.isArray(q.choix) || q.choix.length < 2 || q.choix.length > 6) {
+                errors.push(prefix + 'choix doit contenir 2 à 6 éléments');
+            } else {
+                const trimmed = q.choix.map(c => String(c).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les choix doivent être tous différents');
+                if (!Array.isArray(q.reponse) || q.reponse.length === 0) {
+                    errors.push(prefix + 'reponse doit être un tableau non vide d\'indices');
+                } else {
+                    const idxSet = new Set(q.reponse);
+                    if (idxSet.size !== q.reponse.length) errors.push(prefix + 'reponse contient des indices dupliqués');
+                    q.reponse.forEach(idx => {
+                        if (typeof idx !== 'number' || idx < 0 || idx >= q.choix.length) {
+                            errors.push(prefix + 'index ' + idx + ' invalide dans reponse');
+                        }
+                    });
+                }
+            }
+        } else if (mappedType === 'vf') {
+            if (typeof q.reponse !== 'boolean') {
+                errors.push(prefix + 'reponse doit être true ou false (boolean strict)');
+            }
+        } else if (mappedType === 'mot') {
+            if (!q.reponse || typeof q.reponse !== 'string' || !q.reponse.trim()) {
+                errors.push(prefix + 'reponse doit être une string non vide');
+            }
+        } else if (mappedType === 'nombre') {
+            if (typeof q.reponse !== 'number') {
+                errors.push(prefix + 'reponse doit être un nombre');
+            }
+            if (q.tolerance !== undefined) {
+                const tol = Number(q.tolerance);
+                if (isNaN(tol) || tol < 0) errors.push(prefix + 'tolerance doit être un nombre >= 0');
+            }
+        } else if (mappedType === 'ordonner') {
+            if (!Array.isArray(q.elements) || q.elements.length < 3) {
+                errors.push(prefix + 'elements doit contenir au moins 3 éléments');
+            } else {
+                const hasEmpty = q.elements.some(e => !e || typeof e !== 'string' || !e.trim());
+                if (hasEmpty) errors.push(prefix + 'tous les éléments doivent être des strings non vides');
+                const trimmed = q.elements.map(e => String(e).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les éléments doivent être tous différents');
+            }
+        }
+    });
+
+    return { ok: errors.length === 0, data, errors };
+}
+
+// === EXECUTE IMPORT ===
+window.executeImport = function() {
+    const jsonStr = document.getElementById('import-json-input').value.trim();
+    const errDiv = document.getElementById('import-errors');
+
+    if (!jsonStr) {
+        errDiv.textContent = '❌ Collez un JSON avant d\'importer.';
+        errDiv.style.display = 'block';
+        return;
+    }
+
+    const result = validateImportJSON(jsonStr);
+    if (!result.ok) {
+        errDiv.textContent = result.errors.join('\n');
+        errDiv.style.display = 'block';
+        return;
+    }
+
+    const data = result.data;
+
+    // === MAP DOCUMENTS ===
+    const docIdMap = {}; // oldId -> newId
+    const newDocs = [];
+    if (Array.isArray(data.documents)) {
+        data.documents.forEach(doc => {
+            const newId = 'doc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+            docIdMap[doc.id] = newId;
+            const internalDoc = {
+                id: newId,
+                titre: doc.titre || '',
+                description: doc.description || ''
+            };
+            if (doc.type === 'texte') {
+                internalDoc.type = 'text';
+                internalDoc.content = doc.contenu || '';
+            } else if (doc.type === 'image') {
+                internalDoc.type = 'image';
+                internalDoc.content = doc.image_url || '';
+                if (doc.alt) internalDoc.alt = doc.alt;
+                if (doc.credit) internalDoc.credit = doc.credit;
+            }
+            newDocs.push(internalDoc);
+        });
+    }
+
+    // === MAP QUESTIONS ===
+    const newQuestions = [];
+    data.questions.forEach(q => {
+        const newId = 'q_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+        const mappedType = q.type === 'qcm' ? 'qcm_single' : q.type;
+
+        const internalQ = {
+            id: newId,
+            type: mappedType,
+            question: (q.consigne || '').trim(),
+            points: (typeof q.points === 'number' && q.points > 0) ? q.points : 1,
+            competence: q.competence || '',
+            correction: (q.correction || '').trim(),
+            explication: (q.explication || '').trim(),
+            documentRef: null
+        };
+
+        // Map document_id
+        if (q.document_id && typeof q.document_id === 'string' && q.document_id !== '') {
+            internalQ.documentRef = docIdMap[q.document_id] || null;
+        }
+
+        // Type-specific mapping
+        if (mappedType === 'qcm_single') {
+            internalQ.choices = (q.choix || []).map(c => String(c));
+            internalQ.correct = typeof q.reponse === 'number' ? q.reponse : 0;
+        } else if (mappedType === 'qcm_multi') {
+            internalQ.choices = (q.choix || []).map(c => String(c));
+            internalQ.correct = Array.isArray(q.reponse) ? q.reponse : [];
+        } else if (mappedType === 'vf') {
+            internalQ.correct = q.reponse === true;
+        } else if (mappedType === 'mot') {
+            internalQ.correct = String(q.reponse || '').trim();
+        } else if (mappedType === 'nombre') {
+            internalQ.correct = typeof q.reponse === 'number' ? q.reponse : 0;
+            const tol = Number(q.tolerance);
+            internalQ.tolerance = (!isNaN(tol) && tol >= 0) ? tol : 0;
+        } else if (mappedType === 'ordonner') {
+            internalQ.items = (q.elements || []).map(e => String(e).trim());
+            internalQ.correct = internalQ.items.map((_, i) => i);
+        }
+
+        newQuestions.push(internalQ);
+    });
+
+    // === APPLY IMPORT ===
+    documents = newDocs;
+    questions = newQuestions;
+
+    // Optional: title
+    if (document.getElementById('import-opt-titre').checked && data.titre) {
+        const titreEl = document.getElementById('eval-titre');
+        if (titreEl) titreEl.value = data.titre;
+    }
+
+    // Optional: bareme
+    if (document.getElementById('import-opt-bareme').checked && data.bareme) {
+        setBareme(data.bareme);
+    }
+
+    // Refresh UI
+    updateDocRefDropdowns();
+    renderFlow();
+    updatePointsTotal();
+    closeImportModal();
+    showToast('📥 Import réussi ! ' + questions.length + ' question(s) importée(s)');
+};
 </script>
 </body>
 </html>
