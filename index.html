@@ -2471,7 +2471,7 @@ QN80,Wael HWORI</pre>
             const resp = await fetch(p.fichier);
             if (!resp.ok) throw new Error('Fichier non trouve');
             const text = await resp.text();
-            await navigator.clipboard.writeText(text);
+            clipCopy(text);
             showToast('📋 Prompt copie dans le presse-papiers ! Collez-le dans ChatGPT.');
         } catch(e) {
             showToast('❌ Erreur : ' + e.message);
@@ -2701,16 +2701,38 @@ QN80,Wael HWORI</pre>
         document.getElementById('biblio-preview-overlay').style.display = 'none';
     };
 
+    // Clipboard helper with fallback for non-HTTPS / async contexts
+    function clipCopy(text) {
+        try {
+            navigator.clipboard.writeText(text).then(() => showToast('📋 Copie dans le presse-papiers !')).catch(function() {
+                _clipFallback(text);
+                showToast('📋 Copie dans le presse-papiers !');
+            });
+        } catch(e) {
+            _clipFallback(text);
+            showToast('📋 Copie dans le presse-papiers !');
+        }
+    }
+    function _clipFallback(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
+
     window.copyPreviewJSON = function() {
         const text = document.getElementById('biblio-preview-json').textContent;
-        navigator.clipboard.writeText(text).then(() => showToast('📋 JSON copié !'));
+        clipCopy(text);
     };
 
     // Copy item JSON to clipboard
     window.copyBiblioJSON = function(id) {
         const item = allBiblioItems.find(i => i.id === id);
         if (!item) return;
-        navigator.clipboard.writeText(JSON.stringify(item.contenu, null, 2)).then(() => showToast('📋 JSON copié !'));
+        clipCopy(JSON.stringify(item.contenu, null, 2));
     };
 
     // Send to editor via sessionStorage
