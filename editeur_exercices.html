@@ -1271,16 +1271,36 @@
         const container = document.getElementById('qimg-questions');
         const num = container.children.length + 1;
         const d = data || {};
+        // Detect source type from existing data
+        const isGithub = d.image && !d.image.startsWith('http');
+        const githubFilename = isGithub ? d.image.replace('images/exercices/', '') : '';
         const card = document.createElement('div');
         card.className = 'serie-card';
         card.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h4>Question ' + num + '</h4>' +
             '<button style="background:none; border:none; color:#64748b; cursor:pointer; font-size:1rem;" onclick="this.closest(\'.serie-card\').remove()">&times;</button></div>' +
-            '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">URL Image</label><input type="text" class="form-input qimg-url" placeholder="https://..." value="' + (d.image || '') + '"></div>' +
+            '<div style="display:flex; gap:8px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">' +
+            '<select class="form-select qimg-source" style="width:160px;" onchange="toggleQimgSource(this)">' +
+            '<option value="url"' + (isGithub ? '' : ' selected') + '>🔗 URL externe</option>' +
+            '<option value="github"' + (isGithub ? ' selected' : '') + '>📁 Dossier GitHub</option>' +
+            '</select>' +
+            '<div class="qimg-url-wrap" style="flex:1; min-width:180px;' + (isGithub ? 'display:none;' : '') + '"><input type="text" class="form-input qimg-url" placeholder="https://exemple.com/image.jpg" value="' + (isGithub ? '' : (d.image || '')) + '"></div>' +
+            '<div class="qimg-github-wrap" style="flex:1; min-width:180px;' + (isGithub ? '' : 'display:none;') + '"><input type="text" class="form-input qimg-github" placeholder="nom_image.jpg (dans images/exercices/)" value="' + githubFilename + '"></div>' +
+            '</div>' +
             '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Question</label><input type="text" class="form-input qimg-question" value="' + (d.question || '') + '"></div>' +
             '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Choix (1 par ligne)</label><textarea class="form-textarea qimg-choix" rows="4" placeholder="Choix A\nChoix B\nChoix C\nChoix D">' + ((d.choix || []).join('\n')) + '</textarea></div>' +
             '<div class="form-group" style="margin-bottom:6px;"><label style="font-size:0.7rem;">Index correct (0-based)</label><input type="number" class="form-input qimg-correct" min="0" value="' + (d.correct || 0) + '" style="width:80px;"></div>' +
             '<div class="form-group"><label style="font-size:0.7rem;">Explication</label><input type="text" class="form-input qimg-explication" value="' + (d.explication || '') + '"></div>';
         container.appendChild(card);
+    };
+    window.toggleQimgSource = function(sel) {
+        const card = sel.closest('.serie-card');
+        const urlWrap = card.querySelector('.qimg-url-wrap');
+        const ghWrap = card.querySelector('.qimg-github-wrap');
+        if (sel.value === 'url') {
+            urlWrap.style.display = ''; ghWrap.style.display = 'none';
+        } else {
+            urlWrap.style.display = 'none'; ghWrap.style.display = '';
+        }
     };
 
     // --- TABLEAU ---
@@ -1367,8 +1387,16 @@
         } else if (type === 'qcm_image') {
             const questions = [];
             document.querySelectorAll('#qimg-questions .serie-card').forEach(card => {
+                const source = card.querySelector('.qimg-source').value;
+                let image = '';
+                if (source === 'url') {
+                    image = card.querySelector('.qimg-url').value.trim();
+                } else {
+                    const filename = card.querySelector('.qimg-github').value.trim();
+                    image = filename ? 'images/exercices/' + filename : '';
+                }
                 questions.push({
-                    image: card.querySelector('.qimg-url').value.trim(),
+                    image,
                     question: card.querySelector('.qimg-question').value.trim(),
                     choix: card.querySelector('.qimg-choix').value.split('\n').map(s => s.trim()).filter(Boolean),
                     correct: parseInt(card.querySelector('.qimg-correct').value) || 0,
@@ -2460,7 +2488,7 @@
         pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "..." }] }\n8 a 12 mots en MAJUSCULES sans accents.',
         mots_croises: 'Genere un exercice "mots croises" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "definition": "..." }] }\n6 a 10 mots MAJUSCULES sans accents.',
         swipe_vf: 'Genere un exercice "vrai/faux" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "affirmations": [{ "texte": "...", "reponse": true/false, "explication": "..." }] }\n10 a 15 affirmations.',
-        qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "questions": [{ "image": "", "question": "...", "choix": ["A","B","C","D"], "correct": 0, "explication": "..." }] }\nLaisse image vide. 3 a 5 questions.\nATTENTION : "correct" est un index 0-based. Pour 4 choix, les index valides sont 0, 1, 2, 3.',
+        qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\n\nFormat : {\n  "consigne": "...",\n  "questions": [{\n    "image": "URL_OU_CHEMIN",\n    "question": "...",\n    "choix": ["A","B","C","D"],\n    "correct": 0,\n    "explication": "..."\n  }]\n}\n\nIMAGES — 2 options :\n1. Si l\'utilisateur fournit des URLs d\'images → les utiliser directement dans le champ "image"\n2. Si pas d\'URLs → laisser "image": "" (l\'enseignant ajoutera les images apres import)\n\nLe champ "image" accepte :\n- Une URL complete (https://...)\n- Un chemin relatif GitHub (images/exercices/nom.jpg)\n\n3 a 5 questions.\nATTENTION : "correct" est un index 0-based. Pour 4 choix, les index valides sont 0, 1, 2, 3 (PAS 4).\nVocabulaire adapte CAP/Bac Pro.',
         tableau: 'Genere un exercice "tableau" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "colonnes": ["Col1","Col2"], "lignes": [{ "cellules": ["val", "{{trou}}"] }] }\nCellules entre {{ }} = trous. 4-6 lignes, 3-4 colonnes.',
         etude_cas: 'Genere une "etude de cas" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "scenario": "...", "questions": [{ "question": "...", "type": "qcm", "choix": ["A","B"], "correct": 0 }, { "question": "...", "type": "texte", "reponse": "..." }] }\n3 a 5 questions.',
         prevention: 'Genere un exercice "Mesures de prevention" pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel expose a un danger identifie (3-5 phrases realistes, max 500 caracteres).\nLe danger est deja identifie, l\'eleve doit trouver la bonne mesure pour chaque niveau de prevention.\n\nFormat STRICT :\n{\n  "titre": "Prevention - [metier/situation]",\n  "situation": "...",\n  "danger": "...",\n  "niveaux": [\n    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] }\n  ]\n}\n\nREGLES CRUCIALES :\n- 5 niveaux dans cet ordre : supprimer > reduire > collective > individuelle > formation\n- Exactement 3 distracteurs par niveau (tableaux JSON)\n- Les distracteurs doivent etre des VRAIES mesures de prevention mais du MAUVAIS niveau\n  Ex: pour "Supprimer", un distracteur peut etre "Porter des gants" (qui est un EPI, pas une suppression)\n- Chaque mesure max 120 caracteres, distracteurs max 80 caracteres\n- Vocabulaire simple adapte a des eleves de CAP/Bac Pro\n- Le principe cle : plus on agit a la source, plus c\'est efficace\n  Supprimer > Reduire > Collectif > Individuel > Formation\n- JAMAIS de mesure vague comme "faire attention" ou "etre vigilant"\n- Chaque mesure doit etre CONCRETE et APPLICABLE',
