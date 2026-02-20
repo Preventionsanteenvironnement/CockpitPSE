@@ -309,6 +309,11 @@
                         <option value="qcm_image">🖼️ QCM Image</option>
                         <option value="tableau">📊 Tableau a completer</option>
                         <option value="etude_cas">📖 Etude de cas</option>
+                        <option value="qcm_classique">🎯 QCM Classique</option>
+                        <option value="quiz_chrono">⏱️ Quiz Chrono</option>
+                        <option value="categoriser">📂 Categoriser / Trier</option>
+                        <option value="memory">🃏 Memory</option>
+                        <option value="scenario">🎬 Scenario interactif</option>
                         <option value="pad">⚠️ PAD (Processus d'apparition du dommage)</option>
                         <option value="prevention">🛡️ Mesures de prevention</option>
                         <option value="estimation_risque">📊 Estimation du risque</option>
@@ -882,6 +887,49 @@
             </div>
         </div>
 
+        <!-- ====== QCM CLASSIQUE ====== -->
+        <div class="content-type-section" id="ct-qcm_classique" style="display:none;">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="qcmc-titre" placeholder="QCM - Les risques electriques"></div>
+            <div class="form-group"><label>Question</label><textarea class="form-textarea" id="qcmc-question" rows="3" placeholder="Quelle est la premiere action a effectuer..."></textarea></div>
+            <div class="form-group"><label>Bonne(s) reponse(s) (une par ligne si multiple)</label><textarea class="form-textarea" id="qcmc-reponse" rows="2" placeholder="Couper le courant"></textarea></div>
+            <div class="form-group"><label>Distracteurs (separés par |)</label><input type="text" class="form-input" id="qcmc-distracteurs" placeholder="Toucher la victime | Appeler les pompiers | Arroser d'eau"></div>
+            <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                <input type="checkbox" id="qcmc-multiple"> <label for="qcmc-multiple" style="margin:0;">Plusieurs bonnes reponses (QCM multiple)</label>
+            </div>
+            <div class="form-group"><label>Explication (optionnel)</label><textarea class="form-textarea" id="qcmc-explication" rows="2" placeholder="Il faut toujours couper le courant avant..."></textarea></div>
+        </div>
+
+        <!-- ====== QUIZ CHRONO ====== -->
+        <div class="content-type-section" id="ct-quiz_chrono" style="display:none;">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="chrono-titre" placeholder="Quiz Chrono - Gestes de secours"></div>
+            <div class="form-group"><label>Temps par question (secondes)</label><input type="number" class="form-input" id="chrono-temps" value="15" min="5" max="120" style="width:100px;"></div>
+            <div id="chrono-questions"></div>
+            <button type="button" class="btn-save" style="background:#0ea5e9; margin-top:8px;" onclick="addChronoQuestion()">+ Ajouter une question</button>
+        </div>
+
+        <!-- ====== CATEGORISER ====== -->
+        <div class="content-type-section" id="ct-categoriser" style="display:none;">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="cat-titre" placeholder="Categoriser - Types de risques"></div>
+            <div class="form-group"><label>Consigne</label><input type="text" class="form-input" id="cat-consigne" value="Classez chaque element dans la bonne categorie"></div>
+            <div class="form-group"><label>Categories (separees par |)</label><input type="text" class="form-input" id="cat-categories" placeholder="Risques physiques | Risques chimiques | Risques biologiques" oninput="updateCatSelects()"></div>
+            <div id="cat-items-list"></div>
+            <button type="button" class="btn-save" style="background:#22c55e; margin-top:8px;" onclick="addCatItem()">+ Ajouter un item</button>
+        </div>
+
+        <!-- ====== MEMORY ====== -->
+        <div class="content-type-section" id="ct-memory" style="display:none;">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="mem-titre" placeholder="Memory - Vocabulaire SST"></div>
+            <div id="mem-list"></div>
+            <button type="button" class="btn-save" style="background:#a855f7; margin-top:8px;" onclick="addMemoryPair()">+ Ajouter une paire</button>
+        </div>
+
+        <!-- ====== SCENARIO ====== -->
+        <div class="content-type-section" id="ct-scenario" style="display:none;">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="scen-titre" placeholder="Scenario - Accident du travail"></div>
+            <div id="scen-etapes"></div>
+            <button type="button" class="btn-save" style="background:#f97316; margin-top:8px;" onclick="addScenEtape()">+ Ajouter une etape</button>
+        </div>
+
         <!-- ACTIONS -->
         <div class="bottom-actions">
             <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
@@ -952,6 +1000,11 @@
         intrus: '🔍 Intrus', pendu: '🎯 Pendu', mots_croises: '✏️ Mots croises',
         swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau',
         etude_cas: '📖 Etude de cas',
+        qcm_classique: '🎯 QCM Classique',
+        quiz_chrono: '⏱️ Quiz Chrono',
+        categoriser: '📂 Categoriser',
+        memory: '🃏 Memory',
+        scenario: '🎬 Scenario',
         pad: '⚠️ PAD',
         prevention: '🛡️ Prevention',
         estimation_risque: '📊 Estimation',
@@ -1459,6 +1512,95 @@
                     nb_prioritaires: parseInt(document.getElementById('duerp-m-nb-prio').value) || 2
                 }
             };
+        } else if (type === 'qcm_classique') {
+            const isMultiple = document.getElementById('qcmc-multiple').checked;
+            const repLines = document.getElementById('qcmc-reponse').value.split('\n').map(s=>s.trim()).filter(Boolean);
+            const distracteurs = document.getElementById('qcmc-distracteurs').value.split('|').map(s=>s.trim()).filter(Boolean);
+            const allTextes = [...repLines, ...distracteurs];
+            const choix = allTextes.map((t, i) => ({ id: 'c' + (i+1), texte: t }));
+            const repIds = choix.filter(c => repLines.includes(c.texte)).map(c => c.id);
+            return {
+                titre: document.getElementById('qcmc-titre').value.trim(),
+                question: document.getElementById('qcmc-question').value.trim(),
+                choix,
+                reponse: isMultiple ? repIds : repIds[0],
+                multiple: isMultiple,
+                explication: document.getElementById('qcmc-explication').value.trim() || undefined
+            };
+        } else if (type === 'quiz_chrono') {
+            const container = document.getElementById('chrono-questions');
+            const blocs = container.querySelectorAll('.chrono-q-bloc');
+            const questions = [];
+            blocs.forEach((bloc, qi) => {
+                const q = bloc.querySelector('.chrono-q-text').value.trim();
+                const rep = bloc.querySelector('.chrono-q-rep').value.trim();
+                const dist = bloc.querySelector('.chrono-q-dist').value.split('|').map(s=>s.trim()).filter(Boolean);
+                const expl = bloc.querySelector('.chrono-q-expl').value.trim();
+                const allT = [rep, ...dist];
+                const choix = allT.map((t, i) => ({ id: 'c' + (i+1), texte: t }));
+                questions.push({ question: q, choix, reponse: 'c1', explication: expl || undefined });
+            });
+            return {
+                titre: document.getElementById('chrono-titre').value.trim(),
+                temps_par_question: parseInt(document.getElementById('chrono-temps').value) || 15,
+                questions
+            };
+        } else if (type === 'categoriser') {
+            const categories = document.getElementById('cat-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+            const container = document.getElementById('cat-items-list');
+            const rows = container.querySelectorAll('.cat-item-row');
+            const items = [];
+            rows.forEach((row, i) => {
+                items.push({
+                    id: 'i' + (i+1),
+                    label: row.querySelector('.cat-item-label').value.trim(),
+                    categorie: row.querySelector('.cat-item-cat').value
+                });
+            });
+            return {
+                titre: document.getElementById('cat-titre').value.trim(),
+                consigne: document.getElementById('cat-consigne').value.trim(),
+                categories,
+                items
+            };
+        } else if (type === 'memory') {
+            const container = document.getElementById('mem-list');
+            const rows = container.querySelectorAll('.mem-pair-row');
+            const cartes = [];
+            rows.forEach((row, i) => {
+                cartes.push({
+                    id: 'p' + (i+1),
+                    a: row.querySelector('.mem-a').value.trim(),
+                    b: row.querySelector('.mem-b').value.trim()
+                });
+            });
+            return {
+                titre: document.getElementById('mem-titre').value.trim(),
+                cartes
+            };
+        } else if (type === 'scenario') {
+            const container = document.getElementById('scen-etapes');
+            const blocs = container.querySelectorAll('.scen-etape-bloc');
+            const etapes = [];
+            blocs.forEach(bloc => {
+                const id = bloc.querySelector('.scen-etape-id').value.trim();
+                const texte = bloc.querySelector('.scen-etape-texte').value.trim();
+                const choixEls = bloc.querySelectorAll('.scen-choix-row');
+                const choix = [];
+                choixEls.forEach(cr => {
+                    choix.push({
+                        label: cr.querySelector('.scen-choix-label').value.trim(),
+                        suite: cr.querySelector('.scen-choix-suite').value.trim(),
+                        correct: cr.querySelector('.scen-choix-correct').checked,
+                        feedback: cr.querySelector('.scen-choix-feedback').value.trim() || undefined
+                    });
+                });
+                etapes.push({ id, texte, choix });
+            });
+            return {
+                titre: document.getElementById('scen-titre').value.trim(),
+                etapes
+            };
         }
         return {};
     }
@@ -1542,6 +1684,91 @@
             }
         });
         if (grav > 0 && proba > 0) { matrixDiv.style.display = ''; } else { matrixDiv.style.display = 'none'; }
+    };
+
+    // ========== DYNAMIC HELPERS : QUIZ CHRONO ==========
+    window.addChronoQuestion = function(data) {
+        const container = document.getElementById('chrono-questions');
+        const idx = container.querySelectorAll('.chrono-q-bloc').length + 1;
+        const div = document.createElement('div');
+        div.className = 'chrono-q-bloc';
+        div.style.cssText = 'background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px; position:relative;';
+        div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>' +
+            '<label style="font-size:0.75rem; color:#38bdf8; font-weight:700;">Question ' + idx + '</label>' +
+            '<div class="form-group" style="margin:6px 0;"><textarea class="form-textarea chrono-q-text" rows="2" placeholder="Question...">' + (data && data.question || '') + '</textarea></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Bonne reponse</label><input type="text" class="form-input chrono-q-rep" value="' + (data && data.reponse || '') + '"></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Distracteurs (|)</label><input type="text" class="form-input chrono-q-dist" value="' + (data && data.distracteurs || '') + '"></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Explication (optionnel)</label><input type="text" class="form-input chrono-q-expl" value="' + (data && data.explication || '') + '"></div>';
+        container.appendChild(div);
+    };
+
+    // ========== DYNAMIC HELPERS : CATEGORISER ==========
+    window.addCatItem = function(label, categorie) {
+        const container = document.getElementById('cat-items-list');
+        const cats = document.getElementById('cat-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+        const div = document.createElement('div');
+        div.className = 'cat-item-row';
+        div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        let opts = cats.map(c => '<option value="' + c + '"' + (c === categorie ? ' selected' : '') + '>' + c + '</option>').join('');
+        div.innerHTML = '<input type="text" class="form-input cat-item-label" style="flex:2;" placeholder="Label item" value="' + (label || '') + '">' +
+            '<select class="form-select cat-item-cat" style="flex:1;">' + opts + '</select>' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
+    };
+    window.updateCatSelects = function() {
+        const cats = document.getElementById('cat-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+        document.querySelectorAll('.cat-item-cat').forEach(sel => {
+            const cur = sel.value;
+            sel.innerHTML = cats.map(c => '<option value="' + c + '"' + (c === cur ? ' selected' : '') + '>' + c + '</option>').join('');
+        });
+    };
+
+    // ========== DYNAMIC HELPERS : MEMORY ==========
+    window.addMemoryPair = function(a, b) {
+        const container = document.getElementById('mem-list');
+        const idx = container.querySelectorAll('.mem-pair-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'mem-pair-row';
+        div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        div.innerHTML = '<span style="color:#a855f7; font-weight:700; min-width:20px;">' + idx + '</span>' +
+            '<input type="text" class="form-input mem-a" style="flex:1;" placeholder="Face A (terme)" value="' + (a || '') + '">' +
+            '<input type="text" class="form-input mem-b" style="flex:1;" placeholder="Face B (definition)" value="' + (b || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
+    };
+
+    // ========== DYNAMIC HELPERS : SCENARIO ==========
+    window.addScenEtape = function(data) {
+        const container = document.getElementById('scen-etapes');
+        const idx = container.querySelectorAll('.scen-etape-bloc').length;
+        const defaultId = idx === 0 ? 'debut' : 'etape' + (idx + 1);
+        const div = document.createElement('div');
+        div.className = 'scen-etape-bloc';
+        div.style.cssText = 'background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px; position:relative;';
+        div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>' +
+            '<div style="display:flex; gap:8px; margin-bottom:8px;">' +
+            '<div style="flex:0 0 120px;"><label style="font-size:0.65rem;">ID etape</label><input type="text" class="form-input scen-etape-id" value="' + (data && data.id || defaultId) + '"></div>' +
+            '<div style="flex:1;"><label style="font-size:0.65rem;">Texte de l\'etape</label><textarea class="form-textarea scen-etape-texte" rows="2">' + (data && data.texte || '') + '</textarea></div>' +
+            '</div>' +
+            '<div class="scen-choix-container"></div>' +
+            '<button type="button" class="btn-save" style="background:#334155; font-size:0.7rem; padding:4px 10px; margin-top:4px;" onclick="addScenChoix(this)">+ Choix</button>';
+        container.appendChild(div);
+        // Populate choices if data
+        if (data && data.choix) {
+            data.choix.forEach(ch => addScenChoix(div.querySelector('.scen-choix-container ~ button'), ch));
+        }
+    };
+    window.addScenChoix = function(btn, data) {
+        const choixContainer = btn.previousElementSibling;
+        const div = document.createElement('div');
+        div.className = 'scen-choix-row';
+        div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:4px; flex-wrap:wrap;';
+        div.innerHTML = '<input type="text" class="form-input scen-choix-label" style="flex:2; min-width:120px;" placeholder="Label du choix" value="' + (data && data.label || '') + '">' +
+            '<input type="text" class="form-input scen-choix-suite" style="flex:1; min-width:80px;" placeholder="suite → id" value="' + (data && data.suite || '') + '">' +
+            '<label style="font-size:0.6rem; display:flex; align-items:center; gap:3px; white-space:nowrap;"><input type="checkbox" class="scen-choix-correct"' + (data && data.correct ? ' checked' : '') + '> Correct</label>' +
+            '<input type="text" class="form-input scen-choix-feedback" style="flex:2; min-width:100px;" placeholder="Feedback (optionnel)" value="' + (data && data.feedback || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;cursor:pointer;">&times;</button>';
+        choixContainer.appendChild(div);
     };
 
     // ========== SET CONTENU IN FORM ==========
@@ -1669,6 +1896,42 @@
             }
             const mf = contenu.mission_finale || {};
             document.getElementById('duerp-m-nb-prio').value = mf.nb_prioritaires || 2;
+        } else if (type === 'qcm_classique') {
+            document.getElementById('qcmc-titre').value = contenu.titre || '';
+            document.getElementById('qcmc-question').value = contenu.question || '';
+            document.getElementById('qcmc-multiple').checked = !!contenu.multiple;
+            document.getElementById('qcmc-explication').value = contenu.explication || '';
+            const choix = contenu.choix || [];
+            const repIds = Array.isArray(contenu.reponse) ? contenu.reponse : [contenu.reponse];
+            const bonnes = choix.filter(c => repIds.includes(c.id)).map(c => c.texte);
+            const distracteurs = choix.filter(c => !repIds.includes(c.id)).map(c => c.texte);
+            document.getElementById('qcmc-reponse').value = bonnes.join('\n');
+            document.getElementById('qcmc-distracteurs').value = distracteurs.join(' | ');
+        } else if (type === 'quiz_chrono') {
+            document.getElementById('chrono-titre').value = contenu.titre || '';
+            document.getElementById('chrono-temps').value = contenu.temps_par_question || 15;
+            document.getElementById('chrono-questions').innerHTML = '';
+            (contenu.questions || []).forEach(q => {
+                const choix = q.choix || [];
+                const repId = q.reponse;
+                const bonne = choix.find(c => c.id === repId);
+                const dist = choix.filter(c => c.id !== repId).map(c => c.texte);
+                addChronoQuestion({ question: q.question, reponse: bonne ? bonne.texte : '', distracteurs: dist.join(' | '), explication: q.explication || '' });
+            });
+        } else if (type === 'categoriser') {
+            document.getElementById('cat-titre').value = contenu.titre || '';
+            document.getElementById('cat-consigne').value = contenu.consigne || '';
+            document.getElementById('cat-categories').value = (contenu.categories || []).join(' | ');
+            document.getElementById('cat-items-list').innerHTML = '';
+            (contenu.items || []).forEach(it => addCatItem(it.label, it.categorie));
+        } else if (type === 'memory') {
+            document.getElementById('mem-titre').value = contenu.titre || '';
+            document.getElementById('mem-list').innerHTML = '';
+            (contenu.cartes || []).forEach(c => addMemoryPair(c.a, c.b));
+        } else if (type === 'scenario') {
+            document.getElementById('scen-titre').value = contenu.titre || '';
+            document.getElementById('scen-etapes').innerHTML = '';
+            (contenu.etapes || []).forEach(et => addScenEtape(et));
         }
     }
 
@@ -1761,6 +2024,28 @@
             document.getElementById(pre + '-declencheur').value = '';
         }
         document.getElementById('duerp-m-nb-prio').value = '2';
+        // QCM Classique
+        document.getElementById('qcmc-titre').value = '';
+        document.getElementById('qcmc-question').value = '';
+        document.getElementById('qcmc-reponse').value = '';
+        document.getElementById('qcmc-distracteurs').value = '';
+        document.getElementById('qcmc-multiple').checked = false;
+        document.getElementById('qcmc-explication').value = '';
+        // Quiz Chrono
+        document.getElementById('chrono-titre').value = '';
+        document.getElementById('chrono-temps').value = '15';
+        document.getElementById('chrono-questions').innerHTML = '';
+        // Categoriser
+        document.getElementById('cat-titre').value = '';
+        document.getElementById('cat-consigne').value = 'Classez chaque element dans la bonne categorie';
+        document.getElementById('cat-categories').value = '';
+        document.getElementById('cat-items-list').innerHTML = '';
+        // Memory
+        document.getElementById('mem-titre').value = '';
+        document.getElementById('mem-list').innerHTML = '';
+        // Scenario
+        document.getElementById('scen-titre').value = '';
+        document.getElementById('scen-etapes').innerHTML = '';
     }
 
     // ========== SIDEBAR LIST ==========
@@ -2009,6 +2294,108 @@
             if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
         }
 
+        // Validation QCM Classique
+        if (type === 'qcm_classique') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.question) errors.push('La question est obligatoire');
+            if (!c.choix || c.choix.length < 2) errors.push('Il faut au moins 2 choix');
+            if (c.choix) {
+                const ids = c.choix.map(x => x.id);
+                if (new Set(ids).size !== ids.length) errors.push('IDs de choix en doublon');
+                if (c.choix.some(x => !x.texte)) errors.push('Tous les choix doivent avoir un texte');
+            }
+            if (c.multiple) {
+                if (!Array.isArray(c.reponse) || c.reponse.length < 2) errors.push('QCM multiple : au moins 2 bonnes reponses');
+                if (Array.isArray(c.reponse) && c.choix) {
+                    const ids = c.choix.map(x => x.id);
+                    if (!c.reponse.every(r => ids.includes(r))) errors.push('Certaines reponses ne correspondent a aucun choix');
+                }
+            } else {
+                if (!c.reponse) errors.push('La bonne reponse est obligatoire');
+                if (c.choix && !c.choix.find(x => x.id === c.reponse)) errors.push('La reponse ne correspond a aucun choix');
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
+        // Validation Quiz Chrono
+        if (type === 'quiz_chrono') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.temps_par_question || c.temps_par_question < 5) errors.push('Temps minimum : 5 secondes');
+            if (!c.questions || c.questions.length < 2) errors.push('Il faut au moins 2 questions');
+            (c.questions || []).forEach((q, i) => {
+                const qi = 'Q' + (i+1) + ' : ';
+                if (!q.question) errors.push(qi + 'texte obligatoire');
+                if (!q.choix || q.choix.length < 2) errors.push(qi + 'au moins 2 choix');
+                if (!q.reponse) errors.push(qi + 'reponse obligatoire');
+            });
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
+        // Validation Categoriser
+        if (type === 'categoriser') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.categories || c.categories.length < 2) errors.push('Il faut au moins 2 categories');
+            if (!c.items || c.items.length < 3) errors.push('Il faut au moins 3 items');
+            if (c.items) {
+                const ids = c.items.map(x => x.id);
+                if (new Set(ids).size !== ids.length) errors.push('IDs d\'items en doublon');
+                c.items.forEach((it, i) => {
+                    if (!it.label) errors.push('Item ' + (i+1) + ' : label obligatoire');
+                    if (c.categories && !c.categories.includes(it.categorie)) errors.push('Item "' + it.label + '" : categorie invalide');
+                });
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
+        // Validation Memory
+        if (type === 'memory') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.cartes || c.cartes.length < 4) errors.push('Il faut au moins 4 paires');
+            if (c.cartes && c.cartes.length > 8) errors.push('Maximum 8 paires');
+            if (c.cartes) {
+                const ids = c.cartes.map(x => x.id);
+                if (new Set(ids).size !== ids.length) errors.push('IDs de paires en doublon');
+                c.cartes.forEach((p, i) => {
+                    if (!p.a) errors.push('Paire ' + (i+1) + ' : face A obligatoire');
+                    if (!p.b) errors.push('Paire ' + (i+1) + ' : face B obligatoire');
+                });
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
+        // Validation Scenario
+        if (type === 'scenario') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.etapes || c.etapes.length < 2) errors.push('Il faut au moins 2 etapes');
+            if (c.etapes) {
+                const allIds = c.etapes.map(e => e.id);
+                if (new Set(allIds).size !== allIds.length) errors.push('IDs d\'etapes en doublon');
+                let hasFin = false;
+                c.etapes.forEach((et, i) => {
+                    if (!et.id) errors.push('Etape ' + (i+1) + ' : ID obligatoire');
+                    if (!et.texte) errors.push('Etape ' + (i+1) + ' : texte obligatoire');
+                    if (!et.choix || et.choix.length === 0) hasFin = true;
+                    (et.choix || []).forEach((ch, j) => {
+                        if (!ch.label) errors.push('Etape "' + et.id + '" choix ' + (j+1) + ' : label obligatoire');
+                        if (!ch.suite) errors.push('Etape "' + et.id + '" choix ' + (j+1) + ' : suite obligatoire');
+                        if (ch.suite && !allIds.includes(ch.suite)) errors.push('Etape "' + et.id + '" choix ' + (j+1) + ' : suite "' + ch.suite + '" n\'existe pas');
+                    });
+                });
+                if (!hasFin) errors.push('Il faut au moins 1 etape finale (sans choix)');
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
         const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
@@ -2080,7 +2467,12 @@
         pad: 'Genere un exercice PAD (Processus d\'Apparition du Dommage) pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes, max 500 caracteres).\nFormat STRICT :\n{\n  "titre": "PAD - [metier/situation]",\n  "situation": "...",\n  "danger": "..." (max 80 car),\n  "distracteurs_danger": ["dist1", "dist2", "dist3"],\n  "situation_dangereuse": "..." (max 120 car),\n  "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],\n  "evenement_declencheur": "..." (max 120 car),\n  "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],\n  "dommage": "..." (max 120 car),\n  "distracteurs_dommage": ["dist1", "dist2", "dist3"]\n}\nREGLES :\n- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)\n- Distracteurs credibles dans le meme univers professionnel mais faux pour CETTE situation\n- Distracteurs tous differents entre eux et differents de la bonne reponse\n- Chaque distracteur max 80 caracteres\n- Vocabulaire simple adapte a des eleves de Bac Pro\n- Coherence PAD : Danger → exposition = Situation dangereuse → bascule = Evenement declencheur → consequence = Dommage',
         estimation_risque: 'Genere un exercice "Estimation du risque" pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel expose a un danger dans son activite de travail (3-5 phrases realistes, max 500 caracteres).\nLa situation DOIT contenir des indices permettant a l\'eleve de determiner :\n- La GRAVITE du dommage (1 a 4)\n- La FREQUENCE/DUREE d\'exposition (rare/courte OU frequente/longue)\n- La PROBABILITE du declencheur (faible OU elevee)\n\nFormat STRICT :\n{\n  "titre": "Estimation du risque - [metier] / [danger]",\n  "situation": "...",\n  "danger": "..." (max 100 car),\n  "dommage": "..." (max 100 car),\n  "gravite": [1-4],\n  "exposition": "[rare_courte|frequente_longue]",\n  "declencheur": "[faible|eleve]",\n  "priorite": "[prioritaire|non_prioritaire]"\n}\n\nECHELLE DE GRAVITE :\n1 = Faible (accident/maladie SANS arret de travail)\n2 = Moyenne (accident/maladie AVEC arret de travail)\n3 = Grave (incapacite permanente, sequelles)\n4 = Tres grave (deces possible)\n\nCALCUL DE LA PROBABILITE D\'OCCURRENCE :\n- rare_courte + faible → probabilite 1 (tres improbable)\n- rare_courte + eleve → probabilite 2 (improbable)\n- frequente_longue + faible → probabilite 3 (probable)\n- frequente_longue + eleve → probabilite 4 (tres probable)\n\nREGLE DE PRIORITE :\n- Si gravite + probabilite >= 5 → "prioritaire"\n- Sinon → "non_prioritaire"\n\nREGLES CRUCIALES :\n- La situation doit etre realiste et issue d\'un vrai metier\n- Les indices de frequence doivent etre clairs (ex: "chaque jour pendant 6h" = frequente_longue, "une fois par trimestre" = rare_courte)\n- Les indices de declencheur doivent etre clairs (ex: "systeme de securite defaillant" = eleve, "equipement en bon etat et controle" = faible)\n- Les indices de gravite doivent etre coherents avec le dommage annonce\n- Vocabulaire simple adapte a des eleves de CAP/Bac Pro\n- La priorite DOIT correspondre au calcul : gravite + probabilite >= 5',
         duerp_ligne: 'Genere un exercice DUERP (Document Unique) ligne unique pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite (3-5 phrases realistes, max 500 car).\nLa situation DOIT contenir des indices pour : gravite, frequence/duree d\'exposition, probabilite du declencheur.\n\nFormat STRICT :\n{\n  "titre": "DUERP - [metier] / [danger]",\n  "unite_travail": "[poste ou activite]",\n  "situation": "...",\n  "choix": {\n    "danger": ["bonne reponse", "distracteur1", "distracteur2", "distracteur3"],\n    "dommage": ["bonne reponse", "distracteur1", "distracteur2", "distracteur3"],\n    "mesure_principale": ["bonne reponse", "dist1", "dist2", "dist3", "dist4"]\n  },\n  "attendus": {\n    "danger": "...",\n    "dommage": "...",\n    "gravite": [1-4],\n    "exposition": "[rare_courte|frequente_longue]",\n    "declencheur": "[faible|eleve]",\n    "mesure_principale": "..."\n  }\n}\n\nNE PAS inclure probabilite ni priorite dans le JSON (calculees automatiquement).\n\nREGLES :\n- Exactement 4 choix danger (1 correct + 3 distracteurs plausibles dans le meme metier)\n- Exactement 4 choix dommage (1 correct + 3 distracteurs)\n- Exactement 5 choix mesure (1 correct + 4 distracteurs) — privilegier la source > collectif > EPI\n- Tous les choix doivent etre uniques et differents entre eux\n- Gravite : 1=sans arret, 2=avec arret, 3=sequelles, 4=deces\n- Exposition : rare_courte OU frequente_longue\n- Declencheur : faible OU eleve\n- Probabilite = expo x decl (rare+faible=1, rare+eleve=2, freq+faible=3, freq+eleve=4)\n- Priorite = gravite + probabilite >= 5\n- JAMAIS de mesure vague (faire attention, etre vigilant)',
-        duerp_mini: 'Genere un exercice Mini DUERP (4 lignes) pour le module PSE [MODULE] en JSON.\nL\'exercice porte sur UNE SEULE entreprise avec 4 unites de travail differentes.\nChaque ligne = 1 situation professionnelle avec son danger et son dommage.\n\nFormat STRICT :\n{\n  "titre": "Mini DUERP - [entreprise]",\n  "entreprise": "[nom entreprise]",\n  "lignes": [\n    {\n      "id": "L1",\n      "unite_travail": "...",\n      "situation": "..." (3-5 phrases, max 500 car),\n      "choix": {\n        "danger": ["bonne", "dist1", "dist2", "dist3"],\n        "dommage": ["bonne", "dist1", "dist2", "dist3"]\n      },\n      "attendus": {\n        "danger": "...",\n        "dommage": "...",\n        "gravite": [1-4],\n        "exposition": "[rare_courte|frequente_longue]",\n        "declencheur": "[faible|eleve]"\n      }\n    }\n  ],\n  "mission_finale": {\n    "consigne": "Selectionnez les 2 risques prioritaires a traiter en premier",\n    "nb_prioritaires": 2\n  }\n}\n\nNE PAS inclure probabilite ni priorite.\n\nREGLES :\n- 4 lignes (L1 a L4) dans la meme entreprise\n- Varier les gravites et probabilites pour que certaines lignes soient prioritaires et d\'autres non\n- Au moins 2 lignes doivent etre prioritaires (gravite + proba >= 5)\n- Au moins 1 ligne doit etre non prioritaire\n- 4 choix danger et 4 choix dommage par ligne, tous plausibles\n- Situations realistes avec indices clairs\n- Vocabulaire CAP/Bac Pro'
+        duerp_mini: 'Genere un exercice Mini DUERP (4 lignes) pour le module PSE [MODULE] en JSON.\nL\'exercice porte sur UNE SEULE entreprise avec 4 unites de travail differentes.\nChaque ligne = 1 situation professionnelle avec son danger et son dommage.\n\nFormat STRICT :\n{\n  "titre": "Mini DUERP - [entreprise]",\n  "entreprise": "[nom entreprise]",\n  "lignes": [\n    {\n      "id": "L1",\n      "unite_travail": "...",\n      "situation": "..." (3-5 phrases, max 500 car),\n      "choix": {\n        "danger": ["bonne", "dist1", "dist2", "dist3"],\n        "dommage": ["bonne", "dist1", "dist2", "dist3"]\n      },\n      "attendus": {\n        "danger": "...",\n        "dommage": "...",\n        "gravite": [1-4],\n        "exposition": "[rare_courte|frequente_longue]",\n        "declencheur": "[faible|eleve]"\n      }\n    }\n  ],\n  "mission_finale": {\n    "consigne": "Selectionnez les 2 risques prioritaires a traiter en premier",\n    "nb_prioritaires": 2\n  }\n}\n\nNE PAS inclure probabilite ni priorite.\n\nREGLES :\n- 4 lignes (L1 a L4) dans la meme entreprise\n- Varier les gravites et probabilites pour que certaines lignes soient prioritaires et d\'autres non\n- Au moins 2 lignes doivent etre prioritaires (gravite + proba >= 5)\n- Au moins 1 ligne doit etre non prioritaire\n- 4 choix danger et 4 choix dommage par ligne, tous plausibles\n- Situations realistes avec indices clairs\n- Vocabulaire CAP/Bac Pro',
+        qcm_classique: 'Genere un exercice QCM classique pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "QCM - [theme]",\n  "question": "...",\n  "choix": [\n    { "id": "c1", "texte": "Bonne reponse" },\n    { "id": "c2", "texte": "Distracteur 1" },\n    { "id": "c3", "texte": "Distracteur 2" },\n    { "id": "c4", "texte": "Distracteur 3" }\n  ],\n  "reponse": "c1",\n  "multiple": false,\n  "explication": "Explication de la bonne reponse"\n}\n\nSi multiple: true → "reponse": ["c1", "c3"]\n\nREGLES :\n- 4 choix minimum, chacun avec un id unique (c1, c2, c3, c4)\n- reponse = id du bon choix (pas le texte)\n- Distracteurs plausibles mais clairement faux\n- Question claire et sans ambiguite\n- Vocabulaire CAP/Bac Pro',
+        quiz_chrono: 'Genere un exercice Quiz Chrono pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Quiz Chrono - [theme]",\n  "temps_par_question": 15,\n  "questions": [\n    {\n      "question": "...",\n      "choix": [\n        { "id": "c1", "texte": "Bonne reponse" },\n        { "id": "c2", "texte": "Distracteur 1" },\n        { "id": "c3", "texte": "Distracteur 2" }\n      ],\n      "reponse": "c1",\n      "explication": "optionnel"\n    }\n  ]\n}\n\nREGLES :\n- 8 a 12 questions\n- 3 a 4 choix par question, IDs uniques par question (c1, c2, c3...)\n- reponse = id du bon choix\n- temps_par_question entre 10 et 20 secondes\n- Questions courtes et directes (l\'eleve a un timer)\n- Vocabulaire CAP/Bac Pro',
+        categoriser: 'Genere un exercice de categorisation pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Categoriser - [theme]",\n  "consigne": "Classez chaque element dans la bonne categorie",\n  "categories": ["Categorie A", "Categorie B", "Categorie C"],\n  "items": [\n    { "id": "i1", "label": "Item 1", "categorie": "Categorie A" },\n    { "id": "i2", "label": "Item 2", "categorie": "Categorie B" }\n  ]\n}\n\nREGLES :\n- 2 a 4 categories\n- 8 a 15 items avec IDs uniques (i1, i2, i3...)\n- Chaque item a un label et une categorie correspondant exactement a une des categories\n- Repartition equilibree entre categories\n- Items credibles mais clairement attribuables\n- Vocabulaire CAP/Bac Pro',
+        memory: 'Genere un exercice Memory pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Memory - [theme]",\n  "cartes": [\n    { "id": "p1", "a": "Terme", "b": "Definition" },\n    { "id": "p2", "a": "Terme 2", "b": "Definition 2" }\n  ]\n}\n\nREGLES :\n- 6 a 8 paires (cartes)\n- Chaque paire a un id unique (p1, p2, p3...)\n- Face "a" = terme court (1-3 mots)\n- Face "b" = definition courte (max 6-8 mots, doit tenir sur une carte)\n- Les termes doivent etre importants pour le module PSE\n- Vocabulaire CAP/Bac Pro',
+        scenario: 'Genere un exercice Scenario interactif pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Scenario - [situation]",\n  "etapes": [\n    {\n      "id": "debut",\n      "texte": "Description de la situation initiale...",\n      "choix": [\n        { "label": "Choix A", "suite": "etape2", "correct": true },\n        { "label": "Choix B", "suite": "bad1", "correct": false, "feedback": "Explication pourquoi c\'est faux" }\n      ]\n    },\n    {\n      "id": "etape2",\n      "texte": "Suite de la situation...",\n      "choix": [\n        { "label": "Bon choix", "suite": "fin", "correct": true },\n        { "label": "Mauvais choix", "suite": "bad2", "correct": false, "feedback": "..." }\n      ]\n    },\n    { "id": "fin", "texte": "Bravo ! Vous avez gere la situation correctement.", "choix": [] },\n    { "id": "bad1", "texte": "Cette approche n\'est pas adaptee.", "choix": [] },\n    { "id": "bad2", "texte": "Ce n\'est pas la bonne reaction.", "choix": [] }\n  ]\n}\n\nREGLES :\n- 4 a 8 etapes\n- Premiere etape id = "debut"\n- Au moins 1 etape finale (choix: [] = fin)\n- Chaque choix.suite pointe vers un id existant\n- Pas de boucles infinies (max 30 etapes parcourues)\n- 2-3 choix par etape\n- correct: true/false pour le scoring\n- feedback obligatoire pour les mauvais choix\n- Situation realiste et professionnelle\n- Vocabulaire CAP/Bac Pro'
     };
 
     window.openImportModal = function() {
@@ -2130,6 +2522,11 @@
             else if (src.unite_travail && src.choix && src.attendus) type = 'duerp_ligne';
             else if (src.exposition && src.declencheur && src.gravite) type = 'estimation_risque';
             else if (src.distracteurs_danger) type = 'pad';
+            else if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') type = 'scenario';
+            else if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined && src.cartes[0].b !== undefined) type = 'memory';
+            else if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].id !== undefined && src.items[0].categorie !== undefined) type = 'categoriser';
+            else if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') type = 'quiz_chrono';
+            else if (typeof src.question === 'string' && Array.isArray(src.choix) && src.reponse !== undefined) type = 'qcm_classique';
             else if (src.texte && src.texte.includes('{{')) type = 'texte_trous';
             else if (src.paires) type = 'relier';
             else if (src.items && !src.questions) type = 'ordre';
