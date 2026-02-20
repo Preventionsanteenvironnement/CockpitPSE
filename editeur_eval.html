@@ -2137,6 +2137,13 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         setTimeout(() => { t.style.display = 'none'; }, 2500);
     }
 
+    // === BRIDGE : expose module functions to global scope (needed by import script block) ===
+    window.showToast = showToast;
+    window.updateDocRefDropdowns = updateDocRefDropdowns;
+    window.renderFlow = renderFlow;
+    window.updatePointsTotal = updatePointsTotal;
+    window._evalState = { get questions() { return questions; }, set questions(v) { questions = v; }, get documents() { return documents; }, set documents(v) { documents = v; } };
+
     // ========== IMPORT DEPUIS BIBLIOTHEQUE (sessionStorage) ==========
     (function checkBiblioImport() {
         const importData = sessionStorage.getItem('biblio_import');
@@ -2523,8 +2530,8 @@ window.executeImport = function() {
     });
 
     // === APPLY IMPORT ===
-    documents = newDocs;
-    questions = newQuestions;
+    window._evalState.documents = newDocs;
+    window._evalState.questions = newQuestions;
 
     // Optional: title
     if (document.getElementById('import-opt-titre').checked && data.titre) {
@@ -2542,7 +2549,7 @@ window.executeImport = function() {
     renderFlow();
     updatePointsTotal();
     closeImportModal();
-    showToast('📥 Import réussi ! ' + questions.length + ' question(s) importée(s)');
+    showToast('📥 Import réussi ! ' + window._evalState.questions.length + ' question(s) importée(s)');
 };
 </script>
 </body>
