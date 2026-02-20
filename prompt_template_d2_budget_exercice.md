@@ -74,12 +74,14 @@ ATTENTION : Ce JSON est destine a l'editeur d'exercices (type "Etude de cas"), P
       "question": "Texte de la question",
       "type": "qcm",
       "choix": ["Choix A", "Choix B", "Choix C", "Choix D"],
-      "correct": 0
+      "correct": 0,
+      "explication": "Explication pedagogique : pourquoi cette reponse est correcte..."
     },
     {
       "question": "Texte de la question",
       "type": "texte",
-      "reponse": "Reponse attendue"
+      "reponse": "Reponse attendue",
+      "explication": "Explication pedagogique : rappel de la notion ou du calcul..."
     }
   ]
 }
@@ -137,6 +139,13 @@ Il n'y a que 2 types possibles :
 - L'offre A doit etre moins couteuse au total que l'offre B
 - VERIFIER chaque calcul avant de generer le JSON
 
+**Explications pedagogiques (TRES IMPORTANT) :**
+- Chaque question DOIT avoir un champ "explication" avec une explication claire et pedagogique
+- L'explication s'affiche a l'eleve apres correction (qu'il ait bon ou faux) pour l'aider a comprendre
+- Pour les calculs : rappeler la formule et le detail du calcul
+- Pour les QCM : expliquer pourquoi la bonne reponse est correcte
+- Pour les definitions : rappeler la definition du programme (depenses incompressibles, courantes, etc.)
+
 **Texte :**
 - Pas d'accents dans le JSON (utiliser "e" au lieu de "e accent", "a" au lieu de "a accent", etc.)
 - Pas de caracteres speciaux (pas de symbole euro → ecrire "euros")
@@ -156,74 +165,87 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
     {
       "question": "Quel est le total des revenus mensuels de Yanis ?",
       "type": "texte",
-      "reponse": "940 euros"
+      "reponse": "940 euros",
+      "explication": "Total revenus = Salaire net (760) + APL (180) = 940 euros. Les revenus comprennent le salaire et les aides sociales."
     },
     {
       "question": "Parmi les depenses suivantes, laquelle est une depense incompressible ?",
       "type": "qcm",
       "choix": ["Loisirs (sorties, sport)", "Loyer", "Vetements", "Abonnement streaming"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Le loyer est une depense incompressible (charge fixe obligatoire). Les loisirs et vetements sont des depenses occasionnelles. L'abonnement streaming est une depense courante."
     },
     {
       "question": "Quel est le total de toutes les depenses mensuelles de Yanis ?",
       "type": "texte",
-      "reponse": "910 euros"
+      "reponse": "910 euros",
+      "explication": "Total : 420 + 25 + 55 + 30 + 180 + 60 + 40 + 15 + 85 = 910 euros. On additionne toutes les depenses, y compris les mensualites de credit."
     },
     {
       "question": "Quel est le solde mensuel de Yanis (revenus - depenses) ?",
       "type": "texte",
-      "reponse": "30 euros"
+      "reponse": "30 euros",
+      "explication": "Solde = Revenus - Depenses = 940 - 910 = 30 euros. Le solde represente ce qui reste apres avoir paye toutes les depenses."
     },
     {
       "question": "Comment qualifie-t-on le budget de Yanis ?",
       "type": "qcm",
       "choix": ["Budget deficitaire", "Budget equilibre", "Budget excedentaire"],
-      "correct": 2
+      "correct": 2,
+      "explication": "Le solde est positif (30 euros > 0), donc le budget est excedentaire. Deficitaire = solde negatif. Equilibre = solde egal a 0."
     },
     {
       "question": "Quel est le taux d'endettement actuel de Yanis ? (arrondi a l'entier, en %)",
       "type": "texte",
-      "reponse": "9%"
+      "reponse": "9%",
+      "explication": "Taux d'endettement = (mensualites credits / revenus) x 100 = (85 / 940) x 100 = 9,04% soit 9% arrondi. Le seuil de surendettement est a 33%."
     },
     {
       "question": "Le taux d'endettement de Yanis depasse-t-il le seuil de surendettement de 33% ?",
       "type": "qcm",
       "choix": ["Oui, il depasse 33%", "Non, il est en dessous de 33%"],
-      "correct": 1
+      "correct": 1,
+      "explication": "9% est largement en dessous du seuil de 33%. Au-dela de 33%, on considere que le menage est en situation de surendettement."
     },
     {
       "question": "Combien de mois Yanis doit-il epargner pour atteindre 360 euros avec son solde actuel ?",
       "type": "texte",
-      "reponse": "12 mois"
+      "reponse": "12 mois",
+      "explication": "Nombre de mois = Montant du projet / Solde mensuel = 360 / 30 = 12 mois. C'est le temps necessaire pour epargner sans prendre de credit."
     },
     {
       "question": "Quel type d'epargne est le plus adapte a Yanis (18 ans, revenus modestes, besoin de disponibilite immediate) ?",
       "type": "qcm",
       "choix": ["Plan epargne logement (PEL)", "Livret jeune", "Aucune epargne n'est adaptee"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Le Livret jeune est reserve aux 12-25 ans (Yanis a 18 ans), offre un taux minimum de 3%, et l'argent est disponible immediatement. Le PEL est bloque 4 ans et destine a l'immobilier."
     },
     {
       "question": "A quoi sert l'epargne de precaution ?",
       "type": "qcm",
       "choix": ["A financer un projet de vacances", "A faire face aux depenses imprevues (panne, sante)", "A obtenir un meilleur taux d'interet", "A rembourser un credit"],
-      "correct": 1
+      "correct": 1,
+      "explication": "L'epargne de precaution est une reserve d'argent disponible pour faire face aux imprevus (reparation, sante, perte d'emploi). Elle doit etre sur un livret liquide."
     },
     {
       "question": "Quel est le cout supplementaire de l'offre de credit A par rapport au prix comptant du permis (360 euros) ?",
       "type": "texte",
-      "reponse": "40 euros"
+      "reponse": "40 euros",
+      "explication": "Cout du credit = Cout total rembourse - Prix comptant = 400 - 360 = 40 euros. C'est le prix a payer en plus pour avoir le credit."
     },
     {
       "question": "Quelle offre de credit est la moins couteuse au total ?",
       "type": "qcm",
       "choix": ["Offre A (400 euros au total)", "Offre B (405 euros au total)", "Les deux coutent le meme prix"],
-      "correct": 0
+      "correct": 0,
+      "explication": "L'offre A coute 400 euros au total contre 405 pour l'offre B. L'offre A a des mensualites plus elevees (80 euros) mais sur moins de mois (5), ce qui reduit le cout total."
     },
     {
       "question": "Quelle solution permettrait a Yanis d'ameliorer son budget sans prendre de credit ?",
       "type": "qcm",
       "choix": ["Supprimer son assurance habitation", "Reduire ses depenses de loisirs et vetements", "Augmenter son loyer", "Arreter de manger"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Les depenses occasionnelles (loisirs, vetements) sont les premieres a reduire car elles ne sont pas essentielles. L'assurance habitation est obligatoire (incompressible) et ne peut pas etre supprimee."
     }
   ]
 }
@@ -247,6 +269,7 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
 - [ ] Solde = revenus - depenses (verifie)
 - [ ] Tous les montants sont des nombres entiers
 - [ ] Pas d'accents dans le JSON
+- [ ] Chaque question a un champ "explication" pedagogique
 - [ ] Le personnage et les chiffres sont DIFFERENTS de l'exemple
 
 Genere maintenant une etude de cas complete avec les parametres personnalises ci-dessus. Fournis UNIQUEMENT le JSON brut, sans commentaires avant ou apres.
