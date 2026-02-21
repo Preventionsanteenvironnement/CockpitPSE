@@ -321,6 +321,7 @@
                         <option value="duerp_ligne">📋 DUERP — Ligne unique</option>
                         <option value="duerp_mini">📋 DUERP — Mini (4 lignes)</option>
                         <option value="pictogramme">⚠️ Pictogrammes de securite</option>
+                        <option value="analyse_copie">📝 Analyse de copie (competences)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1007,6 +1008,19 @@
             </div>
         </div>
 
+        <div class="content-type-section" id="ct-analyse_copie">
+            <div style="background:#f5f3ff; border:2px solid #c4b5fd; border-radius:10px; padding:16px; margin-bottom:14px;">
+                <div style="font-weight:700; color:#6366f1; margin-bottom:8px;">📝 Analyse de copie — Import JSON</div>
+                <p style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">Collez le JSON genere par ChatGPT ci-dessous. L'exercice sera importe automatiquement.</p>
+                <textarea class="form-textarea" id="ac-json-input" rows="8" placeholder='{"consigne":"...","contexte":"...","items":[...]}'></textarea>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button class="btn-small" onclick="acImportJson()" style="background:#6366f1; color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">📥 Importer le JSON</button>
+                    <button class="btn-small" onclick="acCopyPrompt()" style="background:#e2e8f0; color:#475569; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">📋 Copier le prompt ChatGPT</button>
+                </div>
+                <div id="ac-import-status" style="margin-top:8px; font-size:0.85rem; display:none;"></div>
+            </div>
+        </div>
+
         <!-- ACTIONS -->
         <div class="bottom-actions">
             <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
@@ -1087,7 +1101,8 @@
         estimation_risque: '📊 Estimation',
         duerp_ligne: '📋 DUERP Ligne',
         duerp_mini: '📋 DUERP Mini',
-        pictogramme: '⚠️ Pictogrammes'
+        pictogramme: '⚠️ Pictogrammes',
+        analyse_copie: '📝 Analyse copie'
     };
 
     // ========== CLASS PILLS ==========
@@ -1209,7 +1224,7 @@
     renderClassPills();
 
     // ========== TYPE CHANGE ==========
-    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini'];
+    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'analyse_copie'];
 
     window.onTypeChange = function() {
         const type = document.getElementById('exo-type').value;
@@ -1758,9 +1773,51 @@
                 pictoObj.epreuves = window._pictoEpreuves;
             }
             return pictoObj;
+        } else if (type === 'analyse_copie') {
+            if (window._analyseCopieData) return window._analyseCopieData;
+            return {};
         }
         return {};
     }
+
+    // ========== ANALYSE COPIE FUNCTIONS ==========
+    window._analyseCopieData = null;
+
+    window.acImportJson = function() {
+        var input = document.getElementById('ac-json-input');
+        var status = document.getElementById('ac-import-status');
+        try {
+            var data = JSON.parse(input.value);
+            if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+                throw new Error('Le JSON doit contenir un tableau "items" non vide');
+            }
+            // Validate each item
+            data.items.forEach(function(item, i) {
+                if (!item.question_examen) throw new Error('Item ' + (i+1) + ' : question_examen manquant');
+                if (!item.reponse_eleve) throw new Error('Item ' + (i+1) + ' : reponse_eleve manquant');
+                if (!item.attendus) throw new Error('Item ' + (i+1) + ' : attendus manquant');
+                if (!item.attendus.verbe) throw new Error('Item ' + (i+1) + ' : attendus.verbe manquant');
+                if (!item.attendus.competence) throw new Error('Item ' + (i+1) + ' : attendus.competence manquant');
+                if (!item.attendus.validee) throw new Error('Item ' + (i+1) + ' : attendus.validee manquant');
+            });
+            window._analyseCopieData = data;
+            status.style.display = '';
+            status.style.color = '#16a34a';
+            status.textContent = '✅ Import reussi : ' + data.items.length + ' item(s) detectes';
+            showToast('✅ ' + data.items.length + ' items importes avec succes');
+        } catch (e) {
+            status.style.display = '';
+            status.style.color = '#ef4444';
+            status.textContent = '❌ Erreur : ' + e.message;
+        }
+    };
+
+    window.acCopyPrompt = function() {
+        var prompt = PROMPTS.analyse_copie || 'Prompt non disponible';
+        navigator.clipboard.writeText(prompt).then(function() {
+            showToast('📋 Prompt copie dans le presse-papier !');
+        });
+    };
 
     // ========== PICTO MODE CHANGE ==========
     window.onPictoModeChange = function() {};
@@ -2107,6 +2164,17 @@
             document.querySelectorAll('.picto-cat-cb').forEach(cb => { cb.checked = cats.includes(cb.value); });
             // Escape game : stocker les epreuves pour la sauvegarde
             window._pictoEpreuves = contenu.epreuves || [];
+        } else if (type === 'analyse_copie') {
+            window._analyseCopieData = contenu;
+            var jsonInput = document.getElementById('ac-json-input');
+            if (jsonInput) jsonInput.value = JSON.stringify(contenu, null, 2);
+            var status = document.getElementById('ac-import-status');
+            if (status) {
+                var nbItems = (contenu.items || []).length;
+                status.style.display = '';
+                status.style.color = '#16a34a';
+                status.textContent = '✅ ' + nbItems + ' item(s) charges';
+            }
         }
     }
 
@@ -2228,6 +2296,12 @@
         document.getElementById('picto-explication').value = '';
         document.querySelectorAll('.picto-cat-cb').forEach(cb => { cb.checked = true; });
         window._pictoEpreuves = [];
+        // Analyse copie
+        var acJsonInput = document.getElementById('ac-json-input');
+        if (acJsonInput) acJsonInput.value = '';
+        var acStatus = document.getElementById('ac-import-status');
+        if (acStatus) acStatus.style.display = 'none';
+        window._analyseCopieData = null;
     }
 
     // ========== SIDEBAR LIST ==========
@@ -2672,6 +2746,7 @@
         categoriser: 'Genere un exercice de categorisation pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Categoriser - [theme]",\n  "consigne": "Classez chaque element dans la bonne categorie",\n  "categories": ["Categorie A", "Categorie B", "Categorie C"],\n  "items": [\n    { "id": "i1", "label": "Item 1", "categorie": "Categorie A" },\n    { "id": "i2", "label": "Item 2", "categorie": "Categorie B" }\n  ]\n}\n\nREGLES :\n- 2 a 4 categories\n- 8 a 15 items avec IDs uniques (i1, i2, i3...)\n- Chaque item a un label et une categorie correspondant exactement a une des categories\n- Repartition equilibree entre categories\n- Items credibles mais clairement attribuables\n- Vocabulaire CAP/Bac Pro',
         memory: 'Genere un exercice Memory pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Memory - [theme]",\n  "cartes": [\n    { "id": "p1", "a": "Terme", "b": "Definition" },\n    { "id": "p2", "a": "Terme 2", "b": "Definition 2" }\n  ]\n}\n\nREGLES :\n- 6 a 8 paires (cartes)\n- Chaque paire a un id unique (p1, p2, p3...)\n- Face "a" = terme court (1-3 mots)\n- Face "b" = definition courte (max 6-8 mots, doit tenir sur une carte)\n- Les termes doivent etre importants pour le module PSE\n- Vocabulaire CAP/Bac Pro',
         pictogramme: 'Genere un exercice sur les pictogrammes de securite pour le module PSE [MODULE] en JSON.\n\nIMPORTANT : Les images sont deja integrees dans l\'application. Tu n\'as PAS besoin de mettre les chemins d\'images dans le JSON. Le systeme lie automatiquement chaque pictogramme a son image via son ID.\n\n=== 6 CATEGORIES DISPONIBLES (81 pictogrammes) ===\n\nOBLIGATION (12) - Rond bleu :\nOB01: Port des gants obligatoire (OBLIGATION-gants.jpg)\nOB02: Port du casque obligatoire (OBLIGATION-casque.jpg)\nOB03: Chaussures de securite obligatoires (OBLIGATION-chaussures.jpg)\nOB04: Lunettes de protection obligatoires (OBLIGATION-lunettes.jpg)\nOB05: Visiere de protection obligatoire (OBLIGATION-visiere.jpg)\nOB06: Casque antibruit obligatoire (OBLIGATION-casque-antibruit.jpg)\nOB07: Protection des voies respiratoires obligatoire (OBLIGATION-protection-voies-espiratoires.jpg)\nOB08: Combinaison de protection obligatoire (OBLIGATION-combinaison.jpg)\nOB09: Harnais de securite obligatoire (OBLIGATION-harnais.jpg)\nOB10: Obligation generale (OBLIGATION-general.jpg)\nOB11: Consulter la notice obligatoire (OBLIGATION-consulter-notice.jpg)\nOB12: Passage obligatoire pour pietons (OBLIGATION-pieton.jpg)\n\nINTERDICTION (8) - Rond rouge barre :\nIN01: Interdiction de fumer (INTERDIT-fumer.jpg)\nIN02: Flamme nue interdite (INTERDIT-flamme.jpg)\nIN03: Acces interdit (INTERDIT-entrer.jpg)\nIN04: Defense de toucher (INTERDIT-toucher.jpg)\nIN05: Eau interdite sur ce materiel (INTERDIT-seau-eau.jpg)\nIN06: Interdit aux pietons (INTERDIT-pietons.jpg)\nIN07: Interdit aux chariots (INTERDIT-chariot.jpg)\nIN08: Interdiction de boire et manger (INTERDIT-boire.jpg)\n\nDANGER (20) - Triangle jaune :\nDA01: Danger electrique (DANGER-electricite.jpg)\nDA02: Danger de chute (DANGER-chute.jpg)\nDA03: Danger de trebuchement (DANGER-trebuchement.jpg)\nDA04: Danger general (DANGER-general.jpg)\nDA05: Produit inflammable (DANGER-produit-inflammable.jpg)\nDA06: Produit explosif (DANGER-produit-explosif.jpg)\nDA07: Produit toxique (DANGER-produit-toxique.jpg)\nDA08: Produit nocif / irritant (DANGER-produit-nocif.jpg)\nDA09: Produit corrosif (DANGER-produit-corrosif.jpg)\nDA10: Produit comburant (DANGER-comburant.jpg)\nDA11: Atmosphere explosive (DANGER-atmosphere-explosive.jpg)\nDA12: Risque biologique (DANGER-risque-biologique.jpg)\nDA13: Danger radioactif (DANGER-radioactivite.jpg)\nDA14: Radiations non ionisantes (DANGER-radiations-non-ionisantes.jpg)\nDA15: Danger laser (DANGER-laser.jpg)\nDA16: Charge suspendue (DANGER-charge-suspendue.jpg)\nDA17: Danger chariot (DANGER-chariot.jpg)\nDA18: Champ magnetique (DANGER-champ-magnetique.jpg)\nDA19: Danger froid / gel (DANGER-froid-gel.jpg)\nDA20: Bande de signalisation (DANGER-bande-signalisation.jpg)\n\nINCENDIE (14) - Carre rouge :\nIC01: Extincteur (INCENDIE-extincteur.jpg)\nIC02: Alarme incendie (INCENDIE-alarme.jpg)\nIC03: Lance a incendie (INCENDIE-lance.jpg)\nIC04: Echelle incendie (INCENDIE-echelle.jpg)\nIC05: Equipement incendie (INCENDIE-equipement.jpg)\nIC06: Telephone urgence incendie (INCENDIE-telephone.jpg)\nIC07-IC14: Fleches directionnelles incendie\n\nSECOURS (18) - Carre vert :\nSE01: Sortie de secours vers la droite (SECOURS-sortie-vers-droite.jpg)\nSE02: Sortie de secours vers la gauche (SECOURS-sortie-vers-gauche.jpg)\nSE03: Point de rassemblement (SECOURS-point-rassemblement.jpg)\nSE04: Defibrillateur (SECOURS-defibrillateur.jpg)\nSE05: Premiers secours (SECOURS-croix.jpg)\nSE06: Civiere (SECOURS-civiere.jpg)\nSE07: Douche de securite (SECOURS-douche-securite.jpg)\nSE08: Douche oculaire (SECOURS-douche-oeil.jpg)\nSE09: Telephone urgence secours (SECOURS-telephone-urgence.jpg)\nSE10: Refuge temporaire evacuation (SECOURS-refuge-temporaire-evacuation.jpg)\nSE11-SE18: Fleches directionnelles secours\n\nSGH - PRODUITS CHIMIQUES (9) - Losange rouge :\nSG01: Bombe explosante (SGH01_BombeExplosant.jpg)\nSG02: Flamme (SGH02_Flamme.jpg)\nSG03: Flamme sur cercle (SGH03_FlammeSurCercle.jpg)\nSG04: Bouteille de gaz (SGH04_BouteilleGaz.jpg)\nSG05: Corrosion (SGH05_Corrosion.jpg)\nSG06: Tete de mort (SGH06_TeteDeMort.jpg)\nSG07: Point d\'exclamation (SGH07_PointExclamation.jpg)\nSG08: Danger pour la sante (SGH08_DangerSante.jpg)\nSG09: Environnement (SGH09_Environnement.jpg)\n\n=== 6 MODES D\'EXERCICE ===\n\nMODE 1 - quiz_image : On montre l\'image, l\'eleve choisit le bon nom parmi 4\nMODE 2 - nom_vers_image : On donne le nom, l\'eleve choisit la bonne image parmi 4\nMODE 3 - categoriser : L\'eleve trie les pictogrammes dans les bonnes categories\nMODE 4 - memory : Retrouver les paires image/nom (jeu de memoire)\nMODE 5 - speed : Identifier un maximum de pictogrammes en 60 secondes\nMODE 6 - escape_game : Serie d\'epreuves enchainees a resoudre pour avancer\n\n=== FORMATS JSON PAR MODE ===\n\nPour les modes 1 a 5 (quiz_image, nom_vers_image, categoriser, memory, speed) :\n{\n  "consigne": "Identifie les pictogrammes de securite",\n  "mode": "quiz_image",\n  "nb": 8,\n  "categories": ["obligation", "interdiction", "danger", "incendie", "secours", "sgh"],\n  "explication": "Explication pedagogique (optionnel)"\n}\n\nPour le mode escape_game :\n{\n  "consigne": "Escape Game : Mission Securite !",\n  "mode": "escape_game",\n  "categories": ["obligation", "danger", "incendie", "sgh"],\n  "epreuves": [\n    {\n      "titre": "Epreuve 1 : Identification",\n      "type": "quiz_image",\n      "description": "Identifie ces pictogrammes pour obtenir le code",\n      "pictos": ["OB01", "DA03", "IC01", "SG06"]\n    },\n    {\n      "titre": "Epreuve 2 : Classement",\n      "type": "categoriser",\n      "description": "Trie ces pictogrammes pour deverrouiller la porte",\n      "pictos": ["OB02", "DA01", "IC02", "SE03", "SG02", "IN01"]\n    },\n    {\n      "titre": "Epreuve 3 : Memory",\n      "type": "memory",\n      "description": "Retrouve les paires pour obtenir la cle finale",\n      "pictos": ["DA05", "DA07", "SG05", "SG08", "IN02", "OB04"]\n    }\n  ],\n  "explication": "Les pictogrammes de securite sont essentiels pour prevenir les risques professionnels."\n}\n\nREGLES :\n- nb entre 4 et 81\n- categories : au moins 1 categorie parmi obligation, interdiction, danger, incendie, secours, sgh\n- Pour memory, nb recommande 6 a 10\n- Pour speed, nb recommande 15 a 30\n- Pour escape_game : 3 a 5 epreuves, chaque epreuve a un type (quiz_image, nom_vers_image, categoriser, memory) et une liste de pictos (IDs)\n- Les IDs des pictos doivent correspondre a ceux listes ci-dessus (OB01, DA03, SG06, etc.)\n- Vocabulaire CAP/Bac Pro',
+        analyse_copie: 'Genere un exercice "Analyse de copie" pour le module PSE [MODULE] en JSON.\n\nCONCEPT : L\'eleve devient correcteur d\'une copie d\'examen PSE. Il doit analyser chaque reponse d\'un eleve fictif et evaluer 7 criteres.\n\n=== COMPETENCES EVALUABLES ===\nC2 — Appliquer une demarche d\'analyse (identifier, analyser, reperer)\nC3 — Expliquer un phenomene (expliquer, decrire, definir)\nC4 — Proposer une solution (proposer, suggerer, recommander)\nC5 — Argumenter un choix (argumenter, justifier, comparer)\nC6 — Communiquer a l\'ecrit (communiquer, rediger, presenter)\n\n=== VERBES D\'ACTION ===\nidentifier, expliquer, proposer, argumenter, communiquer, appliquer\n\n=== 4 CRITERES C6 (pour les items ou competence = C6) ===\n1. Vocabulaire adapte (0 = inadapte, 1 = partiellement adapte, 2 = adapte)\n2. Syntaxe claire et correcte (0 = incomprehensible, 1 = partiellement claire, 2 = claire)\n3. Argumentation structuree (0 = absente, 1 = partiellement structuree, 2 = structuree)\n4. Mise en forme / presentation (0 = absente, 1 = partiellement soignee, 2 = soignee)\n\n=== FORMAT JSON ===\n{\n  "consigne": "Analyse cette copie d\'examen PSE et evalue chaque reponse",\n  "contexte": "Description du contexte de l\'examen (situation professionnelle, consignes...)",\n  "items": [\n    {\n      "question_examen": "La question posee a l\'eleve lors de l\'examen",\n      "reponse_eleve": "La reponse ecrite par l\'eleve fictif (peut etre bonne, partielle ou mauvaise)",\n      "verbes_proposes": ["identifier", "expliquer", "proposer", "argumenter"],\n      "attendus": {\n        "verbe": "identifier",\n        "competence": "C2",\n        "validee": "oui",\n        "niveau": 3,\n        "justification_mots_cles": ["danger", "electrique", "risque"],\n        "c6": { "actif": false },\n        "amelioration_mots_cles": ["preciser", "source", "consequence"]\n      }\n    },\n    {\n      "question_examen": "Redige un compte-rendu des mesures de prevention",\n      "reponse_eleve": "faut mettre des gants et faire attention aux fils",\n      "verbes_proposes": ["communiquer", "rediger", "expliquer", "argumenter"],\n      "attendus": {\n        "verbe": "communiquer",\n        "competence": "C6",\n        "validee": "oui",\n        "niveau": 2,\n        "justification_mots_cles": ["communication", "redaction", "ecrit"],\n        "c6": {\n          "actif": true,\n          "criteres": [1, 1, 0, 0]\n        },\n        "amelioration_mots_cles": ["syntaxe", "vocabulaire", "structure", "presentation"]\n      }\n    }\n  ],\n  "explication": "Explication pedagogique globale (optionnel)"\n}\n\n=== REGLES CRUCIALES ===\n1. 3 a 6 items par exercice\n2. Varier les competences : au moins 3 competences differentes, dont obligatoirement 1 item C6\n3. verbes_proposes : 4 verbes dont 1 seul est la bonne reponse\n4. validee : "oui" ou "non" (la reponse de l\'eleve est-elle acceptable ?)\n5. niveau : 1 (insuffisant), 2 (fragile), 3 (satisfaisant), 4 (excellent) — seulement si validee="oui"\n6. justification_mots_cles : 2-4 mots-cles que l\'eleve-correcteur doit mentionner pour justifier son evaluation\n7. c6.actif : true UNIQUEMENT si competence = "C6"\n8. c6.criteres : tableau de 4 valeurs (0, 1 ou 2) correspondant aux 4 criteres C6\n9. amelioration_mots_cles : 2-4 mots-cles que l\'eleve-correcteur doit mentionner comme pistes d\'amelioration\n10. Les reponses de l\'eleve fictif doivent etre REALISTES (certaines bonnes, certaines mediocres, certaines mauvaises)\n11. Vocabulaire adapte CAP/Bac Pro\n12. Les questions d\'examen doivent etre en lien avec des situations professionnelles',
         scenario: 'Genere un exercice Scenario interactif pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Scenario - [situation]",\n  "etapes": [\n    {\n      "id": "debut",\n      "texte": "Description de la situation initiale...",\n      "choix": [\n        { "label": "Choix A (bon)", "suite": "etape2", "correct": true },\n        { "label": "Choix B (mauvais)", "suite": "bad1", "correct": false, "feedback": "Explication courte" }\n      ]\n    },\n    {\n      "id": "etape2",\n      "texte": "Suite de la situation...",\n      "choix": [\n        { "label": "Bon choix", "suite": "fin", "correct": true },\n        { "label": "Mauvais choix", "suite": "bad2", "correct": false, "feedback": "..." }\n      ]\n    },\n    { "id": "fin", "texte": "Bravo ! Vous avez gere la situation correctement.", "choix": [] },\n    { "id": "bad1", "texte": "Cette approche n\'est pas adaptee car [explication detaillee]. Vous pouvez reessayer.", "choix": [{ "label": "Reessayer", "suite": "debut", "correct": false }] },\n    { "id": "bad2", "texte": "Ce n\'est pas la bonne reaction car [explication]. Reessayez.", "choix": [{ "label": "Reessayer", "suite": "etape2", "correct": false }] }\n  ]\n}\n\nREGLES OBLIGATOIRES :\n- 4 a 8 etapes\n- Premiere etape id = "debut"\n- SEULE la fin reelle du scenario (bravo, reussite) a choix: []\n- Les etapes d\'erreur (bad*) NE DOIVENT PAS avoir choix: [] ! Elles doivent contenir au moins 1 choix de reprise :\n  { "label": "Reessayer", "suite": "etape_precedente", "correct": false }\n- Les explications d\'erreur doivent etre dans le champ texte de l\'etape bad (pas seulement dans feedback)\n- Le feedback des mauvais choix n\'est visible que brievement : mettre l\'essentiel dans texte de l\'etape bad\n- Chaque choix.suite pointe vers un id existant\n- Pas de boucles infinies (max 30 etapes parcourues)\n- 2-3 choix par etape\n- correct: true/false pour le scoring\n- feedback obligatoire pour les mauvais choix\n- Situation realiste et professionnelle\n- Vocabulaire CAP/Bac Pro'
     };
 
@@ -2762,6 +2837,7 @@
             else if (src.unite_travail && src.choix && src.attendus) type = 'duerp_ligne';
             else if (src.exposition && src.declencheur && src.gravite) type = 'estimation_risque';
             else if (src.distracteurs_danger) type = 'pad';
+            else if (Array.isArray(src.items) && src.items.length > 0 && src.items[0].attendus && src.items[0].attendus.verbe && src.items[0].attendus.competence) type = 'analyse_copie';
             else if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode) && (typeof src.nb === 'number' || src.mode === 'escape_game')) type = 'pictogramme';
             else if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') type = 'scenario';
             else if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined && src.cartes[0].b !== undefined) type = 'memory';
