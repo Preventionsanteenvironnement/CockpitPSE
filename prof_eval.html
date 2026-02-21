@@ -471,6 +471,7 @@
             <button class="ab-btn" style="background:#f59e0b;color:#000;" onclick="viewEvalContent()">📋 Voir l'evaluation</button>
             <button class="ab-btn ab-refresh" onclick="refreshResults()">🔄 Actualiser</button>
             <button class="ab-btn ab-publish" id="btn-publish-all" onclick="publishAll()">📢 Publier tout</button>
+            <button class="ab-btn" id="btn-publish-correction" style="background:#10b981; display:none;" onclick="publishCorrection()">📝 Publier la correction</button>
             <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
             <button class="ab-btn" style="background:#8b5cf6;" onclick="exportResultsPDF()">📄 PDF</button>
             <button class="ab-btn" style="background:#dc2626;" onclick="deleteEvaluation()">🗑️ Supprimer eval</button>
@@ -710,10 +711,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             };
 
             const pubBadge = ev.publie
-                ? '<span class="ei-badge badge-pub">Publie</span>'
-                : '<span class="ei-badge badge-draft">Brouillon</span>';
+                ? '<span class="ei-badge badge-pub">🟢 Publie</span>'
+                : '<span class="ei-badge badge-draft">🔴 Brouillon</span>';
             const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
             const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
+            const nonNoteBadge = ev.nonNote === true ? '<span class="ei-badge" style="background:rgba(245,158,11,0.15);color:#fcd34d;">Non notee</span>' : '';
 
             const evClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
             const classeBadge = evClasseIds.length > 0
@@ -721,7 +723,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 : '<span class="ei-badge" style="background:#e2e8f0;color:#64748b;">Toutes</span>';
 
             div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + pubBadge + qCountBadge + baremeBadge + classeBadge + '</div>';
+                '<div class="ei-meta">' + pubBadge + nonNoteBadge + qCountBadge + baremeBadge + classeBadge + '</div>';
             container.appendChild(div);
         });
     }
@@ -753,6 +755,16 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         // Show session section if synchronise mode
         const isSyncMode = currentEvalData && currentEvalData.mode === 'synchronise';
         document.getElementById('session-section').style.display = isSyncMode ? 'block' : 'none';
+
+        // Show "Publier correction" button if correction différée
+        const btnPubCorr = document.getElementById('btn-publish-correction');
+        if (currentEvalData && currentEvalData.correctionDifferee === true) {
+            btnPubCorr.style.display = 'inline-flex';
+            btnPubCorr.textContent = currentEvalData.correctionPubliee ? '✅ Correction publiee' : '📝 Publier la correction';
+            btnPubCorr.style.opacity = currentEvalData.correctionPubliee ? '0.6' : '1';
+        } else {
+            btnPubCorr.style.display = 'none';
+        }
 
         renderEvalSidebarList();
         if (window.innerWidth <= 768) closeMenu();
@@ -938,6 +950,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     // === RENDER STATS ===
     function renderStats() {
+        const isNonNote = currentEvalData && currentEvalData.nonNote === true;
         const notes = filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n));
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
         const publies = filteredResults.filter(r => r.publie).length;
@@ -945,7 +958,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('stat-soumis').textContent = filteredResults.length;
         document.getElementById('stat-publies').textContent = publies;
 
-        if (notes.length > 0) {
+        if (isNonNote) {
+            document.getElementById('stat-moyenne').textContent = 'N/A';
+            document.getElementById('stat-min').textContent = 'N/A';
+            document.getElementById('stat-max').textContent = 'N/A';
+        } else if (notes.length > 0) {
             const avg = (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1);
             const min = Math.min(...notes).toFixed(1);
             const max = Math.max(...notes).toFixed(1);
@@ -974,13 +991,16 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
             // Note coloring — use display note (ajustee if exists)
             const bareme = r.bareme || 20;
+            const isEvalNonNote = currentEvalData && currentEvalData.nonNote === true;
             const displayNote = getDisplayNote(r);
             const pct = displayNote !== null ? (displayNote / bareme) * 100 : 0;
-            const noteClass = displayNote === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low');
+            const noteClass = isEvalNonNote ? '' : (displayNote === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low'));
 
             // Note cell content with adjusted badge + edit button
             let noteHtml = '';
-            if (displayNote !== null) {
+            if (isEvalNonNote) {
+                noteHtml = '<span style="color:#fcd34d; font-size:0.8rem;">📋 Soumis</span>';
+            } else if (displayNote !== null) {
                 noteHtml = displayNote + '/' + bareme;
                 if (r.note_ajustee !== null && r.note_ajustee !== undefined) {
                     noteHtml += ' <span class="note-adjusted-badge">ajuste</span>';
@@ -1113,6 +1133,37 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             showToast(toPublish.length + ' resultat(s) publie(s) !');
         } catch(e) {
             console.error("Erreur publication groupee:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === PUBLISH CORRECTION (for correctionDifferee evals) ===
+    window.publishCorrection = async function() {
+        if (!currentEvalId || !currentEvalData) return;
+        if (currentEvalData.correctionPubliee) {
+            if (!confirm('La correction est deja publiee. Voulez-vous la depublier ?')) return;
+            try {
+                await updateDoc(doc(db, "eval_banque", currentEvalId), { correctionPubliee: false });
+                currentEvalData.correctionPubliee = false;
+                const btn = document.getElementById('btn-publish-correction');
+                btn.textContent = '📝 Publier la correction';
+                btn.style.opacity = '1';
+                showToast('Correction depubliee. Les eleves ne la verront plus.');
+            } catch(e) {
+                alert("Erreur : " + e.message);
+            }
+            return;
+        }
+        if (!confirm('Publier la correction ? Les eleves pourront voir les bonnes reponses.')) return;
+        try {
+            await updateDoc(doc(db, "eval_banque", currentEvalId), { correctionPubliee: true });
+            currentEvalData.correctionPubliee = true;
+            const btn = document.getElementById('btn-publish-correction');
+            btn.textContent = '✅ Correction publiee';
+            btn.style.opacity = '0.6';
+            showToast('Correction publiee ! Les eleves peuvent voir les reponses.');
+        } catch(e) {
+            console.error("Erreur publication correction:", e);
             alert("Erreur : " + e.message);
         }
     };
