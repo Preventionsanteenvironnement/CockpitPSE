@@ -1865,7 +1865,8 @@
         var input = document.getElementById('ac-json-input');
         var status = document.getElementById('ac-import-status');
         try {
-            var data = JSON.parse(input.value);
+            var raw = cleanJsonInput(input.value.trim());
+            var data = JSON.parse(raw);
             if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
                 throw new Error('Le JSON doit contenir un tableau "items" non vide');
             }
@@ -2894,28 +2895,128 @@
         return { data, warnings };
     }
 
+    // Nettoyage robuste du JSON colle depuis ChatGPT/Claude/Word
+    function cleanJsonInput(raw) {
+        // 1. Supprimer BOM
+        raw = raw.replace(/^\uFEFF/, '');
+        // 2. Guillemets courbes → droits
+        raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB]/g, '"');
+        raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+        // 3. Extraire le JSON des blocs de code Markdown (```json ... ```)
+        var codeBlockMatch = raw.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+        if (codeBlockMatch) {
+            raw = codeBlockMatch[1].trim();
+        }
+        // 4. Si pas de bloc code, tenter d'extraire entre { } ou [ ]
+        if (raw.charAt(0) !== '{' && raw.charAt(0) !== '[') {
+            var firstBrace = raw.indexOf('{');
+            var firstBracket = raw.indexOf('[');
+            var start = -1;
+            if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+                start = firstBrace;
+                var lastBrace = raw.lastIndexOf('}');
+                if (lastBrace > start) raw = raw.substring(start, lastBrace + 1);
+            } else if (firstBracket >= 0) {
+                start = firstBracket;
+                var lastBracket = raw.lastIndexOf(']');
+                if (lastBracket > start) raw = raw.substring(start, lastBracket + 1);
+            }
+        }
+        // 5. Supprimer les commentaires // en fin de ligne (hors des strings)
+        raw = raw.replace(/^\s*\/\/.*$/gm, '');
+        // 6. Supprimer les trailing commas avant } et ]
+        raw = raw.replace(/,\s*([\]}])/g, '$1');
+        return raw.trim();
+    }
+
+    // Auto-detection du type depuis la structure JSON
+    function detectJsonType(src) {
+        if (src.niveaux && src.danger) return 'prevention';
+        if (Array.isArray(src.lignes) && src.lignes.length > 0 && src.lignes[0].unite_travail) return 'duerp_mini';
+        if (src.unite_travail && src.choix && src.attendus) return 'duerp_ligne';
+        if (src.exposition && src.declencheur && src.gravite) return 'estimation_risque';
+        if (src.distracteurs_danger) return 'pad';
+        if (Array.isArray(src.items) && src.items.length > 0 && src.items[0].attendus && src.items[0].attendus.verbe) return 'analyse_copie';
+        if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) return 'pictogramme';
+        if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
+        if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
+        if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
+        if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
+        if (typeof src.question === 'string' && Array.isArray(src.choix) && src.reponse !== undefined) return 'qcm_classique';
+        if (src.texte && src.texte.includes('{{')) return 'texte_trous';
+        if (src.paires) return 'relier';
+        if (src.series) return 'intrus';
+        if (src.mots && src.mots[0] && src.mots[0].indice !== undefined) return 'pendu';
+        if (src.mots && src.mots[0] && src.mots[0].definition !== undefined) return 'mots_croises';
+        if (src.affirmations) return 'swipe_vf';
+        if (src.questions && src.questions[0] && src.questions[0].image !== undefined) return 'qcm_image';
+        if (src.colonnes && src.lignes) return 'tableau';
+        if (src.scenario) return 'etude_cas';
+        if (src.items && !src.questions) return 'ordre';
+        return null;
+    }
+
     window.doImportJSON = function() {
         let raw = document.getElementById('import-json-input').value.trim();
         const errorEl = document.getElementById('import-error');
-        // Nettoyer les guillemets courbes (ChatGPT/Word) → guillemets droits
-        raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"').replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+        errorEl.style.display = 'none';
+
+        if (!raw) {
+            errorEl.textContent = '❌ Collez du JSON dans le champ ci-dessus';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        // Etape 1 : Nettoyage robuste
+        raw = cleanJsonInput(raw);
+
+        // Etape 2 : Parse JSON
+        var data;
         try {
-            let data = JSON.parse(raw);
-            const type = document.getElementById('exo-type').value;
-            // Auto-repair scenario data if needed
+            data = JSON.parse(raw);
+        } catch(e) {
+            errorEl.textContent = '❌ JSON invalide : ' + e.message + '\n💡 Conseil : copiez UNIQUEMENT le bloc JSON depuis ChatGPT (sans le texte autour)';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        // Etape 3 : Auto-detection du type
+        var selectedType = document.getElementById('exo-type').value;
+        var detectedType = detectJsonType(data);
+        var type = selectedType;
+        if (detectedType && detectedType !== selectedType) {
+            type = detectedType;
+            document.getElementById('exo-type').value = type;
+            onTypeChange();
+            showToast('🔄 Type auto-detecte : ' + (TYPE_LABELS[type] || type), 3000);
+        }
+
+        // Etape 4 : Auto-repair scenario
+        try {
             if (type === 'scenario' && data.etapes) {
                 const result = fixScenarioData(data);
                 data = result.data;
                 if (result.warnings.length > 0) {
-                    showToast('⚠️ Scenario repare : ' + result.warnings.length + ' correctif(s) applique(s)', 5000);
-                    console.warn('Scenario auto-repair:', result.warnings);
+                    showToast('⚠️ Scenario repare : ' + result.warnings.length + ' correctif(s)', 5000);
                 }
             }
             setContenuInForm(type, data);
             closeImportModal();
-            showToast('JSON importe !');
+            // Message detaille
+            var detail = '';
+            if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
+            else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
+            else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
+            else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
+            else if (type === 'scenario' && data.etapes) detail = ' (' + data.etapes.length + ' etapes)';
+            else if (type === 'relier' && data.paires) detail = ' (' + data.paires.length + ' paires)';
+            else if (type === 'pendu' && data.mots) detail = ' (' + data.mots.length + ' mots)';
+            else if (type === 'swipe_vf' && data.affirmations) detail = ' (' + data.affirmations.length + ' affirmations)';
+            else if (type === 'intrus' && data.series) detail = ' (' + data.series.length + ' series)';
+            else if (type === 'analyse_copie' && data.items) detail = ' (' + data.items.length + ' items)';
+            showToast('✅ ' + (TYPE_LABELS[type] || type) + ' importe !' + detail);
         } catch(e) {
-            errorEl.textContent = 'JSON invalide : ' + e.message;
+            errorEl.textContent = '❌ Erreur lors du remplissage du formulaire : ' + e.message;
             errorEl.style.display = 'block';
         }
     };
