@@ -1753,6 +1753,10 @@
             };
             const pictoExpl = document.getElementById('picto-explication').value.trim();
             if (pictoExpl) pictoObj.explication = pictoExpl;
+            // Escape game : conserver les epreuves importees
+            if (pictoObj.mode === 'escape_game' && window._pictoEpreuves && window._pictoEpreuves.length > 0) {
+                pictoObj.epreuves = window._pictoEpreuves;
+            }
             return pictoObj;
         }
         return {};
@@ -2101,6 +2105,8 @@
             document.getElementById('picto-explication').value = contenu.explication || '';
             var cats = contenu.categories || ['obligation', 'interdiction', 'danger', 'incendie', 'secours', 'sgh'];
             document.querySelectorAll('.picto-cat-cb').forEach(cb => { cb.checked = cats.includes(cb.value); });
+            // Escape game : stocker les epreuves pour la sauvegarde
+            window._pictoEpreuves = contenu.epreuves || [];
         }
     }
 
@@ -2221,6 +2227,7 @@
         document.getElementById('picto-nb').value = '8';
         document.getElementById('picto-explication').value = '';
         document.querySelectorAll('.picto-cat-cb').forEach(cb => { cb.checked = true; });
+        window._pictoEpreuves = [];
     }
 
     // ========== SIDEBAR LIST ==========
@@ -2755,7 +2762,7 @@
             else if (src.unite_travail && src.choix && src.attendus) type = 'duerp_ligne';
             else if (src.exposition && src.declencheur && src.gravite) type = 'estimation_risque';
             else if (src.distracteurs_danger) type = 'pad';
-            else if (src.mode && typeof src.nb === 'number' && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) type = 'pictogramme';
+            else if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode) && (typeof src.nb === 'number' || src.mode === 'escape_game')) type = 'pictogramme';
             else if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') type = 'scenario';
             else if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined && src.cartes[0].b !== undefined) type = 'memory';
             else if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].id !== undefined && src.items[0].categorie !== undefined) type = 'categoriser';
