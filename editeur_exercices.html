@@ -1231,7 +1231,8 @@
     renderClassPills();
 
     // ========== TYPE CHANGE ==========
-    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'analyse_copie'];
+    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini'];
+    const AUTO_COMPETENCES_TYPES = ['analyse_copie'];
 
     window.onTypeChange = function() {
         const type = document.getElementById('exo-type').value;
@@ -1239,13 +1240,55 @@
         const section = document.getElementById('ct-' + type);
         if (section) section.classList.add('active');
         document.getElementById('content-title').textContent = 'Contenu — ' + (TYPE_LABELS[type] || type);
-        // Auto-set TRANSVERSAL pour PAD, Prevention, Estimation du risque
+
         const modSel = document.getElementById('exo-module');
-        if (TRANSVERSAL_TYPES.includes(type)) {
+        const catCheckbox = document.getElementById('exo-categorie-competences');
+        const catGroup = document.getElementById('categorie-group');
+
+        if (AUTO_COMPETENCES_TYPES.includes(type)) {
+            // analyse_copie : toujours competences, checkbox cochee + grisee
+            catCheckbox.checked = true;
+            catCheckbox.disabled = true;
+            catGroup.style.display = '';
             modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
             modSel.value = 'TRANSVERSAL';
             modSel.disabled = true;
-        } else if (modSel.disabled && modSel.value === 'TRANSVERSAL') {
+        } else if (TRANSVERSAL_TYPES.includes(type)) {
+            // PAD, Prevention, etc. : checkbox masquee, module = TRANSVERSAL
+            catCheckbox.checked = false;
+            catCheckbox.disabled = false;
+            catGroup.style.display = 'none';
+            modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
+            modSel.value = 'TRANSVERSAL';
+            modSel.disabled = true;
+        } else {
+            // Types normaux : checkbox visible et activable
+            catCheckbox.disabled = false;
+            catGroup.style.display = '';
+            if (!catCheckbox.checked && modSel.disabled && modSel.value === 'TRANSVERSAL') {
+                updateModuleFromPills();
+            }
+            // Si checkbox deja cochee, garder module TRANSVERSAL
+            if (catCheckbox.checked) {
+                modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
+                modSel.value = 'TRANSVERSAL';
+                modSel.disabled = true;
+            }
+        }
+    };
+
+    window.onCategorieChange = function() {
+        const type = document.getElementById('exo-type').value;
+        const catCheckbox = document.getElementById('exo-categorie-competences');
+        const modSel = document.getElementById('exo-module');
+        // Ne pas toucher pour les types qui gerent deja le module
+        if (TRANSVERSAL_TYPES.includes(type) || AUTO_COMPETENCES_TYPES.includes(type)) return;
+        if (catCheckbox.checked) {
+            modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
+            modSel.value = 'TRANSVERSAL';
+            modSel.disabled = true;
+        } else {
+            modSel.disabled = false;
             updateModuleFromPills();
         }
     };
@@ -2309,6 +2352,9 @@
         var acStatus = document.getElementById('ac-import-status');
         if (acStatus) acStatus.style.display = 'none';
         window._analyseCopieData = null;
+        // Categorie checkbox reset
+        var catCb = document.getElementById('exo-categorie-competences');
+        if (catCb) { catCb.checked = false; catCb.disabled = false; }
     }
 
     // ========== SIDEBAR LIST ==========
@@ -2385,6 +2431,12 @@
         window.setDifficulty(ex.difficulte || 'facile');
         clearAllForms();
         onTypeChange();
+        // 6f: restaurer checkbox categorie depuis Firebase
+        if (ex.categorie === 'competences' && !AUTO_COMPETENCES_TYPES.includes(ex.type) && !TRANSVERSAL_TYPES.includes(ex.type)) {
+            var catCb = document.getElementById('exo-categorie-competences');
+            catCb.checked = true;
+            onCategorieChange();
+        }
         setContenuInForm(ex.type, ex.contenu);
         document.getElementById('btn-delete').style.display = 'block';
         updatePublishButtons(!!ex.publie);
@@ -2676,7 +2728,9 @@
             if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
         }
 
-        const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, updatedAt: serverTimestamp() };
+        const catCb = document.getElementById('exo-categorie-competences');
+        const categorie = (catCb.checked || AUTO_COMPETENCES_TYPES.includes(type)) ? 'competences' : null;
+        const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, categorie, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
                 await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
