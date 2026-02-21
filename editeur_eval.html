@@ -135,6 +135,24 @@
         }
         .mode-btn.active { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #93c5fd; }
 
+        /* Notation toggle (Noté/Non noté) */
+        .note-toggle { display: flex; gap: 8px; }
+        .note-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .note-btn.active { border-color: #f59e0b; background: rgba(245,158,11,0.15); color: #fcd34d; }
+
+        /* Correction toggle (Immédiate/Différée) */
+        .correction-toggle { display: flex; gap: 8px; }
+        .corr-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .corr-btn.active { border-color: #10b981; background: rgba(16,185,129,0.15); color: #6ee7b7; }
+
         /* Documents section */
         .doc-card {
             background: #0f172a; border: 1px solid #334155; border-radius: 8px;
@@ -426,6 +444,8 @@
             .q-card { padding:12px; }
             .q-form { padding:14px; }
             .bareme-toggle { flex-wrap:wrap; }
+            .note-toggle { flex-wrap:wrap; }
+            .correction-toggle { flex-wrap:wrap; }
             .doc-form { padding:12px; }
         }
 
@@ -511,6 +531,22 @@
                 <div class="mode-toggle">
                     <button class="mode-btn active" id="mode-libre" onclick="setModeEval('libre')">📖 Libre (a son rythme)</button>
                     <button class="mode-btn" id="mode-sync" onclick="setModeEval('synchronise')">👨‍🏫 Synchronise (en classe)</button>
+                </div>
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>📊 Notation</label>
+                    <div class="note-toggle">
+                        <button class="note-btn active" id="note-oui" onclick="setNonNote(false)">📊 Notee</button>
+                        <button class="note-btn" id="note-non" onclick="setNonNote(true)">📋 Non notee</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>📝 Correction</label>
+                    <div class="correction-toggle">
+                        <button class="corr-btn active" id="corr-immediate" onclick="setCorrectionDifferee(false)">⚡ Immediate</button>
+                        <button class="corr-btn" id="corr-differee" onclick="setCorrectionDifferee(true)">🔒 Differee</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -868,6 +904,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let editingDocIndex = -1;
     let currentBareme = 20;
     let currentModeEval = 'libre';
+    let currentNonNote = false;
+    let currentCorrectionDifferee = false;
     let insertAfterDocRef = null;       // doc context for new questions from flow buttons
     let insertAtIndex = null;           // position in questions[] for insertion
 
@@ -1163,6 +1201,20 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         currentModeEval = mode;
         document.getElementById('mode-libre').className = 'mode-btn' + (mode === 'libre' ? ' active' : '');
         document.getElementById('mode-sync').className = 'mode-btn' + (mode === 'synchronise' ? ' active' : '');
+    };
+
+    // === NOTATION TOGGLE (Noté / Non noté) ===
+    window.setNonNote = function(val) {
+        currentNonNote = val;
+        document.getElementById('note-oui').className = 'note-btn' + (!val ? ' active' : '');
+        document.getElementById('note-non').className = 'note-btn' + (val ? ' active' : '');
+    };
+
+    // === CORRECTION TOGGLE (Immédiate / Différée) ===
+    window.setCorrectionDifferee = function(val) {
+        currentCorrectionDifferee = val;
+        document.getElementById('corr-immediate').className = 'corr-btn' + (!val ? ' active' : '');
+        document.getElementById('corr-differee').className = 'corr-btn' + (val ? ' active' : '');
     };
 
     // === DOCUMENTS MANAGEMENT ===
@@ -1488,8 +1540,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             };
 
             const pubBadge = ev.publie
-                ? '<span class="ei-badge badge-pub">Publie</span>'
-                : '<span class="ei-badge badge-draft">Brouillon</span>';
+                ? '<span class="ei-badge badge-pub">🟢 Publie</span>'
+                : '<span class="ei-badge badge-draft">🔴 Brouillon</span>';
             const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
             const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
             const classIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
@@ -1542,6 +1594,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             bareme: ev.bareme || 20,
             timer: ev.timer || 0,
             mode: ev.mode || 'libre',
+            nonNote: ev.nonNote || false,
+            correctionDifferee: ev.correctionDifferee || false,
             documents: ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [],
             questions: ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [],
             publie: false,
@@ -1617,6 +1671,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('eval-timer').value = ev.timer || 0;
         setBareme(currentBareme);
         setModeEval(currentModeEval);
+
+        currentNonNote = ev.nonNote || false;
+        currentCorrectionDifferee = ev.correctionDifferee || false;
+        setNonNote(currentNonNote);
+        setCorrectionDifferee(currentCorrectionDifferee);
 
         document.getElementById('btn-delete-eval').style.display = 'block';
         document.getElementById('btn-duplicate-eval').style.display = 'block';
@@ -2088,6 +2147,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             bareme: currentBareme,
             timer: parseInt(document.getElementById('eval-timer').value) || 0,
             mode: currentModeEval,
+            nonNote: currentNonNote,
+            correctionDifferee: currentCorrectionDifferee,
             documents: documents,
             questions: questions,
             updatedAt: serverTimestamp()
