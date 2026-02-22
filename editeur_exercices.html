@@ -3040,6 +3040,100 @@
         return null;
     }
 
+    // Normalise les guillemets typographiques sans casser le contenu texte.
+    // - Convertit les délimiteurs de chaînes en "
+    // - Conserve les guillemets décoratifs internes via échappement \"
+    function normalizeJsonQuotes(raw) {
+        if (!raw) return raw;
+        var out = '';
+        var inString = false;
+        var stringDelim = null; // '"' | 'curly'
+        var escaped = false;
+        var i = 0;
+
+        function isDoubleQuoteLike(ch) {
+            return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
+        }
+        function nextSignificantChar(str, start) {
+            for (var k = start; k < str.length; k++) {
+                var cc = str.charAt(k);
+                if (!/\s/.test(cc)) return cc;
+            }
+            return '';
+        }
+
+        while (i < raw.length) {
+            var ch = raw.charAt(i);
+
+            if (!inString) {
+                if (isDoubleQuoteLike(ch)) {
+                    inString = true;
+                    stringDelim = (ch === '"') ? '"' : 'curly';
+                    out += '"';
+                    i++;
+                    continue;
+                }
+                // Apostrophes typographiques simples -> apostrophe standard
+                if (/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch)) {
+                    out += "'";
+                    i++;
+                    continue;
+                }
+                out += ch;
+                i++;
+                continue;
+            }
+
+            // inString === true
+            if (escaped) {
+                out += ch;
+                escaped = false;
+                i++;
+                continue;
+            }
+            if (ch === '\\') {
+                out += ch;
+                escaped = true;
+                i++;
+                continue;
+            }
+
+            if (isDoubleQuoteLike(ch)) {
+                var next = nextSignificantChar(raw, i + 1);
+                var canClose = (next === ':' || next === ',' || next === '}' || next === ']');
+
+                if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
+                    if (canClose) {
+                        out += '"';
+                        inString = false;
+                        stringDelim = null;
+                    } else {
+                        out += '\\"';
+                    }
+                    i++;
+                    continue;
+                }
+
+                // Quote-like différente du délimiteur courant -> texte interne
+                out += '\\"';
+                i++;
+                continue;
+            }
+
+            // Apostrophes typographiques simples -> apostrophe standard dans la string
+            if (/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch)) {
+                out += "'";
+                i++;
+                continue;
+            }
+
+            out += ch;
+            i++;
+        }
+
+        return out;
+    }
+
     // Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Mistral/Word
     function cleanJsonInput(raw) {
         // 1. Supprimer BOM partout (pas seulement au debut)
@@ -3048,9 +3142,8 @@
         raw = raw.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
         // 3. Remplacer NBSP par espace normal
         raw = raw.replace(/\u00A0/g, ' ');
-        // 4. Guillemets courbes / typographiques → droits (elargi fullwidth)
-        raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
-        raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
+        // 4. Normalisation des guillemets typographiques (sans casser les strings)
+        raw = normalizeJsonQuotes(raw);
         // 4b. Supprimer artefacts de citations IA (Gemini/Perplexity/etc.)
         raw = raw.replace(/\[cite_start\]/gi, '');
         raw = raw.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
