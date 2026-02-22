@@ -2936,16 +2936,9 @@
         return { data, warnings };
     }
 
-    // Extrait le premier bloc JSON équilibré ({...} ou [...]) même si texte autour.
-    function extractBalancedJson(raw) {
-        if (!raw) return null;
-        var start = -1;
-        for (var i = 0; i < raw.length; i++) {
-            var c = raw.charAt(i);
-            if (c === '{' || c === '[') { start = i; break; }
-        }
-        if (start < 0) return null;
-
+    // Extrait un bloc JSON équilibré ({...} ou [...]) à partir d'une position donnée.
+    function extractBalancedJsonAt(raw, start) {
+        if (!raw || start < 0 || start >= raw.length) return null;
         var stack = [];
         var inString = false;
         var escaped = false;
@@ -2973,6 +2966,34 @@
         return null;
     }
 
+    // Extrait le premier bloc JSON équilibré ({...} ou [...]) même si texte autour.
+    function extractBalancedJson(raw) {
+        if (!raw) return null;
+        for (var i = 0; i < raw.length; i++) {
+            var c = raw.charAt(i);
+            if (c !== '{' && c !== '[') continue;
+            var candidate = extractBalancedJsonAt(raw, i);
+            if (candidate) return candidate;
+        }
+        return null;
+    }
+
+    // Cherche le premier bloc JSON réellement parsable (évite de capturer un faux bloc du prompt).
+    function extractParsableJson(raw) {
+        if (!raw) return null;
+        for (var i = 0; i < raw.length; i++) {
+            var c = raw.charAt(i);
+            if (c !== '{' && c !== '[') continue;
+            var candidate = extractBalancedJsonAt(raw, i);
+            if (!candidate) continue;
+            try {
+                JSON.parse(candidate);
+                return candidate;
+            } catch (e) {}
+        }
+        return null;
+    }
+
     // Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Mistral/Word
     function cleanJsonInput(raw) {
         // 1. Supprimer BOM partout (pas seulement au debut)
@@ -2992,9 +3013,13 @@
         if (codeBlockMatch) {
             raw = codeBlockMatch[1].trim();
         }
-        // 6. Extraire le premier JSON équilibré si texte autour
-        var balanced = extractBalancedJson(raw);
-        if (balanced) raw = balanced;
+        // 6. Extraire un JSON parsable si texte autour
+        var parsable = extractParsableJson(raw);
+        if (parsable) raw = parsable;
+        else {
+            var balanced = extractBalancedJson(raw);
+            if (balanced) raw = balanced;
+        }
         // 7. Supprimer les commentaires // en debut de ligne
         raw = raw.replace(/^\s*\/\/.*$/gm, '');
         // 8. Supprimer les trailing commas avant } et ]
@@ -3056,6 +3081,38 @@
         var data = unwrapImportPayload(src);
         var typeHint = null;
         var warning = '';
+
+        // Cas fréquent : IA renvoie un tableau de QCM [{question, choix, reponse, ...}, ...]
+        if (
+            Array.isArray(data) &&
+            data.length > 0 &&
+            data[0] &&
+            typeof data[0].question === 'string' &&
+            Array.isArray(data[0].choix) &&
+            data[0].reponse !== undefined
+        ) {
+            if (data.length === 1) {
+                var q0 = data[0];
+                data = {
+                    titre: q0.titre || 'QCM',
+                    question: q0.question || '',
+                    choix: q0.choix || [],
+                    reponse: q0.reponse,
+                    multiple: !!q0.multiple,
+                    explication: q0.explication || ''
+                };
+                typeHint = 'qcm_classique';
+                warning = 'Conversion auto : tableau[0] -> QCM classique';
+            } else {
+                data = {
+                    titre: (data[0] && data[0].titre) || 'Quiz Chrono',
+                    temps_par_question: 15,
+                    questions: data
+                };
+                typeHint = 'quiz_chrono';
+                warning = 'Conversion auto : tableau[] -> Quiz Chrono';
+            }
+        }
 
         // Cas fréquent : JSON "QCM" multi-questions → on convertit vers Quiz Chrono
         if (
