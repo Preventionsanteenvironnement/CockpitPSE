@@ -383,6 +383,13 @@
                     <label>Texte (entourez les mots a deviner avec {{ }})</label>
                     <textarea class="form-textarea" id="tt-texte" rows="5" placeholder="Les energies {{renouvelables}} sont inepuisables contrairement aux energies {{fossiles}}." oninput="previewTexteTrous()"></textarea>
                 </div>
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label>Mode de reponse</label>
+                    <select class="form-select" id="tt-mode">
+                        <option value="input">Saisie libre</option>
+                        <option value="dropdown">Liste deroulante</option>
+                    </select>
+                </div>
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:#94a3b8;">
                     <input type="checkbox" id="tt-indice"> Afficher les lettres melangees comme indice
                 </label>
@@ -1531,7 +1538,7 @@
         const rawType = document.getElementById('exo-type').value;
         const type = rawType === 'hierarchiser' ? 'ordre' : rawType;
         if (type === 'texte_trous') {
-            const ttObj = { consigne: document.getElementById('tt-consigne').value, texte: document.getElementById('tt-texte').value, indice: document.getElementById('tt-indice').checked };
+            const ttObj = { consigne: document.getElementById('tt-consigne').value, texte: document.getElementById('tt-texte').value, indice: document.getElementById('tt-indice').checked, mode: document.getElementById('tt-mode').value || 'input' };
             const ttExpl = document.getElementById('tt-explication').value.trim();
             if (ttExpl) ttObj.explication = ttExpl;
             return ttObj;
@@ -2156,6 +2163,7 @@
             document.getElementById('tt-consigne').value = contenu.consigne || '';
             document.getElementById('tt-texte').value = contenu.texte || '';
             document.getElementById('tt-indice').checked = !!contenu.indice;
+            document.getElementById('tt-mode').value = contenu.mode || 'input';
             document.getElementById('tt-explication').value = contenu.explication || '';
             previewTexteTrous();
         } else if (type === 'relier') {
@@ -2379,6 +2387,7 @@
         document.getElementById('tt-texte').value = '';
         document.getElementById('tt-consigne').value = 'Completez le texte suivant';
         document.getElementById('tt-indice').checked = false;
+        document.getElementById('tt-mode').value = 'input';
         document.getElementById('tt-preview').innerHTML = '';
         document.getElementById('rel-consigne').value = 'Reliez chaque element a sa definition';
         document.getElementById('rel-list').innerHTML = '';
@@ -2977,7 +2986,7 @@
 
     // ========== IMPORT JSON ==========
     const PROMPTS = {
-        texte_trous: 'Genere un exercice "texte a trous" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "texte": "Phrase avec {{mot}} entre doubles accolades.", "indice": false, "explication": "Explication pedagogique (optionnel)" }\nMets 5 a 10 mots entre {{ }}. Texte de 3 a 5 phrases.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre ses erreurs.',
+        texte_trous: 'Genere un exercice "texte a trous" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "texte": "Phrase avec {{mot}} entre doubles accolades.", "mode": "input", "indice": false, "explication": "Explication pedagogique (optionnel)" }\nmode peut etre "input" (saisie libre) ou "dropdown" (liste deroulante).\nMets 5 a 10 mots entre {{ }}. Texte de 3 a 5 phrases.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre ses erreurs.',
         relier: 'Genere un exercice "relier" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "paires": [{ "gauche": "Terme", "droite": "Definition" }], "explication": "Explication pedagogique (optionnel)" }\nCree 5 a 8 paires.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre la logique des associations.',
         ordre: 'Genere un exercice "remettre dans l\'ordre" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre pourquoi cet ordre.',
         hierarchiser: 'Genere un exercice "hierarchiser" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nL\'interface eleve utilisera des boutons haut/bas (pas de drag & drop).',
