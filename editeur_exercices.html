@@ -3027,6 +3027,7 @@
     // Cherche le premier bloc JSON réellement parsable (évite de capturer un faux bloc du prompt).
     function extractParsableJson(raw) {
         if (!raw) return null;
+        var parsed = [];
         for (var i = 0; i < raw.length; i++) {
             var c = raw.charAt(i);
             if (c !== '{' && c !== '[') continue;
@@ -3034,10 +3035,16 @@
             if (!candidate) continue;
             try {
                 JSON.parse(candidate);
-                return candidate;
+                parsed.push({ json: candidate, start: i, len: candidate.length, isArray: c === '[' });
             } catch (e) {}
         }
-        return null;
+        if (parsed.length === 0) return null;
+        // Prefer parsed arrays first, then longest parsed block.
+        parsed.sort(function(a, b) {
+            if (a.isArray !== b.isArray) return a.isArray ? -1 : 1;
+            return b.len - a.len;
+        });
+        return parsed[0].json;
     }
 
     // Normalise les guillemets typographiques sans casser le contenu texte.
@@ -3221,6 +3228,11 @@
         var typeHint = null;
         var warning = '';
 
+        function firstRepId(rep) {
+            if (Array.isArray(rep)) return rep.length > 0 ? rep[0] : 'c1';
+            return rep;
+        }
+
         // Cas fréquent : IA renvoie un tableau de QCM [{question, choix, reponse, ...}, ...]
         if (
             Array.isArray(data) &&
@@ -3243,13 +3255,24 @@
                 typeHint = 'qcm_classique';
                 warning = 'Conversion auto : tableau[0] -> QCM classique';
             } else {
+                var hadMultiAnswers = data.some(function(q) { return Array.isArray(q.reponse) && q.reponse.length > 1; });
+                var chronoQuestions = data.map(function(q) {
+                    return {
+                        question: q.question || '',
+                        choix: q.choix || [],
+                        reponse: firstRepId(q.reponse),
+                        explication: q.explication || ''
+                    };
+                });
                 data = {
                     titre: (data[0] && data[0].titre) || 'Quiz Chrono',
                     temps_par_question: 15,
-                    questions: data
+                    questions: chronoQuestions
                 };
                 typeHint = 'quiz_chrono';
-                warning = 'Conversion auto : tableau[] -> Quiz Chrono';
+                warning = hadMultiAnswers
+                    ? 'Conversion auto : tableau[] -> Quiz Chrono (QCM multiples ramenes a 1 bonne reponse par question)'
+                    : 'Conversion auto : tableau[] -> Quiz Chrono';
             }
         }
 
@@ -3277,13 +3300,24 @@
                 typeHint = 'qcm_classique';
                 warning = 'Conversion auto : questions[0] -> QCM classique';
             } else if (typeof data.temps_par_question !== 'number') {
+                var hadMultiInQuestions = data.questions.some(function(q) { return Array.isArray(q.reponse) && q.reponse.length > 1; });
+                var normalizedQuestions = data.questions.map(function(q) {
+                    return {
+                        question: q.question || '',
+                        choix: q.choix || [],
+                        reponse: firstRepId(q.reponse),
+                        explication: q.explication || ''
+                    };
+                });
                 data = {
                     titre: data.titre || 'Quiz Chrono',
                     temps_par_question: 15,
-                    questions: data.questions
+                    questions: normalizedQuestions
                 };
                 typeHint = 'quiz_chrono';
-                warning = 'Conversion auto : questions[] -> Quiz Chrono';
+                warning = hadMultiInQuestions
+                    ? 'Conversion auto : questions[] -> Quiz Chrono (QCM multiples ramenes a 1 bonne reponse par question)'
+                    : 'Conversion auto : questions[] -> Quiz Chrono';
             }
         }
 
