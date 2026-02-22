@@ -3176,115 +3176,146 @@
     }
 
     function buildAnalyseCopiePrompt() {
-        return 'Genere un exercice analyse_copie Bac Pro PSE au format JSON STRICT en respectant exactement le schema ci-dessous.\n\n' +
-            'BUT\n' +
-            'L\'eleve joue le correcteur. Il corrige 5 reponses d\'examen :\n' +
-            '- repere le verbe d\'action\n' +
-            '- identifie la competence dominante (C2 C3 C4 C5)\n' +
-            '- choisit un niveau (non_traite insuffisant acceptable maitrise)\n' +
-            '- choisit une justification\n' +
-            '- choisit la meilleure amelioration\n' +
-            'Puis, a la fin seulement, il evalue C6 globalement sur l\'ensemble et obtient une note /20 calculee automatiquement.\n\n' +
-            'CONTRAINTES OBLIGATOIRES\n' +
-            '1) 5 items exactement\n' +
-            '2) verbes_proposes : 4 choix, 1 seul correct (verbe_index)\n' +
-            '3) competences_proposees : exactement ["C2","C3","C4","C5"]\n' +
-            '4) niveaux_proposees : exactement ["non_traite","insuffisant","acceptable","maitrise"]\n' +
-            '5) justifs_proposees : 3 choix, 1 seul correct (justif_index)\n' +
-            '6) ameliorations_proposees : 3 choix, 1 seul correct (amelioration_index)\n' +
-            '7) Pas d\'ecriture obligatoire : tout est cliquable\n' +
-            '8) Correction concrete obligatoire (definition + exemple concret + lien direct a la reponse)\n' +
-            '9) Reponses eleve fictif realistes (insuffisantes, acceptables, au moins une maitrisee)\n' +
-            '10) final_c6 obligatoire et uniquement a la fin\n' +
-            '11) Pour chaque critere C6 : definition + bon_exemple + mauvais_exemple\n' +
-            '12) Aucun nom reel, vocabulaire CAP/Bac Pro\n\n' +
-            'JSON attendu (STRICT)\n' +
-            '{\n' +
-            '  "titre": "Analyse de copie — Correcteur (C2 a C6) — [MODULE]",\n' +
-            '  "type": "analyse_copie",\n' +
-            '  "difficulte": "facile|moyen|difficile",\n' +
-            '  "classes": ["toutes"],\n' +
-            '  "module": "transversal",\n' +
-            '  "categorie": "competences",\n' +
-            '  "competences_cibles": ["C2","C3","C4","C5","C6"],\n' +
-            '  "consigne": "Tu es correcteur : verbe, competence, niveau, justification, amelioration, puis C6 global et note /20.",\n' +
-            '  "contexte": "Bac Pro PSE — situation professionnelle realiste.",\n' +
-            '  "intro_eleve": {\n' +
-            '    "titre": "Corrige une copie de Bac Pro PSE",\n' +
-            '    "accroche": "Bonjour. Tu joues le correcteur : tu corriges 5 reponses et tu mets une note finale /20.",\n' +
-            '    "etapes": [\n' +
-            '      "Repere le verbe d\'action",\n' +
-            '      "Trouve la competence dominante (C2 C3 C4 C5)",\n' +
-            '      "Choisis un niveau (non_traite, insuffisant, acceptable, maitrise)",\n' +
-            '      "Choisis la justification correcte",\n' +
-            '      "Choisis la meilleure amelioration",\n' +
-            '      "A la fin : evalue C6 et obtiens une note /20"\n' +
-            '    ],\n' +
-            '    "rappel_competences": [\n' +
-            '      { "id":"C2", "titre":"Appliquer une demarche d\'analyse", "exemple":"Ex : reperer un danger, une cause, une consequence." },\n' +
-            '      { "id":"C3", "titre":"Expliquer", "exemple":"Ex : expliquer cause → effet avec vocabulaire precis." },\n' +
-            '      { "id":"C4", "titre":"Proposer", "exemple":"Ex : proposer une mesure adaptee et realiste." },\n' +
-            '      { "id":"C5", "titre":"Argumenter", "exemple":"Ex : je choisis… parce que… donc…" },\n' +
-            '      { "id":"C6", "titre":"Communiquer a l\'ecrit", "exemple":"Ex : phrases claires, vocabulaire pro, connecteurs." }\n' +
-            '    ]\n' +
-            '  },\n' +
-            '  "regles": {\n' +
-            '    "nb_items": 5,\n' +
-            '    "niveaux": ["non_traite","insuffisant","acceptable","maitrise"],\n' +
-            '    "score_item": { "verbe":1, "competence":1, "niveau":1, "justification":1, "amelioration":1 },\n' +
-            '    "c6": { "max":8, "conversion_note_sur":20, "poids_items_sur_20":12, "poids_c6_sur_20":8 }\n' +
-            '  },\n' +
-            '  "items": [\n' +
-            '    {\n' +
-            '      "id": "I1",\n' +
-            '      "contexte": "Contexte court de l\'item (optionnel).",\n' +
-            '      "question_examen": "...",\n' +
-            '      "reponse_eleve": "...",\n' +
-            '      "verbes_proposes": ["...","...","...","..."],\n' +
-            '      "competences_proposees": ["C2","C3","C4","C5"],\n' +
-            '      "niveaux_proposees": ["non_traite","insuffisant","acceptable","maitrise"],\n' +
-            '      "justifs_proposees": ["...","...","..."],\n' +
-            '      "ameliorations_proposees": ["...","...","..."],\n' +
-            '      "attendus": {\n' +
-            '        "verbe_index": 0,\n' +
-            '        "competence_index": 0,\n' +
-            '        "niveau": "insuffisant",\n' +
-            '        "justif_index": 0,\n' +
-            '        "amelioration_index": 0,\n' +
-            '        "justification_modele": "C\'est C3 car ...",\n' +
-            '        "reponse_amelioree_modele": "..."\n' +
-            '      },\n' +
-            '      "correction": {\n' +
-            '        "resume": "...",\n' +
-            '        "verbe_definition": "...",\n' +
-            '        "verbe_exemple": "...",\n' +
-            '        "verbe_exemple_mauvais": "...",\n' +
-            '        "competence_definition": "...",\n' +
-            '        "competence_exemple": "...",\n' +
-            '        "competence_exemple_mauvais": "...",\n' +
-            '        "pourquoi_ce_niveau": "...",\n' +
-            '        "erreurs_frequentes": ["...","...","..."]\n' +
-            '      }\n' +
-            '    }\n' +
-            '  ],\n' +
-            '  "final_c6": {\n' +
-            '    "actif": true,\n' +
-            '    "consigne": "Evalue la copie entiere en C6 puis obtiens la note /20.",\n' +
-            '    "criteres": [\n' +
-            '      { "id":"clarte", "label":"Clarte et comprehension", "max":2 },\n' +
-            '      { "id":"syntaxe", "label":"Syntaxe et ponctuation", "max":2 },\n' +
-            '      { "id":"vocabulaire", "label":"Vocabulaire adapte", "max":2 },\n' +
-            '      { "id":"connecteurs", "label":"Organisation et connecteurs", "max":2 }\n' +
-            '    ],\n' +
-            '    "explications": {\n' +
-            '      "clarte": { "definition":"...", "bon_exemple":"...", "mauvais_exemple":"..." },\n' +
-            '      "syntaxe": { "definition":"...", "bon_exemple":"...", "mauvais_exemple":"..." },\n' +
-            '      "vocabulaire": { "definition":"...", "bon_exemple":"...", "mauvais_exemple":"..." },\n' +
-            '      "connecteurs": { "definition":"...", "bon_exemple":"...", "mauvais_exemple":"..." }\n' +
-            '    }\n' +
-            '  }\n' +
-            '}\n\n' +
-            'IMPORTANT : duplique la structure de l\'item I1 pour obtenir I2, I3, I4, I5 (5 items au total).';
+        return `Genere un exercice analyse_copie Bac Pro PSE au format JSON STRICT.
+
+Contraintes:
+- 5 items exactement
+- type = analyse_copie
+- categorie = competences
+- module = transversal
+- aucune donnee personnelle
+- l'eleve joue l'enseignant correcteur
+- tout est cliquable, aucune saisie obligatoire
+
+Etapes obligatoires par item:
+1) Je comprends la consigne
+1.1 Je repere le verbe d'action (QCU 4 verbes)
+1.2 Je verifie le sens du verbe (QCU 3 choix)
+1.3 J'identifie la competence mobilisee (QCU C2/C3/C4/C5)
+2) J'analyse la reponse de l'eleve (QCM multi)
+3) J'attribue un niveau (non_traite/insuffisant/acceptable/maitrise + criteres)
+4) Je selectionne une ou plusieurs corrections possibles (4 propositions, 2-3 acceptables)
+
+Regles:
+- feedback concret obligatoire apres chaque sous-etape
+- plusieurs formulations peuvent etre acceptables a l'etape 4
+- final_c6 uniquement a la fin (jamais pendant les items)
+- final_c6: phrases construites, vocabulaire technique, connecteurs, reformulation
+
+JSON STRICT attendu (squelette minimal):
+{
+  "titre": "Analyse de copie - Mode correcteur - [MODULE]",
+  "type": "analyse_copie",
+  "difficulte": "facile",
+  "classes": ["toutes"],
+  "module": "transversal",
+  "categorie": "competences",
+  "competences_cibles": ["C2","C3","C4","C5","C6"],
+  "consigne": "Tu joues l'enseignant correcteur.",
+  "contexte": "Bac Pro PSE - situation professionnelle realiste.",
+  "intro_eleve": {
+    "titre": "Corrige une copie de Bac Pro PSE",
+    "accroche": "Tu joues le correcteur : tu vas corriger 5 reponses.",
+    "etapes": [
+      "Je comprends la consigne",
+      "Je repere le verbe d'action",
+      "J'identifie la competence mobilisee",
+      "J'analyse la reponse de l'eleve",
+      "J'attribue un niveau",
+      "Je selectionne une ou plusieurs corrections possibles",
+      "A la fin : j'evalue C6 globalement et j'obtiens une note /20"
+    ]
+  },
+  "items": [
+    {
+      "id": "I1",
+      "contexte": "...",
+      "question_examen": "...",
+      "reponse_eleve": "...",
+      "etape1": {
+        "verbes_proposes": ["identifier","expliquer","proposer","argumenter"],
+        "verbe_index": 0,
+        "verbe_definition": "...",
+        "verbe_exemple_concret": "...",
+        "verbe_sens_qcu": {
+          "question": "...",
+          "choix": ["...","...","..."],
+          "correct": 0,
+          "explication": "..."
+        }
+      },
+      "etape1_competence": {
+        "competences_proposees": ["C2","C3","C4","C5"],
+        "competence_index": 0,
+        "competence_titre": "...",
+        "competence_definition": "...",
+        "competence_exemple_concret": "...",
+        "pourquoi_pas_les_autres": "..."
+      },
+      "etape2_analyse": {
+        "question": "...",
+        "choix": [
+          {"id":"a1","texte":"..."},
+          {"id":"a2","texte":"..."},
+          {"id":"a3","texte":"..."},
+          {"id":"a4","texte":"..."}
+        ],
+        "corrects": ["a1","a2"],
+        "feedback": {
+          "a1":"...",
+          "a2":"...",
+          "a3":"...",
+          "a4":"..."
+        }
+      },
+      "etape3_niveau": {
+        "niveaux_proposes": ["non_traite","insuffisant","acceptable","maitrise"],
+        "niveau_attendu": "insuffisant",
+        "criteres_simplifies": ["...","...","...","..."],
+        "pourquoi_ce_niveau": "..."
+      },
+      "etape4_corrections": {
+        "instruction": "Je selectionne une ou plusieurs propositions de correction acceptables.",
+        "propositions": [
+          {"id":"c1","texte":"..."},
+          {"id":"c2","texte":"..."},
+          {"id":"c3","texte":"..."},
+          {"id":"c4","texte":"..."}
+        ],
+        "acceptables": ["c1","c2","c4"],
+        "non_pertinentes": ["c3"],
+        "feedback": {
+          "c1":"...",
+          "c2":"...",
+          "c3":"...",
+          "c4":"..."
+        },
+        "message_pedagogique": "Plusieurs formulations peuvent etre correctes si elles respectent la competence."
+      },
+      "recap_item": {
+        "resume": "...",
+        "modele_reponse_amelioree": "...",
+        "erreurs_frequentes": ["...","..."]
+      }
+    }
+  ],
+  "final_c6": {
+    "actif": true,
+    "titre": "Competence 6 - Communication ecrite globale",
+    "consigne": "J'evalue la qualite globale de l'ecrit.",
+    "criteres": [
+      {"id":"phrases","label":"Phrases construites","definition":"...","bon_exemple":"...","mauvais_exemple":"..."},
+      {"id":"vocabulaire","label":"Vocabulaire precis et technique","definition":"...","bon_exemple":"...","mauvais_exemple":"..."},
+      {"id":"connecteurs","label":"Connecteurs logiques","definition":"...","bon_exemple":"...","mauvais_exemple":"..."},
+      {"id":"reformulation","label":"Reformulation personnelle","definition":"...","bon_exemple":"...","mauvais_exemple":"..."}
+    ],
+    "notation": { "mode": "0_1_2", "points_par_critere": 2, "max": 8 }
+  }
+}
+
+Important:
+- Duplique la structure de I1 pour obtenir I2, I3, I4, I5.
+- Reponds UNIQUEMENT avec du JSON valide, sans texte autour, sans markdown.`;
     }
 
     function getImportPrompt(type) {
