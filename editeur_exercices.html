@@ -2990,7 +2990,7 @@
         relier: 'Genere un exercice "relier" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "paires": [{ "gauche": "Terme", "droite": "Definition" }], "explication": "Explication pedagogique (optionnel)" }\nCree 5 a 8 paires.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre la logique des associations.',
         ordre: 'Genere un exercice "remettre dans l\'ordre" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre pourquoi cet ordre.',
         hierarchiser: 'Genere un exercice "hierarchiser" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nL\'interface eleve utilisera des boutons haut/bas (pas de drag & drop).',
-        intrus: 'Genere un exercice "intrus" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "series": [{ "items": ["A","B","C","D"], "intrus": 2, "explication": "..." }] }\n5 a 8 series de 4 elements.\nATTENTION : "intrus" est un index 0-based. Pour 4 elements, les index valides sont 0, 1, 2, 3 (PAS 4).',
+        intrus: 'Genere un exercice "intrus" pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{ "consigne": "...", "series": [{ "items": ["A","B","C","D"], "intrus": 2, "explication": "..." }] }\n\nREGLES :\n- 5 a 8 series de 4 elements\n- "intrus" est un index 0-based (pour 4 items: 0, 1, 2, 3)\n- "items" doit contenir exactement 4 chaines\n- "explication" recommandee pour chaque serie\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{ "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "...", "explication": "Explication pedagogique" }] }\n\nREGLES :\n- 8 a 12 mots\n- "mot" en MAJUSCULES SANS ACCENTS\n- 1 indice clair par mot\n- 1 explication pedagogique par mot\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         mots_croises: 'Genere un exercice "mots croises" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "definition": "...", "explication": "Explication pedagogique (optionnel)" }] }\n6 a 10 mots MAJUSCULES sans accents.\nAjoute une explication pour chaque mot pour aider l\'eleve a comprendre la notion.',
         swipe_vf: 'Genere un exercice "vrai/faux" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "affirmations": [{ "texte": "...", "reponse": true/false, "explication": "..." }] }\n10 a 15 affirmations.',
@@ -3157,9 +3157,10 @@
             } catch (e) {}
         }
         if (parsed.length === 0) return null;
-        // Prefer parsed arrays first, then longest parsed block.
+        // Prefer the earliest parsable root candidate, then the widest span.
+        // This avoids capturing nested arrays (e.g. series/items) instead of the root object.
         parsed.sort(function(a, b) {
-            if (a.isArray !== b.isArray) return a.isArray ? -1 : 1;
+            if (a.start !== b.start) return a.start - b.start;
             return b.len - a.len;
         });
         return parsed[0].json;
@@ -3351,6 +3352,22 @@
         function firstRepId(rep) {
             if (Array.isArray(rep)) return rep.length > 0 ? rep[0] : 'c1';
             return rep;
+        }
+
+        // Cas intrus: l'IA peut renvoyer un tableau de series directement.
+        if (
+            Array.isArray(data) &&
+            data.length > 0 &&
+            data[0] &&
+            Array.isArray(data[0].items) &&
+            data[0].intrus !== undefined
+        ) {
+            data = {
+                consigne: 'Trouvez l\'intrus dans chaque serie',
+                series: data
+            };
+            typeHint = 'intrus';
+            warning = 'Conversion auto : tableau[] -> Intrus';
         }
 
         // Cas fréquent : IA renvoie un tableau de QCM [{question, choix, reponse, ...}, ...]
