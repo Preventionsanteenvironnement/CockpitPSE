@@ -66,6 +66,7 @@
         .badge-texte_trous { background: #dbeafe; color: #1e40af; }
         .badge-relier { background: #dcfce7; color: #166534; }
         .badge-ordre { background: #ffedd5; color: #9a3412; }
+        .badge-hierarchiser { background: #ffedd5; color: #9a3412; }
         .badge-intrus { background: #fce7f3; color: #9d174d; }
         .badge-pendu { background: #fef3c7; color: #92400e; }
         .badge-mots_croises { background: #e0e7ff; color: #3730a3; }
@@ -303,6 +304,7 @@
                         <option value="texte_trous">📝 Texte a trous</option>
                         <option value="relier">🔗 Relier / Associer</option>
                         <option value="ordre">📋 Remettre dans l'ordre</option>
+                        <option value="hierarchiser">↕️ Hierarchiser (fleches)</option>
                         <option value="intrus">🔍 Jeu de l'intrus</option>
                         <option value="pendu">🎯 Pendu</option>
                         <option value="mots_croises">✏️ Mots croises</option>
@@ -1113,7 +1115,7 @@
 
     // ========== TYPE LABELS ==========
     const TYPE_LABELS = {
-        texte_trous: '📝 Texte a trous', relier: '🔗 Relier', ordre: '📋 Ordre',
+        texte_trous: '📝 Texte a trous', relier: '🔗 Relier', ordre: '📋 Ordre', hierarchiser: '↕️ Hierarchiser',
         intrus: '🔍 Intrus', pendu: '🎯 Pendu', mots_croises: '✏️ Mots croises',
         swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau',
         etude_cas: '📖 Etude de cas',
@@ -1255,11 +1257,12 @@
     const AUTO_COMPETENCES_TYPES = ['analyse_copie'];
 
     window.onTypeChange = function() {
-        const type = document.getElementById('exo-type').value;
+        const rawType = document.getElementById('exo-type').value;
+        const type = rawType === 'hierarchiser' ? 'ordre' : rawType;
         document.querySelectorAll('.content-type-section').forEach(s => s.classList.remove('active'));
         const section = document.getElementById('ct-' + type);
         if (section) section.classList.add('active');
-        document.getElementById('content-title').textContent = 'Contenu — ' + (TYPE_LABELS[type] || type);
+        document.getElementById('content-title').textContent = 'Contenu — ' + (TYPE_LABELS[rawType] || rawType);
 
         const modSel = document.getElementById('exo-module');
         const catCheckbox = document.getElementById('exo-categorie-competences');
@@ -1267,7 +1270,7 @@
 
         var compCiblesGroup = document.getElementById('competences-cibles-group');
 
-        if (AUTO_COMPETENCES_TYPES.includes(type)) {
+        if (AUTO_COMPETENCES_TYPES.includes(rawType)) {
             // analyse_copie : toujours competences, checkbox cochee + grisee
             catCheckbox.checked = true;
             catCheckbox.disabled = true;
@@ -1276,7 +1279,7 @@
             modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
             modSel.value = 'TRANSVERSAL';
             modSel.disabled = true;
-        } else if (TRANSVERSAL_TYPES.includes(type)) {
+        } else if (TRANSVERSAL_TYPES.includes(rawType)) {
             // PAD, Prevention, etc. : checkbox masquee, module = TRANSVERSAL
             catCheckbox.checked = false;
             catCheckbox.disabled = false;
@@ -1525,7 +1528,8 @@
 
     // ========== GET CONTENU FROM FORM ==========
     function getContenuFromForm() {
-        const type = document.getElementById('exo-type').value;
+        const rawType = document.getElementById('exo-type').value;
+        const type = rawType === 'hierarchiser' ? 'ordre' : rawType;
         if (type === 'texte_trous') {
             const ttObj = { consigne: document.getElementById('tt-consigne').value, texte: document.getElementById('tt-texte').value, indice: document.getElementById('tt-indice').checked };
             const ttExpl = document.getElementById('tt-explication').value.trim();
@@ -1545,6 +1549,7 @@
             const items = [];
             document.querySelectorAll('#ord-list .dyn-row input').forEach(inp => { if (inp.value.trim()) items.push(inp.value.trim()); });
             const ordObj = { consigne: document.getElementById('ord-consigne').value, items };
+            if (rawType === 'hierarchiser') ordObj.mode = 'hierarchiser';
             const ordExpl = document.getElementById('ord-explication').value.trim();
             if (ordExpl) ordObj.explication = ordExpl;
             return ordObj;
@@ -2145,6 +2150,7 @@
 
     // ========== SET CONTENU IN FORM ==========
     function setContenuInForm(type, contenu) {
+        if (type === 'hierarchiser') type = 'ordre';
         if (!contenu) return;
         if (type === 'texte_trous') {
             document.getElementById('tt-consigne').value = contenu.consigne || '';
@@ -2974,6 +2980,7 @@
         texte_trous: 'Genere un exercice "texte a trous" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "texte": "Phrase avec {{mot}} entre doubles accolades.", "indice": false, "explication": "Explication pedagogique (optionnel)" }\nMets 5 a 10 mots entre {{ }}. Texte de 3 a 5 phrases.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre ses erreurs.',
         relier: 'Genere un exercice "relier" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "paires": [{ "gauche": "Terme", "droite": "Definition" }], "explication": "Explication pedagogique (optionnel)" }\nCree 5 a 8 paires.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre la logique des associations.',
         ordre: 'Genere un exercice "remettre dans l\'ordre" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre pourquoi cet ordre.',
+        hierarchiser: 'Genere un exercice "hierarchiser" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nL\'interface eleve utilisera des boutons haut/bas (pas de drag & drop).',
         intrus: 'Genere un exercice "intrus" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "series": [{ "items": ["A","B","C","D"], "intrus": 2, "explication": "..." }] }\n5 a 8 series de 4 elements.\nATTENTION : "intrus" est un index 0-based. Pour 4 elements, les index valides sont 0, 1, 2, 3 (PAS 4).',
         pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{ "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "...", "explication": "Explication pedagogique" }] }\n\nREGLES :\n- 8 a 12 mots\n- "mot" en MAJUSCULES SANS ACCENTS\n- 1 indice clair par mot\n- 1 explication pedagogique par mot\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         mots_croises: 'Genere un exercice "mots croises" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "definition": "...", "explication": "Explication pedagogique (optionnel)" }] }\n6 a 10 mots MAJUSCULES sans accents.\nAjoute une explication pour chaque mot pour aider l\'eleve a comprendre la notion.',
@@ -3303,6 +3310,7 @@
         if (src.questions && src.questions[0] && src.questions[0].image !== undefined) return 'qcm_image';
         if (src.colonnes && src.lignes) return 'tableau';
         if (src.scenario) return 'etude_cas';
+        if (src.mode === 'hierarchiser' && Array.isArray(src.items)) return 'hierarchiser';
         if (src.items && !src.questions) return 'ordre';
         return null;
     }
@@ -3430,6 +3438,8 @@
                 return (Array.isArray(data.paires) && data.paires.length > 0) ? '' : 'Relier attendu: champ "paires" non vide.';
             case 'ordre':
                 return (Array.isArray(data.items) && data.items.length > 0) ? '' : 'Ordre attendu: champ "items" non vide.';
+            case 'hierarchiser':
+                return (Array.isArray(data.items) && data.items.length > 0) ? '' : 'Hierarchiser attendu: champ "items" non vide.';
             case 'intrus':
                 return (Array.isArray(data.series) && data.series.length > 0) ? '' : 'Intrus attendu: champ "series" non vide.';
             case 'pendu':
@@ -3508,7 +3518,8 @@
         var selectedType = document.getElementById('exo-type').value;
         var detectedType = normalized.typeHint || detectJsonType(data);
         var type = selectedType;
-        if (detectedType && detectedType !== selectedType) {
+        var sameOrderingFamily = (selectedType === 'hierarchiser' && detectedType === 'ordre') || (selectedType === 'ordre' && detectedType === 'hierarchiser');
+        if (detectedType && detectedType !== selectedType && !sameOrderingFamily) {
             type = detectedType;
             document.getElementById('exo-type').value = type;
             onTypeChange();
