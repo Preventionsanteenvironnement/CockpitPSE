@@ -311,6 +311,7 @@
                         <option value="tableau">📊 Tableau a completer</option>
                         <option value="etude_cas">📖 Etude de cas</option>
                         <option value="qcm_classique">🎯 QCM Classique</option>
+                        <option value="qcm_series_multi">🧠 QCM Serie (multi-questions)</option>
                         <option value="quiz_chrono">⏱️ Quiz Chrono</option>
                         <option value="categoriser">📂 Categoriser / Trier</option>
                         <option value="memory">🃏 Memory</option>
@@ -944,6 +945,13 @@
             <div class="form-group"><label>Explication (optionnel)</label><textarea class="form-textarea" id="qcmc-explication" rows="2" placeholder="Il faut toujours couper le courant avant..."></textarea></div>
         </div>
 
+        <!-- ====== QCM SERIE MULTI ====== -->
+        <div class="content-type-section" id="ct-qcm_series_multi">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="qcms-titre" placeholder="QCM Serie - Risques professionnels"></div>
+            <div id="qcms-questions"></div>
+            <button type="button" class="btn-save" style="background:#14b8a6; margin-top:8px;" onclick="addQcmSeriesQuestion()">+ Ajouter une question</button>
+        </div>
+
         <!-- ====== QUIZ CHRONO ====== -->
         <div class="content-type-section" id="ct-quiz_chrono">
             <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="chrono-titre" placeholder="Quiz Chrono - Gestes de secours"></div>
@@ -1110,6 +1118,7 @@
         swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau',
         etude_cas: '📖 Etude de cas',
         qcm_classique: '🎯 QCM Classique',
+        qcm_series_multi: '🧠 QCM Serie',
         quiz_chrono: '⏱️ Quiz Chrono',
         categoriser: '📂 Categoriser',
         memory: '🃏 Memory',
@@ -1761,6 +1770,31 @@
                 multiple: isMultiple,
                 explication: document.getElementById('qcmc-explication').value.trim()
             };
+        } else if (type === 'qcm_series_multi') {
+            const container = document.getElementById('qcms-questions');
+            const blocs = container.querySelectorAll('.qcms-q-bloc');
+            const questions = [];
+            blocs.forEach((bloc) => {
+                const q = bloc.querySelector('.qcms-q-text').value.trim();
+                const repLines = bloc.querySelector('.qcms-q-rep').value.split('\n').map(s=>s.trim()).filter(Boolean);
+                const dist = bloc.querySelector('.qcms-q-dist').value.split('|').map(s=>s.trim()).filter(Boolean);
+                const isMultiple = bloc.querySelector('.qcms-q-multiple').checked;
+                const expl = bloc.querySelector('.qcms-q-expl').value.trim();
+                const allTextes = [...repLines, ...dist];
+                const choix = allTextes.map((t, i) => ({ id: 'c' + (i + 1), texte: t }));
+                const repIds = choix.filter(c => repLines.includes(c.texte)).map(c => c.id);
+                questions.push({
+                    question: q,
+                    choix,
+                    reponse: isMultiple ? repIds : (repIds[0] || ''),
+                    multiple: isMultiple,
+                    explication: expl
+                });
+            });
+            return {
+                titre: document.getElementById('qcms-titre').value.trim(),
+                questions
+            };
         } else if (type === 'quiz_chrono') {
             const container = document.getElementById('chrono-questions');
             const blocs = container.querySelectorAll('.chrono-q-bloc');
@@ -2005,6 +2039,25 @@
         if (grav > 0 && proba > 0) { matrixDiv.style.display = ''; } else { matrixDiv.style.display = 'none'; }
     };
 
+    // ========== DYNAMIC HELPERS : QCM SERIE MULTI ==========
+    window.addQcmSeriesQuestion = function(data) {
+        const container = document.getElementById('qcms-questions');
+        const idx = container.querySelectorAll('.qcms-q-bloc').length + 1;
+        const d = data || {};
+        const rep = Array.isArray(d.reponses) ? d.reponses.join('\n') : (d.reponse || '');
+        const div = document.createElement('div');
+        div.className = 'qcms-q-bloc';
+        div.style.cssText = 'background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px; position:relative;';
+        div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>' +
+            '<label style="font-size:0.75rem; color:#14b8a6; font-weight:700;">Question ' + idx + '</label>' +
+            '<div class="form-group" style="margin:6px 0;"><textarea class="form-textarea qcms-q-text" rows="2" placeholder="Question...">' + (d.question || '') + '</textarea></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Bonne(s) reponse(s) (une par ligne)</label><textarea class="form-textarea qcms-q-rep" rows="2" placeholder="Bonne reponse 1\\nBonne reponse 2">' + rep + '</textarea></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Distracteurs (|)</label><input type="text" class="form-input qcms-q-dist" value="' + (d.distracteurs || '') + '"></div>' +
+            '<div class="form-group" style="margin:6px 0; display:flex; align-items:center; gap:8px;"><input type="checkbox" class="qcms-q-multiple"' + (d.multiple ? ' checked' : '') + '> <label style="margin:0; font-size:0.75rem;">Question multiple (plusieurs bonnes reponses)</label></div>' +
+            '<div class="form-group" style="margin:6px 0;"><label style="font-size:0.65rem;">Explication (optionnel)</label><input type="text" class="form-input qcms-q-expl" value="' + (d.explication || '') + '"></div>';
+        container.appendChild(div);
+    };
+
     // ========== DYNAMIC HELPERS : QUIZ CHRONO ==========
     window.addChronoQuestion = function(data) {
         const container = document.getElementById('chrono-questions');
@@ -2242,6 +2295,22 @@
             const distracteurs = choix.filter(c => !repIds.includes(c.id)).map(c => c.texte);
             document.getElementById('qcmc-reponse').value = bonnes.join('\n');
             document.getElementById('qcmc-distracteurs').value = distracteurs.join(' | ');
+        } else if (type === 'qcm_series_multi') {
+            document.getElementById('qcms-titre').value = contenu.titre || '';
+            document.getElementById('qcms-questions').innerHTML = '';
+            (contenu.questions || []).forEach(q => {
+                const choix = q.choix || [];
+                const repIds = Array.isArray(q.reponse) ? q.reponse : [q.reponse];
+                const bonnes = choix.filter(c => repIds.includes(c.id)).map(c => c.texte);
+                const distracteurs = choix.filter(c => !repIds.includes(c.id)).map(c => c.texte);
+                addQcmSeriesQuestion({
+                    question: q.question || '',
+                    reponses: bonnes,
+                    distracteurs: distracteurs.join(' | '),
+                    multiple: !!q.multiple || Array.isArray(q.reponse),
+                    explication: q.explication || ''
+                });
+            });
         } else if (type === 'quiz_chrono') {
             document.getElementById('chrono-titre').value = contenu.titre || '';
             document.getElementById('chrono-temps').value = contenu.temps_par_question || 15;
@@ -2396,6 +2465,9 @@
         document.getElementById('qcmc-distracteurs').value = '';
         document.getElementById('qcmc-multiple').checked = false;
         document.getElementById('qcmc-explication').value = '';
+        // QCM Serie
+        document.getElementById('qcms-titre').value = '';
+        document.getElementById('qcms-questions').innerHTML = '';
         // Quiz Chrono
         document.getElementById('chrono-titre').value = '';
         document.getElementById('chrono-temps').value = '15';
@@ -2716,6 +2788,35 @@
             if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
         }
 
+        // Validation QCM Serie
+        if (type === 'qcm_series_multi') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.questions || c.questions.length < 2) errors.push('Il faut au moins 2 questions');
+            (c.questions || []).forEach((q, i) => {
+                const prefix = 'Q' + (i + 1) + ' : ';
+                if (!q.question) errors.push(prefix + 'question obligatoire');
+                if (!q.choix || q.choix.length < 2) errors.push(prefix + 'au moins 2 choix');
+                if (q.choix) {
+                    const ids = q.choix.map(x => x.id);
+                    if (new Set(ids).size !== ids.length) errors.push(prefix + 'IDs de choix en doublon');
+                    if (q.choix.some(x => !x.texte)) errors.push(prefix + 'tous les choix doivent avoir un texte');
+                }
+                if (q.multiple) {
+                    if (!Array.isArray(q.reponse) || q.reponse.length < 2) errors.push(prefix + 'QCM multiple : au moins 2 bonnes reponses');
+                    if (Array.isArray(q.reponse) && q.choix) {
+                        const ids = q.choix.map(x => x.id);
+                        if (!q.reponse.every(r => ids.includes(r))) errors.push(prefix + 'certaines reponses ne correspondent a aucun choix');
+                    }
+                } else {
+                    if (!q.reponse) errors.push(prefix + 'la bonne reponse est obligatoire');
+                    if (q.choix && !q.choix.find(x => x.id === q.reponse)) errors.push(prefix + 'la reponse ne correspond a aucun choix');
+                }
+            });
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
         // Validation Quiz Chrono
         if (type === 'quiz_chrono') {
             const c = contenu;
@@ -2886,6 +2987,7 @@
         duerp_ligne: 'Genere un exercice DUERP (Document Unique) ligne unique pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite (3-5 phrases realistes, max 500 car).\nLa situation DOIT contenir des indices pour : gravite, frequence/duree d\'exposition, probabilite du declencheur.\n\nFormat STRICT :\n{\n  "titre": "DUERP - [metier] / [danger]",\n  "unite_travail": "[poste ou activite]",\n  "situation": "...",\n  "choix": {\n    "danger": ["bonne reponse", "distracteur1", "distracteur2", "distracteur3"],\n    "dommage": ["bonne reponse", "distracteur1", "distracteur2", "distracteur3"],\n    "mesure_principale": ["bonne reponse", "dist1", "dist2", "dist3", "dist4"]\n  },\n  "attendus": {\n    "danger": "...",\n    "dommage": "...",\n    "gravite": [1-4],\n    "exposition": "[rare_courte|frequente_longue]",\n    "declencheur": "[faible|eleve]",\n    "mesure_principale": "..."\n  }\n}\n\nNE PAS inclure probabilite ni priorite dans le JSON (calculees automatiquement).\n\nREGLES :\n- Exactement 4 choix danger (1 correct + 3 distracteurs plausibles dans le meme metier)\n- Exactement 4 choix dommage (1 correct + 3 distracteurs)\n- Exactement 5 choix mesure (1 correct + 4 distracteurs) — privilegier la source > collectif > EPI\n- Tous les choix doivent etre uniques et differents entre eux\n- Gravite : 1=sans arret, 2=avec arret, 3=sequelles, 4=deces\n- Exposition : rare_courte OU frequente_longue\n- Declencheur : faible OU eleve\n- Probabilite = expo x decl (rare+faible=1, rare+eleve=2, freq+faible=3, freq+eleve=4)\n- Priorite = gravite + probabilite >= 5\n- JAMAIS de mesure vague (faire attention, etre vigilant)',
         duerp_mini: 'Genere un exercice Mini DUERP (4 lignes) pour le module PSE [MODULE] en JSON.\nL\'exercice porte sur UNE SEULE entreprise avec 4 unites de travail differentes.\nChaque ligne = 1 situation professionnelle avec son danger et son dommage.\n\nFormat STRICT :\n{\n  "titre": "Mini DUERP - [entreprise]",\n  "entreprise": "[nom entreprise]",\n  "lignes": [\n    {\n      "id": "L1",\n      "unite_travail": "...",\n      "situation": "..." (3-5 phrases, max 500 car),\n      "choix": {\n        "danger": ["bonne", "dist1", "dist2", "dist3"],\n        "dommage": ["bonne", "dist1", "dist2", "dist3"]\n      },\n      "attendus": {\n        "danger": "...",\n        "dommage": "...",\n        "gravite": [1-4],\n        "exposition": "[rare_courte|frequente_longue]",\n        "declencheur": "[faible|eleve]"\n      }\n    }\n  ],\n  "mission_finale": {\n    "consigne": "Selectionnez les 2 risques prioritaires a traiter en premier",\n    "nb_prioritaires": 2\n  }\n}\n\nNE PAS inclure probabilite ni priorite.\n\nREGLES :\n- 4 lignes (L1 a L4) dans la meme entreprise\n- Varier les gravites et probabilites pour que certaines lignes soient prioritaires et d\'autres non\n- Au moins 2 lignes doivent etre prioritaires (gravite + proba >= 5)\n- Au moins 1 ligne doit etre non prioritaire\n- 4 choix danger et 4 choix dommage par ligne, tous plausibles\n- Situations realistes avec indices clairs\n- Vocabulaire CAP/Bac Pro',
         qcm_classique: 'Genere un exercice QCM classique pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{\n  "titre": "QCM - [theme]",\n  "question": "...",\n  "choix": [\n    { "id": "c1", "texte": "Bonne reponse" },\n    { "id": "c2", "texte": "Distracteur 1" },\n    { "id": "c3", "texte": "Distracteur 2" },\n    { "id": "c4", "texte": "Distracteur 3" }\n  ],\n  "reponse": "c1",\n  "multiple": false,\n  "explication": "Explication de la bonne reponse"\n}\n\nSi multiple: true → "reponse": ["c1", "c3"]\n\nREGLES :\n- 4 choix minimum, chacun avec un id unique (c1, c2, c3, c4)\n- reponse = id du bon choix (pas le texte)\n- Distracteurs plausibles mais clairement faux\n- Question claire et sans ambiguite\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
+        qcm_series_multi: 'Genere un exercice QCM serie (plusieurs questions) pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{\n  "titre": "QCM Serie - [theme]",\n  "questions": [\n    {\n      "question": "...",\n      "choix": [\n        { "id": "c1", "texte": "Proposition 1" },\n        { "id": "c2", "texte": "Proposition 2" },\n        { "id": "c3", "texte": "Proposition 3" },\n        { "id": "c4", "texte": "Proposition 4" }\n      ],\n      "reponse": ["c1", "c3"],\n      "multiple": true,\n      "explication": "Explication optionnelle"\n    }\n  ]\n}\n\nREGLES :\n- 8 a 12 questions\n- 4 choix minimum par question\n- Si "multiple": true alors "reponse" doit etre un tableau d\'ids\n- Si "multiple": false alors "reponse" doit etre un id unique\n- IDs des choix uniques par question (c1, c2, c3, c4...)\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         quiz_chrono: 'Genere un exercice Quiz Chrono pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Quiz Chrono - [theme]",\n  "temps_par_question": 15,\n  "questions": [\n    {\n      "question": "...",\n      "choix": [\n        { "id": "c1", "texte": "Bonne reponse" },\n        { "id": "c2", "texte": "Distracteur 1" },\n        { "id": "c3", "texte": "Distracteur 2" }\n      ],\n      "reponse": "c1",\n      "explication": "optionnel"\n    }\n  ]\n}\n\nREGLES :\n- 8 a 12 questions\n- 3 a 4 choix par question, IDs uniques par question (c1, c2, c3...)\n- reponse = id du bon choix\n- temps_par_question entre 10 et 20 secondes\n- Questions courtes et directes (l\'eleve a un timer)\n- Vocabulaire CAP/Bac Pro',
         categoriser: 'Genere un exercice de categorisation pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Categoriser - [theme]",\n  "consigne": "Classez chaque element dans la bonne categorie",\n  "categories": ["Categorie A", "Categorie B", "Categorie C"],\n  "items": [\n    { "id": "i1", "label": "Item 1", "categorie": "Categorie A" },\n    { "id": "i2", "label": "Item 2", "categorie": "Categorie B" }\n  ]\n}\n\nREGLES :\n- 2 a 4 categories\n- 8 a 15 items avec IDs uniques (i1, i2, i3...)\n- Chaque item a un label et une categorie correspondant exactement a une des categories\n- Repartition equilibree entre categories\n- Items credibles mais clairement attribuables\n- Vocabulaire CAP/Bac Pro',
         memory: 'Genere un exercice Memory pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Memory - [theme]",\n  "cartes": [\n    { "id": "p1", "a": "Terme", "b": "Definition" },\n    { "id": "p2", "a": "Terme 2", "b": "Definition 2" }\n  ]\n}\n\nREGLES :\n- 6 a 8 paires (cartes)\n- Chaque paire a un id unique (p1, p2, p3...)\n- Face "a" = terme court (1-3 mots)\n- Face "b" = definition courte (max 6-8 mots, doit tenir sur une carte)\n- Les termes doivent etre importants pour le module PSE\n- Vocabulaire CAP/Bac Pro',
@@ -3190,6 +3292,7 @@
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
+        if (Array.isArray(src.questions) && src.questions[0] && typeof src.questions[0].question === 'string' && Array.isArray(src.questions[0].choix) && src.questions[0].reponse !== undefined) return 'qcm_series_multi';
         if (typeof src.question === 'string' && Array.isArray(src.choix) && src.reponse !== undefined) return 'qcm_classique';
         if (src.texte && src.texte.includes('{{')) return 'texte_trous';
         if (src.paires) return 'relier';
@@ -3255,24 +3358,21 @@
                 typeHint = 'qcm_classique';
                 warning = 'Conversion auto : tableau[0] -> QCM classique';
             } else {
-                var hadMultiAnswers = data.some(function(q) { return Array.isArray(q.reponse) && q.reponse.length > 1; });
-                var chronoQuestions = data.map(function(q) {
+                var seriesQuestions = data.map(function(q) {
                     return {
                         question: q.question || '',
                         choix: q.choix || [],
-                        reponse: firstRepId(q.reponse),
+                        reponse: Array.isArray(q.reponse) ? q.reponse : firstRepId(q.reponse),
+                        multiple: !!q.multiple || Array.isArray(q.reponse),
                         explication: q.explication || ''
                     };
                 });
                 data = {
-                    titre: (data[0] && data[0].titre) || 'Quiz Chrono',
-                    temps_par_question: 15,
-                    questions: chronoQuestions
+                    titre: (data[0] && data[0].titre) || 'QCM Serie',
+                    questions: seriesQuestions
                 };
-                typeHint = 'quiz_chrono';
-                warning = hadMultiAnswers
-                    ? 'Conversion auto : tableau[] -> Quiz Chrono (QCM multiples ramenes a 1 bonne reponse par question)'
-                    : 'Conversion auto : tableau[] -> Quiz Chrono';
+                typeHint = 'qcm_series_multi';
+                warning = 'Conversion auto : tableau[] -> QCM serie';
             }
         }
 
@@ -3300,24 +3400,21 @@
                 typeHint = 'qcm_classique';
                 warning = 'Conversion auto : questions[0] -> QCM classique';
             } else if (typeof data.temps_par_question !== 'number') {
-                var hadMultiInQuestions = data.questions.some(function(q) { return Array.isArray(q.reponse) && q.reponse.length > 1; });
                 var normalizedQuestions = data.questions.map(function(q) {
                     return {
                         question: q.question || '',
                         choix: q.choix || [],
-                        reponse: firstRepId(q.reponse),
+                        reponse: Array.isArray(q.reponse) ? q.reponse : firstRepId(q.reponse),
+                        multiple: !!q.multiple || Array.isArray(q.reponse),
                         explication: q.explication || ''
                     };
                 });
                 data = {
-                    titre: data.titre || 'Quiz Chrono',
-                    temps_par_question: 15,
+                    titre: data.titre || 'QCM Serie',
                     questions: normalizedQuestions
                 };
-                typeHint = 'quiz_chrono';
-                warning = hadMultiInQuestions
-                    ? 'Conversion auto : questions[] -> Quiz Chrono (QCM multiples ramenes a 1 bonne reponse par question)'
-                    : 'Conversion auto : questions[] -> Quiz Chrono';
+                typeHint = 'qcm_series_multi';
+                warning = 'Conversion auto : questions[] -> QCM serie';
             }
         }
 
@@ -3359,6 +3456,8 @@
                 return (Array.isArray(data.lignes) && data.lignes.length > 0) ? '' : 'DUERP mini attendu: lignes[].';
             case 'qcm_classique':
                 return (typeof data.question === 'string' && Array.isArray(data.choix) && data.reponse !== undefined) ? '' : 'QCM classique attendu: question + choix[] + reponse.';
+            case 'qcm_series_multi':
+                return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'QCM serie attendu: questions[].';
             case 'quiz_chrono':
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'Quiz chrono attendu: questions[] + temps_par_question.';
             case 'categoriser':
@@ -3437,6 +3536,7 @@
             // Message detaille
             var detail = '';
             if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
+            else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
             else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
             else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
             else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
