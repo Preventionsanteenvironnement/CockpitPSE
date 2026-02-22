@@ -1874,6 +1874,11 @@
                 // Fallback : essayer le texte original sans nettoyage
                 try { data = JSON.parse(rawOriginal); } catch(e2) { throw e1; }
             }
+            // Deballer si enveloppe dans { contenu: ..., data: ..., etc. }
+            var unwrapKeys = ['contenu', 'content', 'data', 'exercise', 'exercice', 'payload'];
+            for (var ui = 0; ui < unwrapKeys.length; ui++) {
+                if (data[unwrapKeys[ui]] && data[unwrapKeys[ui]].items) { data = data[unwrapKeys[ui]]; break; }
+            }
             if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
                 throw new Error('Le JSON doit contenir un tableau "items" non vide');
             }
@@ -2108,7 +2113,8 @@
             document.getElementById('int-consigne').value = contenu.consigne || '';
             document.getElementById('int-series').innerHTML = '';
             (contenu.series || []).forEach(s => {
-                const safeIdx = Math.min(Math.max(parseInt(s.intrus) || 0, 0), (s.items || []).length - 1);
+                const maxIdx = Math.max((s.items || []).length - 1, 0);
+                const safeIdx = Math.min(Math.max(parseInt(s.intrus) || 0, 0), maxIdx);
                 addIntrusSerie(s.items, safeIdx, s.explication);
             });
         } else if (type === 'pendu') {
@@ -2122,7 +2128,12 @@
         } else if (type === 'swipe_vf') {
             document.getElementById('svf-consigne').value = contenu.consigne || '';
             document.getElementById('svf-list').innerHTML = '';
-            (contenu.affirmations || []).forEach(a => addSwipeAffirmation(a.texte, a.reponse, a.explication));
+            (contenu.affirmations || []).forEach(a => {
+                // Normaliser reponse : string → boolean
+                var rep = a.reponse;
+                if (typeof rep === 'string') rep = (rep.toLowerCase() === 'true' || rep.toLowerCase() === 'vrai' || rep.toLowerCase() === 'oui');
+                addSwipeAffirmation(a.texte, rep, a.explication);
+            });
         } else if (type === 'qcm_image') {
             document.getElementById('qimg-consigne').value = contenu.consigne || '';
             document.getElementById('qimg-questions').innerHTML = '';
@@ -2139,16 +2150,18 @@
             document.getElementById('ec-questions').innerHTML = '';
             (contenu.questions || []).forEach(q => addEtudeCasQuestion(q));
         } else if (type === 'pad') {
+            // Helper : forcer un tableau (certaines IA generent des strings separees par virgules)
+            function toArray(v) { if (Array.isArray(v)) return v; if (typeof v === 'string') return v.split(/[|,]/).map(function(s){return s.trim();}).filter(Boolean); return []; }
             document.getElementById('pad-titre').value = contenu.titre || '';
             document.getElementById('pad-situation').value = contenu.situation || '';
             document.getElementById('pad-danger').value = contenu.danger || '';
-            document.getElementById('pad-dist-danger').value = (contenu.distracteurs_danger || []).join(' | ');
+            document.getElementById('pad-dist-danger').value = toArray(contenu.distracteurs_danger).join(' | ');
             document.getElementById('pad-sitdang').value = contenu.situation_dangereuse || '';
-            document.getElementById('pad-dist-sitdang').value = (contenu.distracteurs_situation_dangereuse || []).join(' | ');
+            document.getElementById('pad-dist-sitdang').value = toArray(contenu.distracteurs_situation_dangereuse).join(' | ');
             document.getElementById('pad-event').value = contenu.evenement_declencheur || '';
-            document.getElementById('pad-dist-event').value = (contenu.distracteurs_evenement_declencheur || []).join(' | ');
+            document.getElementById('pad-dist-event').value = toArray(contenu.distracteurs_evenement_declencheur).join(' | ');
             document.getElementById('pad-dommage').value = contenu.dommage || '';
-            document.getElementById('pad-dist-dommage').value = (contenu.distracteurs_dommage || []).join(' | ');
+            document.getElementById('pad-dist-dommage').value = toArray(contenu.distracteurs_dommage).join(' | ');
             document.getElementById('pad-explication').value = contenu.explication || '';
         } else if (type === 'prevention') {
             document.getElementById('prev-titre').value = contenu.titre || '';
@@ -2161,7 +2174,9 @@
             niveaux.forEach(n => {
                 if (fieldMap[n.niveau]) {
                     document.getElementById(fieldMap[n.niveau]).value = n.bonne_reponse || '';
-                    document.getElementById(distMap[n.niveau]).value = (n.distracteurs || []).join(' | ');
+                    var dist = n.distracteurs;
+                    if (typeof dist === 'string') dist = dist.split(/[|,]/).map(function(s){return s.trim();}).filter(Boolean);
+                    document.getElementById(distMap[n.niveau]).value = (dist || []).join(' | ');
                 }
             });
         } else if (type === 'estimation_risque') {
@@ -2258,6 +2273,7 @@
             document.getElementById('picto-nb').value = contenu.nb || 8;
             document.getElementById('picto-explication').value = contenu.explication || '';
             var cats = contenu.categories || ['obligation', 'interdiction', 'danger', 'incendie', 'secours', 'sgh'];
+            if (typeof cats === 'string') cats = cats.split(/[|,]/).map(function(s){return s.trim();}).filter(Boolean);
             document.querySelectorAll('.picto-cat-cb').forEach(cb => { cb.checked = cats.includes(cb.value); });
             // Escape game : stocker les epreuves pour la sauvegarde
             window._pictoEpreuves = contenu.epreuves || [];
@@ -2858,7 +2874,7 @@
         relier: 'Genere un exercice "relier" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "paires": [{ "gauche": "Terme", "droite": "Definition" }], "explication": "Explication pedagogique (optionnel)" }\nCree 5 a 8 paires.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre la logique des associations.',
         ordre: 'Genere un exercice "remettre dans l\'ordre" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "items": ["Etape 1", "Etape 2"], "explication": "Explication pedagogique (optionnel)" }\nItems dans le BON ordre. 4 a 8 etapes.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre pourquoi cet ordre.',
         intrus: 'Genere un exercice "intrus" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "series": [{ "items": ["A","B","C","D"], "intrus": 2, "explication": "..." }] }\n5 a 8 series de 4 elements.\nATTENTION : "intrus" est un index 0-based. Pour 4 elements, les index valides sont 0, 1, 2, 3 (PAS 4).',
-        pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "...", "explication": "Explication pedagogique (optionnel)" }] }\n8 a 12 mots en MAJUSCULES sans accents.\nAjoute une explication pour chaque mot pour aider l\'eleve a comprendre la notion.',
+        pendu: 'Genere un exercice "pendu" pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{ "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "indice": "...", "explication": "Explication pedagogique" }] }\n\nREGLES :\n- 8 a 12 mots\n- "mot" en MAJUSCULES SANS ACCENTS\n- 1 indice clair par mot\n- 1 explication pedagogique par mot\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         mots_croises: 'Genere un exercice "mots croises" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "mots": [{ "mot": "MOT_MAJUSCULES", "definition": "...", "explication": "Explication pedagogique (optionnel)" }] }\n6 a 10 mots MAJUSCULES sans accents.\nAjoute une explication pour chaque mot pour aider l\'eleve a comprendre la notion.',
         swipe_vf: 'Genere un exercice "vrai/faux" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "affirmations": [{ "texte": "...", "reponse": true/false, "explication": "..." }] }\n10 a 15 affirmations.',
         qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\n\nFormat : {\n  "consigne": "...",\n  "questions": [{\n    "image": "URL_OU_CHEMIN",\n    "question": "...",\n    "choix": ["A","B","C","D"],\n    "correct": 0,\n    "explication": "..."\n  }]\n}\n\nIMAGES — 2 options :\n1. Si l\'utilisateur fournit des URLs d\'images → les utiliser directement dans le champ "image"\n2. Si pas d\'URLs → laisser "image": "" (l\'enseignant ajoutera les images apres import)\n\nLe champ "image" accepte :\n- Une URL complete (https://...)\n- Un chemin relatif GitHub (images/exercices/nom.jpg)\n\n3 a 5 questions.\nATTENTION : "correct" est un index 0-based. Pour 4 choix, les index valides sont 0, 1, 2, 3 (PAS 4).\nVocabulaire adapte CAP/Bac Pro.',
@@ -2920,37 +2936,42 @@
         return { data, warnings };
     }
 
-    // Nettoyage robuste du JSON colle depuis ChatGPT/Claude/Word
+    // Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Mistral/Word
     function cleanJsonInput(raw) {
-        // 1. Supprimer BOM
-        raw = raw.replace(/^\uFEFF/, '');
-        // 2. Guillemets courbes → droits
-        raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB]/g, '"');
-        raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
-        // 3. Extraire le JSON des blocs de code Markdown (```json ... ```)
+        // 1. Supprimer BOM partout (pas seulement au debut)
+        raw = raw.replace(/\uFEFF/g, '');
+        // 2. Supprimer les caracteres invisibles / zero-width
+        raw = raw.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
+        // 3. Remplacer NBSP par espace normal
+        raw = raw.replace(/\u00A0/g, ' ');
+        // 4. Guillemets courbes / typographiques → droits (elargi fullwidth)
+        raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
+        raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
+        // 5. Extraire le JSON des blocs de code Markdown (```json ... ```)
         var codeBlockMatch = raw.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
         if (codeBlockMatch) {
             raw = codeBlockMatch[1].trim();
         }
-        // 4. Si pas de bloc code, tenter d'extraire entre { } ou [ ]
+        // 6. Si pas de bloc code, tenter d'extraire entre { } ou [ ]
         if (raw.charAt(0) !== '{' && raw.charAt(0) !== '[') {
             var firstBrace = raw.indexOf('{');
             var firstBracket = raw.indexOf('[');
-            var start = -1;
             if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
-                start = firstBrace;
                 var lastBrace = raw.lastIndexOf('}');
-                if (lastBrace > start) raw = raw.substring(start, lastBrace + 1);
+                if (lastBrace > firstBrace) raw = raw.substring(firstBrace, lastBrace + 1);
             } else if (firstBracket >= 0) {
-                start = firstBracket;
                 var lastBracket = raw.lastIndexOf(']');
-                if (lastBracket > start) raw = raw.substring(start, lastBracket + 1);
+                if (lastBracket > firstBracket) raw = raw.substring(firstBracket, lastBracket + 1);
             }
         }
-        // 5. Supprimer les commentaires // en fin de ligne (hors des strings)
+        // 7. Supprimer les commentaires // en debut de ligne
         raw = raw.replace(/^\s*\/\/.*$/gm, '');
-        // 6. Supprimer les trailing commas avant } et ]
+        // 8. Supprimer les trailing commas avant } et ]
         raw = raw.replace(/,\s*([\]}])/g, '$1');
+        // 9. Remplacer Python booleans/None (certaines IA generent du Python)
+        raw = raw.replace(/\bTrue\b/g, 'true');
+        raw = raw.replace(/\bFalse\b/g, 'false');
+        raw = raw.replace(/\bNone\b/g, 'null');
         return raw.trim();
     }
 
@@ -2961,7 +2982,7 @@
         if (src.unite_travail && src.choix && src.attendus) return 'duerp_ligne';
         if (src.exposition && src.declencheur && src.gravite) return 'estimation_risque';
         if (src.distracteurs_danger) return 'pad';
-        if (Array.isArray(src.items) && src.items.length > 0 && src.items[0].attendus && src.items[0].attendus.verbe) return 'analyse_copie';
+        if (Array.isArray(src.items) && src.items.length > 0 && src.items[0].attendus && (src.items[0].attendus.verbe || src.items[0].attendus.competence || src.items[0].question_examen)) return 'analyse_copie';
         if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) return 'pictogramme';
         if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
