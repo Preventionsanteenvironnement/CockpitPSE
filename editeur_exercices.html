@@ -73,6 +73,7 @@
         .badge-swipe_vf { background: #d1fae5; color: #065f46; }
         .badge-qcm_image { background: #fce7f3; color: #be185d; }
         .badge-tableau { background: #f1f5f9; color: #475569; }
+        .badge-tableau_selection { background: #e0f2fe; color: #075985; }
         .badge-etude_cas { background: #ede9fe; color: #5b21b6; }
         .badge-pad { background: #fef3c7; color: #b45309; }
         .badge-prevention { background: #d1fae5; color: #065f46; }
@@ -311,6 +312,7 @@
                         <option value="swipe_vf">👆 Swipe Vrai/Faux</option>
                         <option value="qcm_image">🖼️ QCM Image</option>
                         <option value="tableau">📊 Tableau a completer</option>
+                        <option value="tableau_selection">✅ Tableau a selection (croix multiples)</option>
                         <option value="etude_cas">📖 Etude de cas</option>
                         <option value="qcm_classique">🎯 QCM Classique</option>
                         <option value="qcm_series_multi">🧠 QCM Serie (multi-questions)</option>
@@ -498,6 +500,47 @@
                 <div class="form-group" style="margin-top:10px;">
                     <label style="color:#a78bfa;">💡 Explication (optionnel)</label>
                     <textarea class="form-textarea" id="tab-explication" rows="2" placeholder="Explication pedagogique : logique du classement..."></textarea>
+                </div>
+            </div>
+
+            <!-- TABLEAU SELECTION (CROIX MULTIPLES) -->
+            <div class="content-type-section" id="ct-tableau_selection">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Consigne</label>
+                    <input type="text" class="form-input" id="tabs-consigne" placeholder="Cochez les cases correctes dans le tableau" value="Cochez les cases correctes dans le tableau. Plusieurs cases peuvent etre justes par ligne.">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Colonnes (separees par |)</label>
+                    <input type="text" class="form-input" id="tabs-colonnes" placeholder="Cause | Symptome | Prevention">
+                    <small style="color:#94a3b8; font-size:0.7rem;">Conseil mobile: 3 a 5 colonnes max.</small>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Regles de selection par ligne</label>
+                    <div style="display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:8px;">
+                        <div>
+                            <label style="font-size:0.7rem;">Min / ligne</label>
+                            <input type="number" class="form-input" id="tabs-min" min="0" value="1">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem;">Max / ligne</label>
+                            <input type="number" class="form-input" id="tabs-max" min="1" value="2">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem;">Exact / ligne (optionnel)</label>
+                            <input type="number" class="form-input" id="tabs-exact" min="0" placeholder="">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem;">Penalite erreur</label>
+                            <input type="number" class="form-input" id="tabs-penalite" min="0" max="1" step="0.1" value="0.5">
+                        </div>
+                    </div>
+                </div>
+                <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; display:block; margin-bottom:8px;">Lignes (bonnes colonnes par IDs)</label>
+                <div class="dyn-list" id="tabs-list"></div>
+                <button class="btn-add-row" onclick="addTableauSelectionLigne()" style="margin-top:8px;">+ Ajouter une ligne</button>
+                <div class="form-group" style="margin-top:10px;">
+                    <label style="color:#a78bfa;">💡 Explication (optionnel)</label>
+                    <textarea class="form-textarea" id="tabs-explication" rows="2" placeholder="Explication pedagogique globale..."></textarea>
                 </div>
             </div>
 
@@ -1124,7 +1167,7 @@
     const TYPE_LABELS = {
         texte_trous: '📝 Texte a trous', relier: '🔗 Relier', ordre: '📋 Ordre', hierarchiser: '↕️ Hierarchiser',
         intrus: '🔍 Intrus', pendu: '🎯 Pendu', mots_croises: '✏️ Mots croises',
-        swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau',
+        swipe_vf: '👆 Vrai/Faux', qcm_image: '🖼️ QCM Image', tableau: '📊 Tableau', tableau_selection: '✅ Tableau selection',
         etude_cas: '📖 Etude de cas',
         qcm_classique: '🎯 QCM Classique',
         qcm_series_multi: '🧠 QCM Serie',
@@ -1507,6 +1550,21 @@
         list.appendChild(row);
     };
 
+    // --- TABLEAU SELECTION ---
+    window.addTableauSelectionLigne = function(data) {
+        const list = document.getElementById('tabs-list');
+        const row = document.createElement('div');
+        row.className = 'dyn-row';
+        const d = data || {};
+        const bonnes = Array.isArray(d.bonnes) ? d.bonnes.join(' | ') : (d.bonnes || '');
+        row.innerHTML =
+            '<input type="text" class="form-input tabs-label" placeholder="Texte de la ligne (ex: Tolerance)" value="' + (d.label || '') + '" style="flex:2; min-width:180px;">' +
+            '<input type="text" class="form-input tabs-bonnes" placeholder="Bonnes colonnes (IDs, ex: c1 | c3)" value="' + bonnes + '" style="flex:1.2; min-width:170px;">' +
+            '<input type="text" class="form-input tabs-explication-ligne" placeholder="Explication (optionnel)" value="' + (d.explication || '') + '" style="flex:1.5; min-width:180px;">' +
+            '<div class="dyn-row-actions"><button class="btn-del" onclick="this.closest(\'.dyn-row\').remove()">&times;</button></div>';
+        list.appendChild(row);
+    };
+
     // --- ETUDE DE CAS ---
     window.addEtudeCasQuestion = function(data) {
         const container = document.getElementById('ec-questions');
@@ -1631,6 +1689,42 @@
             const tabExpl = document.getElementById('tab-explication').value.trim();
             if (tabExpl) tabObj.explication = tabExpl;
             return tabObj;
+        } else if (type === 'tableau_selection') {
+            const colLabels = document.getElementById('tabs-colonnes').value.split('|').map(s => s.trim()).filter(Boolean);
+            const colonnes = colLabels.map((label, idx) => ({ id: 'c' + (idx + 1), label }));
+            const colIds = colonnes.map(c => c.id);
+            const lignes = [];
+            document.querySelectorAll('#tabs-list .dyn-row').forEach((row, idx) => {
+                const label = row.querySelector('.tabs-label').value.trim();
+                const bonnesRaw = row.querySelector('.tabs-bonnes').value.trim();
+                const explication = row.querySelector('.tabs-explication-ligne').value.trim();
+                if (!label) return;
+                const bonnes = bonnesRaw
+                    ? bonnesRaw.split('|').map(s => s.trim()).filter(Boolean)
+                    : [];
+                const bonnesSanitized = [...new Set(bonnes.filter(id => colIds.includes(id)))];
+                const ligne = { id: 'l' + (idx + 1), label, bonnes };
+                ligne.bonnes = bonnesSanitized;
+                if (explication) ligne.explication = explication;
+                lignes.push(ligne);
+            });
+            const regles = {
+                minParLigne: parseInt(document.getElementById('tabs-min').value, 10) || 0,
+                maxParLigne: parseInt(document.getElementById('tabs-max').value, 10) || 0,
+                penaliteErreur: parseFloat(document.getElementById('tabs-penalite').value)
+            };
+            const exact = parseInt(document.getElementById('tabs-exact').value, 10);
+            if (!isNaN(exact) && exact > 0) regles.exactParLigne = exact;
+            if (isNaN(regles.penaliteErreur)) regles.penaliteErreur = 0.5;
+            const obj = {
+                consigne: document.getElementById('tabs-consigne').value,
+                colonnes,
+                lignes,
+                regles
+            };
+            const expl = document.getElementById('tabs-explication').value.trim();
+            if (expl) obj.explication = expl;
+            return obj;
         } else if (type === 'etude_cas') {
             const questions = [];
             document.querySelectorAll('#ec-questions .serie-card').forEach(card => {
@@ -2211,6 +2305,18 @@
             document.getElementById('tab-explication').value = contenu.explication || '';
             document.getElementById('tab-list').innerHTML = '';
             (contenu.lignes || []).forEach(l => addTableauLigne((l.cellules || []).join(', ')));
+        } else if (type === 'tableau_selection') {
+            document.getElementById('tabs-consigne').value = contenu.consigne || '';
+            const cols = (contenu.colonnes || []).map(c => (typeof c === 'string' ? c : (c.label || c.id || ''))).filter(Boolean);
+            document.getElementById('tabs-colonnes').value = cols.join(' | ');
+            document.getElementById('tabs-list').innerHTML = '';
+            (contenu.lignes || []).forEach(l => addTableauSelectionLigne(l));
+            const r = contenu.regles || {};
+            document.getElementById('tabs-min').value = (r.minParLigne != null) ? r.minParLigne : 1;
+            document.getElementById('tabs-max').value = (r.maxParLigne != null) ? r.maxParLigne : 2;
+            document.getElementById('tabs-exact').value = (r.exactParLigne != null) ? r.exactParLigne : '';
+            document.getElementById('tabs-penalite').value = (r.penaliteErreur != null) ? r.penaliteErreur : 0.5;
+            document.getElementById('tabs-explication').value = contenu.explication || '';
         } else if (type === 'etude_cas') {
             document.getElementById('ec-consigne').value = contenu.consigne || '';
             document.getElementById('ec-scenario').value = contenu.scenario || '';
@@ -2406,6 +2512,14 @@
         document.getElementById('tab-consigne').value = 'Completez le tableau';
         document.getElementById('tab-colonnes').value = '';
         document.getElementById('tab-list').innerHTML = '';
+        document.getElementById('tabs-consigne').value = 'Cochez les cases correctes dans le tableau. Plusieurs cases peuvent etre justes par ligne.';
+        document.getElementById('tabs-colonnes').value = '';
+        document.getElementById('tabs-list').innerHTML = '';
+        document.getElementById('tabs-min').value = '1';
+        document.getElementById('tabs-max').value = '2';
+        document.getElementById('tabs-exact').value = '';
+        document.getElementById('tabs-penalite').value = '0.5';
+        document.getElementById('tabs-explication').value = '';
         document.getElementById('ec-consigne').value = 'Lisez le cas et repondez aux questions';
         document.getElementById('ec-scenario').value = '';
         document.getElementById('ec-questions').innerHTML = '';
@@ -2996,6 +3110,7 @@
         swipe_vf: 'Genere un exercice "vrai/faux" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "affirmations": [{ "texte": "...", "reponse": true/false, "explication": "..." }] }\n10 a 15 affirmations.',
         qcm_image: 'Genere un exercice "QCM image" pour le module PSE [MODULE] en JSON.\n\nFormat : {\n  "consigne": "...",\n  "questions": [{\n    "image": "URL_OU_CHEMIN",\n    "question": "...",\n    "choix": ["A","B","C","D"],\n    "correct": 0,\n    "explication": "..."\n  }]\n}\n\nIMAGES — 2 options :\n1. Si l\'utilisateur fournit des URLs d\'images → les utiliser directement dans le champ "image"\n2. Si pas d\'URLs → laisser "image": "" (l\'enseignant ajoutera les images apres import)\n\nLe champ "image" accepte :\n- Une URL complete (https://...)\n- Un chemin relatif GitHub (images/exercices/nom.jpg)\n\n3 a 5 questions.\nATTENTION : "correct" est un index 0-based. Pour 4 choix, les index valides sont 0, 1, 2, 3 (PAS 4).\nVocabulaire adapte CAP/Bac Pro.',
         tableau: 'Genere un exercice "tableau" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "colonnes": ["Col1","Col2"], "lignes": [{ "cellules": ["val", "{{trou}}"] }], "explication": "Explication pedagogique (optionnel)" }\nCellules entre {{ }} = trous. 4-6 lignes, 3-4 colonnes.\nAjoute une explication pedagogique pour aider l\'eleve a comprendre la logique du classement.',
+        tableau_selection: 'Genere un exercice "tableau selection" pour le module PSE [MODULE] en JSON.\n\nREPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n- N\'ajoute aucun texte avant/apres\n- N\'ajoute aucun bloc Markdown (pas de ```)\n- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n- N\'ajoute aucun commentaire JSON\n\nFormat STRICT :\n{\n  "consigne": "Cochez les cases correctes dans le tableau",\n  "colonnes": [\n    { "id": "c1", "label": "Categorie 1" },\n    { "id": "c2", "label": "Categorie 2" },\n    { "id": "c3", "label": "Categorie 3" }\n  ],\n  "lignes": [\n    { "id": "l1", "label": "Affirmation 1", "bonnes": ["c1","c3"], "explication": "..." },\n    { "id": "l2", "label": "Affirmation 2", "bonnes": ["c2"] }\n  ],\n  "regles": {\n    "minParLigne": 1,\n    "maxParLigne": 2,\n    "exactParLigne": null,\n    "penaliteErreur": 0.5\n  },\n  "explication": "Explication pedagogique globale (optionnel)"\n}\n\nREGLES :\n- 3 a 5 colonnes max (lisibilite mobile)\n- 5 a 10 lignes\n- plusieurs bonnes cases possibles par ligne\n- chaque ligne doit avoir au moins 1 bonne case\n- IDs colonnes uniques (c1, c2, c3...)\n- IDs lignes uniques (l1, l2, l3...)\n- "bonnes" contient uniquement des IDs de colonnes existants\n- Vocabulaire CAP/Bac Pro\n- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)',
         etude_cas: 'Genere une "etude de cas" pour le module PSE [MODULE] en JSON.\nFormat : { "consigne": "...", "scenario": "...", "questions": [{ "question": "...", "type": "qcm", "choix": ["A","B"], "correct": 0, "explication": "Pourquoi cette reponse..." }, { "question": "...", "type": "texte", "reponse": "...", "explication": "Explication pedagogique..." }] }\n3 a 5 questions.\nIMPORTANT : Ajoute une explication pedagogique pour chaque question. L\'explication s\'affiche a l\'eleve apres correction pour l\'aider a comprendre.',
         prevention: 'Genere un exercice "Mesures de prevention" pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel expose a un danger identifie (3-5 phrases realistes, max 500 caracteres).\nLe danger est deja identifie, l\'eleve doit trouver la bonne mesure pour chaque niveau de prevention.\n\nFormat STRICT :\n{\n  "titre": "Prevention - [metier/situation]",\n  "situation": "...",\n  "danger": "...",\n  "niveaux": [\n    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },\n    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] }\n  ]\n}\n\nREGLES CRUCIALES :\n- 5 niveaux dans cet ordre : supprimer > reduire > collective > individuelle > formation\n- Exactement 3 distracteurs par niveau (tableaux JSON)\n- Les distracteurs doivent etre des VRAIES mesures de prevention mais du MAUVAIS niveau\n  Ex: pour "Supprimer", un distracteur peut etre "Porter des gants" (qui est un EPI, pas une suppression)\n- Chaque mesure max 120 caracteres, distracteurs max 80 caracteres\n- Vocabulaire simple adapte a des eleves de CAP/Bac Pro\n- Le principe cle : plus on agit a la source, plus c\'est efficace\n  Supprimer > Reduire > Collectif > Individuel > Formation\n- JAMAIS de mesure vague comme "faire attention" ou "etre vigilant"\n- Chaque mesure doit etre CONCRETE et APPLICABLE\n- Ajoute un champ "explication" (optionnel) avec une explication pedagogique globale pour aider l\'eleve a comprendre la hierarchie des mesures.',
         pad: 'Genere un exercice PAD (Processus d\'Apparition du Dommage) pour le module PSE [MODULE] en JSON.\nLa situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes, max 500 caracteres).\nFormat STRICT :\n{\n  "titre": "PAD - [metier/situation]",\n  "situation": "...",\n  "danger": "..." (max 80 car),\n  "distracteurs_danger": ["dist1", "dist2", "dist3"],\n  "situation_dangereuse": "..." (max 120 car),\n  "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],\n  "evenement_declencheur": "..." (max 120 car),\n  "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],\n  "dommage": "..." (max 120 car),\n  "distracteurs_dommage": ["dist1", "dist2", "dist3"]\n}\nREGLES :\n- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)\n- Distracteurs credibles dans le meme univers professionnel mais faux pour CETTE situation\n- Distracteurs tous differents entre eux et differents de la bonne reponse\n- Chaque distracteur max 80 caracteres\n- Vocabulaire simple adapte a des eleves de Bac Pro\n- Coherence PAD : Danger → exposition = Situation dangereuse → bascule = Evenement declencheur → consequence = Dommage\n- Ajoute un champ "explication" (optionnel) avec une explication pedagogique pour aider l\'eleve a comprendre la chaine PAD.',
@@ -3318,6 +3433,7 @@
         if (src.mots && src.mots[0] && src.mots[0].definition !== undefined) return 'mots_croises';
         if (src.affirmations) return 'swipe_vf';
         if (src.questions && src.questions[0] && src.questions[0].image !== undefined) return 'qcm_image';
+        if (src.colonnes && Array.isArray(src.lignes) && src.lignes[0] && (src.lignes[0].bonnes || src.lignes[0].label)) return 'tableau_selection';
         if (src.colonnes && src.lignes) return 'tableau';
         if (src.scenario) return 'etude_cas';
         if (src.mode === 'hierarchiser' && Array.isArray(src.items)) return 'hierarchiser';
@@ -3478,6 +3594,10 @@
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'QCM image attendu: champ "questions" non vide.';
             case 'tableau':
                 return (Array.isArray(data.colonnes) && Array.isArray(data.lignes)) ? '' : 'Tableau attendu: champs "colonnes" et "lignes".';
+            case 'tableau_selection':
+                return (Array.isArray(data.colonnes) && Array.isArray(data.lignes) && data.lignes.length > 0 && data.lignes[0].bonnes !== undefined)
+                    ? ''
+                    : 'Tableau selection attendu: colonnes[] + lignes[].bonnes[]';
             case 'etude_cas':
                 return (typeof data.scenario === 'string' && Array.isArray(data.questions)) ? '' : 'Etude de cas attendue: "scenario" + "questions[]".';
             case 'pad':
@@ -3582,6 +3702,7 @@
             else if (type === 'pendu' && data.mots) detail = ' (' + data.mots.length + ' mots)';
             else if (type === 'swipe_vf' && data.affirmations) detail = ' (' + data.affirmations.length + ' affirmations)';
             else if (type === 'intrus' && data.series) detail = ' (' + data.series.length + ' series)';
+            else if (type === 'tableau_selection' && data.lignes) detail = ' (' + data.lignes.length + ' lignes)';
             else if (type === 'analyse_copie' && data.items) detail = ' (' + data.items.length + ' items)';
             showToast('✅ ' + (TYPE_LABELS[type] || type) + ' importe !' + detail);
         } catch(e) {
