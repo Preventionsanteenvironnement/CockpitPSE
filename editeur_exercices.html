@@ -194,6 +194,8 @@
         .bottom-actions { display: flex; gap: 12px; padding-top: 10px; }
         .btn-save { padding: 12px 24px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; flex: 1; }
         .btn-save:hover { opacity: 0.85; }
+        .btn-duplicate { padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: none; }
+        .btn-duplicate:hover { opacity: 0.85; }
         .btn-publish { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
         .btn-publish:hover { opacity: 0.85; }
         .btn-unpublish { padding: 12px 24px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: none; }
@@ -1102,6 +1104,7 @@
         <!-- ACTIONS -->
         <div class="bottom-actions">
             <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
+            <button class="btn-duplicate" id="btn-duplicate" onclick="duplicateExercice()">📄 Dupliquer</button>
             <button class="btn-publish" id="btn-publish" onclick="publishExercice()">🚀 Publier</button>
             <button class="btn-unpublish" id="btn-unpublish" onclick="unpublishExercice()">⏸️ Depublier</button>
             <button class="btn-delete" id="btn-delete" onclick="deleteExercice()">🗑️ Supprimer</button>
@@ -2694,6 +2697,7 @@
         clearAllForms();
         onTypeChange();
         document.getElementById('btn-delete').style.display = 'none';
+        document.getElementById('btn-duplicate').style.display = 'none';
         document.getElementById('btn-unpublish').style.display = 'none';
         document.getElementById('btn-publish').style.display = '';
         document.getElementById('main-empty').style.display = 'none';
@@ -2726,6 +2730,7 @@
         }
         setContenuInForm(ex.type, ex.contenu);
         document.getElementById('btn-delete').style.display = 'block';
+        document.getElementById('btn-duplicate').style.display = 'block';
         updatePublishButtons(!!ex.publie);
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
@@ -3061,9 +3066,63 @@
                 await setDoc(doc(db, "exercices_banque", newId), data);
                 currentExoId = newId;
                 document.getElementById('btn-delete').style.display = 'block';
+                document.getElementById('btn-duplicate').style.display = 'block';
             }
             showToast('Exercice sauvegarde !');
         } catch(e) { alert('Erreur : ' + e.message); }
+    };
+
+    window.duplicateExercice = async function() {
+        const titreSource = document.getElementById('exo-titre').value.trim();
+        if (!titreSource) { showToast('Donne un titre avant de dupliquer.'); return; }
+
+        const type = document.getElementById('exo-type').value;
+        const classeIds = getSelectedClasseIds();
+        const classeId = classeIds.length > 0 ? classeIds[0] : null;
+        const moduleId = document.getElementById('exo-module').value || null;
+        let niveau = null;
+        if (classeId) {
+            const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
+        }
+        const contenu = getContenuFromForm();
+
+        const catCb = document.getElementById('exo-categorie-competences');
+        const categorie = (catCb.checked || AUTO_COMPETENCES_TYPES.includes(type)) ? 'competences' : 'modules';
+        let competences_cibles = getSelectedCompetences();
+        if (AUTO_COMPETENCES_TYPES.includes(type) && competences_cibles.length === 0) {
+            competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
+        }
+
+        const titreCopie = titreSource + ' (copie)';
+        const newId = 'exo_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        const data = {
+            titre: titreCopie,
+            type,
+            classeIds,
+            classeId,
+            moduleId,
+            niveau,
+            difficulte: currentDifficulty,
+            contenu,
+            categorie,
+            competences_cibles,
+            publie: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+        try {
+            await setDoc(doc(db, "exercices_banque", newId), data);
+            currentExoId = newId;
+            document.getElementById('exo-titre').value = titreCopie;
+            document.getElementById('btn-delete').style.display = 'block';
+            document.getElementById('btn-duplicate').style.display = 'block';
+            updatePublishButtons(false);
+            renderExoList();
+            showToast('Exercice duplique en brouillon.');
+        } catch (e) {
+            alert('Erreur duplication : ' + e.message);
+        }
     };
 
     window.publishExercice = async function() {
@@ -3090,6 +3149,7 @@
         if (!confirm('Supprimer cet exercice ?')) return;
         await deleteDoc(doc(db, "exercices_banque", currentExoId));
         currentExoId = null;
+        document.getElementById('btn-duplicate').style.display = 'none';
         document.getElementById('main-editor').style.display = 'none';
         document.getElementById('main-empty').style.display = 'flex';
         showToast('Exercice supprime.');
@@ -3099,6 +3159,7 @@
         await deleteDoc(doc(db, "exercices_banque", id));
         if (id === currentExoId) {
             currentExoId = null;
+            document.getElementById('btn-duplicate').style.display = 'none';
             document.getElementById('main-editor').style.display = 'none';
             document.getElementById('main-empty').style.display = 'flex';
         }
