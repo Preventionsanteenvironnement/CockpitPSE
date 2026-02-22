@@ -2421,8 +2421,33 @@ function validateImportJSON(jsonString) {
     const errors = [];
     let data;
 
-    // 0. Nettoyer les guillemets courbes (ChatGPT/Word) → guillemets droits
-    jsonString = jsonString.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"').replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+    // 0. Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Word
+    // BOM partout
+    jsonString = jsonString.replace(/\uFEFF/g, '');
+    // Caracteres invisibles / zero-width
+    jsonString = jsonString.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
+    // NBSP → espace normal
+    jsonString = jsonString.replace(/\u00A0/g, ' ');
+    // Guillemets courbes / typographiques → droits
+    jsonString = jsonString.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
+    jsonString = jsonString.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
+    // Extraire le JSON des blocs de code Markdown
+    var codeBlockMatch = jsonString.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+    if (codeBlockMatch) jsonString = codeBlockMatch[1].trim();
+    // Extraire entre { } si texte autour
+    if (jsonString.charAt(0) !== '{' && jsonString.charAt(0) !== '[') {
+        var fb = jsonString.indexOf('{');
+        if (fb >= 0) { var lb = jsonString.lastIndexOf('}'); if (lb > fb) jsonString = jsonString.substring(fb, lb + 1); }
+    }
+    // Supprimer commentaires // en debut de ligne
+    jsonString = jsonString.replace(/^\s*\/\/.*$/gm, '');
+    // Trailing commas
+    jsonString = jsonString.replace(/,\s*([\]}])/g, '$1');
+    // Python booleans/None
+    jsonString = jsonString.replace(/\bTrue\b/g, 'true');
+    jsonString = jsonString.replace(/\bFalse\b/g, 'false');
+    jsonString = jsonString.replace(/\bNone\b/g, 'null');
+    jsonString = jsonString.trim();
 
     // 1. Parse
     try {
@@ -2453,12 +2478,14 @@ function validateImportJSON(jsonString) {
                 docIds.add(doc.id);
                 if (!doc.titre || typeof doc.titre !== 'string') errors.push(prefix + 'titre manquant');
                 const docType = doc.type;
-                if (docType !== 'texte' && docType !== 'image') {
-                    errors.push(prefix + 'type doit être "texte" ou "image" (reçu : "' + docType + '")');
+                if (docType !== 'texte' && docType !== 'image' && docType !== 'video') {
+                    errors.push(prefix + 'type doit être "texte", "image" ou "video" (reçu : "' + docType + '")');
                 } else if (docType === 'texte') {
                     if (!doc.contenu || typeof doc.contenu !== 'string') errors.push(prefix + 'contenu manquant pour doc texte');
                 } else if (docType === 'image') {
                     if (!doc.image_url || typeof doc.image_url !== 'string') errors.push(prefix + 'image_url manquant pour doc image');
+                } else if (docType === 'video') {
+                    if (!doc.video_url || typeof doc.video_url !== 'string') errors.push(prefix + 'video_url manquant pour doc video');
                 }
             });
         }
