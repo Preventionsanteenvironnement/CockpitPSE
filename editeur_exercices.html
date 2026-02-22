@@ -2894,9 +2894,55 @@
         scenario: 'Genere un exercice Scenario interactif pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Scenario - [situation]",\n  "etapes": [\n    {\n      "id": "debut",\n      "texte": "Description de la situation initiale...",\n      "choix": [\n        { "label": "Choix A (bon)", "suite": "etape2", "correct": true },\n        { "label": "Choix B (mauvais)", "suite": "bad1", "correct": false, "feedback": "Explication courte" }\n      ]\n    },\n    {\n      "id": "etape2",\n      "texte": "Suite de la situation...",\n      "choix": [\n        { "label": "Bon choix", "suite": "fin", "correct": true },\n        { "label": "Mauvais choix", "suite": "bad2", "correct": false, "feedback": "..." }\n      ]\n    },\n    { "id": "fin", "texte": "Bravo ! Vous avez gere la situation correctement.", "choix": [] },\n    { "id": "bad1", "texte": "Cette approche n\'est pas adaptee car [explication detaillee]. Vous pouvez reessayer.", "choix": [{ "label": "Reessayer", "suite": "debut", "correct": false }] },\n    { "id": "bad2", "texte": "Ce n\'est pas la bonne reaction car [explication]. Reessayez.", "choix": [{ "label": "Reessayer", "suite": "etape2", "correct": false }] }\n  ]\n}\n\nREGLES OBLIGATOIRES :\n- 4 a 8 etapes\n- Premiere etape id = "debut"\n- SEULE la fin reelle du scenario (bravo, reussite) a choix: []\n- Les etapes d\'erreur (bad*) NE DOIVENT PAS avoir choix: [] ! Elles doivent contenir au moins 1 choix de reprise :\n  { "label": "Reessayer", "suite": "etape_precedente", "correct": false }\n- Les explications d\'erreur doivent etre dans le champ texte de l\'etape bad (pas seulement dans feedback)\n- Le feedback des mauvais choix n\'est visible que brievement : mettre l\'essentiel dans texte de l\'etape bad\n- Chaque choix.suite pointe vers un id existant\n- Pas de boucles infinies (max 30 etapes parcourues)\n- 2-3 choix par etape\n- correct: true/false pour le scoring\n- feedback obligatoire pour les mauvais choix\n- Situation realiste et professionnelle\n- Vocabulaire CAP/Bac Pro'
     };
 
+    function buildQcmClassiquePrompt() {
+        var isMultiple = !!(document.getElementById('qcmc-multiple') && document.getElementById('qcmc-multiple').checked);
+        var modeLine = isMultiple
+            ? 'MODE ACTUEL: QCM MULTIPLE (plusieurs bonnes reponses).'
+            : 'MODE ACTUEL: QCM UNIQUE (une seule bonne reponse).';
+        var reponseExample = isMultiple ? '"reponse": ["c1", "c3"],' : '"reponse": "c1",';
+        var multipleExample = isMultiple ? '"multiple": true,' : '"multiple": false,';
+        var regleReponse = isMultiple
+            ? '- reponse DOIT etre un tableau d\'ids (ex: ["c1","c3"]), au moins 2 bonnes reponses'
+            : '- reponse DOIT etre un id unique (ex: "c1"), une seule bonne reponse';
+
+        return 'Genere un exercice QCM classique pour le module PSE [MODULE] en JSON.\n\n' +
+            modeLine + '\n\n' +
+            'REPONDS UNIQUEMENT AVEC UN JSON VALIDE.\n' +
+            '- N\'ajoute aucun texte avant/apres\n' +
+            '- N\'ajoute aucun bloc Markdown (pas de ```)\n' +
+            '- N\'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)\n' +
+            '- N\'ajoute aucun commentaire JSON\n\n' +
+            'Format STRICT :\n' +
+            '{\n' +
+            '  "titre": "QCM - [theme]",\n' +
+            '  "question": "...",\n' +
+            '  "choix": [\n' +
+            '    { "id": "c1", "texte": "Bonne reponse" },\n' +
+            '    { "id": "c2", "texte": "Distracteur 1" },\n' +
+            '    { "id": "c3", "texte": "Distracteur 2" },\n' +
+            '    { "id": "c4", "texte": "Distracteur 3" }\n' +
+            '  ],\n' +
+            '  ' + reponseExample + '\n' +
+            '  ' + multipleExample + '\n' +
+            '  "explication": "Explication de la bonne reponse"\n' +
+            '}\n\n' +
+            'REGLES :\n' +
+            '- 4 choix minimum, chacun avec un id unique (c1, c2, c3, c4)\n' +
+            regleReponse + '\n' +
+            '- Distracteurs plausibles mais clairement faux\n' +
+            '- Question claire et sans ambiguite\n' +
+            '- Vocabulaire CAP/Bac Pro\n' +
+            '- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)';
+    }
+
+    function getImportPrompt(type) {
+        if (type === 'qcm_classique') return buildQcmClassiquePrompt();
+        return PROMPTS[type] || '';
+    }
+
     window.openImportModal = function() {
         const type = document.getElementById('exo-type').value;
-        document.getElementById('import-prompt-guide').textContent = '💡 Prompt a copier dans ChatGPT/Claude :\n\n' + (PROMPTS[type] || '');
+        document.getElementById('import-prompt-guide').textContent = '💡 Prompt a copier dans ChatGPT/Claude :\n\n' + getImportPrompt(type);
         document.getElementById('import-json-guide').textContent = 'Format JSON attendu pour "' + (TYPE_LABELS[type] || type) + '"';
         document.getElementById('import-json-input').value = '';
         document.getElementById('import-error').style.display = 'none';
