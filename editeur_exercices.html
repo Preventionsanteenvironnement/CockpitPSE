@@ -2008,6 +2008,40 @@
     // ========== ANALYSE COPIE FUNCTIONS ==========
     window._analyseCopieData = null;
 
+    function acGetNewSchemaMissingBlocks(item) {
+        var missing = [];
+        if (!item || !item.etape1) missing.push('etape1');
+        if (!item || !item.etape1_competence) missing.push('etape1_competence');
+        if (!item || !item.etape3_niveau) missing.push('etape3_niveau');
+        if (!item || !item.etape4_corrections) missing.push('etape4_corrections');
+        return missing;
+    }
+
+    function acHasNewSchemaCore(item) {
+        return acGetNewSchemaMissingBlocks(item).length === 0;
+    }
+
+    function acHasAnyNewSchemaBlock(item) {
+        return !!(item && (item.etape1 || item.etape1_competence || item.etape3_niveau || item.etape4_corrections));
+    }
+
+    function acBuildAttendusFromNewSchema(item) {
+        var e1 = item.etape1 || {};
+        var e1c = item.etape1_competence || {};
+        var e3 = item.etape3_niveau || {};
+        var recap = item.recap_item || {};
+        return {
+            verbe_index: (typeof e1.verbe_index === 'number' ? e1.verbe_index : 0),
+            competence_index: (typeof e1c.competence_index === 'number' ? e1c.competence_index : 0),
+            niveau: e3.niveau_attendu || 'insuffisant',
+            // Nouveau schema : indexes legacy non requis (eviter impact score legacy)
+            justif_index: null,
+            amelioration_index: null,
+            justification_modele: e1c.justification_modele || recap.resume || '',
+            reponse_amelioree_modele: recap.modele_reponse_amelioree || recap.modele_reponse || ''
+        };
+    }
+
     window.acImportJson = function() {
         var input = document.getElementById('ac-json-input');
         var status = document.getElementById('ac-import-status');
@@ -2034,9 +2068,26 @@
             data.items.forEach(function(item, i) {
                 if (!item.question_examen) warnings.push('Item ' + (i+1) + ' : question_examen manquant');
                 if (!item.reponse_eleve && item.reponse_eleve !== '') warnings.push('Item ' + (i+1) + ' : reponse_eleve manquant');
-                if (!item.attendus) {
+                // Priorite a l'ancien schema si attendus deja present
+                if (item.attendus) {
+                    // no-op
+                } else if (acHasNewSchemaCore(item)) {
+                    // Nouveau schema valide : generer attendus sans warning
+                    item.attendus = acBuildAttendusFromNewSchema(item);
+                } else if (acHasAnyNewSchemaBlock(item)) {
+                    // Nouveau schema incomplet : generer attendus et avertir
+                    item.attendus = acBuildAttendusFromNewSchema(item);
+                    var missing = acGetNewSchemaMissingBlocks(item);
+                    warnings.push('Item ' + (i+1) + ' : schema etapes incomplet (' + missing.join(', ') + ')');
+                } else {
+                    // Ancien schema incomplet : conserver warning historique
                     item.attendus = {};
                     warnings.push('Item ' + (i+1) + ' : attendus manquant (valeurs par defaut)');
+                }
+                // Valeurs minimales pour compatibilite moteur legacy uniquement
+                if (!acHasAnyNewSchemaBlock(item)) {
+                    if (item.attendus.justif_index === undefined) item.attendus.justif_index = 0;
+                    if (item.attendus.amelioration_index === undefined) item.attendus.amelioration_index = 0;
                 }
                 // Normaliser validee : boolean → string
                 if (item.attendus.validee === true) item.attendus.validee = 'oui';
@@ -3630,7 +3681,13 @@ Important:
         if (src.unite_travail && src.choix && src.attendus) return 'duerp_ligne';
         if (src.exposition && src.declencheur && src.gravite) return 'estimation_risque';
         if (src.distracteurs_danger) return 'pad';
-        if (Array.isArray(src.items) && src.items.length > 0 && src.items[0].attendus && (src.items[0].attendus.verbe || src.items[0].attendus.competence || src.items[0].question_examen)) return 'analyse_copie';
+        if (Array.isArray(src.items) && src.items.length > 0) {
+            var acFirst = src.items[0] || {};
+            var hasLegacyAnalyse = !!(acFirst.attendus && (acFirst.attendus.verbe || acFirst.attendus.competence || acFirst.question_examen));
+            var hasNewAnalyseCore = !!(acFirst.etape1 && acFirst.etape1_competence && acFirst.etape3_niveau && acFirst.etape4_corrections);
+            var hasNewAnalysePartial = !!((acFirst.etape1 || acFirst.etape1_competence || acFirst.etape3_niveau || acFirst.etape4_corrections) && (acFirst.question_examen || acFirst.reponse_eleve !== undefined));
+            if (hasLegacyAnalyse || hasNewAnalyseCore || hasNewAnalysePartial) return 'analyse_copie';
+        }
         if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) return 'pictogramme';
         if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
