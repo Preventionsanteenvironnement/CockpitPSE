@@ -1119,10 +1119,33 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let currentPastilleNiveau = 'moyen';
     let insertAfterDocRef = null;       // doc context for new questions from flow buttons
     let insertAtIndex = null;           // position in questions[] for insertion
+    let firestoreV2PermissionDenied = false;
+    let firestoreV2DeniedAlertShown = false;
 
     const DOC_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#10b981', '#e11d48'];
     const PASTILLE_LEVELS = ['facile', 'moyen', 'eleve'];
     const PASTILLE_LABELS = { facile: 'Facile', moyen: 'Moyen', eleve: 'Eleve' };
+
+    function makeUid(prefix) {
+        return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    function isPermissionDeniedError(e) {
+        const msg = e && e.message ? String(e.message) : '';
+        return !!(e && (e.code === 'permission-denied' || msg.includes('Missing or insufficient permissions')));
+    }
+
+    function handleV2PermissionDenied(origin, e) {
+        if (!isPermissionDeniedError(e)) return false;
+        firestoreV2PermissionDenied = true;
+        console.error('[V2] Permission denied on eval_banque_v2 (' + origin + ')', e);
+        if (!firestoreV2DeniedAlertShown) {
+            firestoreV2DeniedAlertShown = true;
+            alert('Acces refuse a Firestore pour eval_banque_v2.\n\nAction a faire: ajouter les regles Firestore pour la collection V2 (eval_banque_v2), sinon la V2 ne peut ni charger ni sauvegarder.');
+        }
+        showToast('⚠️ Regles Firestore manquantes sur eval_banque_v2');
+        return true;
+    }
 
     function normalizePastilleNiveau(level, fallback) {
         const defaultLevel = (fallback === undefined) ? 'moyen' : fallback;
@@ -1517,7 +1540,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         } else {
             // Mode ajout : creer un nouveau document (toujours en fin de liste)
             const newDoc = {
-                id: 'doc_' + Date.now().toString(36),
+                id: makeUid('doc'),
                 type, titre, content, description
             };
             documents.push(newDoc);
@@ -1775,6 +1798,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let pendingLoadId = new URLSearchParams(window.location.search).get('id');
     const qBanque = query(collection(db, "eval_banque_v2"), orderBy("updatedAt", "desc"));
     onSnapshot(qBanque, (snap) => {
+        firestoreV2PermissionDenied = false;
         allEvals = [];
         snap.forEach(d => {
             allEvals.push({ id: d.id, ...d.data() });
@@ -1786,6 +1810,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             if (ev) loadEval(pendingLoadId);
             pendingLoadId = null;
         }
+    }, (e) => {
+        handleV2PermissionDenied('onSnapshot', e);
     });
 
     function renderEvalList() {
@@ -1838,6 +1864,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             }
             showToast('Evaluation supprimee.');
         } catch(e) {
+            if (handleV2PermissionDenied('deleteEvalFromSidebar', e)) return;
             console.error("Erreur suppression:", e);
             alert("Erreur : " + e.message);
         }
@@ -1851,7 +1878,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         if (!confirm('Dupliquer "' + (ev.titre || 'Sans titre') + '" ?\nLa copie sera en brouillon, sans classe assignee.')) return;
 
-        const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        const newId = makeUid('eval');
         const newEvalData = {
             titre: (ev.titre || 'Sans titre') + ' (copie)',
             classeId: null,
@@ -1876,6 +1903,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             // onSnapshot will update allEvals, then load the new eval
             setTimeout(() => loadEval(newId), 500);
         } catch(e) {
+            if (handleV2PermissionDenied('duplicateEval', e)) return;
             console.error("Erreur duplication:", e);
             alert("Erreur : " + e.message);
         }
@@ -2387,7 +2415,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const questionText = qField ? qField.value.trim() : '';
         if (!questionText) { alert('Ecris la question !'); return; }
 
-        let newQ = { type, question: questionText, id: 'q_' + Date.now().toString(36) };
+        let newQ = { type, question: questionText, id: makeUid('q') };
 
         // Type-specific
         if (type === 'qcm_single') {
@@ -2581,7 +2609,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             if (currentEvalId) {
                 await setDoc(doc(db, "eval_banque_v2", currentEvalId), evalData, { merge: true });
             } else {
-                const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                const newId = makeUid('eval');
                 evalData.createdAt = serverTimestamp();
                 evalData.publie = false;
                 await setDoc(doc(db, "eval_banque_v2", newId), evalData);
@@ -2591,6 +2619,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             showToast('Evaluation sauvegardee (brouillon) !');
             renderEvalList();
         } catch(e) {
+            if (handleV2PermissionDenied('saveEval', e)) return;
             console.error("Erreur sauvegarde:", e);
             alert("Erreur : " + e.message);
         }
@@ -2617,13 +2646,20 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         // Save first then publish
         await saveEval();
+        if (firestoreV2PermissionDenied) return;
 
         if (currentEvalId) {
-            await setDoc(doc(db, "eval_banque_v2", currentEvalId), { publie: true }, { merge: true });
-            showToast('Evaluation publiee ! Les eleves peuvent y acceder.');
-            banner.style.display = 'none';
-            updatePublishButtons(true);
-            renderEvalList();
+            try {
+                await setDoc(doc(db, "eval_banque_v2", currentEvalId), { publie: true }, { merge: true });
+                showToast('Evaluation publiee ! Les eleves peuvent y acceder.');
+                banner.style.display = 'none';
+                updatePublishButtons(true);
+                renderEvalList();
+            } catch (e) {
+                if (handleV2PermissionDenied('publishEval', e)) return;
+                console.error("Erreur publication:", e);
+                alert("Erreur : " + e.message);
+            }
         }
     };
 
@@ -2638,6 +2674,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             updatePublishButtons(false);
             renderEvalList();
         } catch(e) {
+            if (handleV2PermissionDenied('unpublishEval', e)) return;
             console.error("Erreur depublication:", e);
             alert("Erreur : " + e.message);
         }
@@ -2670,6 +2707,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             document.getElementById('main-empty').style.display = 'flex';
             showToast('Evaluation supprimee.');
         } catch(e) {
+            if (handleV2PermissionDenied('deleteEval', e)) return;
             console.error("Erreur suppression:", e);
             alert("Erreur : " + e.message);
         }
