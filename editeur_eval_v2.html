@@ -1,0 +1,3189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur d'Evaluations V2 — PSE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 320px; min-width: 320px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.05rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        #btn-new-eval {
+            width: 100%; padding: 12px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #btn-new-eval:hover { opacity: 0.85; }
+
+        .eval-list { display: flex; flex-direction: column; gap: 4px; }
+        .eval-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent; position: relative;
+        }
+        .eval-list-item:hover { border-color: #475569; }
+        .eval-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .eval-list-item .ei-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; padding-right: 28px; }
+        .eval-list-item .ei-meta { font-size: 0.7rem; color: #64748b; }
+        .eval-list-item .ei-del {
+            position: absolute; top: 8px; right: 8px;
+            background: transparent; border: none; color: #64748b;
+            font-size: 0.85rem; cursor: pointer; padding: 2px 5px; border-radius: 4px;
+            opacity: 0; transition: 0.2s;
+        }
+        .eval-list-item:hover .ei-del { opacity: 1; }
+        .eval-list-item .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .ei-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.65rem; font-weight: 700; margin-right: 4px;
+        }
+        .badge-pub { background: #dcfce7; color: #166534; }
+        .badge-draft { background: #fef3c7; color: #92400e; }
+        .badge-qcount { background: #dbeafe; color: #1e40af; }
+        .badge-bareme { background: #ede9fe; color: #5b21b6; }
+        .badge-pastille-facile { background: #dcfce7; color: #166534; }
+        .badge-pastille-moyen { background: #dbeafe; color: #1e40af; }
+        .badge-pastille-eleve { background: #fee2e2; color: #991b1b; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        #main-editor { display: none; flex-direction: column; gap: 20px; max-width: 850px; width: 100%; margin: 0 auto; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .form-input, .form-textarea {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; font-family: inherit;
+        }
+        .form-textarea { resize: vertical; min-height: 60px; }
+        .form-input:focus, .form-textarea:focus { border-color: #3b82f6; }
+        .form-input::placeholder, .form-textarea::placeholder { color: #64748b; }
+        .form-select {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row > * { flex: 1; }
+
+        /* Class pills */
+        .classes-pills-container { display: flex; flex-wrap: wrap; gap: 6px; }
+        .class-pill {
+            padding: 5px 14px; border-radius: 20px; border: 2px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer; font-size: 0.8rem;
+            font-weight: 600; transition: all 0.2s; user-select: none;
+        }
+        .class-pill:hover { border-color: #3b82f6; color: #e2e8f0; }
+        .class-pill.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .class-pill.pill-all { font-style: italic; }
+
+        /* Meta section */
+        .meta-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .meta-card h3 { font-size: 1rem; margin-bottom: 16px; color: #f1f5f9; }
+
+        /* Bareme radio */
+        .bareme-toggle { display: flex; gap: 8px; }
+        .bareme-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .bareme-btn.active { border-color: #8b5cf6; background: rgba(139,92,246,0.15); color: #c4b5fd; }
+
+        /* Mode toggle */
+        .mode-toggle { display: flex; gap: 8px; }
+        .mode-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .mode-btn.active { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #93c5fd; }
+
+        /* Notation toggle (Noté/Non noté) */
+        .note-toggle { display: flex; gap: 8px; }
+        .note-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .note-btn.active { border-color: #f59e0b; background: rgba(245,158,11,0.15); color: #fcd34d; }
+
+        /* Correction toggle (Immédiate/Différée) */
+        .correction-toggle { display: flex; gap: 8px; }
+        .corr-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .corr-btn.active { border-color: #10b981; background: rgba(16,185,129,0.15); color: #6ee7b7; }
+        .pastille-toggle { display: flex; gap: 8px; }
+        .pastille-btn {
+            flex: 1; padding: 10px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .pastille-dot {
+            width: 11px; height: 11px; border-radius: 999px; display: inline-block;
+            border: 1px solid rgba(15,23,42,0.2);
+        }
+        .dot-facile { background: #22c55e; }
+        .dot-moyen { background: #3b82f6; }
+        .dot-eleve { background: #ef4444; }
+        .pastille-btn.active-facile { border-color: #22c55e; background: rgba(34,197,94,0.15); color: #bbf7d0; }
+        .pastille-btn.active-moyen { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #bfdbfe; }
+        .pastille-btn.active-eleve { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #fecaca; }
+
+        /* Documents section */
+        .doc-card {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .doc-card .doc-info { flex: 1; }
+        .doc-card .doc-title { font-weight: 700; font-size: 0.9rem; }
+        .doc-card .doc-type { font-size: 0.7rem; color: #64748b; }
+        .doc-card .doc-del {
+            background: transparent; border: none; color: #64748b; font-size: 1rem;
+            cursor: pointer; padding: 4px 8px;
+        }
+        .doc-card .doc-del:hover { color: #ef4444; }
+
+        .doc-form {
+            background: #1a1a2e; border: 2px solid #8b5cf6; border-radius: 12px;
+            padding: 16px; margin-bottom: 12px; display: none;
+        }
+
+        /* Questions section */
+        .questions-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+        .questions-header h3 { font-size: 1.1rem; }
+        .questions-count { font-size: 0.85rem; color: #64748b; }
+
+        .add-btns { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .add-btn {
+            flex: 1; min-width: 100px; padding: 10px 8px; border: 2px dashed #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 0.8rem;
+            cursor: pointer; transition: 0.2s; text-align: center;
+        }
+        .add-btn:hover { border-color: #3b82f6; color: #3b82f6; background: rgba(59,130,246,0.05); }
+
+        /* Question cards */
+        .q-card {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 16px; margin-bottom: 10px; position: relative;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .q-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .q-card-num { font-weight: 900; font-size: 1rem; color: #3b82f6; }
+        .q-card-type-badge {
+            display: inline-block; padding: 3px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 700; margin-left: 8px;
+        }
+        .type-qcm_single { background: #3b82f6; color: white; }
+        .type-qcm_multi { background: #06b6d4; color: white; }
+        .type-vf { background: #8b5cf6; color: white; }
+        .type-mot { background: #f59e0b; color: white; }
+        .type-nombre { background: #22c55e; color: white; }
+        .type-ordonner { background: #e11d48; color: white; }
+        .type-pad { background: #b45309; color: #fffbeb; }
+        .type-prevention { background: #0f766e; color: #ecfeff; }
+
+        .q-card-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        .q-card-meta span {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+        }
+        .qm-pts { background: #ede9fe; color: #5b21b6; }
+        .qm-comp { background: #dbeafe; color: #1e40af; }
+        .qm-doc { background: #fef3c7; color: #92400e; }
+
+        .q-card-actions { display: flex; gap: 4px; }
+        .q-card-actions button {
+            background: #0f172a; border: 1px solid #475569; color: #94a3b8;
+            width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .q-card-actions button:hover { background: #334155; color: white; }
+        .q-card-actions button.btn-del:hover { background: #ef4444; color: white; }
+        .q-card-actions button.btn-edit:hover { background: #3b82f6; color: white; }
+
+        .q-card-question { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+        .q-card-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+        .q-card-choice {
+            padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;
+            background: #0f172a; color: #94a3b8; border: 1px solid #334155;
+        }
+        .q-card-choice.correct { background: #166534; color: #bbf7d0; border-color: #22c55e; }
+        .q-card-answer { font-size: 0.85rem; color: #22c55e; font-weight: 600; }
+        .q-card-correction { font-size: 0.75rem; color: #64748b; margin-top: 6px; font-style: italic; }
+
+        /* Question add form */
+        .q-form {
+            background: #1a1a2e; border: 2px solid #3b82f6; border-radius: 12px;
+            padding: 20px; margin-bottom: 12px; display: none;
+        }
+        .q-form h4 { font-size: 0.95rem; margin-bottom: 14px; color: #93c5fd; }
+        .q-form .form-input, .q-form .form-textarea { background: #0f172a; }
+        .q-form-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .btn-save-q {
+            flex: 1; padding: 10px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-save-q:hover { opacity: 0.85; }
+        .btn-cancel-q {
+            padding: 10px 20px; background: #334155; color: #94a3b8;
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .btn-cancel-q:hover { background: #475569; color: white; }
+
+        /* Common question fields (points, competence, correction, explication) */
+        .q-extra-fields {
+            border-top: 1px solid #334155; margin-top: 14px; padding-top: 14px;
+        }
+
+        /* Radio/checkbox custom */
+        .radio-row, .check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .radio-row input[type="radio"], .check-row input[type="checkbox"] { accent-color: #22c55e; width: 18px; height: 18px; }
+        .radio-row input[type="text"], .check-row input[type="text"] { flex: 1; }
+        .radio-row .remove-choice, .check-row .remove-choice {
+            background: transparent; border: none; color: #ef4444; font-size: 1.2rem;
+            cursor: pointer; padding: 0 4px; opacity: 0.5;
+        }
+        .radio-row .remove-choice:hover, .check-row .remove-choice:hover { opacity: 1; }
+        .btn-add-choice {
+            padding: 6px 12px; background: #1e293b; border: 1px dashed #475569;
+            color: #64748b; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-top: 4px;
+        }
+        .btn-add-choice:hover { border-color: #3b82f6; color: #3b82f6; }
+
+        /* VF buttons */
+        .vf-toggle { display: flex; gap: 8px; }
+        .vf-btn {
+            flex: 1; padding: 12px; border: 2px solid #475569; border-radius: 10px;
+            background: transparent; color: #94a3b8; font-weight: 700; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .vf-btn.selected-true { border-color: #22c55e; background: rgba(34,197,94,0.15); color: #22c55e; }
+        .vf-btn.selected-false { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Validation banner */
+        .validation-banner {
+            background: #7f1d1d; border: 1px solid #ef4444; border-radius: 10px;
+            padding: 14px 18px; display: none;
+        }
+        .validation-banner h4 { color: #fca5a5; font-size: 0.9rem; margin-bottom: 8px; }
+        .validation-banner ul { list-style: none; }
+        .validation-banner li { color: #fca5a5; font-size: 0.85rem; margin-bottom: 4px; }
+        .validation-banner li::before { content: "⚠️ "; }
+
+        /* Bottom actions */
+        .bottom-actions {
+            display: flex; gap: 10px; margin-top: 20px; padding-top: 20px;
+            border-top: 1px solid #334155;
+        }
+        .btn-save-eval {
+            flex: 1; padding: 14px; background: #3b82f6; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-save-eval:hover { background: #2563eb; }
+        .btn-publish-eval {
+            padding: 14px 24px; background: #22c55e; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-publish-eval:hover { background: #16a34a; }
+        .btn-unpublish-eval {
+            padding: 14px 24px; background: #f59e0b; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-unpublish-eval:hover { background: #d97706; }
+        .btn-delete-eval {
+            padding: 14px 20px; background: #7f1d1d; color: #fca5a5;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-delete-eval:hover { background: #ef4444; color: white; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 1000; display: none; animation: fadeIn 0.3s;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        .info-text { font-size: 0.75rem; color: #64748b; font-style: italic; margin-top: 4px; }
+        .q-card.editing { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.15); }
+        .q-form.edit-mode { border-color: #f59e0b; }
+        .q-form.edit-mode h4 { color: #fbbf24; }
+
+        /* Points total display */
+        .points-total {
+            font-size: 0.85rem; padding: 6px 12px; border-radius: 8px; font-weight: 700;
+        }
+        .points-ok { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .points-warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .points-err { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Import JSON modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1e293b; border-radius: 16px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; border: 1px solid #334155; }
+        .modal-content h3 { margin: 0 0 12px; color: #e2e8f0; }
+        .modal-textarea { width: 100%; font-family: monospace; font-size: 0.85rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: vertical; box-sizing: border-box; }
+        .import-prompt-details { margin: 12px 0; }
+        .import-prompt-details summary { cursor: pointer; color: #94a3b8; font-size: 0.85rem; }
+        .import-prompt-details pre { white-space: pre-wrap; font-size: 0.7rem; max-height: 300px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; color: #94a3b8; margin-top: 8px; }
+        .import-checkboxes { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+        .import-checkboxes label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #e2e8f0; font-size: 0.85rem; }
+        .btn-import-json { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+        .btn-import-json:hover { background: #4f46e5; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+        /* === FLOW MODE === */
+        .flow-segment-doc {
+            border-left: 4px solid var(--seg-color, #64748b);
+            margin-bottom: 4px; padding-left: 0;
+            border-radius: 8px;
+        }
+        .flow-doc-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; background: #1e293b; border-radius: 8px;
+            margin-bottom: 8px; border-left: 4px solid var(--seg-color, #64748b);
+        }
+        .flow-doc-header .flow-doc-info {
+            display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+        }
+        .flow-doc-header .flow-doc-icon {
+            font-size: 1.3rem; flex-shrink: 0;
+        }
+        .flow-doc-header .flow-doc-title {
+            font-weight: 700; font-size: 0.95rem; color: #f1f5f9;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .flow-doc-header .flow-doc-type {
+            font-size: 0.7rem; color: #94a3b8; margin-left: 8px;
+        }
+        .flow-doc-header .flow-doc-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .flow-doc-header .flow-doc-actions button {
+            background: #0f172a; border: 1px solid #475569; color: #94a3b8;
+            width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        .flow-doc-header .flow-doc-actions button:hover { background: #334155; color: white; }
+        .flow-doc-header .flow-doc-actions button.btn-del:hover { background: #ef4444; color: white; }
+
+        .flow-add-btns {
+            display: flex; gap: 6px; margin: 8px 0 12px 0; flex-wrap: wrap;
+        }
+        .flow-add-btns .add-btn {
+            padding: 7px 12px; font-size: 0.75rem; min-width: 70px; flex: 0;
+        }
+
+        .flow-orphan-docs {
+            border: 2px dashed #f59e0b; border-radius: 10px; padding: 14px;
+            margin-top: 12px; background: rgba(245, 158, 11, 0.05);
+        }
+        .flow-orphan-docs .orphan-title {
+            font-size: 0.85rem; color: #f59e0b; font-weight: 700; margin-bottom: 8px;
+        }
+
+        .flow-section-label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;
+        }
+        .flow-section-label::after {
+            content: ''; flex: 1; height: 1px; background: #334155;
+        }
+        /* === HAMBURGER MENU INFRASTRUCTURE === */
+        .menu-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); z-index:999; }
+        .menu-btn { display:none; border:none; background:#1e293b; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); }
+        body.menu-open #sidebar { transform:translateX(0); }
+        body.menu-open .menu-overlay { display:block; }
+        .close-sidebar-btn { display:none; }
+
+        /* === MOBILE 768px === */
+        @media (max-width:768px) {
+            body { height:auto; overflow:auto; display:block; }
+            #sidebar { position:fixed; top:0; left:0; bottom:0; height:100vh; width:min(86vw,320px); min-width:0; transform:translateX(-110%); transition:transform 0.25s ease; z-index:1000; overflow-y:auto; }
+            #main { padding:16px; min-height:100vh; }
+            .menu-btn { display:inline-flex; margin-bottom:12px; }
+            .close-sidebar-btn { display:block; position:absolute; top:15px; right:15px; background:none; border:none; color:white; font-size:24px; cursor:pointer; z-index:1002; }
+            .form-row { flex-direction:column; gap:10px; }
+            .add-btns { gap:8px; }
+            .add-btn { min-width:calc(50% - 8px); }
+            .bottom-actions { flex-direction:column; gap:8px; }
+            .btn-save-eval, .btn-publish-eval, .btn-unpublish-eval, .btn-delete-eval { width:100%; text-align:center; }
+            .q-card { padding:12px; }
+            .q-form { padding:14px; }
+            .bareme-toggle { flex-wrap:wrap; }
+            .note-toggle { flex-wrap:wrap; }
+            .correction-toggle { flex-wrap:wrap; }
+            .doc-form { padding:12px; }
+        }
+
+        /* === PHONE 480px === */
+        @media (max-width:480px) {
+            #main { padding:10px; }
+            .add-btn { min-width:100%; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Menu overlay -->
+<div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <button class="close-sidebar-btn" onclick="closeMenu()">✕</button>
+    <div class="sidebar-header">
+        <h2>📋 Editeur d'Eval</h2>
+        <a href="index.html">← Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <button id="btn-new-eval" onclick="newEval()">+ Nouvelle evaluation</button>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Mes evaluations (<span id="eval-count">0</span>)</label>
+        <div class="eval-list" id="eval-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">☰</button>
+    <!-- Empty state -->
+    <div id="main-empty">
+        <div class="big-icon">📋</div>
+        <h2 style="margin-bottom:8px;">Editeur d'Evaluations</h2>
+        <p>Cree une nouvelle evaluation ou selectionne-en une dans la liste.</p>
+    </div>
+
+    <!-- Editor -->
+    <div id="main-editor">
+        <!-- Metadonnees -->
+        <div class="meta-card">
+            <h3>Informations de l'evaluation</h3>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Titre *</label>
+                <input type="text" class="form-input" id="eval-titre" placeholder="Ex: Evaluation Module A2 Le sommeil">
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Classe(s)</label>
+                <div id="eval-classes-container" class="classes-pills-container">
+                    <!-- Pills generated dynamically -->
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Module</label>
+                <select class="form-select" id="eval-module" disabled>
+                    <option value="">— Choisir une classe d'abord —</option>
+                </select>
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Bareme</label>
+                    <div class="bareme-toggle">
+                        <button class="bareme-btn" id="bareme-10" onclick="setBareme(10)">/ 10</button>
+                        <button class="bareme-btn active" id="bareme-20" onclick="setBareme(20)">/ 20</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Timer (0 = pas de limite)</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" class="form-input" id="eval-timer" value="0" min="0" max="120" step="5" style="width:80px; text-align:center;">
+                        <span style="color:#64748b; font-size:0.85rem;">minutes</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Mode</label>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="mode-libre" onclick="setModeEval('libre')">📖 Libre (a son rythme)</button>
+                    <button class="mode-btn" id="mode-sync" onclick="setModeEval('synchronise')">👨‍🏫 Synchronise (en classe)</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:12px;">
+                <label>Pastille niveau (eleves)</label>
+                <div class="pastille-toggle">
+                    <button class="pastille-btn" id="pastille-facile" onclick="setPastilleNiveau('facile')"><span class="pastille-dot dot-facile"></span>Facile</button>
+                    <button class="pastille-btn" id="pastille-moyen" onclick="setPastilleNiveau('moyen')"><span class="pastille-dot dot-moyen"></span>Moyen</button>
+                    <button class="pastille-btn" id="pastille-eleve" onclick="setPastilleNiveau('eleve')"><span class="pastille-dot dot-eleve"></span>Eleve</button>
+                </div>
+                <div class="info-text">Rappel enseignant : vert = facile, bleu = moyen, rouge = eleve.</div>
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>📊 Notation</label>
+                    <div class="note-toggle">
+                        <button class="note-btn active" id="note-oui" onclick="setNonNote(false)">📊 Notee</button>
+                        <button class="note-btn" id="note-non" onclick="setNonNote(true)">📋 Non notee</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>📝 Correction</label>
+                    <div class="correction-toggle">
+                        <button class="corr-btn active" id="corr-immediate" onclick="setCorrectionDifferee(false)">⚡ Immediate</button>
+                        <button class="corr-btn" id="corr-differee" onclick="setCorrectionDifferee(true)">🔒 Differee</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenu de l'evaluation (flux lineaire : documents + questions) -->
+        <div>
+            <div class="questions-header">
+                <h3>Contenu de l'evaluation</h3>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button type="button" class="btn-import-json" onclick="openImportModal()">📥 Importer JSON</button>
+                    <span class="points-total" id="points-total">0 pts</span>
+                    <span class="questions-count" id="q-count">0 question(s)</span>
+                </div>
+            </div>
+
+            <!-- Doc form (hidden by default, shown inline) -->
+            <div class="doc-form" id="doc-form">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Titre du document</label>
+                    <input type="text" class="form-input" id="doc-titre" placeholder="Ex: Document 1 - Le cycle du sommeil">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Type</label>
+                    <select class="form-select" id="doc-type">
+                        <option value="text">Texte</option>
+                        <option value="image">Image (URL)</option>
+                        <option value="video">Video (URL YouTube)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label id="doc-content-label">Contenu du texte</label>
+                    <textarea class="form-textarea" id="doc-content" placeholder="Collez le texte ici..." rows="4"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label id="doc-description-label">Description (optionnel)</label>
+                    <textarea class="form-textarea" id="doc-description" placeholder="Ajoutez une description ou un texte sous le document..." rows="2"></textarea>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-save-q" id="btn-save-doc" onclick="saveDocument()" style="flex:1;">Ajouter le document</button>
+                    <button class="btn-cancel-q" onclick="hideDocForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- QCM Single Form -->
+            <div class="q-form" id="form-qcm_single">
+                <h4>Nouvelle question QCM (choix unique)</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="qcm_single-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponses (cochez la bonne)</label>
+                    <div id="qcm_single-choices"></div>
+                    <button class="btn-add-choice" id="btn-add-choice-single" onclick="addChoiceSingle()">+ Ajouter un choix</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="qcm_single-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="qcm_single-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="qcm_single-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction (affichee a l'eleve)</label>
+                        <textarea class="form-textarea" id="qcm_single-correction" placeholder="Explication de la bonne reponse..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="qcm_single-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('qcm_single')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- QCM Multi Form -->
+            <div class="q-form" id="form-qcm_multi">
+                <h4>Nouvelle question QCM (choix multiples)</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="qcm_multi-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponses (cochez toutes les bonnes)</label>
+                    <div id="qcm_multi-choices"></div>
+                    <button class="btn-add-choice" id="btn-add-choice-multi" onclick="addChoiceMulti()">+ Ajouter un choix</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="qcm_multi-points" value="2" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="qcm_multi-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="qcm_multi-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="qcm_multi-correction" placeholder="Explication de la bonne reponse..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="qcm_multi-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('qcm_multi')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- VF Form -->
+            <div class="q-form" id="form-vf">
+                <h4>Nouvelle question Vrai / Faux</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question (affirmation)</label>
+                    <textarea class="form-textarea" id="vf-question" placeholder="Tapez une affirmation..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Bonne reponse</label>
+                    <div class="vf-toggle">
+                        <button class="vf-btn selected-true" id="vf-true" onclick="setVF(true)">Vrai</button>
+                        <button class="vf-btn" id="vf-false" onclick="setVF(false)">Faux</button>
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="vf-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="vf-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="vf-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="vf-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="vf-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('vf')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Mot Form -->
+            <div class="q-form" id="form-mot">
+                <h4>Nouvelle question Reponse courte</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="mot-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Reponse attendue (1-2 mots)</label>
+                    <input type="text" class="form-input" id="mot-reponse" placeholder="Ex: melatonine">
+                    <div class="info-text">Les accents et majuscules seront toleres automatiquement.</div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="mot-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="mot-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="mot-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="mot-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="mot-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('mot')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Nombre Form -->
+            <div class="q-form" id="form-nombre">
+                <h4>Nouvelle question Nombre</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="nombre-question" placeholder="Tapez la question..."></textarea>
+                </div>
+                <div class="form-row" style="margin-bottom:12px;">
+                    <div class="form-group">
+                        <label>Reponse attendue (nombre)</label>
+                        <input type="number" class="form-input" id="nombre-reponse" placeholder="Ex: 8" step="any">
+                    </div>
+                    <div class="form-group">
+                        <label>Tolerance (+/-)</label>
+                        <input type="number" class="form-input" id="nombre-tolerance" value="0" min="0" step="any" style="width:80px;">
+                        <div class="info-text">0 = reponse exacte requise</div>
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="nombre-points" value="1" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="nombre-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="nombre-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="nombre-correction" placeholder="Explication..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="nombre-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button class="btn-save-q" onclick="saveQuestion('nombre')">Ajouter la question</button>
+                    <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Ordonner Form -->
+            <div class="q-form" id="form-ordonner">
+                <h4>Nouvelle question Ordonner</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question (consigne)</label>
+                    <textarea class="form-textarea" id="ordonner-question" placeholder="Ex: Remets dans l'ordre les étapes de la PLS..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Éléments (dans l'ordre correct, du 1er au dernier)</label>
+                    <div id="ordonner-items"></div>
+                    <button type="button" class="btn-add-choice" onclick="addOrdonnerItem()">+ Ajouter un élément</button>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="ordonner-points" value="2" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="ordonner-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="ordonner-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="ordonner-correction" placeholder="Explication de l'ordre correct..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="ordonner-explication" placeholder="Explication detaillee..."></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button type="button" class="btn-save-q" onclick="saveQuestion('ordonner')">Ajouter la question</button>
+                    <button type="button" class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- PAD Form -->
+            <div class="q-form" id="form-pad">
+                <h4>Nouvelle question PAD</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="pad-question" placeholder="Ex: Complete le PAD suivant..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Situation professionnelle</label>
+                    <textarea class="form-textarea" id="pad-situation" rows="3" placeholder="Decris la situation de travail..."></textarea>
+                </div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Danger (bonne reponse)</label>
+                        <input type="text" class="form-input" id="pad-danger" placeholder="Ex: Lame de cutter">
+                    </div>
+                    <div class="form-group">
+                        <label>Distracteurs danger (|)</label>
+                        <input type="text" class="form-input" id="pad-dist-danger" placeholder="Sol mouille | Bruit | Chaleur">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Situation dangereuse</label>
+                        <input type="text" class="form-input" id="pad-sitdang" placeholder="Ex: Decoupe rapide sans gant">
+                    </div>
+                    <div class="form-group">
+                        <label>Distracteurs situation (|)</label>
+                        <input type="text" class="form-input" id="pad-dist-sitdang" placeholder="Nettoie le poste | Transporte un carton | Balaye">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Evenement declencheur</label>
+                        <input type="text" class="form-input" id="pad-event" placeholder="Ex: Le cutter derape">
+                    </div>
+                    <div class="form-group">
+                        <label>Distracteurs evenement (|)</label>
+                        <input type="text" class="form-input" id="pad-dist-event" placeholder="Le chef passe | Sonnerie | Pause">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Dommage</label>
+                        <input type="text" class="form-input" id="pad-dommage" placeholder="Ex: Coupure profonde">
+                    </div>
+                    <div class="form-group">
+                        <label>Distracteurs dommage (|)</label>
+                        <input type="text" class="form-input" id="pad-dist-dommage" placeholder="Mal de tete | Fatigue visuelle | Rhume">
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="pad-points" value="4" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="pad-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="pad-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="pad-correction" placeholder="Rappel de la chaine PAD correcte..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="pad-explication" placeholder="Explication de la logique Danger → Situation → Evenement → Dommage"></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button type="button" class="btn-save-q" onclick="saveQuestion('pad')">Ajouter la question</button>
+                    <button type="button" class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Prevention Form -->
+            <div class="q-form" id="form-prevention">
+                <h4>Nouvelle question Mesures de prevention</h4>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Question</label>
+                    <textarea class="form-textarea" id="prevention-question" placeholder="Ex: Choisis la meilleure mesure pour chaque niveau de prevention..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Situation professionnelle</label>
+                    <textarea class="form-textarea" id="prevention-situation" rows="3" placeholder="Decris la situation..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Danger identifie</label>
+                    <input type="text" class="form-input" id="prevention-danger" placeholder="Ex: Projection de produit corrosif">
+                </div>
+                <div style="padding:10px; border:1px dashed #334155; border-radius:10px; margin-bottom:12px;">
+                    <div class="info-text" style="margin-bottom:8px;">5 niveaux fixes : supprimer, reduire, collective, individuelle, formation</div>
+                    <div class="form-row" style="margin-bottom:8px;">
+                        <div class="form-group">
+                            <label>1. Supprimer (bonne reponse)</label>
+                            <input type="text" class="form-input" id="prevention-supprimer" placeholder="Ex: Remplacer le produit dangereux">
+                        </div>
+                        <div class="form-group">
+                            <label>Distracteurs (|)</label>
+                            <input type="text" class="form-input" id="prevention-dist-supprimer" placeholder="Lunettes | Affiche | Formation">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:8px;">
+                        <div class="form-group">
+                            <label>2. Reduire (bonne reponse)</label>
+                            <input type="text" class="form-input" id="prevention-reduire" placeholder="Ex: Diminuer concentration/quantite">
+                        </div>
+                        <div class="form-group">
+                            <label>Distracteurs (|)</label>
+                            <input type="text" class="form-input" id="prevention-dist-reduire" placeholder="Casque | Affiche | Gants">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:8px;">
+                        <div class="form-group">
+                            <label>3. Protection collective</label>
+                            <input type="text" class="form-input" id="prevention-collective" placeholder="Ex: Ecran de protection / aspiration">
+                        </div>
+                        <div class="form-group">
+                            <label>Distracteurs (|)</label>
+                            <input type="text" class="form-input" id="prevention-dist-collective" placeholder="Gants | Formation | Procede alternatif">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:8px;">
+                        <div class="form-group">
+                            <label>4. Protection individuelle (EPI)</label>
+                            <input type="text" class="form-input" id="prevention-individuelle" placeholder="Ex: Lunettes + gants adaptes">
+                        </div>
+                        <div class="form-group">
+                            <label>Distracteurs (|)</label>
+                            <input type="text" class="form-input" id="prevention-dist-individuelle" placeholder="Ventilation | Remplacement produit | Notice">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>5. Information / formation</label>
+                            <input type="text" class="form-input" id="prevention-formation" placeholder="Ex: Brief securite + consignes">
+                        </div>
+                        <div class="form-group">
+                            <label>Distracteurs (|)</label>
+                            <input type="text" class="form-input" id="prevention-dist-formation" placeholder="EPI | Capotage machine | Produit moins nocif">
+                        </div>
+                    </div>
+                </div>
+                <div class="q-extra-fields">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <div class="form-group">
+                            <label>Points</label>
+                            <input type="number" class="form-input" id="prevention-points" value="5" min="0.5" step="0.5" style="width:80px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Competence</label>
+                            <select class="form-select" id="prevention-competence"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document associe</label>
+                            <select class="form-select" id="prevention-docref"><option value="">— Aucun —</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label>Correction</label>
+                        <textarea class="form-textarea" id="prevention-correction" placeholder="Rappel de la hierarchie de prevention..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Explication pedagogique</label>
+                        <textarea class="form-textarea" id="prevention-explication" placeholder="Pourquoi agir a la source est plus efficace"></textarea>
+                    </div>
+                </div>
+                <div class="q-form-actions">
+                    <button type="button" class="btn-save-q" onclick="saveQuestion('prevention')">Ajouter la question</button>
+                    <button type="button" class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
+                </div>
+            </div>
+
+            <!-- Questions list -->
+            <div id="questions-container"></div>
+        </div>
+
+        <!-- Validation banner -->
+        <div class="validation-banner" id="validation-banner">
+            <h4>Verifications avant publication</h4>
+            <ul id="validation-list"></ul>
+        </div>
+
+        <!-- Save / Publish / Delete -->
+        <div class="bottom-actions">
+            <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
+            <button class="btn-publish-eval" id="btn-publish" onclick="publishEval()">📢 Publier</button>
+            <button class="btn-unpublish-eval" id="btn-unpublish" onclick="unpublishEval()" style="display:none;">⏸️ Depublier</button>
+            <button class="btn-save-eval" id="btn-duplicate-eval" onclick="duplicateCurrentEval()" style="display:none; background:#f59e0b; color:#000;">📋 Dupliquer</button>
+            <button class="btn-delete-eval" id="btn-delete-eval" onclick="deleteEval()" style="display:none;">🗑️ Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="data_modules.js"></script>
+<script>
+function toggleMenu(){ document.body.classList.toggle('menu-open'); }
+function closeMenu(){ document.body.classList.remove('menu-open'); }
+</script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === STATE ===
+    let currentEvalId = null;
+    let questions = [];
+    let documents = [];
+    let vfAnswer = true;
+    let allEvals = [];
+    let editingIndex = -1;
+    let editingDocIndex = -1;
+    let currentBareme = 20;
+    let currentModeEval = 'libre';
+    let currentNonNote = false;
+    let currentCorrectionDifferee = false;
+    let currentPastilleNiveau = 'moyen';
+    let insertAfterDocRef = null;       // doc context for new questions from flow buttons
+    let insertAtIndex = null;           // position in questions[] for insertion
+
+    const DOC_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#10b981', '#e11d48'];
+    const PASTILLE_LEVELS = ['facile', 'moyen', 'eleve'];
+    const PASTILLE_LABELS = { facile: 'Facile', moyen: 'Moyen', eleve: 'Eleve' };
+
+    function normalizePastilleNiveau(level, fallback) {
+        const defaultLevel = (fallback === undefined) ? 'moyen' : fallback;
+        return PASTILLE_LEVELS.includes(level) ? level : defaultLevel;
+    }
+
+    function getPastilleLabel(level, fallback) {
+        const normalized = normalizePastilleNiveau(level, fallback);
+        return normalized ? PASTILLE_LABELS[normalized] : '';
+    }
+
+    // Compute segments: groups consecutive questions by documentRef
+    function computeEditorSegments() {
+        const segments = [];
+        let currentSeg = null;
+        questions.forEach((q, i) => {
+            const ref = q.documentRef || null;
+            if (!currentSeg || currentSeg.documentRef !== ref) {
+                currentSeg = { documentRef: ref, questionIndices: [i] };
+                segments.push(currentSeg);
+            } else {
+                currentSeg.questionIndices.push(i);
+            }
+        });
+        return segments;
+    }
+
+    function buildDocColorMap() {
+        const map = {};
+        let ci = 0;
+        documents.forEach(d => {
+            map[d.id] = DOC_COLORS[ci % DOC_COLORS.length];
+            ci++;
+        });
+        return map;
+    }
+
+    // === POPULATE CLASSE DROPDOWN ===
+    // === CLASS PILLS ===
+    function renderClassPills() {
+        const container = document.getElementById('eval-classes-container');
+        container.innerHTML = '';
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+
+        // "Toutes les classes" pill
+        const allPill = document.createElement('span');
+        allPill.className = 'class-pill pill-all active';
+        allPill.dataset.classeId = '';
+        allPill.textContent = 'Toutes les classes';
+        allPill.onclick = () => toggleClassPill(allPill);
+        container.appendChild(allPill);
+
+        classes.forEach(c => {
+            const pill = document.createElement('span');
+            pill.className = 'class-pill';
+            pill.dataset.classeId = c.id;
+            pill.textContent = c.label;
+            pill.title = c.niveau.replace(/_/g, ' ');
+            pill.onclick = () => toggleClassPill(pill);
+            container.appendChild(pill);
+        });
+    }
+
+    function toggleClassPill(el) {
+        const isAllPill = el.dataset.classeId === '';
+        const container = document.getElementById('eval-classes-container');
+        const allPills = container.querySelectorAll('.class-pill');
+        const allPillEl = container.querySelector('.pill-all');
+
+        if (isAllPill) {
+            // Clicking "Toutes" -> deselect others, activate "Toutes"
+            allPills.forEach(p => p.classList.remove('active'));
+            allPillEl.classList.add('active');
+        } else {
+            // Clicking a class -> toggle it, deselect "Toutes"
+            el.classList.toggle('active');
+            allPillEl.classList.remove('active');
+
+            // If no class selected -> reactivate "Toutes"
+            const activeClasses = container.querySelectorAll('.class-pill.active:not(.pill-all)');
+            if (activeClasses.length === 0) {
+                allPillEl.classList.add('active');
+            }
+        }
+
+        // Update module dropdown
+        updateModuleFromPills();
+    }
+
+    function getSelectedClasseIds() {
+        const container = document.getElementById('eval-classes-container');
+        const allPillEl = container.querySelector('.pill-all');
+        if (allPillEl && allPillEl.classList.contains('active')) return [];
+
+        const ids = [];
+        container.querySelectorAll('.class-pill.active:not(.pill-all)').forEach(p => {
+            ids.push(p.dataset.classeId);
+        });
+        return ids;
+    }
+
+    function setClassPillsActive(ids) {
+        const container = document.getElementById('eval-classes-container');
+        const allPills = container.querySelectorAll('.class-pill');
+        allPills.forEach(p => p.classList.remove('active'));
+
+        if (!ids || ids.length === 0) {
+            container.querySelector('.pill-all').classList.add('active');
+        } else {
+            ids.forEach(id => {
+                const pill = container.querySelector('.class-pill[data-classe-id="' + id + '"]');
+                if (pill) pill.classList.add('active');
+            });
+        }
+        updateModuleFromPills();
+    }
+
+    function resetClassPills() {
+        setClassPillsActive([]);
+    }
+
+    function updateModuleFromPills() {
+        const ids = getSelectedClasseIds();
+        const modSel = document.getElementById('eval-module');
+        modSel.innerHTML = '';
+
+        if (ids.length === 0) {
+            // "Toutes les classes" or none -> module disabled with "Aucun module" option
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
+            populateCompetenceDropdowns(null);
+            return;
+        }
+
+        if (ids.length === 1) {
+            // Single class -> load its modules (revision-aware for Bac Pro)
+            const classeId = ids[0];
+            modSel.disabled = false;
+            modSel.innerHTML = '<option value="">— Aucun module —</option>';
+
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const firstClass = classesInGroup[0];
+
+            // Use revision-aware function (shows all cursus years for Bac Pro)
+            const groups = window.getModulesForRevision
+                ? window.getModulesForRevision(firstClass)
+                : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+
+            const isMultiYear = groups.length > 1;
+
+            groups.forEach(group => {
+                let currentTheme = '';
+                group.modules.forEach(m => {
+                    if (m.theme !== currentTheme) {
+                        currentTheme = m.theme;
+                        const optGroup = document.createElement('optgroup');
+                        optGroup.label = isMultiYear
+                            ? group.niveauLabel + ' — Theme ' + m.theme
+                            : 'Theme ' + m.theme;
+                        modSel.appendChild(optGroup);
+                    }
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.id + ' — ' + m.titre;
+                    const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                    if (lastGroup) lastGroup.appendChild(opt);
+                    else modSel.appendChild(opt);
+                });
+            });
+
+            populateCompetenceDropdowns(classeId);
+        } else {
+            // Multiple classes -> check if they share the same curriculum
+            const niveaux = new Set();
+            ids.forEach(cid => {
+                const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(cid) : [cid];
+                const niv = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
+                if (niv) niveaux.add(niv);
+            });
+
+            // All same niveau, OR all Bac Pro (same programme)
+            const allBacPro = [...niveaux].every(n => n.startsWith('BAC_PRO'));
+            const allCap = [...niveaux].every(n => n === 'CAP');
+            const allSameNiveau = niveaux.size === 1;
+
+            if (allSameNiveau || allBacPro || allCap) {
+                // Shared curriculum -> show modules using the highest level class
+                modSel.disabled = false;
+                modSel.innerHTML = '<option value="">— Aucun module —</option>';
+
+                // Pick representative class (highest year for Bac Pro)
+                let refClasseId = ids[0];
+                if (allBacPro) {
+                    const order = { 'BAC_PRO_TERM': 3, 'BAC_PRO_1ERE': 2, 'BAC_PRO_2NDE': 1 };
+                    ids.forEach(cid => {
+                        const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(cid) : [cid];
+                        const niv = window.getNiveauClasse(cig[0]);
+                        const refNiv = window.getNiveauClasse(
+                            (window.getClassesFromGroupe ? window.getClassesFromGroupe(refClasseId) : [refClasseId])[0]
+                        );
+                        if ((order[niv] || 0) > (order[refNiv] || 0)) refClasseId = cid;
+                    });
+                }
+
+                const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(refClasseId) : [refClasseId];
+                const firstClass = classesInGroup[0];
+
+                const groups = window.getModulesForRevision
+                    ? window.getModulesForRevision(firstClass)
+                    : [{ niveauLabel: '', modules: window.getModulesForClasse ? window.getModulesForClasse(firstClass) : [] }];
+
+                const isMultiYear = groups.length > 1;
+
+                groups.forEach(group => {
+                    let currentTheme = '';
+                    group.modules.forEach(m => {
+                        if (m.theme !== currentTheme) {
+                            currentTheme = m.theme;
+                            const optGroup = document.createElement('optgroup');
+                            optGroup.label = isMultiYear
+                                ? group.niveauLabel + ' — Theme ' + m.theme
+                                : 'Theme ' + m.theme;
+                            modSel.appendChild(optGroup);
+                        }
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.textContent = m.id + ' — ' + m.titre;
+                        const lastGroup = modSel.querySelector('optgroup:last-of-type');
+                        if (lastGroup) lastGroup.appendChild(opt);
+                        else modSel.appendChild(opt);
+                    });
+                });
+            } else {
+                // Mix CAP + Bac Pro -> cannot determine common modules
+                modSel.disabled = true;
+                modSel.innerHTML = '<option value="">— Programmes differents (pas de module commun) —</option>';
+            }
+            // Use first class for competences
+            populateCompetenceDropdowns(ids[0]);
+        }
+    }
+
+    renderClassPills();
+
+    // === COMPETENCE DROPDOWNS ===
+    function populateCompetenceDropdowns(classeId) {
+        let comps = [];
+        if (classeId && window.getCompetencesForClasse) {
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            comps = window.getCompetencesForClasse(classesInGroup[0]) || [];
+        }
+        if (comps.length === 0 && window.COMPETENCES_PSE) {
+            // Default to CAP competences
+            comps = window.COMPETENCES_PSE['CAP'] || [];
+        }
+
+        const selectors = document.querySelectorAll('[id$="-competence"]');
+        selectors.forEach(sel => {
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">— Choisir —</option>';
+            comps.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.id + ' — ' + c.titre;
+                sel.appendChild(opt);
+            });
+            if (currentVal) sel.value = currentVal;
+        });
+    }
+    // Initial population with default comps
+    populateCompetenceDropdowns(null);
+
+    // === DOCUMENT REF DROPDOWNS ===
+    function updateDocRefDropdowns() {
+        const selectors = document.querySelectorAll('[id$="-docref"]');
+        selectors.forEach(sel => {
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">— Aucun —</option>';
+            documents.forEach((d, i) => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.titre || ('Document ' + (i + 1));
+                sel.appendChild(opt);
+            });
+            if (currentVal) sel.value = currentVal;
+        });
+    }
+
+    // === BAREME TOGGLE ===
+    window.setBareme = function(val) {
+        currentBareme = val;
+        document.getElementById('bareme-10').className = 'bareme-btn' + (val === 10 ? ' active' : '');
+        document.getElementById('bareme-20').className = 'bareme-btn' + (val === 20 ? ' active' : '');
+        updatePointsTotal();
+    };
+
+    // === MODE TOGGLE ===
+    window.setModeEval = function(mode) {
+        currentModeEval = mode;
+        document.getElementById('mode-libre').className = 'mode-btn' + (mode === 'libre' ? ' active' : '');
+        document.getElementById('mode-sync').className = 'mode-btn' + (mode === 'synchronise' ? ' active' : '');
+    };
+
+    // === NOTATION TOGGLE (Noté / Non noté) ===
+    window.setNonNote = function(val) {
+        currentNonNote = val;
+        document.getElementById('note-oui').className = 'note-btn' + (!val ? ' active' : '');
+        document.getElementById('note-non').className = 'note-btn' + (val ? ' active' : '');
+    };
+
+    // === CORRECTION TOGGLE (Immédiate / Différée) ===
+    window.setCorrectionDifferee = function(val) {
+        currentCorrectionDifferee = val;
+        document.getElementById('corr-immediate').className = 'corr-btn' + (!val ? ' active' : '');
+        document.getElementById('corr-differee').className = 'corr-btn' + (val ? ' active' : '');
+    };
+
+    // === PASTILLE NIVEAU ===
+    window.setPastilleNiveau = function(level) {
+        currentPastilleNiveau = normalizePastilleNiveau(level);
+        ['facile', 'moyen', 'eleve'].forEach(lvl => {
+            const btn = document.getElementById('pastille-' + lvl);
+            if (btn) btn.className = 'pastille-btn' + (lvl === currentPastilleNiveau ? ' active-' + lvl : '');
+        });
+    };
+    setPastilleNiveau(currentPastilleNiveau);
+
+    // === DOCUMENTS MANAGEMENT ===
+    window.showDocForm = function() {
+        editingDocIndex = -1;
+        document.getElementById('doc-form').style.display = 'block';
+        document.getElementById('doc-titre').value = '';
+        document.getElementById('doc-type').value = 'text';
+        document.getElementById('doc-content').value = '';
+        document.getElementById('doc-description').value = '';
+        document.getElementById('btn-save-doc').textContent = 'Ajouter le document';
+        updateDocContentLabel();
+        document.getElementById('doc-titre').focus();
+    };
+
+    window.hideDocForm = function() {
+        editingDocIndex = -1;
+        document.getElementById('doc-form').style.display = 'none';
+    };
+
+    window.editDocument = function(index) {
+        const d = documents[index];
+        editingDocIndex = index;
+        document.getElementById('doc-form').style.display = 'block';
+        document.getElementById('doc-titre').value = d.titre;
+        document.getElementById('doc-type').value = d.type;
+        updateDocContentLabel();
+        document.getElementById('doc-content').value = d.content;
+        document.getElementById('doc-description').value = d.description || '';
+        document.getElementById('btn-save-doc').textContent = 'Modifier le document';
+        document.getElementById('doc-titre').focus();
+    };
+
+    document.getElementById('doc-type').addEventListener('change', updateDocContentLabel);
+    function updateDocContentLabel() {
+        const type = document.getElementById('doc-type').value;
+        if (type === 'video') {
+            document.getElementById('doc-content-label').textContent = 'URL YouTube';
+            document.getElementById('doc-content').placeholder = 'https://www.youtube.com/watch?v=...';
+        } else if (type === 'image') {
+            document.getElementById('doc-content-label').textContent = 'URL de l\'image';
+            document.getElementById('doc-content').placeholder = 'https://...';
+        } else {
+            document.getElementById('doc-content-label').textContent = 'Contenu du texte';
+            document.getElementById('doc-content').placeholder = 'Collez le texte ici...';
+        }
+        const descLabel = document.getElementById('doc-description-label');
+        if (descLabel) {
+            descLabel.textContent = type === 'image' ? 'Texte sous l\'image (optionnel)' : (type === 'video' ? 'Description de la video (optionnel)' : 'Description supplementaire (optionnel)');
+        }
+    }
+
+    window.saveDocument = function() {
+        const titre = document.getElementById('doc-titre').value.trim();
+        const type = document.getElementById('doc-type').value;
+        const content = document.getElementById('doc-content').value.trim();
+        const description = document.getElementById('doc-description').value.trim();
+        if (!titre) { alert('Donne un titre au document !'); return; }
+        if (!content) { alert('Ajoute le contenu !'); return; }
+
+        if (editingDocIndex >= 0 && editingDocIndex < documents.length) {
+            // Mode edition : mettre a jour le document existant (meme ID)
+            documents[editingDocIndex].titre = titre;
+            documents[editingDocIndex].type = type;
+            documents[editingDocIndex].content = content;
+            documents[editingDocIndex].description = description;
+        } else {
+            // Mode ajout : creer un nouveau document (toujours en fin de liste)
+            const newDoc = {
+                id: 'doc_' + Date.now().toString(36),
+                type, titre, content, description
+            };
+            documents.push(newDoc);
+            insertAfterDocRef = newDoc.id;
+        }
+        editingDocIndex = -1;
+        updateDocRefDropdowns();
+        hideDocForm();
+        renderFlow();
+    };
+
+    window.deleteDocument = function(index) {
+        if (!confirm('Supprimer ce document ? Les questions liees deviendront independantes.')) return;
+        const docId = documents[index].id;
+        documents.splice(index, 1);
+        // Remove references from questions
+        questions.forEach(q => {
+            if (q.documentRef === docId) q.documentRef = null;
+        });
+        updateDocRefDropdowns();
+        renderFlow();
+    };
+
+    // renderFlow() — unified rendering of documents + questions in a linear flow
+    function renderFlow() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        document.getElementById('q-count').textContent = questions.length + ' question(s)';
+
+        const segments = computeEditorSegments();
+        const colorMap = buildDocColorMap();
+        const typeLabels = {
+            qcm_single: 'QCM',
+            qcm_multi: 'QCM Multi',
+            vf: 'V/F',
+            mot: 'Mot',
+            nombre: 'Nombre',
+            ordonner: 'Ordonner',
+            pad: 'PAD',
+            prevention: 'Prevention'
+        };
+        const qTypes = [
+            { t: 'qcm_single', label: '+ QCM' },
+            { t: 'qcm_multi', label: '+ QCM Multi' },
+            { t: 'vf', label: '+ V/F' },
+            { t: 'mot', label: '+ Mot' },
+            { t: 'nombre', label: '+ Nombre' },
+            { t: 'ordonner', label: '+ Ordonner' },
+            { t: 'pad', label: '+ PAD' },
+            { t: 'prevention', label: '+ Prevention' }
+        ];
+        const referencedDocIds = new Set();
+        questions.forEach(q => { if (q.documentRef) referencedDocIds.add(q.documentRef); });
+
+        // Render each segment
+        segments.forEach((seg, si) => {
+            const docRef = seg.documentRef;
+            const docObj = docRef ? documents.find(d => d.id === docRef) : null;
+            const color = docObj ? (colorMap[docObj.id] || '#64748b') : '#64748b';
+
+            if (docObj) {
+                // Document header
+                container.appendChild(buildDocHeader(docObj, color));
+            } else if (!docRef && si > 0) {
+                // Independent questions label
+                const label = document.createElement('div');
+                label.className = 'flow-section-label';
+                label.textContent = 'Questions independantes';
+                container.appendChild(label);
+            }
+
+            // Render question cards for this segment
+            seg.questionIndices.forEach(qi => {
+                const q = questions[qi];
+                const card = buildQuestionCard(q, qi, typeLabels, color, docRef);
+                container.appendChild(card);
+            });
+
+            // Contextual add-question buttons ONLY for document-linked segments
+            if (docRef) {
+                const lastQIndex = seg.questionIndices[seg.questionIndices.length - 1];
+                const addBtnsRow = document.createElement('div');
+                addBtnsRow.className = 'flow-add-btns';
+                qTypes.forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.className = 'add-btn';
+                    btn.textContent = item.label;
+                    btn.onclick = () => showAddForm(item.t, docRef, lastQIndex + 1);
+                    addBtnsRow.appendChild(btn);
+                });
+                container.appendChild(addBtnsRow);
+            }
+        });
+
+        // Orphan documents: show as normal doc headers with add-question buttons (in-flow, not as errors)
+        const orphanDocs = documents.filter(d => !referencedDocIds.has(d.id));
+        orphanDocs.forEach(d => {
+            const color = colorMap[d.id] || '#64748b';
+            container.appendChild(buildDocHeader(d, color));
+
+            // Add-question buttons linked to this orphan document
+            const addBtnsRow = document.createElement('div');
+            addBtnsRow.className = 'flow-add-btns';
+            qTypes.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'add-btn';
+                btn.textContent = item.label;
+                btn.onclick = () => showAddForm(item.t, d.id, questions.length);
+                addBtnsRow.appendChild(btn);
+            });
+            container.appendChild(addBtnsRow);
+        });
+
+        // === BOTTOM ADD SECTION (always present) ===
+        const bottomSection = document.createElement('div');
+        bottomSection.style.cssText = 'margin-top: 20px; padding-top: 16px; border-top: 2px dashed #334155;';
+
+        // "Add document" button
+        const addDocBtn = document.createElement('button');
+        addDocBtn.className = 'add-btn';
+        addDocBtn.style.cssText = 'width: 100%; margin-bottom: 10px; padding: 12px; font-size: 0.85rem; border-color: #7c3aed; color: #a78bfa;';
+        addDocBtn.textContent = '+ Ajouter un document';
+        addDocBtn.onclick = () => showDocForm();
+        bottomSection.appendChild(addDocBtn);
+
+        // "Add question" buttons row (independent questions at end)
+        const addQRow = document.createElement('div');
+        addQRow.className = 'flow-add-btns';
+        qTypes.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'add-btn';
+            btn.textContent = item.label;
+            btn.onclick = () => showAddForm(item.t, null, null);
+            addQRow.appendChild(btn);
+        });
+        bottomSection.appendChild(addQRow);
+        container.appendChild(bottomSection);
+
+        updatePointsTotal();
+    }
+
+    // Helper: build a document header element for the flow
+    function buildDocHeader(docObj, color) {
+        const docIndex = documents.indexOf(docObj);
+        const header = document.createElement('div');
+        header.className = 'flow-doc-header';
+        header.style.setProperty('--seg-color', color);
+        const typeIcon = docObj.type === 'image' ? '🖼️' : (docObj.type === 'video' ? '🎬' : '📄');
+        const descPreview = docObj.description ? ' — ' + escHtml(docObj.description.substring(0, 40)) + (docObj.description.length > 40 ? '...' : '') : '';
+        header.innerHTML = '<div class="flow-doc-info">' +
+            '<span class="flow-doc-icon">' + typeIcon + '</span>' +
+            '<span class="flow-doc-title">' + escHtml(docObj.titre) + '</span>' +
+            '<span class="flow-doc-type">(' + docObj.type + descPreview + ')</span>' +
+            '</div>' +
+            '<div class="flow-doc-actions">' +
+            '<button onclick="editDocument(' + docIndex + ')" title="Modifier">✏️</button>' +
+            '<button class="btn-del" onclick="deleteDocument(' + docIndex + ')" title="Supprimer">&times;</button>' +
+            '</div>';
+        return header;
+    }
+
+    function escHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function buildQuestionCard(q, i, typeLabels, borderColor, docRef) {
+        const card = document.createElement('div');
+        card.className = 'q-card';
+        card.dataset.qIndex = i;
+        if (docRef) {
+            card.style.borderLeftColor = borderColor;
+        }
+
+        const typeLabel = typeLabels[q.type] || q.type;
+        const typeClass = 'type-' + q.type;
+
+        // Meta badges
+        let metaHtml = '<div class="q-card-meta">';
+        if (q.points) metaHtml += '<span class="qm-pts">' + q.points + ' pt' + (q.points > 1 ? 's' : '') + '</span>';
+        if (q.competence) metaHtml += '<span class="qm-comp">' + q.competence + '</span>';
+        if (q.documentRef) {
+            const docObj = documents.find(d => d.id === q.documentRef);
+            if (docObj) metaHtml += '<span class="qm-doc">' + escHtml(docObj.titre) + '</span>';
+        }
+        metaHtml += '</div>';
+
+        // Answer display
+        let body = '';
+        if (q.type === 'qcm_single') {
+            body = '<div class="q-card-choices">';
+            (q.choices || []).forEach((c, ci) => {
+                body += '<span class="q-card-choice' + (ci === q.correct ? ' correct' : '') + '">' + escHtml(c) + '</span>';
+            });
+            body += '</div>';
+        } else if (q.type === 'qcm_multi') {
+            body = '<div class="q-card-choices">';
+            (q.choices || []).forEach((c, ci) => {
+                body += '<span class="q-card-choice' + ((q.correct || []).includes(ci) ? ' correct' : '') + '">' + escHtml(c) + '</span>';
+            });
+            body += '</div>';
+        } else if (q.type === 'vf') {
+            body = '<div class="q-card-answer">' + (q.correct ? 'Vrai' : 'Faux') + '</div>';
+        } else if (q.type === 'mot') {
+            body = '<div class="q-card-answer">Reponse : ' + escHtml(q.correct || q.reponse || '') + '</div>';
+        } else if (q.type === 'nombre') {
+            body = '<div class="q-card-answer">Reponse : ' + q.correct + (q.tolerance ? ' (+/- ' + q.tolerance + ')' : '') + '</div>';
+        } else if (q.type === 'ordonner') {
+            body = '<div class="q-card-choices">';
+            (q.items || []).forEach((item, ii) => {
+                body += '<span class="q-card-choice">' + (ii + 1) + '. ' + escHtml(item) + '</span>';
+            });
+            body += '</div>';
+        } else if (q.type === 'pad') {
+            body = '<div class="q-card-answer">' +
+                '<strong>Situation:</strong> ' + escHtml((q.situation || '').substring(0, 120)) +
+                ((q.situation || '').length > 120 ? '...' : '') +
+                '<br><strong>Chaine:</strong> ' +
+                escHtml(q.danger || '') + ' → ' +
+                escHtml(q.situation_dangereuse || '') + ' → ' +
+                escHtml(q.evenement_declencheur || '') + ' → ' +
+                escHtml(q.dommage || '') +
+                '</div>';
+        } else if (q.type === 'prevention') {
+            const niveaux = ensurePreventionLevels(q.niveaux);
+            body = '<div class="q-card-answer"><strong>Danger:</strong> ' + escHtml(q.danger || '') + '</div>';
+            body += '<div class="q-card-choices">';
+            niveaux.forEach((n, ni) => {
+                body += '<span class="q-card-choice">' + (ni + 1) + '. ' + escHtml(n.label || n.niveau || '') + ' → ' + escHtml(n.bonne_reponse || '') + '</span>';
+            });
+            body += '</div>';
+        }
+
+        if (q.correction) {
+            body += '<div class="q-card-correction">' + escHtml(q.correction.substring(0, 80)) + (q.correction.length > 80 ? '...' : '') + '</div>';
+        }
+
+        card.innerHTML = '<div class="q-card-header">' +
+            '<div><span class="q-card-num">Q' + (i + 1) + '</span><span class="q-card-type-badge ' + typeClass + '">' + typeLabel + '</span></div>' +
+            '<div class="q-card-actions">' +
+                '<button class="btn-edit" onclick="editQuestion(' + i + ')" title="Modifier">✏️</button>' +
+                '<button onclick="moveQuestion(' + i + ', -1)" title="Monter"' + (i === 0 ? ' disabled style="opacity:0.3"' : '') + '>&#9650;</button>' +
+                '<button onclick="moveQuestion(' + i + ', 1)" title="Descendre"' + (i === questions.length - 1 ? ' disabled style="opacity:0.3"' : '') + '>&#9660;</button>' +
+                '<button class="btn-del" onclick="deleteQuestion(' + i + ')" title="Supprimer">&times;</button>' +
+            '</div></div>' +
+            metaHtml +
+            '<div class="q-card-question">' + escHtml(q.question) + '</div>' +
+            body;
+
+        return card;
+    }
+
+    // === LOAD EVAL LIST (real-time) ===
+    let pendingLoadId = new URLSearchParams(window.location.search).get('id');
+    const qBanque = query(collection(db, "eval_banque_v2"), orderBy("updatedAt", "desc"));
+    onSnapshot(qBanque, (snap) => {
+        allEvals = [];
+        snap.forEach(d => {
+            allEvals.push({ id: d.id, ...d.data() });
+        });
+        renderEvalList();
+        // Auto-load eval from URL param ?id=xxx
+        if (pendingLoadId) {
+            const ev = allEvals.find(e => e.id === pendingLoadId);
+            if (ev) loadEval(pendingLoadId);
+            pendingLoadId = null;
+        }
+    });
+
+    function renderEvalList() {
+        const container = document.getElementById('eval-list');
+        container.innerHTML = '';
+        document.getElementById('eval-count').textContent = allEvals.length;
+
+        allEvals.forEach(ev => {
+            const div = document.createElement('div');
+            div.className = 'eval-list-item' + (ev.id === currentEvalId ? ' active' : '');
+            div.onclick = (e) => {
+                if (e.target.classList.contains('ei-del')) return;
+                loadEval(ev.id);
+            };
+
+            const pubBadge = ev.publie
+                ? '<span class="ei-badge badge-pub">🟢 Publie</span>'
+                : '<span class="ei-badge badge-draft">🔴 Brouillon</span>';
+            const pastilleNiveau = normalizePastilleNiveau(ev.pastilleNiveau, null);
+            const pastilleBadge = pastilleNiveau
+                ? ('<span class="ei-badge badge-pastille-' + pastilleNiveau + '">⬤ ' + getPastilleLabel(pastilleNiveau) + '</span>')
+                : '';
+            const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
+            const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
+            const classIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+            const classInfo = classIds.length > 0 ? classIds.join(', ') : 'Toutes';
+
+            div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + pubBadge + pastilleBadge + qCountBadge + baremeBadge + ' ' + classInfo + '</div>' +
+                '<button class="ei-del" style="right:32px;" onclick="duplicateEval(\'' + ev.id + '\', event)" title="Dupliquer">📋</button>' +
+                '<button class="ei-del" onclick="deleteEvalFromSidebar(\'' + ev.id + '\', event)" title="Supprimer">🗑️</button>';
+            container.appendChild(div);
+        });
+    }
+
+    // === DELETE EVAL FROM SIDEBAR ===
+    window.deleteEvalFromSidebar = async function(evalId, event) {
+        event.stopPropagation();
+        if (!confirm("Supprimer definitivement cette evaluation ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "eval_banque_v2", evalId));
+            if (currentEvalId === evalId) {
+                currentEvalId = null;
+                questions = [];
+                documents = [];
+                editingIndex = -1;
+                document.getElementById('main-editor').style.display = 'none';
+                document.getElementById('main-empty').style.display = 'flex';
+            }
+            showToast('Evaluation supprimee.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === DUPLICATE EVAL ===
+    window.duplicateEval = async function(evalId, event) {
+        if (event && event.stopPropagation) event.stopPropagation();
+        const ev = allEvals.find(e => e.id === evalId);
+        if (!ev) return;
+
+        if (!confirm('Dupliquer "' + (ev.titre || 'Sans titre') + '" ?\nLa copie sera en brouillon, sans classe assignee.')) return;
+
+        const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+        const newEvalData = {
+            titre: (ev.titre || 'Sans titre') + ' (copie)',
+            classeId: null,
+            moduleId: null,
+            niveau: null,
+            bareme: ev.bareme || 20,
+            timer: ev.timer || 0,
+            mode: ev.mode || 'libre',
+            nonNote: ev.nonNote || false,
+            correctionDifferee: ev.correctionDifferee || false,
+            pastilleNiveau: normalizePastilleNiveau(ev.pastilleNiveau, 'moyen'),
+            documents: ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [],
+            questions: ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [],
+            publie: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            await setDoc(doc(db, "eval_banque_v2", newId), newEvalData);
+            showToast('Evaluation dupliquee ! Choisis la classe et publie.');
+            // onSnapshot will update allEvals, then load the new eval
+            setTimeout(() => loadEval(newId), 500);
+        } catch(e) {
+            console.error("Erreur duplication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.duplicateCurrentEval = function() {
+        if (!currentEvalId) return;
+        duplicateEval(currentEvalId, null);
+    };
+
+    // === NEW EVAL ===
+    window.newEval = function() {
+        currentEvalId = null;
+        questions = [];
+        documents = [];
+        editingIndex = -1;
+        currentBareme = 20;
+        currentModeEval = 'libre';
+        currentNonNote = false;
+        currentCorrectionDifferee = false;
+        currentPastilleNiveau = 'moyen';
+
+        document.getElementById('eval-titre').value = '';
+        resetClassPills();
+        document.getElementById('eval-module').innerHTML = '<option value="">— Aucun module —</option>';
+        document.getElementById('eval-module').disabled = false;
+        document.getElementById('eval-timer').value = '0';
+        setBareme(20);
+        setModeEval('libre');
+        setNonNote(false);
+        setCorrectionDifferee(false);
+        setPastilleNiveau('moyen');
+        document.getElementById('btn-delete-eval').style.display = 'none';
+        document.getElementById('btn-duplicate-eval').style.display = 'none';
+        document.getElementById('validation-banner').style.display = 'none';
+        updatePublishButtons(false);
+        hideAddForm();
+        hideDocForm();
+        updateDocRefDropdowns();
+        renderFlow();
+        showEditor();
+        populateCompetenceDropdowns(null);
+        if (window.innerWidth <= 768) closeMenu();
+
+        document.querySelectorAll('.eval-list-item').forEach(i => i.classList.remove('active'));
+    };
+
+    // === LOAD EVAL ===
+    window.loadEval = function(evalId) {
+        const ev = allEvals.find(e => e.id === evalId);
+        if (!ev) return;
+
+        currentEvalId = evalId;
+        questions = ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [];
+        documents = ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [];
+        currentBareme = ev.bareme || 20;
+        currentModeEval = ev.mode || 'libre';
+
+        document.getElementById('eval-titre').value = ev.titre || '';
+        const loadedClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+        setClassPillsActive(loadedClasseIds);
+        setTimeout(() => {
+            document.getElementById('eval-module').value = ev.moduleId || '';
+        }, 100);
+
+        document.getElementById('eval-timer').value = ev.timer || 0;
+        setBareme(currentBareme);
+        setModeEval(currentModeEval);
+
+        currentNonNote = ev.nonNote || false;
+        currentCorrectionDifferee = ev.correctionDifferee || false;
+        currentPastilleNiveau = normalizePastilleNiveau(ev.pastilleNiveau, 'moyen');
+        setNonNote(currentNonNote);
+        setCorrectionDifferee(currentCorrectionDifferee);
+        setPastilleNiveau(currentPastilleNiveau);
+
+        document.getElementById('btn-delete-eval').style.display = 'block';
+        document.getElementById('btn-duplicate-eval').style.display = 'block';
+        document.getElementById('validation-banner').style.display = 'none';
+        updatePublishButtons(ev.publie === true);
+        hideAddForm();
+        hideDocForm();
+        updateDocRefDropdowns();
+        renderFlow();
+        showEditor();
+        renderEvalList();
+        if (window.innerWidth <= 768) closeMenu();
+    };
+
+    // === SHOW EDITOR ===
+    function showEditor() {
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+    }
+
+    // === QCM SINGLE CHOICES ===
+    function resetChoicesSingle() {
+        const container = document.getElementById('qcm_single-choices');
+        container.innerHTML = '';
+        for (let i = 0; i < 2; i++) addChoiceRowSingle(container, i);
+        updateRemoveButtonsSingle();
+        document.getElementById('btn-add-choice-single').style.display = 'block';
+    }
+
+    function addChoiceRowSingle(container, index) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const row = document.createElement('div');
+        row.className = 'radio-row';
+        row.innerHTML = '<input type="radio" name="qcm_single-correct" value="' + index + '"' + (index === 0 ? ' checked' : '') + '>' +
+            '<input type="text" class="form-input" placeholder="Reponse ' + letters[index] + '" data-choice="' + index + '">' +
+            '<button class="remove-choice" onclick="removeChoiceSingle(this)" title="Supprimer">&times;</button>';
+        container.appendChild(row);
+    }
+
+    window.addChoiceSingle = function() {
+        const container = document.getElementById('qcm_single-choices');
+        if (container.children.length >= 6) return;
+        addChoiceRowSingle(container, container.children.length);
+        updateRemoveButtonsSingle();
+        if (container.children.length >= 6) document.getElementById('btn-add-choice-single').style.display = 'none';
+    };
+
+    window.removeChoiceSingle = function(btn) {
+        const container = document.getElementById('qcm_single-choices');
+        if (container.children.length <= 2) return;
+        btn.closest('.radio-row').remove();
+        renumberRows(container, 'radio');
+        updateRemoveButtonsSingle();
+        document.getElementById('btn-add-choice-single').style.display = container.children.length < 6 ? 'block' : 'none';
+    };
+
+    function updateRemoveButtonsSingle() {
+        const container = document.getElementById('qcm_single-choices');
+        const rows = container.querySelectorAll('.radio-row');
+        rows.forEach(r => { r.querySelector('.remove-choice').style.display = rows.length > 2 ? 'block' : 'none'; });
+    }
+
+    // === QCM MULTI CHOICES ===
+    function resetChoicesMulti() {
+        const container = document.getElementById('qcm_multi-choices');
+        container.innerHTML = '';
+        for (let i = 0; i < 2; i++) addChoiceRowMulti(container, i);
+        updateRemoveButtonsMulti();
+        document.getElementById('btn-add-choice-multi').style.display = 'block';
+    }
+
+    function addChoiceRowMulti(container, index) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const row = document.createElement('div');
+        row.className = 'check-row';
+        row.innerHTML = '<input type="checkbox" name="qcm_multi-correct" value="' + index + '">' +
+            '<input type="text" class="form-input" placeholder="Reponse ' + letters[index] + '" data-choice="' + index + '">' +
+            '<button class="remove-choice" onclick="removeChoiceMulti(this)" title="Supprimer">&times;</button>';
+        container.appendChild(row);
+    }
+
+    window.addChoiceMulti = function() {
+        const container = document.getElementById('qcm_multi-choices');
+        if (container.children.length >= 6) return;
+        addChoiceRowMulti(container, container.children.length);
+        updateRemoveButtonsMulti();
+        if (container.children.length >= 6) document.getElementById('btn-add-choice-multi').style.display = 'none';
+    };
+
+    window.removeChoiceMulti = function(btn) {
+        const container = document.getElementById('qcm_multi-choices');
+        if (container.children.length <= 2) return;
+        btn.closest('.check-row').remove();
+        renumberRows(container, 'checkbox');
+        updateRemoveButtonsMulti();
+        document.getElementById('btn-add-choice-multi').style.display = container.children.length < 6 ? 'block' : 'none';
+    };
+
+    function updateRemoveButtonsMulti() {
+        const container = document.getElementById('qcm_multi-choices');
+        const rows = container.querySelectorAll('.check-row');
+        rows.forEach(r => { r.querySelector('.remove-choice').style.display = rows.length > 2 ? 'block' : 'none'; });
+    }
+
+    // === RENUMBER ROWS (shared) ===
+    function renumberRows(container, inputType) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const rows = container.children;
+        for (let i = 0; i < rows.length; i++) {
+            const inp = rows[i].querySelector('input[type="' + inputType + '"]');
+            if (inp) inp.value = i;
+            const text = rows[i].querySelector('input[type="text"]');
+            if (text) { text.dataset.choice = i; text.placeholder = 'Reponse ' + letters[i]; }
+        }
+        if (inputType === 'radio' && !container.querySelector('input[type="radio"]:checked')) {
+            const first = container.querySelector('input[type="radio"]');
+            if (first) first.checked = true;
+        }
+    }
+
+    // === ORDONNER ===
+    window.addOrdonnerItem = function(text) {
+        const container = document.getElementById('ordonner-items');
+        const idx = container.children.length;
+        const row = document.createElement('div');
+        row.className = 'ord-item-row';
+        row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        row.innerHTML = '<span class="ord-row-num" style="min-width:24px; font-weight:600; color:#94a3b8;">' + (idx + 1) + '.</span>' +
+            '<input type="text" class="form-input" placeholder="Élément ' + (idx + 1) + '" value="' + escHtml(text || '') + '" style="flex:1;">' +
+            '<button type="button" class="remove-choice" onclick="removeOrdonnerItem(this)" title="Supprimer" style="display:' + (container.children.length >= 3 ? 'block' : 'none') + ';">&times;</button>';
+        container.appendChild(row);
+        updateOrdonnerRemoveButtons();
+    };
+
+    window.removeOrdonnerItem = function(btn) {
+        const container = document.getElementById('ordonner-items');
+        if (container.children.length <= 3) return;
+        btn.closest('.ord-item-row').remove();
+        // Renumber
+        Array.from(container.children).forEach((row, i) => {
+            row.querySelector('.ord-row-num').textContent = (i + 1) + '.';
+            row.querySelector('input[type="text"]').placeholder = 'Élément ' + (i + 1);
+        });
+        updateOrdonnerRemoveButtons();
+    };
+
+    function updateOrdonnerRemoveButtons() {
+        const container = document.getElementById('ordonner-items');
+        const rows = container.querySelectorAll('.ord-item-row');
+        rows.forEach(r => { const btn = r.querySelector('.remove-choice'); if (btn) btn.style.display = rows.length > 3 ? 'block' : 'none'; });
+    }
+
+    function resetOrdonnerItems() {
+        const container = document.getElementById('ordonner-items');
+        container.innerHTML = '';
+        for (let i = 0; i < 3; i++) addOrdonnerItem('');
+    }
+
+    function splitDistractors(raw) {
+        return String(raw || '')
+            .split('|')
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    function toPipeList(arr) {
+        return Array.isArray(arr) ? arr.join(' | ') : '';
+    }
+
+    function getPrevLevelMeta(niveau) {
+        const labels = {
+            supprimer: 'Supprimer le risque',
+            reduire: 'Reduire le risque a la source',
+            collective: 'Protection collective',
+            individuelle: 'Protection individuelle (EPI)',
+            formation: 'Information et formation'
+        };
+        return { niveau: niveau, label: labels[niveau] || niveau };
+    }
+
+    function ensurePreventionLevels(levels) {
+        const expected = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
+        const source = Array.isArray(levels) ? levels : [];
+        return expected.map(id => {
+            const found = source.find(n => n && n.niveau === id) || {};
+            const meta = getPrevLevelMeta(id);
+            const distracteurs = Array.isArray(found.distracteurs)
+                ? found.distracteurs
+                : splitDistractors(found.distracteurs);
+            return {
+                niveau: id,
+                label: found.label || meta.label,
+                bonne_reponse: found.bonne_reponse || '',
+                distracteurs: distracteurs
+            };
+        });
+    }
+
+    function setPrevField(niveau, niveaux) {
+        const n = (niveaux || []).find(x => x.niveau === niveau) || {};
+        const good = document.getElementById('prevention-' + niveau);
+        const dist = document.getElementById('prevention-dist-' + niveau);
+        if (good) good.value = n.bonne_reponse || '';
+        if (dist) dist.value = toPipeList(n.distracteurs);
+    }
+
+    function buildPreventionLevelsFromForm() {
+        const expected = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
+        return expected.map(id => {
+            const meta = getPrevLevelMeta(id);
+            const good = (document.getElementById('prevention-' + id).value || '').trim();
+            const dist = splitDistractors(document.getElementById('prevention-dist-' + id).value || '');
+            return {
+                niveau: id,
+                label: meta.label,
+                bonne_reponse: good,
+                distracteurs: dist
+            };
+        });
+    }
+
+    // === VF ===
+    window.setVF = function(val) {
+        vfAnswer = val;
+        document.getElementById('vf-true').className = 'vf-btn' + (vfAnswer ? ' selected-true' : '');
+        document.getElementById('vf-false').className = 'vf-btn' + (!vfAnswer ? ' selected-false' : '');
+    };
+
+    // === SHOW/HIDE ADD FORM ===
+    window.showAddForm = function(type, docRef, atIndex) {
+        hideAddForm();
+        editingIndex = -1;
+        insertAfterDocRef = docRef || null;
+        insertAtIndex = (typeof atIndex === 'number') ? atIndex : null;
+
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.remove('edit-mode');
+
+        const typeLabels = {
+            qcm_single: 'QCM (choix unique)',
+            qcm_multi: 'QCM (choix multiples)',
+            vf: 'Vrai / Faux',
+            mot: 'Reponse courte',
+            nombre: 'Nombre',
+            ordonner: 'Ordonner',
+            pad: 'PAD',
+            prevention: 'Mesures de prevention'
+        };
+        updateFormTitle(type, 'Nouvelle question ' + typeLabels[type]);
+        updateFormButtonText(type, 'Ajouter la question');
+
+        // Reset form
+        const qField = document.getElementById(type + '-question');
+        if (qField) qField.value = '';
+
+        if (type === 'qcm_single') {
+            resetChoicesSingle();
+        } else if (type === 'qcm_multi') {
+            resetChoicesMulti();
+        } else if (type === 'vf') {
+            vfAnswer = true;
+            setVF(true);
+        } else if (type === 'mot') {
+            document.getElementById('mot-reponse').value = '';
+        } else if (type === 'nombre') {
+            document.getElementById('nombre-reponse').value = '';
+            document.getElementById('nombre-tolerance').value = '0';
+        } else if (type === 'ordonner') {
+            resetOrdonnerItems();
+        } else if (type === 'pad') {
+            document.getElementById('pad-situation').value = '';
+            document.getElementById('pad-danger').value = '';
+            document.getElementById('pad-dist-danger').value = '';
+            document.getElementById('pad-sitdang').value = '';
+            document.getElementById('pad-dist-sitdang').value = '';
+            document.getElementById('pad-event').value = '';
+            document.getElementById('pad-dist-event').value = '';
+            document.getElementById('pad-dommage').value = '';
+            document.getElementById('pad-dist-dommage').value = '';
+        } else if (type === 'prevention') {
+            document.getElementById('prevention-situation').value = '';
+            document.getElementById('prevention-danger').value = '';
+            document.getElementById('prevention-supprimer').value = '';
+            document.getElementById('prevention-dist-supprimer').value = '';
+            document.getElementById('prevention-reduire').value = '';
+            document.getElementById('prevention-dist-reduire').value = '';
+            document.getElementById('prevention-collective').value = '';
+            document.getElementById('prevention-dist-collective').value = '';
+            document.getElementById('prevention-individuelle').value = '';
+            document.getElementById('prevention-dist-individuelle').value = '';
+            document.getElementById('prevention-formation').value = '';
+            document.getElementById('prevention-dist-formation').value = '';
+        }
+
+        // Reset extra fields
+        const ptsField = document.getElementById(type + '-points');
+        if (ptsField) {
+            if (type === 'qcm_multi') ptsField.value = '2';
+            else if (type === 'pad') ptsField.value = '4';
+            else if (type === 'prevention') ptsField.value = '5';
+            else ptsField.value = '1';
+        }
+        const compField = document.getElementById(type + '-competence');
+        if (compField) compField.value = '';
+        const corrField = document.getElementById(type + '-correction');
+        if (corrField) corrField.value = '';
+        const explField = document.getElementById(type + '-explication');
+        if (explField) explField.value = '';
+        // Auto-select the document ref based on flow context
+        const docField = document.getElementById(type + '-docref');
+        if (docField) docField.value = insertAfterDocRef || '';
+
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        if (qField) qField.focus();
+    };
+
+    window.hideAddForm = function() {
+        editingIndex = -1;
+        insertAfterDocRef = null;
+        insertAtIndex = null;
+        document.querySelectorAll('.q-form').forEach(f => { f.style.display = 'none'; f.classList.remove('edit-mode'); });
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+    };
+
+    function updateFormButtonText(type, text) {
+        const form = document.getElementById('form-' + type);
+        const btn = form.querySelector('.btn-save-q');
+        if (btn) btn.textContent = text;
+    }
+
+    function updateFormTitle(type, text) {
+        const form = document.getElementById('form-' + type);
+        const h4 = form.querySelector('h4');
+        if (h4) h4.textContent = text;
+    }
+
+    // === EDIT QUESTION ===
+    window.editQuestion = function(index) {
+        const q = questions[index];
+        if (!q) return;
+
+        hideAddForm();
+        editingIndex = index;
+        const type = q.type;
+        const form = document.getElementById('form-' + type);
+        form.style.display = 'block';
+        form.classList.add('edit-mode');
+
+        updateFormButtonText(type, 'Enregistrer la modification');
+        updateFormTitle(type, 'Modifier Q' + (index + 1));
+
+        document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        const targetCard = document.querySelector('.q-card[data-q-index="' + index + '"]');
+        if (targetCard) targetCard.classList.add('editing');
+
+        // Pre-fill question text
+        const qField = document.getElementById(type + '-question');
+        if (qField) qField.value = q.question || '';
+
+        // Pre-fill type-specific
+        if (type === 'qcm_single') {
+            const container = document.getElementById('qcm_single-choices');
+            container.innerHTML = '';
+            (q.choices || []).forEach((choice, ci) => {
+                addChoiceRowSingle(container, ci);
+                container.querySelectorAll('input[type="text"]')[ci].value = choice;
+                if (ci === q.correct) container.querySelectorAll('input[type="radio"]')[ci].checked = true;
+            });
+            updateRemoveButtonsSingle();
+            document.getElementById('btn-add-choice-single').style.display = (q.choices || []).length < 6 ? 'block' : 'none';
+        } else if (type === 'qcm_multi') {
+            const container = document.getElementById('qcm_multi-choices');
+            container.innerHTML = '';
+            (q.choices || []).forEach((choice, ci) => {
+                addChoiceRowMulti(container, ci);
+                container.querySelectorAll('input[type="text"]')[ci].value = choice;
+                if ((q.correct || []).includes(ci)) container.querySelectorAll('input[type="checkbox"]')[ci].checked = true;
+            });
+            updateRemoveButtonsMulti();
+            document.getElementById('btn-add-choice-multi').style.display = (q.choices || []).length < 6 ? 'block' : 'none';
+        } else if (type === 'vf') {
+            vfAnswer = q.correct;
+            setVF(q.correct);
+        } else if (type === 'mot') {
+            document.getElementById('mot-reponse').value = q.correct || q.reponse || '';
+        } else if (type === 'nombre') {
+            document.getElementById('nombre-reponse').value = q.correct;
+            document.getElementById('nombre-tolerance').value = q.tolerance || 0;
+        } else if (type === 'ordonner') {
+            const container = document.getElementById('ordonner-items');
+            container.innerHTML = '';
+            (q.items || []).forEach(item => addOrdonnerItem(item));
+        } else if (type === 'pad') {
+            document.getElementById('pad-situation').value = q.situation || '';
+            document.getElementById('pad-danger').value = q.danger || '';
+            document.getElementById('pad-dist-danger').value = toPipeList(q.distracteurs_danger);
+            document.getElementById('pad-sitdang').value = q.situation_dangereuse || '';
+            document.getElementById('pad-dist-sitdang').value = toPipeList(q.distracteurs_situation_dangereuse);
+            document.getElementById('pad-event').value = q.evenement_declencheur || '';
+            document.getElementById('pad-dist-event').value = toPipeList(q.distracteurs_evenement_declencheur);
+            document.getElementById('pad-dommage').value = q.dommage || '';
+            document.getElementById('pad-dist-dommage').value = toPipeList(q.distracteurs_dommage);
+        } else if (type === 'prevention') {
+            const niveaux = ensurePreventionLevels(q.niveaux);
+            document.getElementById('prevention-situation').value = q.situation || '';
+            document.getElementById('prevention-danger').value = q.danger || '';
+            setPrevField('supprimer', niveaux);
+            setPrevField('reduire', niveaux);
+            setPrevField('collective', niveaux);
+            setPrevField('individuelle', niveaux);
+            setPrevField('formation', niveaux);
+        }
+
+        // Pre-fill extra fields
+        const ptsField = document.getElementById(type + '-points');
+        if (ptsField) ptsField.value = q.points || 1;
+        const compField = document.getElementById(type + '-competence');
+        if (compField) compField.value = q.competence || '';
+        const corrField = document.getElementById(type + '-correction');
+        if (corrField) corrField.value = q.correction || '';
+        const explField = document.getElementById(type + '-explication');
+        if (explField) explField.value = q.explication || '';
+        const docField = document.getElementById(type + '-docref');
+        if (docField) docField.value = q.documentRef || '';
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    // === SAVE QUESTION ===
+    window.saveQuestion = function(type) {
+        // Get question text
+        const qField = document.getElementById(type + '-question');
+        const questionText = qField ? qField.value.trim() : '';
+        if (!questionText) { alert('Ecris la question !'); return; }
+
+        let newQ = { type, question: questionText, id: 'q_' + Date.now().toString(36) };
+
+        // Type-specific
+        if (type === 'qcm_single') {
+            const choiceInputs = document.querySelectorAll('#qcm_single-choices input[type="text"]');
+            const choices = [];
+            let hasEmpty = false;
+            choiceInputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; choices.push(v); });
+            if (hasEmpty) { alert('Remplis toutes les reponses !'); return; }
+            const correctRadio = document.querySelector('input[name="qcm_single-correct"]:checked');
+            newQ.choices = choices;
+            newQ.correct = parseInt(correctRadio.value);
+        } else if (type === 'qcm_multi') {
+            const choiceInputs = document.querySelectorAll('#qcm_multi-choices input[type="text"]');
+            const choices = [];
+            let hasEmpty = false;
+            choiceInputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; choices.push(v); });
+            if (hasEmpty) { alert('Remplis toutes les reponses !'); return; }
+            const checked = document.querySelectorAll('input[name="qcm_multi-correct"]:checked');
+            if (checked.length === 0) { alert('Coche au moins une bonne reponse !'); return; }
+            newQ.choices = choices;
+            newQ.correct = Array.from(checked).map(c => parseInt(c.value));
+        } else if (type === 'vf') {
+            newQ.correct = vfAnswer;
+        } else if (type === 'mot') {
+            const reponse = document.getElementById('mot-reponse').value.trim();
+            if (!reponse) { alert('Ecris la reponse attendue !'); return; }
+            newQ.correct = reponse;
+        } else if (type === 'nombre') {
+            const reponse = document.getElementById('nombre-reponse').value;
+            if (reponse === '') { alert('Ecris la reponse attendue !'); return; }
+            newQ.correct = parseFloat(reponse);
+            newQ.tolerance = parseFloat(document.getElementById('nombre-tolerance').value) || 0;
+        } else if (type === 'ordonner') {
+            const inputs = document.querySelectorAll('#ordonner-items input[type="text"]');
+            const items = [];
+            let hasEmpty = false;
+            inputs.forEach(inp => { const v = inp.value.trim(); if (!v) hasEmpty = true; items.push(v); });
+            if (items.length < 3) { alert('Ajoute au moins 3 éléments !'); return; }
+            if (hasEmpty) { alert('Remplis tous les éléments !'); return; }
+            const unique = new Set(items);
+            if (unique.size !== items.length) { alert('Les éléments doivent être tous différents !'); return; }
+            newQ.items = items;
+            newQ.correct = items.map((_, i) => i);
+        } else if (type === 'pad') {
+            const situation = document.getElementById('pad-situation').value.trim();
+            const danger = document.getElementById('pad-danger').value.trim();
+            const sitdang = document.getElementById('pad-sitdang').value.trim();
+            const event = document.getElementById('pad-event').value.trim();
+            const dommage = document.getElementById('pad-dommage').value.trim();
+            if (!situation || !danger || !sitdang || !event || !dommage) {
+                alert('Remplis la situation et les 4 etapes PAD.');
+                return;
+            }
+            newQ.situation = situation;
+            newQ.danger = danger;
+            newQ.distracteurs_danger = splitDistractors(document.getElementById('pad-dist-danger').value);
+            newQ.situation_dangereuse = sitdang;
+            newQ.distracteurs_situation_dangereuse = splitDistractors(document.getElementById('pad-dist-sitdang').value);
+            newQ.evenement_declencheur = event;
+            newQ.distracteurs_evenement_declencheur = splitDistractors(document.getElementById('pad-dist-event').value);
+            newQ.dommage = dommage;
+            newQ.distracteurs_dommage = splitDistractors(document.getElementById('pad-dist-dommage').value);
+        } else if (type === 'prevention') {
+            const situation = document.getElementById('prevention-situation').value.trim();
+            const danger = document.getElementById('prevention-danger').value.trim();
+            if (!situation || !danger) {
+                alert('Remplis la situation et le danger.');
+                return;
+            }
+            const niveaux = buildPreventionLevelsFromForm();
+            const incomplete = niveaux.some(n => !n.bonne_reponse);
+            if (incomplete) {
+                alert('Remplis les 5 bonnes reponses des niveaux de prevention.');
+                return;
+            }
+            newQ.situation = situation;
+            newQ.danger = danger;
+            newQ.niveaux = niveaux;
+        }
+
+        // Extra fields
+        newQ.points = parseFloat(document.getElementById(type + '-points').value) || 1;
+        newQ.competence = document.getElementById(type + '-competence').value || '';
+        newQ.correction = document.getElementById(type + '-correction').value.trim();
+        newQ.explication = document.getElementById(type + '-explication').value.trim();
+        newQ.documentRef = document.getElementById(type + '-docref').value || null;
+
+        // If adding from a flow context, force the docRef
+        if (editingIndex < 0 && insertAfterDocRef && !newQ.documentRef) {
+            newQ.documentRef = insertAfterDocRef;
+        }
+
+        // Keep original id if editing
+        if (editingIndex >= 0 && editingIndex < questions.length) {
+            newQ.id = questions[editingIndex].id || newQ.id;
+            questions[editingIndex] = newQ;
+        } else if (insertAtIndex !== null && insertAtIndex >= 0 && insertAtIndex <= questions.length) {
+            questions.splice(insertAtIndex, 0, newQ);
+        } else {
+            questions.push(newQ);
+        }
+
+        editingIndex = -1;
+        insertAfterDocRef = null;
+        insertAtIndex = null;
+        hideAddForm();
+        renderFlow();
+        updatePointsTotal();
+    };
+
+    // === UPDATE POINTS TOTAL ===
+    function updatePointsTotal() {
+        const total = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+        const el = document.getElementById('points-total');
+        el.textContent = total + ' / ' + currentBareme + ' pts';
+        if (total === currentBareme) {
+            el.className = 'points-total points-ok';
+        } else if (total > 0) {
+            el.className = 'points-total ' + (total > currentBareme ? 'points-err' : 'points-warn');
+        } else {
+            el.className = 'points-total';
+        }
+    }
+
+    // renderQuestions is now replaced by renderFlow() — keep alias for safety
+    function renderQuestions() { renderFlow(); }
+
+    // === MOVE / DELETE ===
+    window.moveQuestion = function(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= questions.length) return;
+        [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
+        renderFlow();
+    };
+
+    window.deleteQuestion = function(index) {
+        questions.splice(index, 1);
+        renderFlow();
+    };
+
+    // === VALIDATION ===
+    function validateEval() {
+        const warnings = [];
+        const total = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+
+        if (questions.length === 0) warnings.push('Aucune question ajoutee');
+        if (total !== currentBareme) warnings.push('Le total des points (' + total + ') ne correspond pas au bareme (/' + currentBareme + ')');
+
+        questions.forEach((q, i) => {
+            if (!q.points || q.points <= 0) warnings.push('Q' + (i + 1) + ' : pas de points attribues');
+            if (!q.competence) warnings.push('Q' + (i + 1) + ' : pas de competence associee');
+            if (!q.correction) warnings.push('Q' + (i + 1) + ' : pas de correction / explication');
+        });
+
+        return warnings;
+    }
+
+    // === SAVE EVAL ===
+    window.saveEval = async function() {
+        const titre = document.getElementById('eval-titre').value.trim();
+        if (!titre) { alert('Donne un titre a l\'evaluation !'); return; }
+        if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
+
+        const classeIds = getSelectedClasseIds();
+        const classeId = classeIds.length > 0 ? classeIds[0] : null; // backward compat
+        const moduleId = document.getElementById('eval-module').value || null;
+        let niveau = null;
+        if (classeId) {
+            const classesInGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
+        }
+
+        const evalData = {
+            titre,
+            classeId,
+            classeIds,
+            moduleId,
+            niveau,
+            bareme: currentBareme,
+            timer: parseInt(document.getElementById('eval-timer').value) || 0,
+            mode: currentModeEval,
+            nonNote: currentNonNote,
+            correctionDifferee: currentCorrectionDifferee,
+            pastilleNiveau: normalizePastilleNiveau(currentPastilleNiveau, 'moyen'),
+            documents: documents,
+            questions: questions,
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            if (currentEvalId) {
+                await setDoc(doc(db, "eval_banque_v2", currentEvalId), evalData, { merge: true });
+            } else {
+                const newId = 'eval_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                evalData.createdAt = serverTimestamp();
+                evalData.publie = false;
+                await setDoc(doc(db, "eval_banque_v2", newId), evalData);
+                currentEvalId = newId;
+                document.getElementById('btn-delete-eval').style.display = 'block';
+            }
+            showToast('Evaluation sauvegardee (brouillon) !');
+            renderEvalList();
+        } catch(e) {
+            console.error("Erreur sauvegarde:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === PUBLISH EVAL ===
+    window.publishEval = async function() {
+        const titre = document.getElementById('eval-titre').value.trim();
+        if (!titre) { alert('Donne un titre a l\'evaluation !'); return; }
+        if (questions.length === 0) { alert('Ajoute au moins une question !'); return; }
+
+        // Validate
+        const warnings = validateEval();
+        const banner = document.getElementById('validation-banner');
+        const list = document.getElementById('validation-list');
+
+        if (warnings.length > 0) {
+            list.innerHTML = warnings.map(w => '<li>' + w + '</li>').join('');
+            banner.style.display = 'block';
+            banner.scrollIntoView({ behavior: 'smooth' });
+
+            if (!confirm('Il y a ' + warnings.length + ' avertissement(s). Publier quand meme ?')) return;
+        }
+
+        // Save first then publish
+        await saveEval();
+
+        if (currentEvalId) {
+            await setDoc(doc(db, "eval_banque_v2", currentEvalId), { publie: true }, { merge: true });
+            showToast('Evaluation publiee ! Les eleves peuvent y acceder.');
+            banner.style.display = 'none';
+            updatePublishButtons(true);
+            renderEvalList();
+        }
+    };
+
+    // === UNPUBLISH EVAL ===
+    window.unpublishEval = async function() {
+        if (!currentEvalId) return;
+        if (!confirm('Depublier cette evaluation ? Les eleves ne la verront plus.')) return;
+
+        try {
+            await setDoc(doc(db, "eval_banque_v2", currentEvalId), { publie: false }, { merge: true });
+            showToast('Evaluation depubliee. Les eleves ne la voient plus.');
+            updatePublishButtons(false);
+            renderEvalList();
+        } catch(e) {
+            console.error("Erreur depublication:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === UPDATE PUBLISH/UNPUBLISH BUTTONS ===
+    function updatePublishButtons(isPublished) {
+        const btnPublish = document.getElementById('btn-publish');
+        const btnUnpublish = document.getElementById('btn-unpublish');
+        if (isPublished) {
+            btnPublish.style.display = 'none';
+            btnUnpublish.style.display = '';
+        } else {
+            btnPublish.style.display = '';
+            btnUnpublish.style.display = 'none';
+        }
+    }
+
+    // === DELETE EVAL ===
+    window.deleteEval = async function() {
+        if (!currentEvalId) return;
+        if (!confirm("Supprimer definitivement cette evaluation ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "eval_banque_v2", currentEvalId));
+            currentEvalId = null;
+            questions = [];
+            documents = [];
+            document.getElementById('main-editor').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+            showToast('Evaluation supprimee.');
+        } catch(e) {
+            console.error("Erreur suppression:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === TOAST ===
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2500);
+    }
+
+    // === BRIDGE : expose module functions to global scope (needed by import script block) ===
+    window.showToast = showToast;
+    window.updateDocRefDropdowns = updateDocRefDropdowns;
+    window.renderFlow = renderFlow;
+    window.updatePointsTotal = updatePointsTotal;
+    window._evalState = { get questions() { return questions; }, set questions(v) { questions = v; }, get documents() { return documents; }, set documents(v) { documents = v; } };
+
+    // ========== IMPORT DEPUIS BIBLIOTHEQUE (sessionStorage) ==========
+    (function checkBiblioImport() {
+        const importData = sessionStorage.getItem('biblio_import');
+        if (!importData) return;
+        const cat = sessionStorage.getItem('biblio_categorie');
+        sessionStorage.removeItem('biblio_import');
+        sessionStorage.removeItem('biblio_categorie');
+        if (cat !== 'evaluation') return;
+        try {
+            const data = JSON.parse(importData);
+            // Reset state
+            currentEvalId = null;
+            questions = data.questions || [];
+            documents = data.documents || [];
+            editingIndex = -1;
+            editingDocIndex = -1;
+            // Set metadata
+            const titreEl = document.getElementById('eval-titre');
+            if (titreEl) titreEl.value = data.titre || '';
+            if (data.bareme) setBareme(data.bareme);
+            if (data.mode) setModeEval(data.mode);
+            setPastilleNiveau(data.pastilleNiveau || 'moyen');
+            const timerEl = document.getElementById('eval-timer');
+            if (timerEl && data.timer) timerEl.value = data.timer;
+            // Render
+            updateDocRefDropdowns();
+            renderFlow();
+            showEditor();
+            showToast('📚 Évaluation importée depuis la bibliothèque !');
+        } catch(e) { console.error('Erreur import biblio eval:', e); }
+    })();
+</script>
+
+<!-- Import JSON Modal -->
+<div class="modal-overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
+    <div class="modal-content">
+        <h3>📥 Importer une évaluation (JSON)</h3>
+        <p class="info-text" style="margin-bottom:8px;">Collez le JSON généré par l'IA ou créé manuellement. L'import remplace les documents et questions existants.</p>
+        <details class="import-prompt-details">
+            <summary>📋 Voir le prompt IA</summary>
+            <pre id="import-prompt-text"></pre>
+            <button type="button" onclick="copyImportPrompt()" style="margin-top:6px;" class="btn-import-json">📋 Copier le prompt</button>
+        </details>
+        <div class="import-checkboxes">
+            <label><input type="checkbox" id="import-opt-titre"> Importer le titre</label>
+            <label><input type="checkbox" id="import-opt-bareme"> Importer le barème</label>
+            <label><input type="checkbox" id="import-opt-contenu" checked disabled> Importer les documents et questions</label>
+        </div>
+        <textarea id="import-json-input" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-save-q" onclick="executeImport()">✅ Importer</button>
+            <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== IMPORT JSON SYSTEM ==========
+
+const IMPORT_PROMPT = `Tu es un générateur d'évaluations PSE (Prévention Santé Environnement). Génère un JSON strictement valide au format suivant.
+
+FORMAT JSON :
+{
+  "titre": "Titre de l'évaluation",
+  "bareme": 20,
+  "documents": [
+    { "id": "doc1", "type": "texte", "titre": "Document 1", "contenu": "Texte du document..." },
+    { "id": "doc2", "type": "image", "titre": "Schéma", "image_url": "https://...", "alt": "Description", "description": "Légende", "credit": "Source" }
+  ],
+  "questions": [
+    {
+      "type": "qcm",
+      "consigne": "Identifier le principal risque lié à...",
+      "choix": ["Risque A", "Risque B", "Risque C", "Risque D"],
+      "reponse": 0,
+      "points": 1,
+      "competence": "C1",
+      "correction": "La bonne réponse est A parce que...",
+      "explication": "Ce point est important car...",
+      "document_id": "doc1"
+    }
+  ]
+}
+
+TYPES DE QUESTIONS AUTORISÉS :
+- "qcm" : QCM choix unique. choix (tableau 2-6, tous différents), reponse (index 0-based)
+- "qcm_multi" : QCM choix multiples. choix (tableau 2-6, tous différents), reponse (tableau d'indices, non vide)
+- "vf" : Vrai/Faux. reponse (true ou false, boolean strict)
+- "mot" : Réponse courte. reponse (string non vide)
+- "nombre" : Réponse numérique. reponse (number), tolerance (optionnel, number >= 0)
+- "ordonner" : Remettre dans l'ordre. elements (tableau >= 3 éléments, tous différents, dans l'ordre correct)
+- "pad" : Processus d'apparition du dommage. Champs requis: situation, danger, distracteurs_danger[], situation_dangereuse, distracteurs_situation_dangereuse[], evenement_declencheur, distracteurs_evenement_declencheur[], dommage, distracteurs_dommage[]
+- "prevention" : Mesures de prevention. Champs requis: situation, danger, niveaux[5] avec niveaux fixes supprimer/reduire/collective/individuelle/formation. Chaque niveau: label, bonne_reponse, distracteurs[]
+
+TYPES DE DOCUMENTS :
+- "texte" : champs obligatoires = id, type, titre, contenu
+- "image" : champs obligatoires = id, type, titre, image_url. Optionnels : alt, description, credit
+
+COMPÉTENCES PSE (C1 à C6 UNIQUEMENT) :
+- C1 – Traiter une information
+- C2 – Appliquer une démarche d'analyse dans une situation donnée
+- C3 – Expliquer un phénomène physiologique, un enjeu environnemental, une disposition réglementaire, en lien avec une mesure de prévention (UNIQUEMENT si la question relie phénomène/règle → prévention précise)
+- C4 – Proposer une solution pour résoudre un problème
+- C5 – Argumenter un choix
+- C6 – Communication à l'écrit et à l'oral avec une syntaxe claire et adaptée
+
+RÈGLES BLOOM :
+Chaque consigne respecte la taxonomie de Bloom et commence par un seul verbe d'action unique (définir, identifier, appliquer, analyser, justifier, proposer, etc.). Pas de consignes floues ou doubles. Un seul verbe d'action par question. La compétence est choisie selon le verbe et la production attendue.
+
+RÈGLES ANTI-HALLUCINATION :
+- Ne pas inventer de document image si aucune image_url n'est fournie
+- Ne pas inventer de document_id : utiliser uniquement les ids définis dans documents[]
+- Si aucun document pertinent pour une question, mettre document_id: null
+- competence est OBLIGATOIRE pour chaque question (C1 à C6)
+
+RÈGLES STRICTES :
+- Tous les choix d'un QCM doivent être différents
+- Tous les éléments d'un ordonner doivent être différents
+- Le JSON doit être valide et parsable directement
+- points doit être un nombre > 0
+- Ne pas ajouter de commentaires dans le JSON`;
+
+window.openImportModal = function() {
+    document.getElementById('import-modal').style.display = 'flex';
+    document.getElementById('import-json-input').value = '';
+    document.getElementById('import-errors').style.display = 'none';
+    document.getElementById('import-errors').textContent = '';
+    document.getElementById('import-opt-titre').checked = false;
+    document.getElementById('import-opt-bareme').checked = false;
+    document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+};
+
+window.closeImportModal = function() {
+    document.getElementById('import-modal').style.display = 'none';
+};
+
+window.copyImportPrompt = function() {
+    navigator.clipboard.writeText(IMPORT_PROMPT).then(() => {
+        showToast('📋 Prompt copié !');
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = IMPORT_PROMPT;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('📋 Prompt copié !');
+    });
+};
+
+// === VALIDATE IMPORT JSON ===
+function validateImportJSON(jsonString) {
+    const errors = [];
+    let data;
+
+    // 0. Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Word
+    // BOM partout
+    jsonString = jsonString.replace(/\uFEFF/g, '');
+    // Caracteres invisibles / zero-width
+    jsonString = jsonString.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
+    // NBSP → espace normal
+    jsonString = jsonString.replace(/\u00A0/g, ' ');
+    // Guillemets courbes / typographiques → droits
+    jsonString = jsonString.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
+    jsonString = jsonString.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
+    // Extraire le JSON des blocs de code Markdown
+    var codeBlockMatch = jsonString.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+    if (codeBlockMatch) jsonString = codeBlockMatch[1].trim();
+    // Extraire entre { } si texte autour
+    if (jsonString.charAt(0) !== '{' && jsonString.charAt(0) !== '[') {
+        var fb = jsonString.indexOf('{');
+        if (fb >= 0) { var lb = jsonString.lastIndexOf('}'); if (lb > fb) jsonString = jsonString.substring(fb, lb + 1); }
+    }
+    // Supprimer commentaires // en debut de ligne
+    jsonString = jsonString.replace(/^\s*\/\/.*$/gm, '');
+    // Trailing commas
+    jsonString = jsonString.replace(/,\s*([\]}])/g, '$1');
+    // Python booleans/None
+    jsonString = jsonString.replace(/\bTrue\b/g, 'true');
+    jsonString = jsonString.replace(/\bFalse\b/g, 'false');
+    jsonString = jsonString.replace(/\bNone\b/g, 'null');
+    jsonString = jsonString.trim();
+
+    // 1. Parse
+    try {
+        data = JSON.parse(jsonString);
+    } catch (e) {
+        return { ok: false, data: null, errors: ['❌ JSON invalide : ' + e.message] };
+    }
+
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        return { ok: false, data: null, errors: ['❌ Le JSON doit être un objet { ... }'] };
+    }
+
+    // 2. Bareme
+    if (data.bareme !== undefined && data.bareme !== 10 && data.bareme !== 20) {
+        errors.push('⚠️ bareme doit être 10 ou 20 (reçu : ' + data.bareme + ')');
+    }
+
+    // 3. Documents
+    const docIds = new Set();
+    if (data.documents !== undefined) {
+        if (!Array.isArray(data.documents)) {
+            errors.push('❌ documents doit être un tableau');
+        } else {
+            data.documents.forEach((doc, di) => {
+                const prefix = 'Doc ' + (di + 1) + ' : ';
+                if (!doc.id || typeof doc.id !== 'string') { errors.push(prefix + 'id manquant ou invalide'); return; }
+                if (docIds.has(doc.id)) { errors.push(prefix + 'id "' + doc.id + '" dupliqué'); return; }
+                docIds.add(doc.id);
+                if (!doc.titre || typeof doc.titre !== 'string') errors.push(prefix + 'titre manquant');
+                const docType = doc.type;
+                if (docType !== 'texte' && docType !== 'image' && docType !== 'video') {
+                    errors.push(prefix + 'type doit être "texte", "image" ou "video" (reçu : "' + docType + '")');
+                } else if (docType === 'texte') {
+                    if (!doc.contenu || typeof doc.contenu !== 'string') errors.push(prefix + 'contenu manquant pour doc texte');
+                } else if (docType === 'image') {
+                    if (!doc.image_url || typeof doc.image_url !== 'string') errors.push(prefix + 'image_url manquant pour doc image');
+                } else if (docType === 'video') {
+                    if (!doc.video_url || typeof doc.video_url !== 'string') errors.push(prefix + 'video_url manquant pour doc video');
+                }
+            });
+        }
+    }
+
+    // 4. Questions
+    if (!Array.isArray(data.questions) || data.questions.length === 0) {
+        errors.push('❌ questions doit être un tableau non vide');
+        return { ok: false, data, errors };
+    }
+
+    const validComps = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+
+    data.questions.forEach((q, qi) => {
+        const prefix = 'Q' + (qi + 1) + ' : ';
+
+        // Type
+        if (!q.type) { errors.push(prefix + 'type manquant'); return; }
+        let mappedType = q.type === 'qcm' ? 'qcm_single' : q.type;
+        const validTypes = ['qcm_single', 'qcm_multi', 'vf', 'mot', 'nombre', 'ordonner', 'pad', 'prevention'];
+        if (!validTypes.includes(mappedType)) { errors.push(prefix + 'type "' + q.type + '" non reconnu'); return; }
+
+        // Consigne
+        if (!q.consigne || typeof q.consigne !== 'string' || !q.consigne.trim()) {
+            errors.push(prefix + 'consigne manquante ou vide');
+        }
+
+        // Points
+        if (q.points !== undefined && (typeof q.points !== 'number' || q.points <= 0)) {
+            errors.push(prefix + 'points doit être un nombre > 0');
+        }
+
+        // Competence
+        if (!q.competence || !validComps.includes(q.competence)) {
+            errors.push(prefix + 'competence obligatoire et doit être C1, C2, C3, C4, C5 ou C6 (reçu : "' + (q.competence || '') + '")');
+        }
+
+        // document_id
+        if (q.document_id !== undefined && q.document_id !== null) {
+            if (typeof q.document_id !== 'string' || q.document_id === '') {
+                errors.push(prefix + 'document_id doit être null ou une string non vide');
+            } else if (!docIds.has(q.document_id)) {
+                errors.push(prefix + 'document_id "' + q.document_id + '" ne correspond à aucun document');
+            }
+        }
+
+        // Type-specific validation
+        if (mappedType === 'qcm_single') {
+            if (!Array.isArray(q.choix) || q.choix.length < 2 || q.choix.length > 6) {
+                errors.push(prefix + 'choix doit contenir 2 à 6 éléments');
+            } else {
+                const trimmed = q.choix.map(c => String(c).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les choix doivent être tous différents');
+                if (typeof q.reponse !== 'number' || q.reponse < 0 || q.reponse >= q.choix.length) {
+                    errors.push(prefix + 'reponse doit être un index valide (0 à ' + (q.choix.length - 1) + ')');
+                }
+            }
+        } else if (mappedType === 'qcm_multi') {
+            if (!Array.isArray(q.choix) || q.choix.length < 2 || q.choix.length > 6) {
+                errors.push(prefix + 'choix doit contenir 2 à 6 éléments');
+            } else {
+                const trimmed = q.choix.map(c => String(c).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les choix doivent être tous différents');
+                if (!Array.isArray(q.reponse) || q.reponse.length === 0) {
+                    errors.push(prefix + 'reponse doit être un tableau non vide d\'indices');
+                } else {
+                    const idxSet = new Set(q.reponse);
+                    if (idxSet.size !== q.reponse.length) errors.push(prefix + 'reponse contient des indices dupliqués');
+                    q.reponse.forEach(idx => {
+                        if (typeof idx !== 'number' || idx < 0 || idx >= q.choix.length) {
+                            errors.push(prefix + 'index ' + idx + ' invalide dans reponse');
+                        }
+                    });
+                }
+            }
+        } else if (mappedType === 'vf') {
+            if (typeof q.reponse !== 'boolean') {
+                errors.push(prefix + 'reponse doit être true ou false (boolean strict)');
+            }
+        } else if (mappedType === 'mot') {
+            if (!q.reponse || typeof q.reponse !== 'string' || !q.reponse.trim()) {
+                errors.push(prefix + 'reponse doit être une string non vide');
+            }
+        } else if (mappedType === 'nombre') {
+            if (typeof q.reponse !== 'number') {
+                errors.push(prefix + 'reponse doit être un nombre');
+            }
+            if (q.tolerance !== undefined) {
+                const tol = Number(q.tolerance);
+                if (isNaN(tol) || tol < 0) errors.push(prefix + 'tolerance doit être un nombre >= 0');
+            }
+        } else if (mappedType === 'ordonner') {
+            if (!Array.isArray(q.elements) || q.elements.length < 3) {
+                errors.push(prefix + 'elements doit contenir au moins 3 éléments');
+            } else {
+                const hasEmpty = q.elements.some(e => !e || typeof e !== 'string' || !e.trim());
+                if (hasEmpty) errors.push(prefix + 'tous les éléments doivent être des strings non vides');
+                const trimmed = q.elements.map(e => String(e).trim());
+                if (new Set(trimmed).size !== trimmed.length) errors.push(prefix + 'les éléments doivent être tous différents');
+            }
+        } else if (mappedType === 'pad') {
+            if (!q.situation || typeof q.situation !== 'string' || !q.situation.trim()) {
+                errors.push(prefix + 'situation manquante');
+            }
+            if (!q.danger || typeof q.danger !== 'string' || !q.danger.trim()) errors.push(prefix + 'danger manquant');
+            if (!q.situation_dangereuse || typeof q.situation_dangereuse !== 'string' || !q.situation_dangereuse.trim()) errors.push(prefix + 'situation_dangereuse manquante');
+            if (!q.evenement_declencheur || typeof q.evenement_declencheur !== 'string' || !q.evenement_declencheur.trim()) errors.push(prefix + 'evenement_declencheur manquant');
+            if (!q.dommage || typeof q.dommage !== 'string' || !q.dommage.trim()) errors.push(prefix + 'dommage manquant');
+        } else if (mappedType === 'prevention') {
+            if (!q.situation || typeof q.situation !== 'string' || !q.situation.trim()) {
+                errors.push(prefix + 'situation manquante');
+            }
+            if (!q.danger || typeof q.danger !== 'string' || !q.danger.trim()) {
+                errors.push(prefix + 'danger manquant');
+            }
+            if (!Array.isArray(q.niveaux) || q.niveaux.length === 0) {
+                errors.push(prefix + 'niveaux manquant (tableau)');
+            } else {
+                const expected = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
+                expected.forEach(levelId => {
+                    const found = q.niveaux.find(n => n && n.niveau === levelId);
+                    if (!found) {
+                        errors.push(prefix + 'niveau "' + levelId + '" manquant');
+                        return;
+                    }
+                    if (!found.bonne_reponse || typeof found.bonne_reponse !== 'string' || !found.bonne_reponse.trim()) {
+                        errors.push(prefix + 'niveau "' + levelId + '" sans bonne_reponse');
+                    }
+                });
+            }
+        }
+    });
+
+    return { ok: errors.length === 0, data, errors };
+}
+
+// === EXECUTE IMPORT ===
+window.executeImport = function() {
+    const jsonStr = document.getElementById('import-json-input').value.trim();
+    const errDiv = document.getElementById('import-errors');
+
+    if (!jsonStr) {
+        errDiv.textContent = '❌ Collez un JSON avant d\'importer.';
+        errDiv.style.display = 'block';
+        return;
+    }
+
+    const result = validateImportJSON(jsonStr);
+    if (!result.ok) {
+        errDiv.textContent = result.errors.join('\n');
+        errDiv.style.display = 'block';
+        return;
+    }
+
+    const data = result.data;
+
+    // === MAP DOCUMENTS ===
+    const docIdMap = {}; // oldId -> newId
+    const newDocs = [];
+    if (Array.isArray(data.documents)) {
+        data.documents.forEach(doc => {
+            const newId = 'doc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+            docIdMap[doc.id] = newId;
+            const internalDoc = {
+                id: newId,
+                titre: doc.titre || '',
+                description: doc.description || ''
+            };
+            if (doc.type === 'texte') {
+                internalDoc.type = 'text';
+                internalDoc.content = doc.contenu || '';
+            } else if (doc.type === 'image') {
+                internalDoc.type = 'image';
+                internalDoc.content = doc.image_url || '';
+                if (doc.alt) internalDoc.alt = doc.alt;
+                if (doc.credit) internalDoc.credit = doc.credit;
+            }
+            newDocs.push(internalDoc);
+        });
+    }
+
+    // === MAP QUESTIONS ===
+    const newQuestions = [];
+    data.questions.forEach(q => {
+        const newId = 'q_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+        const mappedType = q.type === 'qcm' ? 'qcm_single' : q.type;
+
+        const internalQ = {
+            id: newId,
+            type: mappedType,
+            question: (q.consigne || '').trim(),
+            points: (typeof q.points === 'number' && q.points > 0) ? q.points : 1,
+            competence: q.competence || '',
+            correction: (q.correction || '').trim(),
+            explication: (q.explication || '').trim(),
+            documentRef: null
+        };
+
+        // Map document_id
+        if (q.document_id && typeof q.document_id === 'string' && q.document_id !== '') {
+            internalQ.documentRef = docIdMap[q.document_id] || null;
+        }
+
+        // Type-specific mapping
+        if (mappedType === 'qcm_single') {
+            internalQ.choices = (q.choix || []).map(c => String(c));
+            internalQ.correct = typeof q.reponse === 'number' ? q.reponse : 0;
+        } else if (mappedType === 'qcm_multi') {
+            internalQ.choices = (q.choix || []).map(c => String(c));
+            internalQ.correct = Array.isArray(q.reponse) ? q.reponse : [];
+        } else if (mappedType === 'vf') {
+            internalQ.correct = q.reponse === true;
+        } else if (mappedType === 'mot') {
+            internalQ.correct = String(q.reponse || '').trim();
+        } else if (mappedType === 'nombre') {
+            internalQ.correct = typeof q.reponse === 'number' ? q.reponse : 0;
+            const tol = Number(q.tolerance);
+            internalQ.tolerance = (!isNaN(tol) && tol >= 0) ? tol : 0;
+        } else if (mappedType === 'ordonner') {
+            internalQ.items = (q.elements || []).map(e => String(e).trim());
+            internalQ.correct = internalQ.items.map((_, i) => i);
+        } else if (mappedType === 'pad') {
+            internalQ.situation = String(q.situation || '').trim();
+            internalQ.danger = String(q.danger || '').trim();
+            internalQ.distracteurs_danger = Array.isArray(q.distracteurs_danger) ? q.distracteurs_danger.map(x => String(x).trim()).filter(Boolean) : [];
+            internalQ.situation_dangereuse = String(q.situation_dangereuse || '').trim();
+            internalQ.distracteurs_situation_dangereuse = Array.isArray(q.distracteurs_situation_dangereuse) ? q.distracteurs_situation_dangereuse.map(x => String(x).trim()).filter(Boolean) : [];
+            internalQ.evenement_declencheur = String(q.evenement_declencheur || '').trim();
+            internalQ.distracteurs_evenement_declencheur = Array.isArray(q.distracteurs_evenement_declencheur) ? q.distracteurs_evenement_declencheur.map(x => String(x).trim()).filter(Boolean) : [];
+            internalQ.dommage = String(q.dommage || '').trim();
+            internalQ.distracteurs_dommage = Array.isArray(q.distracteurs_dommage) ? q.distracteurs_dommage.map(x => String(x).trim()).filter(Boolean) : [];
+            if (!internalQ.points || internalQ.points < 0.5) internalQ.points = 4;
+        } else if (mappedType === 'prevention') {
+            internalQ.situation = String(q.situation || '').trim();
+            internalQ.danger = String(q.danger || '').trim();
+            internalQ.niveaux = ensurePreventionLevels(q.niveaux).map(n => ({
+                niveau: n.niveau,
+                label: n.label,
+                bonne_reponse: n.bonne_reponse,
+                distracteurs: Array.isArray(n.distracteurs) ? n.distracteurs : []
+            }));
+            if (!internalQ.points || internalQ.points < 0.5) internalQ.points = 5;
+        }
+
+        newQuestions.push(internalQ);
+    });
+
+    // === APPLY IMPORT ===
+    window._evalState.documents = newDocs;
+    window._evalState.questions = newQuestions;
+
+    // Optional: title
+    if (document.getElementById('import-opt-titre').checked && data.titre) {
+        const titreEl = document.getElementById('eval-titre');
+        if (titreEl) titreEl.value = data.titre;
+    }
+
+    // Optional: bareme
+    if (document.getElementById('import-opt-bareme').checked && data.bareme) {
+        setBareme(data.bareme);
+    }
+    if (data.pastilleNiveau) {
+        setPastilleNiveau(data.pastilleNiveau);
+    }
+
+    // Refresh UI
+    updateDocRefDropdowns();
+    renderFlow();
+    updatePointsTotal();
+    closeImportModal();
+    showToast('📥 Import réussi ! ' + window._evalState.questions.length + ' question(s) importée(s)');
+};
+</script>
+</body>
+</html>
