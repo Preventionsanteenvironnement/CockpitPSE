@@ -3969,6 +3969,52 @@ Important:
             return;
         }
 
+        // Etape 2a : Import en lot si tableau d'exercices mixtes (PAD, Prevention, etc.)
+        if (Array.isArray(data) && data.length > 1) {
+            var allDetectable = data.every(function(item) {
+                return item && typeof item === 'object' && !Array.isArray(item) && detectJsonType(item);
+            });
+            if (allDetectable) {
+                if (!confirm('📦 ' + data.length + ' exercices detectes. Importer tous en lot (brouillon) ?')) return;
+                var created = 0, batchErrors = [];
+                var classeIds = getSelectedClasseIds();
+                var classeId = classeIds.length > 0 ? classeIds[0] : null;
+                var moduleId = document.getElementById('exo-module').value || null;
+                var niveau = null;
+                if (classeId) {
+                    var cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+                    niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
+                }
+                var promises = data.map(function(item, i) {
+                    try {
+                        var itemType = detectJsonType(item);
+                        var titre = item.titre || ('Exercice ' + (i + 1));
+                        var newId = 'exo_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4) + '_' + i;
+                        var exData = {
+                            titre: titre, type: itemType, classeIds: classeIds, classeId: classeId,
+                            moduleId: moduleId, niveau: niveau, difficulte: currentDifficulty,
+                            contenu: item, categorie: 'modules', competences_cibles: [],
+                            publie: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                        };
+                        created++;
+                        return setDoc(doc(db, "exercices_banque", newId), exData);
+                    } catch(e) {
+                        batchErrors.push('Exercice ' + (i + 1) + ': ' + e.message);
+                        return Promise.resolve();
+                    }
+                });
+                Promise.all(promises).then(function() {
+                    closeImportModal();
+                    showToast('✅ ' + created + '/' + data.length + ' exercices importes en brouillon !', 4000);
+                    if (batchErrors.length > 0) console.warn('Erreurs import lot:', batchErrors);
+                }).catch(function(e) {
+                    errorEl.textContent = '❌ Erreur Firebase : ' + e.message;
+                    errorEl.style.display = 'block';
+                });
+                return;
+            }
+        }
+
         // Etape 2b : normalisation robuste de structures JSON proches
         var normalized = normalizeImportedData(data);
         data = normalized.data;
