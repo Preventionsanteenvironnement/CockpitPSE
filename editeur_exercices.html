@@ -3857,6 +3857,12 @@ Important:
         return { data: data, typeHint: typeHint, warning: warning };
     }
 
+    function importList(v) {
+        if (Array.isArray(v)) return v.map(function(s) { return String(s || '').trim(); }).filter(Boolean);
+        if (typeof v === 'string') return v.split(/[|,]/).map(function(s) { return s.trim(); }).filter(Boolean);
+        return [];
+    }
+
     function validateImportedData(type, data) {
         if (!data || typeof data !== 'object') return 'JSON vide ou invalide.';
         switch (type) {
@@ -3887,9 +3893,31 @@ Important:
             case 'etude_cas':
                 return (typeof data.scenario === 'string' && Array.isArray(data.questions)) ? '' : 'Etude de cas attendue: "scenario" + "questions[]".';
             case 'pad':
-                return (data.danger && data.dommage && data.distracteurs_danger) ? '' : 'PAD attendu: danger, dommage et distracteurs_*.';
+                var padCore = ['danger', 'situation_dangereuse', 'evenement_declencheur', 'dommage'];
+                for (var pi = 0; pi < padCore.length; pi++) {
+                    var pKey = padCore[pi];
+                    if (!String(data[pKey] || '').trim()) return 'PAD attendu: champ "' + pKey + '" obligatoire.';
+                    var pDist = importList(data['distracteurs_' + pKey]);
+                    if (pDist.length !== 3) return 'PAD attendu: 3 distracteurs pour "' + pKey + '".';
+                }
+                return '';
             case 'prevention':
-                return (Array.isArray(data.niveaux) && data.niveaux.length > 0 && data.danger) ? '' : 'Prevention attendue: "danger" + "niveaux[]".';
+                if (!String(data.danger || '').trim()) return 'Prevention attendue: champ "danger" obligatoire.';
+                if (!Array.isArray(data.niveaux) || data.niveaux.length !== 5) return 'Prevention attendue: exactement 5 niveaux.';
+                var reqNiveaux = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
+                var byLevel = {};
+                data.niveaux.forEach(function(n) {
+                    if (n && n.niveau) byLevel[String(n.niveau)] = n;
+                });
+                for (var ni = 0; ni < reqNiveaux.length; ni++) {
+                    var lvl = reqNiveaux[ni];
+                    var nObj = byLevel[lvl];
+                    if (!nObj) return 'Prevention attendue: niveau manquant "' + lvl + '".';
+                    if (!String(nObj.bonne_reponse || '').trim()) return 'Prevention attendu: bonne_reponse obligatoire pour "' + lvl + '".';
+                    var nDist = importList(nObj.distracteurs);
+                    if (nDist.length !== 3) return 'Prevention attendu: 3 distracteurs pour "' + lvl + '".';
+                }
+                return '';
             case 'estimation_risque':
                 return (data.gravite && data.exposition && data.declencheur) ? '' : 'Estimation attendue: gravite, exposition, declencheur.';
             case 'duerp_ligne':
