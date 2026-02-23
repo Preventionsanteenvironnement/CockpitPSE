@@ -110,7 +110,10 @@ window.MODULES_PSE = {
         // Thème D - Consommation
         { id: "MD1", titre: "L'assurance", theme: "D" },
         { id: "MD2", titre: "Le budget", theme: "D" },
-        { id: "MD3", titre: "Les achats", theme: "D" }
+        { id: "MD3", titre: "Les achats", theme: "D" },
+
+        // Chef d'œuvre
+        { id: "CDO", titre: "Chef d'œuvre", theme: "E" }
     ],
     
     // ─────────────────────────────────────────────────────────────────────
