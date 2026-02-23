@@ -3127,6 +3127,23 @@
         const titreSource = document.getElementById('exo-titre').value.trim();
         if (!titreSource) { showToast('Donne un titre avant de dupliquer.'); return; }
 
+        function buildDuplicateTitle(sourceTitle) {
+            var title = String(sourceTitle || '').trim();
+            if (!title) return 'Nouvel exercice';
+            var root = title.replace(/\s*\(\d+\)\s*$/, '').trim();
+            var used = new Set((allExercices || []).map(function(ex) {
+                return String(ex && ex.titre ? ex.titre : '').trim().toLowerCase();
+            }));
+            if (!used.has(root.toLowerCase())) return root;
+            var n = 2;
+            var candidate = root + ' (' + n + ')';
+            while (used.has(candidate.toLowerCase())) {
+                n++;
+                candidate = root + ' (' + n + ')';
+            }
+            return candidate;
+        }
+
         const type = document.getElementById('exo-type').value;
         const classeIds = getSelectedClasseIds();
         const classeId = classeIds.length > 0 ? classeIds[0] : null;
@@ -3145,7 +3162,7 @@
             competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
         }
 
-        const titreCopie = titreSource + ' (copie)';
+        const titreCopie = buildDuplicateTitle(titreSource);
         const newId = 'exo_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
         const data = {
             titre: titreCopie,
