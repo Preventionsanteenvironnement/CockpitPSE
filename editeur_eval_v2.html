@@ -574,9 +574,11 @@
                 <div class="form-group">
                     <label>📊 Notation</label>
                     <div class="note-toggle">
-                        <button class="note-btn active" id="note-oui" onclick="setNonNote(false)">📊 Notee</button>
-                        <button class="note-btn" id="note-non" onclick="setNonNote(true)">📋 Non notee</button>
+                        <button class="note-btn active" id="note-oui" onclick="setModeNotation('notee')">📊 Notee</button>
+                        <button class="note-btn" id="note-formatif" onclick="setModeNotation('formatif_visible')">🧪 Formative (note visible)</button>
+                        <button class="note-btn" id="note-non" onclick="setModeNotation('non_notee')">📋 Non notee</button>
                     </div>
+                    <div class="info-text" id="notation-help">La note est prise en compte.</div>
                 </div>
                 <div class="form-group">
                     <label>📝 Correction</label>
@@ -1120,7 +1122,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let editingDocIndex = -1;
     let currentBareme = 20;
     let currentModeEval = 'libre';
-    let currentNonNote = false;
+    let currentModeNotation = 'notee';
+    let currentNonNote = false; // compat legacy
     let currentCorrectionDifferee = false;
     let currentPastilleNiveau = 'moyen';
     let insertAfterDocRef = null;       // doc context for new questions from flow buttons
@@ -1131,6 +1134,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     const DOC_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#10b981', '#e11d48'];
     const PASTILLE_LEVELS = ['facile', 'moyen', 'eleve'];
     const PASTILLE_LABELS = { facile: 'Facile', moyen: 'Moyen', eleve: 'Eleve' };
+    const NOTATION_MODES = ['notee', 'formatif_visible', 'non_notee'];
 
     function makeUid(prefix) {
         return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
@@ -1156,6 +1160,16 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     function normalizePastilleNiveau(level, fallback) {
         const defaultLevel = (fallback === undefined) ? 'moyen' : fallback;
         return PASTILLE_LEVELS.includes(level) ? level : defaultLevel;
+    }
+
+    function normalizeModeNotation(mode, fallback) {
+        const safeFallback = (fallback === undefined) ? 'notee' : fallback;
+        return NOTATION_MODES.includes(mode) ? mode : safeFallback;
+    }
+
+    function deriveModeNotationFromEval(ev) {
+        if (ev && NOTATION_MODES.includes(ev.modeNotation)) return ev.modeNotation;
+        return (ev && ev.nonNote === true) ? 'non_notee' : 'notee';
     }
 
     function getPastilleLabel(level, fallback) {
@@ -1455,11 +1469,29 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('mode-sync').className = 'mode-btn' + (mode === 'synchronise' ? ' active' : '');
     };
 
-    // === NOTATION TOGGLE (Noté / Non noté) ===
+    // === NOTATION TOGGLE (Notée / Formative / Non notée) ===
+    window.setModeNotation = function(mode) {
+        currentModeNotation = normalizeModeNotation(mode);
+        currentNonNote = currentModeNotation !== 'notee';
+        document.getElementById('note-oui').className = 'note-btn' + (currentModeNotation === 'notee' ? ' active' : '');
+        document.getElementById('note-formatif').className = 'note-btn' + (currentModeNotation === 'formatif_visible' ? ' active' : '');
+        document.getElementById('note-non').className = 'note-btn' + (currentModeNotation === 'non_notee' ? ' active' : '');
+
+        const help = document.getElementById('notation-help');
+        if (help) {
+            if (currentModeNotation === 'notee') {
+                help.textContent = 'La note est prise en compte.';
+            } else if (currentModeNotation === 'formatif_visible') {
+                help.textContent = 'La note est visible pour l eleve mais non prise en compte (validation professeur).';
+            } else {
+                help.textContent = 'Aucune note finale affichee a l eleve.';
+            }
+        }
+    };
+
+    // Compat legacy calls
     window.setNonNote = function(val) {
-        currentNonNote = val;
-        document.getElementById('note-oui').className = 'note-btn' + (!val ? ' active' : '');
-        document.getElementById('note-non').className = 'note-btn' + (val ? ' active' : '');
+        setModeNotation(val ? 'non_notee' : 'notee');
     };
 
     // === CORRECTION TOGGLE (Immédiate / Différée) ===
@@ -1893,7 +1925,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             bareme: ev.bareme || 20,
             timer: ev.timer || 0,
             mode: ev.mode || 'libre',
-            nonNote: ev.nonNote || false,
+            modeNotation: deriveModeNotationFromEval(ev),
+            nonNote: deriveModeNotationFromEval(ev) !== 'notee',
             correctionDifferee: ev.correctionDifferee || false,
             pastilleNiveau: normalizePastilleNiveau(ev.pastilleNiveau, 'moyen'),
             documents: ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [],
@@ -1938,6 +1971,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         editingIndex = -1;
         currentBareme = 20;
         currentModeEval = 'libre';
+        currentModeNotation = 'notee';
         currentNonNote = false;
         currentCorrectionDifferee = false;
         currentPastilleNiveau = 'moyen';
@@ -1949,7 +1983,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('eval-timer').value = '0';
         setBareme(20);
         setModeEval('libre');
-        setNonNote(false);
+        setModeNotation('notee');
         setCorrectionDifferee(false);
         setPastilleNiveau('moyen');
         document.getElementById('btn-delete-eval').style.display = 'none';
@@ -1977,6 +2011,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         documents = ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [];
         currentBareme = ev.bareme || 20;
         currentModeEval = ev.mode || 'libre';
+        currentModeNotation = deriveModeNotationFromEval(ev);
 
         document.getElementById('eval-titre').value = ev.titre || '';
         const loadedClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
@@ -1989,10 +2024,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         setBareme(currentBareme);
         setModeEval(currentModeEval);
 
-        currentNonNote = ev.nonNote || false;
+        currentNonNote = currentModeNotation !== 'notee';
         currentCorrectionDifferee = ev.correctionDifferee || false;
         currentPastilleNiveau = normalizePastilleNiveau(ev.pastilleNiveau, 'moyen');
-        setNonNote(currentNonNote);
+        setModeNotation(currentModeNotation);
         setCorrectionDifferee(currentCorrectionDifferee);
         setPastilleNiveau(currentPastilleNiveau);
 
@@ -2613,7 +2648,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             bareme: currentBareme,
             timer: parseInt(document.getElementById('eval-timer').value) || 0,
             mode: currentModeEval,
-            nonNote: currentNonNote,
+            modeNotation: currentModeNotation,
+            nonNote: currentModeNotation !== 'notee',
             correctionDifferee: currentCorrectionDifferee,
             pastilleNiveau: normalizePastilleNiveau(currentPastilleNiveau, 'moyen'),
             documents: documents,

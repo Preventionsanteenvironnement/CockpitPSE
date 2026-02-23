@@ -621,6 +621,12 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let results = [];
     let filteredResults = [];
     let currentClassFilter = 'all';
+    const NOTATION_MODES = ['notee', 'formatif_visible', 'non_notee'];
+
+    function getModeNotationFromEval(ev) {
+        if (ev && NOTATION_MODES.includes(ev.modeNotation)) return ev.modeNotation;
+        return (ev && ev.nonNote === true) ? 'non_notee' : 'notee';
+    }
     let sortField = 'code';
     let sortAsc = true;
     let sessionId = null;
@@ -715,7 +721,12 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 : '<span class="ei-badge badge-draft">🔴 Brouillon</span>';
             const qCountBadge = '<span class="ei-badge badge-qcount">' + (ev.questions ? ev.questions.length : 0) + ' Q</span>';
             const baremeBadge = '<span class="ei-badge badge-bareme">/' + (ev.bareme || 20) + '</span>';
-            const nonNoteBadge = ev.nonNote === true ? '<span class="ei-badge" style="background:rgba(245,158,11,0.15);color:#fcd34d;">Non notee</span>' : '';
+            const modeNotation = getModeNotationFromEval(ev);
+            const nonNoteBadge = modeNotation === 'non_notee'
+                ? '<span class="ei-badge" style="background:rgba(245,158,11,0.15);color:#fcd34d;">Non notee</span>'
+                : (modeNotation === 'formatif_visible'
+                    ? '<span class="ei-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;">Note formative</span>'
+                    : '');
 
             const evClasseIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
             const classeBadge = evClasseIds.length > 0
@@ -950,7 +961,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     // === RENDER STATS ===
     function renderStats() {
-        const isNonNote = currentEvalData && currentEvalData.nonNote === true;
+        const notationMode = getModeNotationFromEval(currentEvalData);
+        const isHorsMoyenne = notationMode !== 'notee';
         const notes = filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n));
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
         const publies = filteredResults.filter(r => r.publie).length;
@@ -958,7 +970,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('stat-soumis').textContent = filteredResults.length;
         document.getElementById('stat-publies').textContent = publies;
 
-        if (isNonNote) {
+        if (isHorsMoyenne) {
             document.getElementById('stat-moyenne').textContent = 'N/A';
             document.getElementById('stat-min').textContent = 'N/A';
             document.getElementById('stat-max').textContent = 'N/A';
@@ -991,7 +1003,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
             // Note coloring — use display note (ajustee if exists)
             const bareme = r.bareme || 20;
-            const isEvalNonNote = currentEvalData && currentEvalData.nonNote === true;
+            const notationMode = getModeNotationFromEval(currentEvalData);
+            const isEvalNonNote = notationMode === 'non_notee';
+            const isEvalFormatifVisible = notationMode === 'formatif_visible';
             const displayNote = getDisplayNote(r);
             const pct = displayNote !== null ? (displayNote / bareme) * 100 : 0;
             const noteClass = isEvalNonNote ? '' : (displayNote === null ? '' : (pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low'));
@@ -1002,6 +1016,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 noteHtml = '<span style="color:#fcd34d; font-size:0.8rem;">📋 Soumis</span>';
             } else if (displayNote !== null) {
                 noteHtml = displayNote + '/' + bareme;
+                if (isEvalFormatifVisible) {
+                    noteHtml += ' <span class="note-adjusted-badge" style="background:rgba(59,130,246,0.2);color:#bfdbfe;border-color:rgba(147,197,253,0.45);">formatif</span>';
+                }
                 if (r.note_ajustee !== null && r.note_ajustee !== undefined) {
                     noteHtml += ' <span class="note-adjusted-badge">ajuste</span>';
                 }
@@ -1490,6 +1507,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
 
         const bareme = currentEvalData ? (currentEvalData.bareme || 20) : 20;
+        const notationMode = getModeNotationFromEval(currentEvalData);
         const header = ['Eleve', 'Code', 'Classe', 'Note/' + bareme, 'Note auto', 'Note ajustee', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'Statut', 'Temps (sec)', 'Date', 'Sorties onglet', 'Copier-coller', 'Clics droit', 'Captures ecran'];
 
         const rows = filteredResults.map(r => {
@@ -1508,11 +1526,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 }
             }
             const displayNote = getDisplayNote(r);
+            const noteCsv = notationMode === 'non_notee'
+                ? 'NN'
+                : (displayNote !== null ? displayNote : '--');
             return [
                 getNomEleve(r.eleveCode) || r.eleveCode,
                 r.eleveCode,
                 r.classe,
-                displayNote !== null ? displayNote : '--',
+                noteCsv,
                 r.note !== null ? r.note : '--',
                 (r.note_ajustee !== null && r.note_ajustee !== undefined) ? r.note_ajustee : '',
                 ...comps,
@@ -1543,11 +1564,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (filteredResults.length === 0) { showToast('Aucun resultat a exporter.'); return; }
 
         const bareme = currentEvalData.bareme || 20;
+        const notationMode = getModeNotationFromEval(currentEvalData);
         const titre = currentEvalData.titre || 'Evaluation';
         const now = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         // Stats
-        const notes = filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n));
+        const notes = notationMode === 'notee'
+            ? filteredResults.map(r => getDisplayNote(r)).filter(n => n !== null && n !== undefined && !isNaN(n)).map(n => parseFloat(n))
+            : [];
         const avg = notes.length > 0 ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1) : '--';
         const min = notes.length > 0 ? Math.min(...notes).toFixed(1) : '--';
         const max = notes.length > 0 ? Math.max(...notes).toFixed(1) : '--';
@@ -1557,7 +1581,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         let tableRows = '';
         filteredResults.forEach(r => {
             const displayNote = getDisplayNote(r);
-            const noteStr = displayNote !== null ? displayNote + '/' + bareme : '--';
+            const noteStr = notationMode === 'non_notee'
+                ? 'NN'
+                : (displayNote !== null ? (displayNote + '/' + bareme + (notationMode === 'formatif_visible' ? ' (formatif)' : '')) : '--');
             const adjusted = (r.note_ajustee !== null && r.note_ajustee !== undefined) ? ' (ajuste)' : '';
             let comps = '';
             for (let c = 1; c <= 6; c++) {
