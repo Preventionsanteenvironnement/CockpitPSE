@@ -2788,262 +2788,167 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 <script>
 // ========== IMPORT JSON SYSTEM ==========
 
-const IMPORT_PROMPT = `Tu es un generateur d'evaluations PSE (Prevention Sante Environnement) pour l'editeur Eval V2.
+const IMPORT_PROMPT = `Tu es un générateur d'évaluations PSE (Prévention Santé Environnement). Génère un JSON strictement valide au format suivant.
+
+FORMAT JSON :
+{
+  "titre": "Titre de l'évaluation",
+  "bareme": 20,
+  "documents": [
+    { "id": "doc1", "type": "texte", "titre": "Document 1", "contenu": "Texte du document..." },
+    { "id": "doc2", "type": "image", "titre": "Schéma", "image_url": "https://...", "alt": "Description", "description": "Légende", "credit": "Source" }
+  ],
+  "questions": [
+    {
+      "type": "qcm",
+      "consigne": "Identifier le principal risque lié à...",
+      "choix": ["Risque A", "Risque B", "Risque C", "Risque D"],
+      "reponse": 0,
+      "points": 1,
+      "competence": "C1",
+      "correction": "La bonne réponse est A parce que...",
+      "explication": "Ce point est important car...",
+      "document_id": "doc1"
+    }
+  ]
+}
+
+TYPES DE QUESTIONS AUTORISÉS :
+- "qcm" : QCM choix unique. choix (tableau 2-6, tous différents), reponse (index 0-based)
+- "qcm_multi" : QCM choix multiples. choix (tableau 2-6, tous différents), reponse (tableau d'indices, non vide)
+- "vf" : Vrai/Faux. reponse (true ou false, boolean strict)
+- "mot" : Réponse courte. reponse (string non vide)
+- "nombre" : Réponse numérique. reponse (number), tolerance (optionnel, number >= 0)
+- "ordonner" : Remettre dans l'ordre. elements (tableau >= 3 éléments, tous différents, dans l'ordre correct)
+
+TYPES DE DOCUMENTS :
+- "texte" : champs obligatoires = id, type, titre, contenu
+- "image" : champs obligatoires = id, type, titre, image_url. Optionnels : alt, description, credit
+
+COMPÉTENCES PSE (C1 à C6 UNIQUEMENT) :
+- C1 – Traiter une information
+- C2 – Appliquer une démarche d'analyse dans une situation donnée
+- C3 – Expliquer un phénomène physiologique, un enjeu environnemental, une disposition réglementaire, en lien avec une mesure de prévention (UNIQUEMENT si la question relie phénomène/règle → prévention précise)
+- C4 – Proposer une solution pour résoudre un problème
+- C5 – Argumenter un choix
+- C6 – Communication à l'écrit et à l'oral avec une syntaxe claire et adaptée
+
+RÈGLES BLOOM :
+Chaque consigne respecte la taxonomie de Bloom et commence par un seul verbe d'action unique (définir, identifier, appliquer, analyser, justifier, proposer, etc.). Pas de consignes floues ou doubles. Un seul verbe d'action par question. La compétence est choisie selon le verbe et la production attendue.
+
+RÈGLES ANTI-HALLUCINATION :
+- Ne pas inventer de document image si aucune image_url n'est fournie
+- Ne pas inventer de document_id : utiliser uniquement les ids définis dans documents[]
+- Si aucun document pertinent pour une question, mettre document_id: null
+- competence est OBLIGATOIRE pour chaque question (C1 à C6)
+
+RÈGLES STRICTES :
+- Tous les choix d'un QCM doivent être différents
+- Tous les éléments d'un ordonner doivent être différents
+- Le JSON doit être valide et parsable directement
+- points doit être un nombre > 0
+- Ne pas ajouter de commentaires dans le JSON
+
+========================
+PROMPT QCM (copie intégrale)
+========================
+Genere un exercice QCM classique pour le module PSE [MODULE] en JSON.
 
 REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
 - N'ajoute aucun texte avant/apres
 - N'ajoute aucun bloc Markdown (pas de \`\`\`)
 - N'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)
 - N'ajoute aucun commentaire JSON
-- Utilise uniquement des guillemets doubles standards
 
-OBJECTIF:
-Produire une evaluation complete contenant des documents et un mix de questions.
-Le mix peut inclure dans la meme evaluation: QCM + PAD + PREVENTION + autres types.
-
-FORMAT JSON STRICT (racine):
+Format STRICT :
 {
-  "titre": "Titre de l'evaluation",
-  "bareme": 20,
-  "documents": [
-    { "id": "doc1", "type": "texte", "titre": "Document 1", "contenu": "Texte du document..." },
-    { "id": "doc2", "type": "image", "titre": "Schema", "image_url": "https://...", "alt": "Description", "description": "Legende", "credit": "Source" },
-    { "id": "doc3", "type": "video", "titre": "Video", "video_url": "https://...", "description": "Resume video" }
+  "titre": "QCM - [theme]",
+  "question": "...",
+  "choix": [
+    { "id": "c1", "texte": "Bonne reponse" },
+    { "id": "c2", "texte": "Distracteur 1" },
+    { "id": "c3", "texte": "Distracteur 2" },
+    { "id": "c4", "texte": "Distracteur 3" }
   ],
-  "questions": [
-    {
-      "type": "qcm",
-      "consigne": "Identifier ...",
-      "choix": ["A", "B", "C", "D"],
-      "reponse": 0,
-      "points": 1,
-      "competence": "C1",
-      "correction": "Correction courte",
-      "explication": "Explication pedagogique",
-      "document_id": "doc1"
-    }
-  ]
+  "reponse": "c1",
+  "multiple": false,
+  "explication": "Explication de la bonne reponse"
 }
 
-CHAMPS COMMUNS OBLIGATOIRES POUR CHAQUE QUESTION:
-- "type"
-- "consigne"
-- "points" (nombre > 0)
-- "competence" (C1 a C6)
-- "correction" (recommande)
-- "explication" (recommande)
-- "document_id": id d'un document existant, ou null
+Si multiple: true → "reponse": ["c1", "c3"]
 
-TYPES DE DOCUMENTS:
-- "texte": id, type, titre, contenu
-- "image": id, type, titre, image_url (+ alt/description/credit optionnels)
-- "video": id, type, titre, video_url (+ description optionnelle)
-
-COMPETENCES PSE (C1 a C6 UNIQUEMENT):
-- C1: Traiter une information
-- C2: Appliquer une demarche d'analyse dans une situation donnee
-- C3: Expliquer un phenomene / enjeu / regle en lien avec la prevention
-- C4: Proposer une solution adaptee
-- C5: Argumenter un choix
-- C6: Communiquer a l'ecrit/oral avec une syntaxe claire et adaptee
+REGLES :
+- 4 choix minimum, chacun avec un id unique (c1, c2, c3, c4)
+- reponse = id du bon choix (pas le texte)
+- Distracteurs plausibles mais clairement faux
+- Question claire et sans ambiguite
+- Vocabulaire CAP/Bac Pro
+- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)
 
 ========================
-PROMPT COMPLET QCM
+PROMPT PAD (copie intégrale)
 ========================
-Tu peux utiliser:
-- "type": "qcm" (choix unique)
-- "type": "qcm_multi" (plusieurs bonnes reponses)
-
-QCM CHOIX UNIQUE - FORMAT:
+Genere un exercice PAD (Processus d'Apparition du Dommage) pour le module PSE [MODULE] en JSON.
+La situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes, max 500 caracteres).
+Format STRICT :
 {
-  "type": "qcm",
-  "consigne": "...",
-  "choix": ["Proposition A", "Proposition B", "Proposition C", "Proposition D"],
-  "reponse": 0,
-  "points": 1,
-  "competence": "C2",
-  "correction": "...",
-  "explication": "...",
-  "document_id": "doc1"
-}
-
-QCM MULTI - FORMAT:
-{
-  "type": "qcm_multi",
-  "consigne": "...",
-  "choix": ["Proposition A", "Proposition B", "Proposition C", "Proposition D"],
-  "reponse": [0, 2],
-  "points": 2,
-  "competence": "C3",
-  "correction": "...",
-  "explication": "...",
-  "document_id": "doc1"
-}
-
-REGLES QCM:
-- 2 a 6 choix
-- tous les choix doivent etre differents
-- index 0-based obligatoire
-- en qcm_multi: "reponse" = tableau non vide d'indices valides
-- distracteurs plausibles mais faux
-- question claire, directe, non ambigue
-- vocabulaire CAP/Bac Pro
-
-========================
-PROMPT COMPLET PAD
-========================
-Genere une question PAD (Processus d'Apparition du Dommage) en JSON pour Eval V2.
-La situation decrit un professionnel dans son activite reelle (3 a 5 phrases, max 500 caracteres).
-
-FORMAT STRICT PAD:
-{
-  "type": "pad",
-  "consigne": "Complete la chaine PAD suivante...",
+  "titre": "PAD - [metier/situation]",
   "situation": "...",
-  "danger": "...",
+  "danger": "..." (max 80 car),
   "distracteurs_danger": ["dist1", "dist2", "dist3"],
-  "situation_dangereuse": "...",
+  "situation_dangereuse": "..." (max 120 car),
   "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],
-  "evenement_declencheur": "...",
+  "evenement_declencheur": "..." (max 120 car),
   "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],
-  "dommage": "...",
-  "distracteurs_dommage": ["dist1", "dist2", "dist3"],
-  "points": 4,
-  "competence": "C2",
-  "correction": "Rappel de la chaine PAD correcte",
-  "explication": "Explication pedagogique de la logique PAD",
-  "document_id": null
+  "dommage": "..." (max 120 car),
+  "distracteurs_dommage": ["dist1", "dist2", "dist3"]
 }
-
-REGLES PAD:
-- exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)
-- distracteurs credibles du meme univers pro mais faux pour CETTE situation
-- distracteurs tous differents entre eux et differents de la bonne reponse
-- longueur conseillee:
-  - danger <= 80 caracteres
-  - autres champs <= 120 caracteres
-  - distracteurs <= 80 caracteres
-- coherence stricte:
-  Danger -> exposition (situation dangereuse) -> bascule (evenement declencheur) -> consequence (dommage)
-- pas de formule vague type "faire attention"
+REGLES :
+- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)
+- Distracteurs credibles dans le meme univers professionnel mais faux pour CETTE situation
+- Distracteurs tous differents entre eux et differents de la bonne reponse
+- Chaque distracteur max 80 caracteres
+- Vocabulaire simple adapte a des eleves de Bac Pro
+- Coherence PAD : Danger → exposition = Situation dangereuse → bascule = Evenement declencheur → consequence = Dommage
+- Ajoute un champ "explication" (optionnel) avec une explication pedagogique pour aider l'eleve a comprendre la chaine PAD.
 
 ========================
-PROMPT COMPLET PREVENTION
+PROMPT PREVENTION (copie intégrale)
 ========================
-Genere une question "Mesures de prevention" en JSON pour Eval V2.
-La situation decrit un contexte professionnel avec un danger identifie.
-L'eleve choisit la meilleure mesure pour chaque niveau de prevention.
+Genere un exercice "Mesures de prevention" pour le module PSE [MODULE] en JSON.
+La situation doit decrire un professionnel expose a un danger identifie (3-5 phrases realistes, max 500 caracteres).
+Le danger est deja identifie, l'eleve doit trouver la bonne mesure pour chaque niveau de prevention.
 
-FORMAT STRICT PREVENTION:
+Format STRICT :
 {
-  "type": "prevention",
-  "consigne": "Choisis la meilleure mesure pour chaque niveau de prevention...",
+  "titre": "Prevention - [metier/situation]",
   "situation": "...",
   "danger": "...",
   "niveaux": [
-    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["d1", "d2", "d3"] },
-    { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "...", "distracteurs": ["d1", "d2", "d3"] },
-    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["d1", "d2", "d3"] },
-    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["d1", "d2", "d3"] },
-    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["d1", "d2", "d3"] }
-  ],
-  "points": 5,
-  "competence": "C4",
-  "correction": "Rappel de la hierarchie de prevention",
-  "explication": "Pourquoi agir a la source est plus efficace",
-  "document_id": null
-}
-
-REGLES PREVENTION:
-- 5 niveaux obligatoires dans CET ordre:
-  supprimer > reduire > collective > individuelle > formation
-- exactement 3 distracteurs par niveau
-- distracteurs = vraies mesures de prevention mais du MAUVAIS niveau
-- chaque mesure doit etre concrete et applicable
-- interdiction des mesures vagues ("etre vigilant", "faire attention")
-- longueurs conseillees:
-  - bonne_reponse <= 120 caracteres
-  - distracteurs <= 80 caracteres
-- logique pedagogique obligatoire:
-  agir a la source > protection collective > EPI > information
-
-========================
-AUTRES TYPES AUTORISES
-========================
-- "vf": { "type":"vf", "consigne":"...", "reponse": true/false, "points":1, "competence":"C1", "correction":"...", "explication":"...", "document_id":null }
-- "mot": { "type":"mot", "consigne":"...", "reponse":"mot attendu", "points":1, "competence":"C1", "correction":"...", "explication":"...", "document_id":null }
-- "nombre": { "type":"nombre", "consigne":"...", "reponse": 12, "tolerance": 0, "points":1, "competence":"C1", "correction":"...", "explication":"...", "document_id":null }
-- "ordonner": { "type":"ordonner", "consigne":"...", "elements":["e1","e2","e3"], "points":2, "competence":"C2", "correction":"...", "explication":"...", "document_id":null }
-
-========================
-EXEMPLE D'EVALUATION MIXTE (QCM + PAD + PREVENTION)
-========================
-{
-  "titre": "Evaluation PSE - Risques professionnels",
-  "bareme": 20,
-  "documents": [
-    { "id": "doc1", "type": "texte", "titre": "Contexte atelier", "contenu": "Un eleve realise une decoupe de cartons..." }
-  ],
-  "questions": [
-    {
-      "type": "qcm",
-      "consigne": "Identifier le danger principal dans la situation.",
-      "choix": ["Cutter expose", "Pause dejeuner", "Musique de fond", "Lumiere naturelle"],
-      "reponse": 0,
-      "points": 1,
-      "competence": "C2",
-      "correction": "Le danger est le cutter expose.",
-      "explication": "L'outil tranchant non securise expose a un risque de coupure.",
-      "document_id": "doc1"
-    },
-    {
-      "type": "pad",
-      "consigne": "Complete la chaine PAD.",
-      "situation": "Un eleve coupe rapidement des cartons sans gant adapte.",
-      "danger": "Lame de cutter",
-      "distracteurs_danger": ["Bruit ambiant", "Sol sec", "Lumiere plafond"],
-      "situation_dangereuse": "Decoupe rapide sans protection",
-      "distracteurs_situation_dangereuse": ["Rangement du poste", "Lecture consigne", "Nettoyage table"],
-      "evenement_declencheur": "Le cutter derape",
-      "distracteurs_evenement_declencheur": ["Debut de pause", "Sonnerie", "Passage enseignant"],
-      "dommage": "Coupure de la main",
-      "distracteurs_dommage": ["Fatigue visuelle", "Rhume", "Mal de tete"],
-      "points": 4,
-      "competence": "C2",
-      "correction": "PAD: lame -> exposition -> derapage -> coupure",
-      "explication": "Le dommage apparait apres la chaine complete du risque.",
-      "document_id": null
-    },
-    {
-      "type": "prevention",
-      "consigne": "Associe la meilleure mesure a chaque niveau.",
-      "situation": "Risque de projection de produit irritant.",
-      "danger": "Projection de produit chimique",
-      "niveaux": [
-        { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "Remplacer le produit par une version non dangereuse", "distracteurs": ["Porter des gants", "Afficher une consigne", "Faire un rappel oral"] },
-        { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "Diminuer la concentration et la quantite utilisee", "distracteurs": ["Mettre des lunettes", "Former le personnel", "Ajouter une affiche"] },
-        { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "Installer un ecran de protection et une aspiration", "distracteurs": ["Porter un masque", "Lire la notice", "Changer de salle"] },
-        { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "Porter lunettes et gants adaptes", "distracteurs": ["Changer le produit", "Installer capotage", "Faire un briefing"] },
-        { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "Former aux consignes et gestes de securite", "distracteurs": ["Remplacer le produit", "Installer ventilation", "Porter combinaison"] }
-      ],
-      "points": 5,
-      "competence": "C4",
-      "correction": "Ordre logique: source -> reduction -> collectif -> individuel -> information",
-      "explication": "On privilegie les actions a la source avant l'EPI.",
-      "document_id": null
-    }
+    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
+    { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
+    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
+    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
+    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] }
   ]
 }
 
-RAPPEL FINAL - REGLES STRICTES:
-- JSON parsable directement avec JSON.parse
-- aucune cle manquante sur les types utilises
-- points > 0 pour chaque question
-- competence obligatoire sur chaque question
-- document_id reference un id existant ou null
-- pas de texte hors JSON`;
+REGLES CRUCIALES :
+- 5 niveaux dans cet ordre : supprimer > reduire > collective > individuelle > formation
+- Exactement 3 distracteurs par niveau (tableaux JSON)
+- Les distracteurs doivent etre des VRAIES mesures de prevention mais du MAUVAIS niveau
+  Ex: pour "Supprimer", un distracteur peut etre "Porter des gants" (qui est un EPI, pas une suppression)
+- Chaque mesure max 120 caracteres, distracteurs max 80 caracteres
+- Vocabulaire simple adapte a des eleves de CAP/Bac Pro
+- Le principe cle : plus on agit a la source, plus c'est efficace
+  Supprimer > Reduire > Collectif > Individuel > Formation
+- JAMAIS de mesure vague comme "faire attention" ou "etre vigilant"
+- Chaque mesure doit etre CONCRETE et APPLICABLE
+- Ajoute un champ "explication" (optionnel) avec une explication pedagogique globale pour aider l'eleve a comprendre la hierarchie des mesures.`;
 
-window.openImportModal = function() {
+window.openImportModal
+
+ = function() {
     document.getElementById('import-modal').style.display = 'flex';
     document.getElementById('import-json-input').value = '';
     document.getElementById('import-errors').style.display = 'none';
