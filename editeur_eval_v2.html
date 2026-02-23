@@ -333,6 +333,12 @@
             cursor: pointer; transition: 0.2s;
         }
         .btn-save-eval:hover { background: #2563eb; }
+        .btn-save-eval:disabled {
+            opacity: 0.45; cursor: not-allowed;
+        }
+        .btn-save-eval:disabled:hover {
+            background: #3b82f6;
+        }
         .btn-publish-eval {
             padding: 14px 24px; background: #22c55e; color: white;
             border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
@@ -1075,7 +1081,7 @@
             <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
             <button class="btn-publish-eval" id="btn-publish" onclick="publishEval()">📢 Publier</button>
             <button class="btn-unpublish-eval" id="btn-unpublish" onclick="unpublishEval()" style="display:none;">⏸️ Depublier</button>
-            <button class="btn-save-eval" id="btn-duplicate-eval" onclick="duplicateCurrentEval()" style="display:none; background:#f59e0b; color:#000;">📋 Dupliquer</button>
+            <button class="btn-save-eval" id="btn-duplicate-eval" onclick="duplicateCurrentEval()" style="background:#f59e0b; color:#000;" disabled title="Ouvrez d'abord une evaluation a dupliquer">📋 Dupliquer</button>
             <button class="btn-delete-eval" id="btn-delete-eval" onclick="deleteEval()" style="display:none;">🗑️ Supprimer</button>
         </div>
     </div>
@@ -1910,9 +1916,19 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     };
 
     window.duplicateCurrentEval = function() {
-        if (!currentEvalId) return;
+        if (!currentEvalId) {
+            showToast("Ouvre d'abord une evaluation existante pour la dupliquer.");
+            return;
+        }
         duplicateEval(currentEvalId, null);
     };
+
+    function setDuplicateButtonEnabled(enabled) {
+        const btn = document.getElementById('btn-duplicate-eval');
+        if (!btn) return;
+        btn.disabled = !enabled;
+        btn.title = enabled ? 'Dupliquer cette evaluation' : "Ouvrez d'abord une evaluation a dupliquer";
+    }
 
     // === NEW EVAL ===
     window.newEval = function() {
@@ -1937,7 +1953,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         setCorrectionDifferee(false);
         setPastilleNiveau('moyen');
         document.getElementById('btn-delete-eval').style.display = 'none';
-        document.getElementById('btn-duplicate-eval').style.display = 'none';
+        setDuplicateButtonEnabled(false);
         document.getElementById('validation-banner').style.display = 'none';
         updatePublishButtons(false);
         hideAddForm();
@@ -1981,7 +1997,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         setPastilleNiveau(currentPastilleNiveau);
 
         document.getElementById('btn-delete-eval').style.display = 'block';
-        document.getElementById('btn-duplicate-eval').style.display = 'block';
+        setDuplicateButtonEnabled(true);
         document.getElementById('validation-banner').style.display = 'none';
         updatePublishButtons(ev.publie === true);
         hideAddForm();
