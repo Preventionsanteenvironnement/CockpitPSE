@@ -970,6 +970,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     window.newSession = async function() {
+        if (currentSessionId && playerCount > 0) {
+            const ok = confirm("Des eleves sont deja connectes (" + playerCount + ").\n\nCreer une nouvelle session va les deconnecter de la session en cours.\nContinuer ?");
+            if (!ok) return;
+        }
         // Fix 4 : nettoyer les anciennes presences et reponses avant de creer la session
         try {
             var oldSessionId = localStorage.getItem('quiz_live_sessionId');
@@ -1119,14 +1123,34 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const timer = currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-input').value) || 15;
         const shuffleMap = shuffleEnabled ? generateShuffleMap(q) : null;
 
-        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
-            phase: 'question',
-            currentQuestionIndex: currentQuestionIndex,
-            isOpen: true,
-            showResults: false,
-            paused: false,
-            shuffleMap: shuffleMap
-        }));
+        try {
+            await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+                phase: 'question',
+                currentQuestionIndex: currentQuestionIndex,
+                isOpen: true,
+                showResults: false,
+                paused: false,
+                shuffleMap: shuffleMap
+            }));
+        } catch(e) {
+            console.error("Erreur lancement question:", e);
+            // Retry une fois apres 1s
+            try {
+                await new Promise(function(r) { setTimeout(r, 1000); });
+                await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+                    phase: 'question',
+                    currentQuestionIndex: currentQuestionIndex,
+                    isOpen: true,
+                    showResults: false,
+                    paused: false,
+                    shuffleMap: shuffleMap
+                }));
+            } catch(e2) {
+                alert("Erreur reseau : la question n'a pas pu etre envoyee. Verifie ta connexion et reessaie.");
+                currentQuestionIndex--;
+                return;
+            }
+        }
 
         // Clean up previous team display
         const oldTeamStrip = document.getElementById('team-results-strip');
