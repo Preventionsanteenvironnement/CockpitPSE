@@ -3751,6 +3751,62 @@ Important:
         var typeHint = null;
         var warning = '';
 
+        // Normalisation des noms de champs anglais courants (top-level)
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            if (!data.titre && data.title) { data.titre = data.title; delete data.title; }
+            if (!data.question && data.consigne) { data.question = data.consigne; delete data.consigne; }
+            if (!data.choix && data.choices) { data.choix = data.choices; delete data.choices; }
+            if (!data.choix && data.options) { data.choix = data.options; delete data.options; }
+            if (data.reponse === undefined && data.answer !== undefined) { data.reponse = data.answer; delete data.answer; }
+            if (data.reponse === undefined && data.response !== undefined) { data.reponse = data.response; delete data.response; }
+            if (data.reponse === undefined && data.correct !== undefined) { data.reponse = data.correct; delete data.correct; }
+            if (!data.explication && data.explanation) { data.explication = data.explanation; delete data.explanation; }
+            if (!data.affirmations && data.statements) { data.affirmations = data.statements; delete data.statements; }
+            if (!data.paires && data.pairs) { data.paires = data.pairs; delete data.pairs; }
+            if (!data.mots && data.words) { data.mots = data.words; delete data.words; }
+            if (!data.cartes && data.cards) { data.cartes = data.cards; delete data.cards; }
+            if (!data.etapes && data.steps) { data.etapes = data.steps; delete data.steps; }
+            if (!data.colonnes && data.columns) { data.colonnes = data.columns; delete data.columns; }
+            if (!data.lignes && data.rows) { data.lignes = data.rows; delete data.rows; }
+            if (!data.categories && data.groups) { data.categories = data.groups; delete data.groups; }
+            // Normaliser les questions internes
+            if (Array.isArray(data.questions)) {
+                data.questions.forEach(function(q) {
+                    if (!q.question && q.consigne) { q.question = q.consigne; delete q.consigne; }
+                    if (!q.choix && q.choices) { q.choix = q.choices; delete q.choices; }
+                    if (!q.choix && q.options) { q.choix = q.options; delete q.options; }
+                    if (q.reponse === undefined && q.answer !== undefined) { q.reponse = q.answer; delete q.answer; }
+                    if (q.reponse === undefined && q.response !== undefined) { q.reponse = q.response; delete q.response; }
+                    if (q.reponse === undefined && q.correct !== undefined) { q.reponse = q.correct; delete q.correct; }
+                    if (!q.explication && q.explanation) { q.explication = q.explanation; delete q.explanation; }
+                });
+            }
+            // Normaliser niveaux de prevention (case insensitive)
+            if (Array.isArray(data.niveaux)) {
+                data.niveaux.forEach(function(n) {
+                    if (n && n.niveau) n.niveau = String(n.niveau).toLowerCase().trim();
+                    if (n && !n.bonne_reponse && n.correct_answer) { n.bonne_reponse = n.correct_answer; delete n.correct_answer; }
+                    if (n && !n.bonne_reponse && n.answer) { n.bonne_reponse = n.answer; delete n.answer; }
+                });
+            }
+            // Normaliser VF affirmations
+            if (Array.isArray(data.affirmations)) {
+                data.affirmations.forEach(function(a) {
+                    if (!a.texte && a.text) { a.texte = a.text; delete a.text; }
+                    if (!a.texte && a.question) { a.texte = a.question; delete a.question; }
+                    if (!a.texte && a.statement) { a.texte = a.statement; delete a.statement; }
+                    if (a.vrai === undefined && a.correct !== undefined) { a.vrai = !!a.correct; delete a.correct; }
+                    if (a.vrai === undefined && a.answer !== undefined) {
+                        if (typeof a.answer === 'string') {
+                            var l = a.answer.toLowerCase().trim();
+                            a.vrai = ['vrai','true','oui','yes','1','v'].indexOf(l) !== -1;
+                        } else { a.vrai = !!a.answer; }
+                        delete a.answer;
+                    }
+                });
+            }
+        }
+
         function firstRepId(rep) {
             if (Array.isArray(rep)) return rep.length > 0 ? rep[0] : 'c1';
             return rep;
@@ -3907,7 +3963,7 @@ Important:
                 var reqNiveaux = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
                 var byLevel = {};
                 data.niveaux.forEach(function(n) {
-                    if (n && n.niveau) byLevel[String(n.niveau)] = n;
+                    if (n && n.niveau) byLevel[String(n.niveau).toLowerCase().trim()] = n;
                 });
                 for (var ni = 0; ni < reqNiveaux.length; ni++) {
                     var lvl = reqNiveaux[ni];

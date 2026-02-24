@@ -1275,7 +1275,143 @@ REGLES STRICTES :
 - Pas d'accents dans le JSON (pas de e accent, a accent, etc.)
 - Le JSON doit etre valide et parsable directement
 - Le champ "type" du quiz vaut "diagnostique" ou "formatif"
-- Ne pas ajouter de champs supplementaires (pas de "explication", "points", "scenario")`;
+- Ne pas ajouter de champs supplementaires (pas de "explication", "points", "scenario")
+
+SORTIE :
+REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
+- N'ajoute aucun texte avant ou apres le JSON
+- N'ajoute aucun bloc Markdown (pas de backticks)
+- N'ajoute aucune citation, source ou tag
+- N'ajoute aucun commentaire dans le JSON
+- Guillemets doubles standards uniquement
+- Le JSON doit commencer par { et finir par }`;
+
+    // === NORMALISATION UNIVERSELLE QUIZ (accepte tout JSON d'IA) ===
+    function normalizeQuizJSON(data) {
+        // --- Champs racine ---
+        if (!data.titre && data.title) { data.titre = data.title; delete data.title; }
+        if (!data.titre && data.nom) { data.titre = data.nom; delete data.nom; }
+        if (!data.type && data.quiz_type) { data.type = data.quiz_type; delete data.quiz_type; }
+        if (data.type) {
+            const t = String(data.type).toLowerCase().trim();
+            if (t === 'diag' || t === 'diagnostic') data.type = 'diagnostique';
+            if (t === 'formative' || t === 'sommatif' || t === 'evaluation') data.type = 'formatif';
+        }
+        if (!data.questions && data.items) { data.questions = data.items; delete data.items; }
+        if (!data.questions && data.exercices) { data.questions = data.exercices; delete data.exercices; }
+
+        if (!Array.isArray(data.questions)) return data;
+
+        data.questions.forEach(q => {
+            // 1. Normaliser le type (case + aliases)
+            if (q.type) {
+                const typeStr = String(q.type).toLowerCase().trim();
+                const TYPE_MAP = {
+                    'qcm': 'qcm', 'qcm_single': 'qcm', 'qcm_unique': 'qcm', 'choix_unique': 'qcm',
+                    'single': 'qcm', 'radio': 'qcm', 'single_choice': 'qcm', 'multiple_choice': 'qcm',
+                    'qcm_multi': 'qcm', 'checkbox': 'qcm',
+                    'vf': 'vf', 'vrai_faux': 'vf', 'true_false': 'vf', 'boolean': 'vf', 'bool': 'vf', 'tf': 'vf',
+                    'mot': 'mot', 'texte': 'mot', 'text': 'mot', 'short': 'mot', 'reponse_courte': 'mot',
+                    'short_answer': 'mot', 'word': 'mot', 'input': 'mot'
+                };
+                q.type = TYPE_MAP[typeStr] || q.type;
+            }
+
+            // 2. Normaliser noms de champs → format quiz (question/choices/correct/reponse)
+            // question
+            if (!q.question && q.consigne) { q.question = q.consigne; delete q.consigne; }
+            if (!q.question && q.enonce) { q.question = q.enonce; delete q.enonce; }
+            if (!q.question && q.intitule) { q.question = q.intitule; delete q.intitule; }
+            if (!q.question && q.libelle) { q.question = q.libelle; delete q.libelle; }
+            if (!q.question && q.texte) { q.question = q.texte; delete q.texte; }
+
+            // choices (pour QCM)
+            if (!q.choices && q.choix) { q.choices = q.choix; delete q.choix; }
+            if (!q.choices && q.options) { q.choices = q.options; delete q.options; }
+            if (!q.choices && q.propositions) { q.choices = q.propositions; delete q.propositions; }
+            if (!q.choices && q.alternatives) { q.choices = q.alternatives; delete q.alternatives; }
+
+            // correct (pour QCM et VF)
+            if (q.correct === undefined && q.reponse !== undefined && q.type !== 'mot') {
+                q.correct = q.reponse; delete q.reponse;
+            }
+            if (q.correct === undefined && q.answer !== undefined) {
+                if (q.type === 'mot') { q.reponse = q.answer; } else { q.correct = q.answer; }
+                delete q.answer;
+            }
+            if (q.correct === undefined && q.response !== undefined) {
+                if (q.type === 'mot') { q.reponse = q.response; } else { q.correct = q.response; }
+                delete q.response;
+            }
+            if (q.correct === undefined && q.correct_answer !== undefined) {
+                if (q.type === 'mot') { q.reponse = q.correct_answer; } else { q.correct = q.correct_answer; }
+                delete q.correct_answer;
+            }
+            if (q.correct === undefined && q.bonne_reponse !== undefined) {
+                if (q.type === 'mot') { q.reponse = q.bonne_reponse; } else { q.correct = q.bonne_reponse; }
+                delete q.bonne_reponse;
+            }
+
+            // reponse pour mot (si correct est fourni a la place)
+            if (q.type === 'mot' && !q.reponse && q.correct !== undefined) {
+                q.reponse = q.correct; delete q.correct;
+            }
+            // Assurer reponse est string pour mot
+            if (q.type === 'mot' && typeof q.reponse === 'number') {
+                q.reponse = String(q.reponse);
+            }
+
+            // 3. Normaliser choices (objets → strings)
+            if (Array.isArray(q.choices) && q.choices.length > 0 && typeof q.choices[0] === 'object' && q.choices[0] !== null) {
+                const idToIndex = {};
+                q.choices = q.choices.map((c, i) => {
+                    if (c.id) { idToIndex[String(c.id)] = i; idToIndex[String(c.id).toLowerCase()] = i; }
+                    return c.texte || c.label || c.text || c.value || c.content || JSON.stringify(c);
+                });
+                // Mapper correct si c'est un ID
+                if (typeof q.correct === 'string' && idToIndex[q.correct] !== undefined) {
+                    q.correct = idToIndex[q.correct];
+                } else if (typeof q.correct === 'string' && idToIndex[q.correct.toLowerCase()] !== undefined) {
+                    q.correct = idToIndex[q.correct.toLowerCase()];
+                }
+            }
+
+            // 4. Normaliser correct pour QCM (string texte → index)
+            if (q.type === 'qcm' && Array.isArray(q.choices) && typeof q.correct === 'string') {
+                const lower = q.correct.trim().toLowerCase();
+                const idx = q.choices.findIndex(c => String(c).trim().toLowerCase() === lower);
+                if (idx >= 0) {
+                    q.correct = idx;
+                } else {
+                    // Essayer match partiel
+                    const partIdx = q.choices.findIndex(c => {
+                        const cl = String(c).trim().toLowerCase();
+                        return cl.includes(lower) || lower.includes(cl);
+                    });
+                    if (partIdx >= 0) {
+                        q.correct = partIdx;
+                    } else {
+                        const numVal = parseInt(q.correct, 10);
+                        if (!isNaN(numVal) && numVal >= 0 && numVal < q.choices.length) q.correct = numVal;
+                    }
+                }
+            }
+
+            // 5. Normaliser correct pour VF (string → boolean)
+            if (q.type === 'vf') {
+                if (typeof q.correct === 'string') {
+                    const l = q.correct.trim().toLowerCase();
+                    if (['vrai', 'true', '1', 'oui', 'yes', 'v', 't'].includes(l)) q.correct = true;
+                    else if (['faux', 'false', '0', 'non', 'no', 'f'].includes(l)) q.correct = false;
+                }
+                if (typeof q.correct === 'number') {
+                    q.correct = q.correct !== 0;
+                }
+            }
+        });
+
+        return data;
+    }
 
     window.openImportModal = function() {
         document.getElementById('quiz-import-modal').style.display = 'flex';
@@ -1346,6 +1482,11 @@ REGLES STRICTES :
             data = JSON.parse(cleaned);
         } catch(e) {
             return { ok: false, data: null, errors: ['JSON invalide : ' + e.message] };
+        }
+
+        // Normalisation universelle (adapte tout format d'IA)
+        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+            data = normalizeQuizJSON(data);
         }
 
         if (!data.questions || !Array.isArray(data.questions)) {
