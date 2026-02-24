@@ -970,6 +970,20 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     window.newSession = async function() {
+        // Fix 4 : nettoyer les anciennes presences et reponses avant de creer la session
+        try {
+            var oldSessionId = localStorage.getItem('quiz_live_sessionId');
+            if (oldSessionId) {
+                var cleanBatch = writeBatch(db);
+                var cleanCount = 0;
+                for (var col of ['quiz_live_reponses', 'quiz_live_presence']) {
+                    var oldSnap = await getDocs(query(collection(db, col), where("sessionId", "==", oldSessionId)));
+                    oldSnap.forEach(function(d) { cleanBatch.delete(d.ref); cleanCount++; });
+                }
+                if (cleanCount > 0) await cleanBatch.commit();
+            }
+        } catch(e) { console.warn("Nettoyage ancien session:", e); }
+
         currentSessionId = generateSessionId();
         currentSessionCode = SESSION_CODES[Math.floor(Math.random() * SESSION_CODES.length)];
         currentQuestionIndex = -1;
