@@ -245,6 +245,24 @@
         .wall-podium-rank { font-size: 2rem; margin-bottom: 4px; }
         .wall-podium-name { font-size: 1.2rem; font-weight: 800; }
         .wall-podium-pct { font-size: 1.5rem; font-weight: 900; margin-top: 4px; }
+        .wall-podium-members { font-size: 0.75rem; color: rgba(255,255,255,0.55); margin-top: 6px; line-height: 1.4; }
+
+        /* === MVP === */
+        .wall-mvp-section {
+            width: 100%; max-width: 800px; margin-top: 20px;
+            display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+        }
+        .wall-mvp-card {
+            background: rgba(255,255,255,0.06); border-radius: 12px;
+            padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: revealCard 0.5s ease both;
+        }
+        .wall-mvp-star { font-size: 1.3rem; }
+        .wall-mvp-info { text-align: left; }
+        .wall-mvp-team { font-size: 0.7rem; font-weight: 700; }
+        .wall-mvp-name { font-size: 0.95rem; font-weight: 800; color: white; }
+        .wall-mvp-score { font-size: 0.7rem; color: #94a3b8; }
 
         /* === TEAM LOBBY BADGES === */
         .lobby-teams-section {
@@ -268,6 +286,8 @@
         @keyframes bounceIn { 0% { transform: translateX(-50%) scale(0); } 50% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         @keyframes fadeIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+        @keyframes revealCard { 0% { opacity:0; transform: translateY(40px) scale(0.8); } 60% { opacity:1; transform: translateY(-8px) scale(1.05); } 100% { opacity:1; transform: translateY(0) scale(1); } }
+        @keyframes winnerGlow { 0%,100% { box-shadow: 0 0 20px rgba(245,158,11,0.3); } 50% { box-shadow: 0 0 40px rgba(245,158,11,0.6), 0 0 80px rgba(245,158,11,0.2); } }
     </style>
 </head>
 <body>
@@ -347,6 +367,7 @@
         <div class="wall-podium-title" id="wall-podium-title">🏆 Classement des equipes</div>
         <div class="wall-podium-list" id="wall-podium-list"></div>
     </div>
+    <div class="wall-mvp-section" id="wall-mvp-section" style="display:none;"></div>
     <div class="sum-mini-bars" id="sum-bars"></div>
     <div class="sum-thanks">Merci d'avoir participe ! 🎉</div>
 </div>
@@ -682,7 +703,7 @@
             const memberIds = t.members.map(m => m.visitorId);
             const teamResp = responsesData.filter(r => r.questionIndex === questionIndex && memberIds.includes(r.visitorId));
             const correct = teamResp.filter(r => r.correct).length;
-            const total = teamResp.length;
+            const total = t.members.length; // use all members (not just responders) — aligned with prof
             return {
                 teamId: t.teamId, teamName: t.teamName, teamEmoji: t.teamEmoji, teamColor: t.teamColor,
                 correct, total, pct: total > 0 ? Math.round((correct / total) * 100) : 0
@@ -773,7 +794,10 @@
         let totalAnswered = 0;
         const container = document.getElementById('sum-bars');
         container.innerHTML = '';
+        const sumGlobal = document.getElementById('sum-global');
 
+        // Compute bar data first
+        const barData = [];
         const maxQ = questions.length;
         for (let i = 0; i < maxQ; i++) {
             const qResp = responsesData.filter(r => r.questionIndex === i);
@@ -783,31 +807,48 @@
             const pct = Math.round((correct / total) * 100);
             totalCorrect += correct;
             totalAnswered += total;
-
-            let barColor = pct >= 60 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444';
-
-            const mini = document.createElement('div');
-            mini.className = 'sum-mini';
-            mini.style.animation = 'fadeIn 0.5s ease ' + (i * 0.2) + 's both';
-            mini.innerHTML = '<div class="sum-mini-pct" style="color:' + barColor + '">' + pct + '%</div>' +
-                '<div class="sum-mini-bar" style="background:' + barColor + ';" id="sumbar-' + i + '"></div>' +
-                '<div class="sum-mini-label">Q' + (i + 1) + '</div>';
-            container.appendChild(mini);
-
-            setTimeout(() => {
-                document.getElementById('sumbar-' + i).style.height = Math.max(20, pct * 1.5) + 'px';
-            }, 400 + i * 200);
+            barData.push({ index: i, pct: pct });
         }
-
         const globalPct = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-        document.getElementById('sum-global').textContent = 'Taux de reussite global : ' + globalPct + '%';
 
-        // Team podium
-        displayWallTeamPodium();
+        // Team podium first (animated reveal)
+        var podiumDuration = displayWallTeamPodium() || 0;
+        // In solo mode, no podium delay
+        var barsDelay = (wallGameMode === 'solo' || wallTeams.length === 0) ? 0 : podiumDuration + 1000;
+
+        // Hide bars + global until podium is done
+        container.style.opacity = '0';
+        sumGlobal.style.opacity = '0';
+
+        setTimeout(function() {
+            container.style.opacity = '1';
+            container.style.transition = 'opacity 0.5s ease';
+            sumGlobal.style.opacity = '1';
+            sumGlobal.style.transition = 'opacity 0.5s ease';
+            sumGlobal.textContent = 'Taux de reussite global : ' + globalPct + '%';
+
+            barData.forEach(function(bd, idx) {
+                let barColor = bd.pct >= 60 ? '#22c55e' : bd.pct >= 40 ? '#f59e0b' : '#ef4444';
+                const mini = document.createElement('div');
+                mini.className = 'sum-mini';
+                mini.style.animation = 'fadeIn 0.5s ease ' + (idx * 0.2) + 's both';
+                mini.innerHTML = '<div class="sum-mini-pct" style="color:' + barColor + '">' + bd.pct + '%</div>' +
+                    '<div class="sum-mini-bar" style="background:' + barColor + ';" id="sumbar-' + bd.index + '"></div>' +
+                    '<div class="sum-mini-label">Q' + (bd.index + 1) + '</div>';
+                container.appendChild(mini);
+
+                setTimeout(function() {
+                    var el = document.getElementById('sumbar-' + bd.index);
+                    if (el) el.style.height = Math.max(20, bd.pct * 1.5) + 'px';
+                }, 400 + idx * 200);
+            });
+        }, barsDelay);
     }
 
     function displayWallTeamPodium() {
         const podiumEl = document.getElementById('wall-team-podium');
+        const mvpEl = document.getElementById('wall-mvp-section');
+        if (mvpEl) mvpEl.style.display = 'none';
         if (wallGameMode === 'solo' || wallTeams.length === 0) {
             podiumEl.style.display = 'none';
             return;
@@ -834,14 +875,103 @@
             titleEl.textContent = '🏆 Classement des equipes';
         }
 
-        cumulative.forEach((t, i) => {
+        // REVERSED reveal: last place first, winner last
+        const reversed = [...cumulative].reverse();
+        const total = reversed.length;
+
+        reversed.forEach((t, revIdx) => {
+            const origIdx = total - 1 - revIdx; // real rank (0=1st, 1=2nd, etc.)
             const card = document.createElement('div');
-            card.className = 'wall-podium-card' + (i < 3 ? ' ' + classes[i] : '');
-            card.style.animationDelay = (i * 0.15) + 's';
-            card.innerHTML = '<div class="wall-podium-rank">' + (i < 3 ? medals[i] : '#' + (i + 1)) + '</div>' +
+            card.className = 'wall-podium-card' + (origIdx < 3 ? ' ' + classes[origIdx] : '');
+            card.style.opacity = '0';
+
+            const team = wallTeams.find(wt => wt.teamId === t.teamId);
+            const memberNames = team ? team.members.map(m => m.pseudo).join(', ') : '';
+            card.innerHTML = '<div class="wall-podium-rank">' + (origIdx < 3 ? medals[origIdx] : '#' + (origIdx + 1)) + '</div>' +
                 '<div class="wall-podium-name" style="color:' + t.teamColor + '">' + t.teamEmoji + ' ' + t.teamName + '</div>' +
-                '<div class="wall-podium-pct">' + t.pct + '%</div>';
+                '<div class="wall-podium-pct">' + t.pct + '%</div>' +
+                '<div class="wall-podium-members">' + memberNames + '</div>';
             list.appendChild(card);
+
+            // Timing: lower ranks fast, top 3 dramatic pauses
+            var delay;
+            var nonPodium = Math.max(0, total - 3);
+            if (origIdx >= 3) {
+                delay = revIdx * 1000;
+            } else if (origIdx === 2) {
+                delay = nonPodium * 1000 + 1500;
+            } else if (origIdx === 1) {
+                delay = nonPodium * 1000 + 3500;
+            } else {
+                delay = nonPodium * 1000 + 6000;
+            }
+
+            setTimeout(function() {
+                card.style.opacity = '1';
+                card.style.animation = 'revealCard 0.6s ease both';
+                if (origIdx === 0) {
+                    // Winner: bigger reveal + infinite glow
+                    card.style.animation = 'revealCard 0.8s ease both';
+                    setTimeout(function() {
+                        card.style.animation = 'winnerGlow 2s ease-in-out infinite';
+                    }, 900);
+                }
+            }, delay);
+        });
+
+        // MVP after full podium reveal
+        var mvpDelay = Math.max(0, total - 3) * 1000 + 8000;
+        setTimeout(function() { displayMVP(); }, mvpDelay);
+
+        // Return total podium duration for bar delay
+        return Math.max(0, total - 3) * 1000 + 9500;
+    }
+
+    // === MVP (Best player per team) ===
+    function computeMVPPerTeam() {
+        return wallTeams.map(function(t) {
+            var memberIds = t.members.map(function(m) { return m.visitorId; });
+            var bestVid = null, bestCorrect = -1;
+            memberIds.forEach(function(vid) {
+                var correct = responsesData.filter(function(r) {
+                    return r.visitorId === vid && r.correct;
+                }).length;
+                if (correct > bestCorrect) {
+                    bestCorrect = correct;
+                    bestVid = vid;
+                }
+            });
+            var bestMember = t.members.find(function(m) { return m.visitorId === bestVid; });
+            var totalQ = wallQuestions.length;
+            return {
+                teamId: t.teamId, teamName: t.teamName,
+                teamEmoji: t.teamEmoji, teamColor: t.teamColor,
+                pseudo: bestMember ? bestMember.pseudo : '?',
+                correct: bestCorrect, total: totalQ
+            };
+        });
+    }
+
+    function displayMVP() {
+        if (wallGameMode === 'solo' || wallTeams.length === 0) return;
+        var mvps = computeMVPPerTeam();
+        var container = document.getElementById('wall-mvp-section');
+        if (!container) return;
+        container.style.display = 'flex';
+        container.innerHTML = '<div style="width:100%;text-align:center;font-size:1.1rem;font-weight:700;color:#f59e0b;margin-bottom:8px;animation:fadeIn 0.5s ease both;">🌟 MVP par equipe</div>';
+
+        mvps.forEach(function(mvp, i) {
+            var card = document.createElement('div');
+            card.className = 'wall-mvp-card';
+            card.style.animationDelay = (i * 0.2) + 's';
+            card.innerHTML =
+                '<div class="wall-mvp-star">🌟</div>' +
+                '<div class="wall-mvp-info">' +
+                    '<div class="wall-mvp-team" style="color:' + mvp.teamColor + ';">' + mvp.teamEmoji + ' ' + mvp.teamName + '</div>' +
+                    '<div class="wall-mvp-name">' + mvp.pseudo + '</div>' +
+                    '<div class="wall-mvp-score">' + mvp.correct + '/' + mvp.total + ' bonnes reponses</div>' +
+                '</div>';
+            container.appendChild(card);
         });
     }
 
