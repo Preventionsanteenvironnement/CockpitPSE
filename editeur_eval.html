@@ -2504,7 +2504,16 @@ RÈGLES STRICTES :
 - Tous les éléments d'un ordonner doivent être différents
 - Le JSON doit être valide et parsable directement
 - points doit être un nombre > 0
-- Ne pas ajouter de commentaires dans le JSON`;
+- Ne pas ajouter de commentaires dans le JSON
+
+SORTIE :
+REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
+- N'ajoute aucun texte avant ou apres le JSON
+- N'ajoute aucun bloc Markdown (pas de \`\`\`json)
+- N'ajoute aucune citation, source ou tag (interdit: [cite], [cite_start], references web)
+- N'ajoute aucun commentaire dans le JSON
+- Guillemets doubles standards uniquement (pas de guillemets typographiques)
+- Le JSON doit commencer par { et finir par }`;
 
 window.openImportModal = function() {
     document.getElementById('import-modal').style.display = 'flex';
@@ -2534,6 +2543,128 @@ window.copyImportPrompt = function() {
         showToast('📋 Prompt copié !');
     });
 };
+
+// === NORMALISATION UNIVERSELLE (accepte tout JSON d'IA) ===
+function normalizeImportJSON(data) {
+    // --- Normaliser les champs racine ---
+    if (!data.titre && data.title) { data.titre = data.title; delete data.title; }
+    if (!data.titre && data.nom) { data.titre = data.nom; delete data.nom; }
+    if (data.bareme === undefined && data.total !== undefined) { data.bareme = data.total; delete data.total; }
+    if (data.bareme === undefined && data.score !== undefined) { data.bareme = data.score; delete data.score; }
+    if (data.bareme !== undefined) {
+        const b = Number(data.bareme);
+        if (!isNaN(b) && b !== 10 && b !== 20) { data.bareme = b <= 15 ? 10 : 20; }
+        else if (typeof data.bareme === 'string') { const bp = parseInt(data.bareme, 10); data.bareme = (!isNaN(bp) && bp <= 15) ? 10 : 20; }
+    }
+    if (!data.questions && data.exercices) { data.questions = data.exercices; delete data.exercices; }
+    if (!data.questions && data.items) { data.questions = data.items; delete data.items; }
+
+    // --- Normaliser les documents ---
+    if (Array.isArray(data.documents)) {
+        data.documents.forEach(doc => {
+            if (doc.type === 'text') doc.type = 'texte';
+            if (doc.type === 'img' || doc.type === 'photo') doc.type = 'image';
+            if (!doc.contenu && doc.content) { doc.contenu = doc.content; delete doc.content; }
+            if (!doc.titre && doc.label) { doc.titre = doc.label; delete doc.label; }
+            if (!doc.titre && doc.name) { doc.titre = doc.name; delete doc.name; }
+            if (doc.type === 'image' && !doc.image_url && doc.url) { doc.image_url = doc.url; delete doc.url; }
+        });
+    }
+
+    // --- Normaliser les questions ---
+    if (!Array.isArray(data.questions)) return data;
+    data.questions.forEach(q => {
+        // Noms de champs
+        if (!q.consigne && q.question) { q.consigne = q.question; delete q.question; }
+        if (!q.consigne && q.enonce) { q.consigne = q.enonce; delete q.enonce; }
+        if (!q.choix && q.options) { q.choix = q.options; delete q.options; }
+        if (!q.choix && q.choices) { q.choix = q.choices; delete q.choices; }
+        if (!q.choix && q.propositions) { q.choix = q.propositions; delete q.propositions; }
+        if (q.reponse === undefined && q.response !== undefined) { q.reponse = q.response; delete q.response; }
+        if (q.reponse === undefined && q.answer !== undefined) { q.reponse = q.answer; delete q.answer; }
+        if (q.reponse === undefined && q.correct !== undefined) { q.reponse = q.correct; delete q.correct; }
+        if (q.reponse === undefined && q.correct_answer !== undefined) { q.reponse = q.correct_answer; delete q.correct_answer; }
+        if (q.reponse === undefined && q.bonne_reponse !== undefined) { q.reponse = q.bonne_reponse; delete q.bonne_reponse; }
+        if (!q.correction && q.feedback) { q.correction = q.feedback; delete q.feedback; }
+        if (!q.explication && q.explanation) { q.explication = q.explanation; delete q.explanation; }
+        if (!q.competence && q.comp) { q.competence = q.comp; delete q.comp; }
+        if (!q.competence && q.competences) { q.competence = q.competences; delete q.competences; }
+
+        // Type
+        if (q.type) {
+            const typeStr = String(q.type).toLowerCase().trim();
+            const TYPE_MAP = {
+                'qcm': 'qcm', 'qcm_single': 'qcm', 'qcm_unique': 'qcm', 'choix_unique': 'qcm',
+                'single': 'qcm', 'radio': 'qcm', 'single_choice': 'qcm',
+                'qcm_multi': 'qcm_multi', 'qcm_multiple': 'qcm_multi', 'choix_multiple': 'qcm_multi',
+                'multi': 'qcm_multi', 'checkbox': 'qcm_multi', 'multiple_choice': 'qcm_multi', 'multiple': 'qcm_multi',
+                'vf': 'vf', 'vrai_faux': 'vf', 'true_false': 'vf', 'boolean': 'vf', 'bool': 'vf',
+                'mot': 'mot', 'texte': 'mot', 'text': 'mot', 'short': 'mot', 'reponse_courte': 'mot',
+                'nombre': 'nombre', 'numerique': 'nombre', 'numeric': 'nombre', 'number': 'nombre',
+                'ordonner': 'ordonner', 'ordre': 'ordonner', 'order': 'ordonner', 'classement': 'ordonner'
+            };
+            q.type = TYPE_MAP[typeStr] || q.type;
+        }
+        if (q.type === 'qcm' && q.multiple === true) { q.type = 'qcm_multi'; delete q.multiple; }
+
+        // Competence
+        if (q.competence) {
+            let comp = String(q.competence).trim().toUpperCase();
+            if (/^\d$/.test(comp)) comp = 'C' + comp;
+            q.competence = comp;
+        }
+
+        // Points string → number
+        if (typeof q.points === 'string') { const p = parseFloat(q.points.replace(',', '.')); if (!isNaN(p)) q.points = p; }
+
+        // Choix objets → strings
+        if (Array.isArray(q.choix) && q.choix.length > 0 && typeof q.choix[0] === 'object' && q.choix[0] !== null) {
+            const idToIndex = {};
+            q.choix = q.choix.map((c, i) => {
+                if (c.id) { idToIndex[String(c.id)] = i; idToIndex[String(c.id).toLowerCase()] = i; }
+                return c.texte || c.label || c.text || c.value || JSON.stringify(c);
+            });
+            if (typeof q.reponse === 'string' && idToIndex[q.reponse] !== undefined) q.reponse = idToIndex[q.reponse];
+            if (Array.isArray(q.reponse)) {
+                q.reponse = q.reponse.map(r => (typeof r === 'string' && idToIndex[r] !== undefined) ? idToIndex[r] : r);
+            }
+        }
+
+        // Reponse selon type
+        const rt = q.type === 'qcm' ? 'qcm_single' : q.type;
+        if (rt === 'qcm_single' && Array.isArray(q.choix) && typeof q.reponse === 'string') {
+            const lower = q.reponse.trim().toLowerCase();
+            const idx = q.choix.findIndex(c => String(c).trim().toLowerCase() === lower);
+            if (idx >= 0) q.reponse = idx;
+            else { const n = parseInt(q.reponse, 10); if (!isNaN(n) && n >= 0 && n < q.choix.length) q.reponse = n; }
+        }
+        if (rt === 'qcm_multi' && Array.isArray(q.choix)) {
+            if (!Array.isArray(q.reponse) && q.reponse !== undefined) q.reponse = [q.reponse];
+            if (Array.isArray(q.reponse)) {
+                q.reponse = q.reponse.map(r => {
+                    if (typeof r === 'string') { const idx = q.choix.findIndex(c => String(c).trim().toLowerCase() === r.trim().toLowerCase()); return idx >= 0 ? idx : (parseInt(r,10)||r); }
+                    return r;
+                });
+            }
+        }
+        if (rt === 'vf') {
+            if (typeof q.reponse === 'string') {
+                const l = q.reponse.trim().toLowerCase();
+                if (['vrai','true','1','oui','yes'].includes(l)) q.reponse = true;
+                else if (['faux','false','0','non','no'].includes(l)) q.reponse = false;
+            }
+            if (typeof q.reponse === 'number') q.reponse = q.reponse !== 0;
+        }
+        if (rt === 'mot' && typeof q.reponse === 'number') q.reponse = String(q.reponse);
+        if (rt === 'nombre' && typeof q.reponse === 'string') { const n = parseFloat(q.reponse.replace(',','.')); if (!isNaN(n)) q.reponse = n; }
+        if (rt === 'ordonner') {
+            if (!q.elements && q.items) { q.elements = q.items; delete q.items; }
+            if (!q.elements && Array.isArray(q.choix)) { q.elements = q.choix; delete q.choix; }
+        }
+        if (q.document_id === undefined) q.document_id = null;
+    });
+    return data;
+}
 
 // === VALIDATE IMPORT JSON ===
 function validateImportJSON(jsonString) {
@@ -2578,6 +2709,9 @@ function validateImportJSON(jsonString) {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
         return { ok: false, data: null, errors: ['❌ Le JSON doit être un objet { ... }'] };
     }
+
+    // 1b. Normalisation universelle (adapte tout format d'IA au format attendu)
+    data = normalizeImportJSON(data);
 
     // 2. Bareme
     if (data.bareme !== undefined && data.bareme !== 10 && data.bareme !== 20) {

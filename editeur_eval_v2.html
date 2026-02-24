@@ -2901,102 +2901,14 @@ RÈGLES STRICTES :
 - points doit être un nombre > 0
 - Ne pas ajouter de commentaires dans le JSON
 
-========================
-PROMPT QCM (copie intégrale)
-========================
-Genere un exercice QCM classique pour le module PSE [MODULE] en JSON.
-
+SORTIE :
 REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
-- N'ajoute aucun texte avant/apres
-- N'ajoute aucun bloc Markdown (pas de \`\`\`)
-- N'ajoute aucune citation/source/tag (interdit: [cite], [cite_start], references web)
-- N'ajoute aucun commentaire JSON
-
-Format STRICT :
-{
-  "titre": "QCM - [theme]",
-  "question": "...",
-  "choix": [
-    { "id": "c1", "texte": "Bonne reponse" },
-    { "id": "c2", "texte": "Distracteur 1" },
-    { "id": "c3", "texte": "Distracteur 2" },
-    { "id": "c4", "texte": "Distracteur 3" }
-  ],
-  "reponse": "c1",
-  "multiple": false,
-  "explication": "Explication de la bonne reponse"
-}
-
-Si multiple: true → "reponse": ["c1", "c3"]
-
-REGLES :
-- 4 choix minimum, chacun avec un id unique (c1, c2, c3, c4)
-- reponse = id du bon choix (pas le texte)
-- Distracteurs plausibles mais clairement faux
-- Question claire et sans ambiguite
-- Vocabulaire CAP/Bac Pro
-- JSON parsable directement avec JSON.parse (guillemets doubles standards uniquement)
-
-========================
-PROMPT PAD (copie intégrale)
-========================
-Genere un exercice PAD (Processus d'Apparition du Dommage) pour le module PSE [MODULE] en JSON.
-La situation doit decrire un professionnel dans son activite de travail (3-5 phrases realistes, max 500 caracteres).
-Format STRICT :
-{
-  "titre": "PAD - [metier/situation]",
-  "situation": "...",
-  "danger": "..." (max 80 car),
-  "distracteurs_danger": ["dist1", "dist2", "dist3"],
-  "situation_dangereuse": "..." (max 120 car),
-  "distracteurs_situation_dangereuse": ["dist1", "dist2", "dist3"],
-  "evenement_declencheur": "..." (max 120 car),
-  "distracteurs_evenement_declencheur": ["dist1", "dist2", "dist3"],
-  "dommage": "..." (max 120 car),
-  "distracteurs_dommage": ["dist1", "dist2", "dist3"]
-}
-REGLES :
-- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)
-- Distracteurs credibles dans le meme univers professionnel mais faux pour CETTE situation
-- Distracteurs tous differents entre eux et differents de la bonne reponse
-- Chaque distracteur max 80 caracteres
-- Vocabulaire simple adapte a des eleves de Bac Pro
-- Coherence PAD : Danger → exposition = Situation dangereuse → bascule = Evenement declencheur → consequence = Dommage
-- Ajoute un champ "explication" (optionnel) avec une explication pedagogique pour aider l'eleve a comprendre la chaine PAD.
-
-========================
-PROMPT PREVENTION (copie intégrale)
-========================
-Genere un exercice "Mesures de prevention" pour le module PSE [MODULE] en JSON.
-La situation doit decrire un professionnel expose a un danger identifie (3-5 phrases realistes, max 500 caracteres).
-Le danger est deja identifie, l'eleve doit trouver la bonne mesure pour chaque niveau de prevention.
-
-Format STRICT :
-{
-  "titre": "Prevention - [metier/situation]",
-  "situation": "...",
-  "danger": "...",
-  "niveaux": [
-    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
-    { "niveau": "reduire", "label": "Reduire le risque a la source", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
-    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
-    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] },
-    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["d1","d2","d3"] }
-  ]
-}
-
-REGLES CRUCIALES :
-- 5 niveaux dans cet ordre : supprimer > reduire > collective > individuelle > formation
-- Exactement 3 distracteurs par niveau (tableaux JSON)
-- Les distracteurs doivent etre des VRAIES mesures de prevention mais du MAUVAIS niveau
-  Ex: pour "Supprimer", un distracteur peut etre "Porter des gants" (qui est un EPI, pas une suppression)
-- Chaque mesure max 120 caracteres, distracteurs max 80 caracteres
-- Vocabulaire simple adapte a des eleves de CAP/Bac Pro
-- Le principe cle : plus on agit a la source, plus c'est efficace
-  Supprimer > Reduire > Collectif > Individuel > Formation
-- JAMAIS de mesure vague comme "faire attention" ou "etre vigilant"
-- Chaque mesure doit etre CONCRETE et APPLICABLE
-- Ajoute un champ "explication" (optionnel) avec une explication pedagogique globale pour aider l'eleve a comprendre la hierarchie des mesures.`;
+- N'ajoute aucun texte avant ou apres le JSON
+- N'ajoute aucun bloc Markdown (pas de \`\`\`json)
+- N'ajoute aucune citation, source ou tag (interdit: [cite], [cite_start], references web)
+- N'ajoute aucun commentaire dans le JSON
+- Guillemets doubles standards uniquement (pas de guillemets typographiques)
+- Le JSON doit commencer par { et finir par }`;
 
 window.openImportModal
 
@@ -3028,6 +2940,241 @@ window.copyImportPrompt = function() {
         showToast('📋 Prompt copié !');
     });
 };
+
+// === NORMALISATION UNIVERSELLE (accepte tout JSON d'IA) ===
+function normalizeImportJSON(data) {
+    // --- Normaliser les champs racine ---
+    // titre aliases
+    if (!data.titre && data.title) { data.titre = data.title; delete data.title; }
+    if (!data.titre && data.nom) { data.titre = data.nom; delete data.nom; }
+    // bareme aliases + conversion
+    if (data.bareme === undefined && data.total !== undefined) { data.bareme = data.total; delete data.total; }
+    if (data.bareme === undefined && data.score !== undefined) { data.bareme = data.score; delete data.score; }
+    if (data.bareme === undefined && data.note !== undefined) { data.bareme = data.note; delete data.note; }
+    if (data.bareme !== undefined) {
+        const b = Number(data.bareme);
+        if (!isNaN(b) && b !== 10 && b !== 20) {
+            data.bareme = b <= 15 ? 10 : 20;
+        } else if (typeof data.bareme === 'string') {
+            const bp = parseInt(data.bareme, 10);
+            data.bareme = (!isNaN(bp) && bp <= 15) ? 10 : 20;
+        }
+    }
+    // questions aliases
+    if (!data.questions && data.exercices) { data.questions = data.exercices; delete data.exercices; }
+    if (!data.questions && data.items) { data.questions = data.items; delete data.items; }
+
+    // --- Normaliser les documents ---
+    if (Array.isArray(data.documents)) {
+        data.documents.forEach(doc => {
+            // type aliases
+            if (doc.type === 'text') doc.type = 'texte';
+            if (doc.type === 'img' || doc.type === 'photo') doc.type = 'image';
+            if (doc.type === 'vid' || doc.type === 'youtube') doc.type = 'video';
+            // content → contenu
+            if (!doc.contenu && doc.content) { doc.contenu = doc.content; delete doc.content; }
+            // label → titre
+            if (!doc.titre && doc.label) { doc.titre = doc.label; delete doc.label; }
+            if (!doc.titre && doc.name) { doc.titre = doc.name; delete doc.name; }
+            // url → image_url
+            if (doc.type === 'image' && !doc.image_url && doc.url) { doc.image_url = doc.url; delete doc.url; }
+            if (doc.type === 'video' && !doc.video_url && doc.url) { doc.video_url = doc.url; delete doc.url; }
+        });
+    }
+
+    // --- Normaliser les questions ---
+    if (!Array.isArray(data.questions)) return data;
+
+    data.questions.forEach(q => {
+        // 1. Normaliser les noms de champs (FR/EN)
+        if (!q.consigne && q.question) { q.consigne = q.question; delete q.question; }
+        if (!q.consigne && q.enonce) { q.consigne = q.enonce; delete q.enonce; }
+        if (!q.consigne && q.intitule) { q.consigne = q.intitule; delete q.intitule; }
+        if (!q.consigne && q.libelle) { q.consigne = q.libelle; delete q.libelle; }
+        if (!q.consigne && q.texte) { q.consigne = q.texte; delete q.texte; }
+
+        if (!q.choix && q.options) { q.choix = q.options; delete q.options; }
+        if (!q.choix && q.choices) { q.choix = q.choices; delete q.choices; }
+        if (!q.choix && q.propositions) { q.choix = q.propositions; delete q.propositions; }
+        if (!q.choix && q.alternatives) { q.choix = q.alternatives; delete q.alternatives; }
+
+        if (q.reponse === undefined && q.response !== undefined) { q.reponse = q.response; delete q.response; }
+        if (q.reponse === undefined && q.answer !== undefined) { q.reponse = q.answer; delete q.answer; }
+        if (q.reponse === undefined && q.correct !== undefined) { q.reponse = q.correct; delete q.correct; }
+        if (q.reponse === undefined && q.correct_answer !== undefined) { q.reponse = q.correct_answer; delete q.correct_answer; }
+        if (q.reponse === undefined && q.reponse_correcte !== undefined) { q.reponse = q.reponse_correcte; delete q.reponse_correcte; }
+        if (q.reponse === undefined && q.bonne_reponse !== undefined) { q.reponse = q.bonne_reponse; delete q.bonne_reponse; }
+
+        if (!q.correction && q.feedback) { q.correction = q.feedback; delete q.feedback; }
+        if (!q.correction && q.corrige) { q.correction = q.corrige; delete q.corrige; }
+
+        if (!q.explication && q.explanation) { q.explication = q.explanation; delete q.explanation; }
+        if (!q.explication && q.justification) { q.explication = q.justification; delete q.justification; }
+        if (!q.explication && q.aide) { q.explication = q.aide; delete q.aide; }
+
+        if (!q.competence && q.comp) { q.competence = q.comp; delete q.comp; }
+        if (!q.competence && q.competences) { q.competence = q.competences; delete q.competences; }
+        if (!q.competence && q.skill) { q.competence = q.skill; delete q.skill; }
+
+        // 2. Normaliser le type
+        if (q.type) {
+            const typeStr = String(q.type).toLowerCase().trim();
+            const TYPE_MAP = {
+                'qcm': 'qcm', 'qcm_single': 'qcm', 'qcm_unique': 'qcm', 'choix_unique': 'qcm',
+                'single': 'qcm', 'radio': 'qcm', 'single_choice': 'qcm',
+                'qcm_multi': 'qcm_multi', 'qcm_multiple': 'qcm_multi', 'choix_multiple': 'qcm_multi',
+                'multi': 'qcm_multi', 'checkbox': 'qcm_multi', 'multiple_choice': 'qcm_multi', 'multiple': 'qcm_multi',
+                'vf': 'vf', 'vrai_faux': 'vf', 'true_false': 'vf', 'boolean': 'vf', 'bool': 'vf', 'tf': 'vf',
+                'mot': 'mot', 'texte': 'mot', 'text': 'mot', 'short': 'mot', 'reponse_courte': 'mot',
+                'short_answer': 'mot', 'word': 'mot', 'input': 'mot', 'libre': 'mot',
+                'nombre': 'nombre', 'numerique': 'nombre', 'numeric': 'nombre', 'number': 'nombre', 'chiffre': 'nombre',
+                'ordonner': 'ordonner', 'ordre': 'ordonner', 'order': 'ordonner', 'classement': 'ordonner',
+                'classer': 'ordonner', 'sort': 'ordonner', 'ranking': 'ordonner', 'orderer': 'ordonner',
+                'pad': 'pad', 'prevention': 'prevention'
+            };
+            q.type = TYPE_MAP[typeStr] || q.type;
+        }
+
+        // Detecter QCM multi via le champ "multiple" (format alternatif ChatGPT)
+        if (q.type === 'qcm' && q.multiple === true) {
+            q.type = 'qcm_multi';
+            delete q.multiple;
+        }
+
+        // 3. Normaliser competence
+        if (q.competence) {
+            let comp = String(q.competence).trim().toUpperCase();
+            // "1" → "C1", "c2" → "C2", etc.
+            if (/^\d$/.test(comp)) comp = 'C' + comp;
+            if (/^[A-Z]\d$/.test(comp) && comp.charAt(0) !== 'C') comp = 'C' + comp.charAt(1);
+            q.competence = comp;
+        }
+
+        // 4. Normaliser points (string → number)
+        if (typeof q.points === 'string') {
+            const p = parseFloat(q.points.replace(',', '.'));
+            if (!isNaN(p)) q.points = p;
+        }
+
+        // 5. Normaliser choix (objets → strings) et mapper reponse
+        if (Array.isArray(q.choix) && q.choix.length > 0 && typeof q.choix[0] === 'object' && q.choix[0] !== null) {
+            // Construire un mapping id → index
+            const idToIndex = {};
+            q.choix = q.choix.map((c, i) => {
+                if (c.id) {
+                    idToIndex[String(c.id)] = i;
+                    idToIndex[String(c.id).toLowerCase()] = i;
+                }
+                return c.texte || c.label || c.text || c.value || c.content || c.titre || JSON.stringify(c);
+            });
+            // Mapper reponse si c'est un ID string
+            if (typeof q.reponse === 'string' && idToIndex[q.reponse] !== undefined) {
+                q.reponse = idToIndex[q.reponse];
+            } else if (typeof q.reponse === 'string' && idToIndex[q.reponse.toLowerCase()] !== undefined) {
+                q.reponse = idToIndex[q.reponse.toLowerCase()];
+            }
+            // Mapper reponse array si c'est des IDs
+            if (Array.isArray(q.reponse)) {
+                q.reponse = q.reponse.map(r => {
+                    if (typeof r === 'string' && idToIndex[r] !== undefined) return idToIndex[r];
+                    if (typeof r === 'string' && idToIndex[r.toLowerCase()] !== undefined) return idToIndex[r.toLowerCase()];
+                    return r;
+                });
+            }
+        }
+
+        // 6. Normaliser reponse selon le type resolu
+        const resolvedType = q.type === 'qcm' ? 'qcm_single' : q.type;
+
+        if (resolvedType === 'qcm_single' && Array.isArray(q.choix)) {
+            // reponse string texte → trouver l'index
+            if (typeof q.reponse === 'string') {
+                const lower = q.reponse.trim().toLowerCase();
+                const idx = q.choix.findIndex(c => String(c).trim().toLowerCase() === lower);
+                if (idx >= 0) {
+                    q.reponse = idx;
+                } else {
+                    // Essayer match partiel (le texte contient la reponse ou inversement)
+                    const partIdx = q.choix.findIndex(c => {
+                        const cl = String(c).trim().toLowerCase();
+                        return cl.includes(lower) || lower.includes(cl);
+                    });
+                    if (partIdx >= 0) {
+                        q.reponse = partIdx;
+                    } else {
+                        // Essayer conversion numerique
+                        const numVal = parseInt(q.reponse, 10);
+                        if (!isNaN(numVal) && numVal >= 0 && numVal < q.choix.length) q.reponse = numVal;
+                    }
+                }
+            }
+        }
+
+        if (resolvedType === 'qcm_multi' && Array.isArray(q.choix)) {
+            // Assurer que reponse est un tableau
+            if (!Array.isArray(q.reponse) && q.reponse !== undefined && q.reponse !== null) {
+                q.reponse = [q.reponse];
+            }
+            // Mapper chaque element texte → index
+            if (Array.isArray(q.reponse)) {
+                q.reponse = q.reponse.map(r => {
+                    if (typeof r === 'string') {
+                        const lower = r.trim().toLowerCase();
+                        const idx = q.choix.findIndex(c => String(c).trim().toLowerCase() === lower);
+                        if (idx >= 0) return idx;
+                        const numVal = parseInt(r, 10);
+                        if (!isNaN(numVal)) return numVal;
+                    }
+                    return r;
+                });
+            }
+        }
+
+        if (resolvedType === 'vf') {
+            // String → boolean
+            if (typeof q.reponse === 'string') {
+                const lower = q.reponse.trim().toLowerCase();
+                if (['vrai', 'true', '1', 'oui', 'yes', 'v', 't'].includes(lower)) q.reponse = true;
+                else if (['faux', 'false', '0', 'non', 'no', 'f'].includes(lower)) q.reponse = false;
+            }
+            // Number → boolean
+            if (typeof q.reponse === 'number') {
+                q.reponse = q.reponse !== 0;
+            }
+        }
+
+        if (resolvedType === 'mot') {
+            // Assurer que c'est une string
+            if (typeof q.reponse === 'number') q.reponse = String(q.reponse);
+        }
+
+        if (resolvedType === 'nombre') {
+            // String → number
+            if (typeof q.reponse === 'string') {
+                const n = parseFloat(q.reponse.replace(',', '.'));
+                if (!isNaN(n)) q.reponse = n;
+            }
+            if (typeof q.tolerance === 'string') {
+                const t = parseFloat(q.tolerance.replace(',', '.'));
+                if (!isNaN(t)) q.tolerance = t;
+            }
+        }
+
+        if (resolvedType === 'ordonner') {
+            // Champs alternatifs
+            if (!q.elements && q.items) { q.elements = q.items; delete q.items; }
+            if (!q.elements && q.etapes) { q.elements = q.etapes; delete q.etapes; }
+            if (!q.elements && q.ordre) { q.elements = q.ordre; delete q.ordre; }
+            // Si choix est utilise a la place de elements
+            if (!q.elements && Array.isArray(q.choix)) { q.elements = q.choix; delete q.choix; }
+        }
+
+        // 7. Default document_id a null si absent
+        if (q.document_id === undefined) q.document_id = null;
+    });
+
+    return data;
+}
 
 // === VALIDATE IMPORT JSON ===
 function validateImportJSON(jsonString) {
@@ -3072,6 +3219,9 @@ function validateImportJSON(jsonString) {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
         return { ok: false, data: null, errors: ['❌ Le JSON doit être un objet { ... }'] };
     }
+
+    // 1b. Normalisation universelle (adapte tout format d'IA au format attendu)
+    data = normalizeImportJSON(data);
 
     // 2. Bareme
     if (data.bareme !== undefined && data.bareme !== 10 && data.bareme !== 20) {
@@ -3275,6 +3425,9 @@ window.executeImport = function() {
                 internalDoc.content = doc.image_url || '';
                 if (doc.alt) internalDoc.alt = doc.alt;
                 if (doc.credit) internalDoc.credit = doc.credit;
+            } else if (doc.type === 'video') {
+                internalDoc.type = 'video';
+                internalDoc.content = doc.video_url || '';
             }
             newDocs.push(internalDoc);
         });
