@@ -190,6 +190,15 @@
             font-size: 0.65rem; padding: 2px 6px; border-radius: 4px;
             background: rgba(255,255,255,0.1); color: #e2e8f0;
         }
+        .team-chip {
+            padding: 8px 12px; border-radius: 10px;
+            border: 1px solid rgba(139,92,246,.4);
+            background: rgba(139,92,246,.12);
+            color: #e2e8f0; font-weight: 700; font-size: 0.82rem;
+            cursor: pointer; transition: all .15s;
+        }
+        .team-chip:hover { background: rgba(139,92,246,.25); }
+        .team-chip.active { background: #8b5cf6; color: white; border-color: #8b5cf6; }
 
         /* Team scores in main area */
         .team-score-strip { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
@@ -302,16 +311,13 @@
         </div>
         <!-- Team formation (hidden by default) -->
         <div id="team-section" style="display:none;">
-            <div id="team-size-row" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                <span style="font-size:0.8rem; color:#94a3b8;">Taille</span>
-                <select id="team-size" class="quiz-select" style="width:auto; flex:1;">
-                    <option value="2">Duos (2)</option>
-                    <option value="3">Trios (3)</option>
-                    <option value="4" selected>Equipes de 4</option>
-                    <option value="5">Equipes de 5</option>
-                </select>
+            <div id="team-player-count" style="font-size:0.8rem;color:#94a3b8;margin-bottom:6px;">
+                <span id="team-count-num" style="font-weight:700;color:#a78bfa;">0</span> eleve(s) connecte(s)
             </div>
-            <button class="ctrl-btn" style="background:#8b5cf6; color:white;" onclick="formTeams()">🎲 Former les equipes</button>
+            <div id="team-options" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+            <div id="team-fixed-info" style="display:none;margin-bottom:8px;font-size:0.85rem;color:#e2e8f0;font-weight:700;"></div>
+            <button class="ctrl-btn" id="btn-form-teams" style="background:#8b5cf6; color:white;" onclick="formTeams()">🎲 Former les equipes</button>
+            <button class="ctrl-btn" id="btn-reshuffle" style="display:none;background:#6366f1;color:white;margin-top:4px;" onclick="formTeams()">🔄 Remelanger</button>
             <div id="teams-display" style="margin-top:8px;"></div>
         </div>
     </div>
@@ -488,27 +494,88 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         { name: "Lions", emoji: "🦁", color: "#eab308" }
     ];
 
+    var selectedNumTeams = null;
+
+    function getTeamOptions(n) {
+        var options = [];
+        for (var numTeams = 2; numTeams <= Math.floor(n / 2); numTeams++) {
+            var baseSize = Math.floor(n / numTeams);
+            var remainder = n % numTeams;
+            if (baseSize < 2) break;
+            var label = remainder === 0
+                ? numTeams + ' \u00d7 ' + baseSize
+                : numTeams + ' \u00d7 ' + baseSize + '-' + (baseSize + 1);
+            options.push({ numTeams: numTeams, baseSize: baseSize, remainder: remainder, label: label });
+        }
+        return options;
+    }
+
+    function updateTeamOptions() {
+        var n = presenceSnapshotData.length;
+        var countEl = document.getElementById('team-count-num');
+        if (countEl) countEl.textContent = n;
+
+        var optionsContainer = document.getElementById('team-options');
+        var fixedInfo = document.getElementById('team-fixed-info');
+        var btnForm = document.getElementById('btn-form-teams');
+        var btnReshuffle = document.getElementById('btn-reshuffle');
+        if (!optionsContainer) return;
+
+        if (gameMode === 'battle') {
+            optionsContainer.style.display = 'none';
+            fixedInfo.style.display = 'block';
+            fixedInfo.innerHTML = '\u2694\ufe0f 2 equipes de ' + Math.ceil(n / 2);
+            selectedNumTeams = 2;
+            btnForm.style.display = n >= 2 ? 'block' : 'none';
+        } else if (gameMode === 'duo') {
+            optionsContainer.style.display = 'none';
+            fixedInfo.style.display = 'block';
+            fixedInfo.innerHTML = '\ud83e\udd1d ' + Math.ceil(n / 2) + ' duos';
+            selectedNumTeams = Math.ceil(n / 2);
+            btnForm.style.display = n >= 2 ? 'block' : 'none';
+        } else if (gameMode === 'equipe') {
+            fixedInfo.style.display = 'none';
+            optionsContainer.style.display = 'flex';
+            optionsContainer.innerHTML = '';
+            if (n < 2) {
+                optionsContainer.innerHTML = '<span style="color:#94a3b8;font-size:0.8rem;">En attente d\'eleves...</span>';
+                btnForm.style.display = 'none';
+                return;
+            }
+            var opts = getTeamOptions(n);
+            opts.forEach(function(opt) {
+                var chip = document.createElement('button');
+                chip.className = 'team-chip' + (selectedNumTeams === opt.numTeams ? ' active' : '');
+                chip.textContent = opt.label;
+                chip.onclick = function() {
+                    selectedNumTeams = opt.numTeams;
+                    optionsContainer.querySelectorAll('.team-chip').forEach(function(c) { c.classList.remove('active'); });
+                    chip.classList.add('active');
+                    formTeams();
+                };
+                optionsContainer.appendChild(chip);
+            });
+            // Hide main button for equipe — chips trigger directly
+            btnForm.style.display = 'none';
+        }
+    }
+
     window.setGameMode = function(mode) {
         gameMode = mode;
         teams = [];
-        ['solo','equipe','battle','duo'].forEach(m => {
+        selectedNumTeams = null;
+        ['solo','equipe','battle','duo'].forEach(function(m) {
             document.getElementById('gm-' + m).className = 'game-mode-btn' + (m === mode ? ' active' : '');
         });
-        const teamSection = document.getElementById('team-section');
-        const teamSizeRow = document.getElementById('team-size-row');
-        if (mode === 'equipe') {
+        var teamSection = document.getElementById('team-section');
+        if (mode !== 'solo') {
             teamSection.style.display = 'block';
-            teamSizeRow.style.display = 'flex';
-        } else if (mode === 'battle') {
-            teamSection.style.display = 'block';
-            teamSizeRow.style.display = 'none'; // battle = always 2 teams
-        } else if (mode === 'duo') {
-            teamSection.style.display = 'block';
-            teamSizeRow.style.display = 'none'; // duo = always pairs
+            updateTeamOptions();
         } else {
             teamSection.style.display = 'none';
         }
         document.getElementById('teams-display').innerHTML = '';
+        document.getElementById('btn-reshuffle').style.display = 'none';
     };
 
     window.formTeams = function() {
@@ -527,8 +594,13 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             numTeams = Math.ceil(shuffled.length / 2);
             teamSize = 2;
         } else {
-            teamSize = parseInt(document.getElementById('team-size').value) || 4;
-            numTeams = Math.ceil(shuffled.length / teamSize);
+            // Mode equipe : utiliser selectedNumTeams (chips) ou fallback
+            if (selectedNumTeams) {
+                numTeams = selectedNumTeams;
+            } else {
+                numTeams = Math.min(4, Math.floor(shuffled.length / 2));
+            }
+            teamSize = Math.ceil(shuffled.length / numTeams);
         }
 
         for (let i = 0; i < numTeams; i++) {
@@ -562,6 +634,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
 
         renderTeamsInSidebar();
+        // Show reshuffle, hide form button
+        document.getElementById('btn-reshuffle').style.display = 'block';
+        document.getElementById('btn-form-teams').style.display = 'none';
         // Write teams to config so students and wall can read them
         if (currentSessionId) {
             setDoc(doc(db, "quiz_live_config", "global"), { teams: teams, gameMode: gameMode }, { merge: true });
@@ -945,6 +1020,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 item.innerHTML = '<span class="presence-pseudo">' + data.pseudo + teamBadge + alertBadge + '</span><span class="presence-num">n°' + data.numero + '</span>';
                 list.appendChild(item);
             });
+            // Update team options chips when students connect/disconnect
+            if (gameMode !== 'solo') { updateTeamOptions(); }
         });
 
         const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
