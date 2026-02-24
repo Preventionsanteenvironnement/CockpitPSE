@@ -33,6 +33,47 @@
             letter-spacing: 1px; display: block; margin-bottom: 8px;
         }
 
+        .sidebar-filters details { width: 100%; }
+        .sidebar-filters summary {
+            list-style: none; cursor: pointer; user-select: none;
+            font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 700; margin-bottom: 8px;
+        }
+        .sidebar-filters summary::-webkit-details-marker { display: none; }
+        .sidebar-filters summary::after { content: '▾'; float: right; color: #64748b; }
+        .sidebar-filters details:not([open]) summary::after { content: '▸'; }
+        .filter-grid {
+            display: grid; grid-template-columns: 1fr; gap: 8px;
+        }
+        .filter-select, .filter-date {
+            width: 100%;
+            padding: 8px 10px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            outline: none;
+        }
+        .filter-select:focus, .filter-date:focus { border-color: #3b82f6; }
+        .filter-date-row {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .filter-reset {
+            width: 100%;
+            margin-top: 8px;
+            padding: 7px 10px;
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+        .filter-reset:hover { border-color: #64748b; color: white; }
+
         #btn-new-exo {
             width: 100%; padding: 12px; background: #22c55e; color: white;
             border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
@@ -57,6 +98,14 @@
         }
         .exo-list-item:hover .ei-del { opacity: 1; }
         .exo-list-item .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .exo-list-empty {
+            padding: 10px;
+            border: 1px dashed #334155;
+            border-radius: 8px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-align: center;
+        }
         .ei-badge {
             display: inline-block; padding: 2px 6px; border-radius: 4px;
             font-size: 0.65rem; font-weight: 700; margin-right: 4px;
@@ -277,6 +326,32 @@
     </div>
     <div class="sidebar-section">
         <button id="btn-new-exo" onclick="newExercice()">+ Nouvel exercice</button>
+    </div>
+    <div class="sidebar-section sidebar-filters">
+        <details id="exo-filter-panel">
+            <summary>Filtres</summary>
+            <div class="filter-grid">
+                <select id="filter-classe" class="filter-select">
+                    <option value="">Toutes les classes</option>
+                </select>
+                <select id="filter-module" class="filter-select">
+                    <option value="">Tous les modules</option>
+                </select>
+                <select id="filter-periode" class="filter-select">
+                    <option value="all">Toutes les dates</option>
+                    <option value="7d">7 derniers jours</option>
+                    <option value="30d">30 derniers jours</option>
+                    <option value="90d">90 derniers jours</option>
+                    <option value="school_year">Annee scolaire</option>
+                    <option value="custom">Periode personnalisee</option>
+                </select>
+                <div id="filter-date-row" class="filter-date-row">
+                    <input id="filter-date-from" class="filter-date" type="date" title="Date debut">
+                    <input id="filter-date-to" class="filter-date" type="date" title="Date fin">
+                </div>
+            </div>
+            <button id="filter-reset" class="filter-reset" type="button">Reinitialiser</button>
+        </details>
     </div>
     <div class="sidebar-section">
         <label>Mes exercices (<span id="exo-count">0</span>)</label>
@@ -1165,6 +1240,13 @@
 
     let currentExoId = null;
     let allExercices = [];
+    const exoFilters = {
+        classeId: '',
+        moduleId: '',
+        period: 'all',
+        dateFrom: '',
+        dateTo: ''
+    };
 
     // ========== TYPE LABELS ==========
     const TYPE_LABELS = {
@@ -2692,18 +2774,224 @@
         if (compCiblesGroup) compCiblesGroup.style.display = 'none';
     }
 
-    // ========== SIDEBAR LIST ==========
+    // ========== SIDEBAR FILTERS + LIST ==========
+    function getExoClasseIds(ex) {
+        if (Array.isArray(ex.classeIds) && ex.classeIds.length) return ex.classeIds.slice();
+        if (ex.classeId) return [ex.classeId];
+        return [];
+    }
+
+    function expandClasseIds(ids) {
+        const out = new Set();
+        (ids || []).forEach(id => {
+            if (!id) return;
+            out.add(String(id));
+            const expanded = window.getClassesFromGroupe ? window.getClassesFromGroupe(id) : [id];
+            if (Array.isArray(expanded)) expanded.forEach(x => out.add(String(x)));
+        });
+        return out;
+    }
+
+    function exoMatchesClassFilter(ex, classeId) {
+        if (!classeId) return true;
+        const exIds = getExoClasseIds(ex);
+        if (!exIds.length) return false;
+        const exSet = expandClasseIds(exIds);
+        const wantedSet = expandClasseIds([classeId]);
+        for (const id of wantedSet) {
+            if (exSet.has(id)) return true;
+        }
+        return false;
+    }
+
+    function getExoUpdatedAtMs(ex) {
+        const ts = ex && ex.updatedAt;
+        if (!ts) return null;
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (typeof ts === 'number') return ts;
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+        if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            return Number.isNaN(parsed) ? null : parsed;
+        }
+        return null;
+    }
+
+    function getSchoolYearStartMs() {
+        const now = new Date();
+        const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+        return new Date(year, 8, 1, 0, 0, 0, 0).getTime();
+    }
+
+    function exoMatchesPeriodFilter(ex) {
+        const period = exoFilters.period || 'all';
+        if (period === 'all') return true;
+
+        const ts = getExoUpdatedAtMs(ex);
+        if (!ts) return false;
+
+        const now = Date.now();
+        if (period === '7d') return ts >= now - 7 * 24 * 60 * 60 * 1000;
+        if (period === '30d') return ts >= now - 30 * 24 * 60 * 60 * 1000;
+        if (period === '90d') return ts >= now - 90 * 24 * 60 * 60 * 1000;
+        if (period === 'school_year') return ts >= getSchoolYearStartMs();
+
+        if (period === 'custom') {
+            const from = exoFilters.dateFrom ? new Date(exoFilters.dateFrom + 'T00:00:00').getTime() : null;
+            const to = exoFilters.dateTo ? new Date(exoFilters.dateTo + 'T23:59:59.999').getTime() : null;
+            if (from && ts < from) return false;
+            if (to && ts > to) return false;
+            return true;
+        }
+        return true;
+    }
+
+    function exoMatchesFilters(ex) {
+        if (!exoMatchesClassFilter(ex, exoFilters.classeId)) return false;
+        if (exoFilters.moduleId && (ex.moduleId || '') !== exoFilters.moduleId) return false;
+        if (!exoMatchesPeriodFilter(ex)) return false;
+        return true;
+    }
+
+    function updateCustomDateVisibility() {
+        const row = document.getElementById('filter-date-row');
+        if (!row) return;
+        row.style.display = exoFilters.period === 'custom' ? 'grid' : 'none';
+    }
+
+    function updateSidebarFilterOptions() {
+        const classSel = document.getElementById('filter-classe');
+        const moduleSel = document.getElementById('filter-module');
+        if (!classSel || !moduleSel) return;
+
+        const prevClasse = exoFilters.classeId || '';
+        const prevModule = exoFilters.moduleId || '';
+
+        const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+        const seenClass = new Set();
+        classSel.innerHTML = '<option value="">Toutes les classes</option>';
+        classes.forEach(c => {
+            if (!c || !c.id || seenClass.has(c.id)) return;
+            seenClass.add(c.id);
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label || c.id;
+            classSel.appendChild(opt);
+        });
+        classSel.value = seenClass.has(prevClasse) ? prevClasse : '';
+        exoFilters.classeId = classSel.value;
+
+        const moduleSource = allExercices.filter(ex => exoMatchesClassFilter(ex, exoFilters.classeId));
+        const moduleSet = new Set();
+        moduleSource.forEach(ex => {
+            if (ex && ex.moduleId) moduleSet.add(String(ex.moduleId));
+        });
+        const modules = Array.from(moduleSet).sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }));
+
+        moduleSel.innerHTML = '<option value="">Tous les modules</option>';
+        modules.forEach(mod => {
+            const opt = document.createElement('option');
+            opt.value = mod;
+            opt.textContent = mod;
+            moduleSel.appendChild(opt);
+        });
+        moduleSel.value = moduleSet.has(prevModule) ? prevModule : '';
+        exoFilters.moduleId = moduleSel.value;
+    }
+
+    function resetSidebarFilters() {
+        exoFilters.classeId = '';
+        exoFilters.moduleId = '';
+        exoFilters.period = 'all';
+        exoFilters.dateFrom = '';
+        exoFilters.dateTo = '';
+
+        const classSel = document.getElementById('filter-classe');
+        const moduleSel = document.getElementById('filter-module');
+        const periodSel = document.getElementById('filter-periode');
+        const fromInput = document.getElementById('filter-date-from');
+        const toInput = document.getElementById('filter-date-to');
+
+        if (classSel) classSel.value = '';
+        if (moduleSel) moduleSel.value = '';
+        if (periodSel) periodSel.value = 'all';
+        if (fromInput) fromInput.value = '';
+        if (toInput) toInput.value = '';
+
+        updateCustomDateVisibility();
+        updateSidebarFilterOptions();
+        renderExoList();
+    }
+
+    function setupSidebarFilters() {
+        const classSel = document.getElementById('filter-classe');
+        const moduleSel = document.getElementById('filter-module');
+        const periodSel = document.getElementById('filter-periode');
+        const fromInput = document.getElementById('filter-date-from');
+        const toInput = document.getElementById('filter-date-to');
+        const resetBtn = document.getElementById('filter-reset');
+        if (!classSel || !moduleSel || !periodSel || !fromInput || !toInput || !resetBtn) return;
+
+        classSel.addEventListener('change', function() {
+            exoFilters.classeId = this.value || '';
+            exoFilters.moduleId = '';
+            updateSidebarFilterOptions();
+            renderExoList();
+        });
+        moduleSel.addEventListener('change', function() {
+            exoFilters.moduleId = this.value || '';
+            renderExoList();
+        });
+        periodSel.addEventListener('change', function() {
+            exoFilters.period = this.value || 'all';
+            if (exoFilters.period !== 'custom') {
+                exoFilters.dateFrom = '';
+                exoFilters.dateTo = '';
+                fromInput.value = '';
+                toInput.value = '';
+            }
+            updateCustomDateVisibility();
+            renderExoList();
+        });
+        fromInput.addEventListener('change', function() {
+            exoFilters.dateFrom = this.value || '';
+            renderExoList();
+        });
+        toInput.addEventListener('change', function() {
+            exoFilters.dateTo = this.value || '';
+            renderExoList();
+        });
+        resetBtn.addEventListener('click', resetSidebarFilters);
+
+        updateCustomDateVisibility();
+        updateSidebarFilterOptions();
+    }
+
     function renderExoList() {
         const list = document.getElementById('exo-list');
         list.innerHTML = '';
-        document.getElementById('exo-count').textContent = allExercices.length;
-        allExercices.forEach(ex => {
+
+        const filteredExercices = allExercices.filter(exoMatchesFilters);
+        const total = allExercices.length;
+        document.getElementById('exo-count').textContent = filteredExercices.length === total
+            ? String(total)
+            : (filteredExercices.length + '/' + total);
+
+        if (filteredExercices.length === 0) {
+            list.innerHTML = '<div class="exo-list-empty">Aucun exercice pour ces filtres.</div>';
+            return;
+        }
+
+        filteredExercices.forEach(ex => {
             const item = document.createElement('div');
             item.className = 'exo-list-item' + (ex.id === currentExoId ? ' active' : '');
             const typeBadge = '<span class="ei-badge badge-' + ex.type + '">' + (TYPE_LABELS[ex.type] || ex.type) + '</span>';
             const pubBadge = ex.publie ? '<span class="ei-badge badge-pub">Publie</span>' : '<span class="ei-badge badge-draft">Brouillon</span>';
             const diffBadge = ex.difficulte ? '<span class="ei-badge badge-' + ex.difficulte + '">' + ex.difficulte + '</span>' : '';
-            const classeBadge = ex.classeIds && ex.classeIds.length > 0 ? '<span class="ei-badge" style="background:#e0e7ff; color:#3730a3;">' + ex.classeIds.join(', ') + '</span>' : '';
+            const exClasses = getExoClasseIds(ex);
+            const classeBadge = exClasses.length > 0
+                ? '<span class="ei-badge" style="background:#e0e7ff; color:#3730a3;">' + exClasses.join(', ') + '</span>'
+                : '';
             const moduleBadge = ex.moduleId ? '<span class="ei-badge" style="background:#fef3c7; color:#92400e;">' + ex.moduleId + '</span>' : '';
             item.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
                 '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + '</div>' +
@@ -2713,11 +3001,14 @@
         });
     }
 
+    setupSidebarFilters();
+
     // ========== FIREBASE SNAPSHOT ==========
     const qExos = query(collection(db, "exercices_banque"), orderBy("updatedAt", "desc"));
     onSnapshot(qExos, (snap) => {
         allExercices = [];
         snap.forEach(d => { allExercices.push({ id: d.id, ...d.data() }); });
+        updateSidebarFilterOptions();
         renderExoList();
         console.log("✅ Exercices charges:", allExercices.length);
     }, (error) => {
@@ -2732,6 +3023,7 @@
                 const tb = b.updatedAt ? (b.updatedAt.seconds || 0) : 0;
                 return tb - ta;
             });
+            updateSidebarFilterOptions();
             renderExoList();
             console.log("✅ Exercices charges (fallback):", allExercices.length);
         });
