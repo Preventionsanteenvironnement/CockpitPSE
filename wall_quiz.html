@@ -308,7 +308,7 @@
     <div class="lobby-code" id="wall-code"></div>
     <div class="lobby-qr">
         <img id="wall-qr" src="" alt="QR">
-        <div class="lobby-qr-label">📱 mapse.fr/eleve_quiz.html</div>
+        <div class="lobby-qr-label" id="wall-qr-label">📱 lien eleve auto</div>
     </div>
     <div class="lobby-players" id="wall-players"></div>
     <div class="lobby-teams-section" id="wall-lobby-teams"></div>
@@ -401,6 +401,47 @@
     let wallGameMode = 'solo';
     let wallTeams = [];
     let wallQuestions = [];
+    let wallStudentQuizUrl = null;
+
+    const STUDENT_QUIZ_PATHS = ['/eleve_quiz.html', '/PSE/eleve_quiz.html'];
+
+    function fallbackStudentQuizUrl() {
+        const origin = window.location.origin;
+        if (window.location.pathname.includes('/CockpitPSE/')) return origin + '/PSE/eleve_quiz.html';
+        if (window.location.pathname.includes('/PSE/')) return origin + '/PSE/eleve_quiz.html';
+        return origin + '/eleve_quiz.html';
+    }
+
+    function setWallStudentQuizUrl(url) {
+        wallStudentQuizUrl = url;
+        const label = document.getElementById('wall-qr-label');
+        if (!label || !url) return;
+        label.textContent = '📱 ' + url.replace(/^https?:\/\//, '');
+    }
+
+    async function resolveStudentQuizUrl() {
+        if (wallStudentQuizUrl) return wallStudentQuizUrl;
+
+        const firstSeg = (window.location.pathname || '').split('/').filter(Boolean)[0];
+        const segCandidate = firstSeg && !firstSeg.includes('.') ? '/' + firstSeg + '/eleve_quiz.html' : null;
+        const candidates = [...new Set([segCandidate, ...STUDENT_QUIZ_PATHS])].filter(Boolean);
+
+        for (const path of candidates) {
+            try {
+                const res = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+                if (res.ok || res.status === 405) {
+                    setWallStudentQuizUrl(new URL(path, window.location.origin).href);
+                    return wallStudentQuizUrl;
+                }
+            } catch (e) {}
+        }
+
+        setWallStudentQuizUrl(fallbackStudentQuizUrl());
+        return wallStudentQuizUrl;
+    }
+
+    setWallStudentQuizUrl(fallbackStudentQuizUrl());
+    resolveStudentQuizUrl();
 
     // === CONNEXION ===
     const urlCode = new URLSearchParams(window.location.search).get('code');
@@ -494,7 +535,7 @@
             if (phase === 'lobby') {
                 showWallScreen('lobby');
                 document.getElementById('wall-code').textContent = currentSessionCode;
-                const qrUrl = 'https://mapse.fr/eleve_quiz.html';
+                const qrUrl = wallStudentQuizUrl || fallbackStudentQuizUrl();
                 document.getElementById('wall-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(qrUrl);
                 updateLobbyTeams();
             } else if (phase === 'question') {

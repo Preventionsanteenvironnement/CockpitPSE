@@ -281,7 +281,7 @@
             <div id="session-id-display"></div>
             <div id="qr-section">
                 <img id="qr-code" src="" alt="QR">
-                <div id="qr-label">📱 mapse.fr/eleve_quiz.html</div>
+                <div id="qr-label">📱 lien eleve auto</div>
             </div>
         </div>
     </div>
@@ -427,6 +427,47 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         "PRISME","VORTEX","PLASMA","QUASAR","NEBULA","ZENITH"
     ];
 
+    const STUDENT_QUIZ_PATHS = ['/eleve_quiz.html', '/PSE/eleve_quiz.html'];
+    let resolvedStudentQuizUrl = null;
+
+    function fallbackStudentQuizUrl() {
+        const origin = window.location.origin;
+        if (window.location.pathname.includes('/CockpitPSE/')) return origin + '/PSE/eleve_quiz.html';
+        if (window.location.pathname.includes('/PSE/')) return origin + '/PSE/eleve_quiz.html';
+        return origin + '/eleve_quiz.html';
+    }
+
+    function setStudentQuizLabel(url) {
+        const label = document.getElementById('qr-label');
+        if (!label || !url) return;
+        label.textContent = '📱 ' + url.replace(/^https?:\/\//, '');
+    }
+
+    async function getStudentQuizUrl() {
+        if (resolvedStudentQuizUrl) return resolvedStudentQuizUrl;
+
+        const firstSeg = (window.location.pathname || '').split('/').filter(Boolean)[0];
+        const segCandidate = firstSeg && !firstSeg.includes('.') ? '/' + firstSeg + '/eleve_quiz.html' : null;
+        const candidates = [...new Set([segCandidate, ...STUDENT_QUIZ_PATHS])].filter(Boolean);
+
+        for (const path of candidates) {
+            try {
+                const res = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+                if (res.ok || res.status === 405) {
+                    resolvedStudentQuizUrl = new URL(path, window.location.origin).href;
+                    setStudentQuizLabel(resolvedStudentQuizUrl);
+                    return resolvedStudentQuizUrl;
+                }
+            } catch (e) {}
+        }
+
+        resolvedStudentQuizUrl = fallbackStudentQuizUrl();
+        setStudentQuizLabel(resolvedStudentQuizUrl);
+        return resolvedStudentQuizUrl;
+    }
+
+    getStudentQuizUrl();
+
     // === QUESTIONS DE DEMO ===
     const DEFAULT_DEMO = [
         {
@@ -524,9 +565,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (gameMode === 'battle') {
             optionsContainer.style.display = 'none';
             fixedInfo.style.display = 'block';
-            fixedInfo.innerHTML = '\u2694\ufe0f 2 equipes de ' + Math.ceil(n / 2);
+            fixedInfo.innerHTML = n >= 1
+                ? '\u2694\ufe0f 2 equipes de ' + Math.ceil(n / 2) + ' (mode test possible a 1 eleve)'
+                : 'En attente d\'eleves...';
             selectedNumTeams = 2;
-            btnForm.style.display = n >= 2 ? 'block' : 'none';
+            btnForm.style.display = n >= 1 ? 'block' : 'none';
         } else if (gameMode === 'duo') {
             optionsContainer.style.display = 'none';
             fixedInfo.style.display = 'block';
@@ -579,8 +622,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     };
 
     window.formTeams = function() {
-        if (presenceSnapshotData.length < 2) {
-            alert("Il faut au moins 2 eleves connectes !");
+        const minPlayers = gameMode === 'battle' ? 1 : 2;
+        if (presenceSnapshotData.length < minPlayers) {
+            alert(minPlayers === 1
+                ? "Il faut au moins 1 eleve connecte pour lancer un battle."
+                : "Il faut au moins 2 eleves connectes !");
             return;
         }
         const shuffled = [...presenceSnapshotData].sort(() => Math.random() - 0.5);
@@ -946,7 +992,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('session-code-display').style.display = 'block';
         document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
 
-        const url = 'https://mapse.fr/eleve_quiz.html';
+        const url = await getStudentQuizUrl();
+        setStudentQuizLabel(url);
         document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
         document.getElementById('qr-section').style.display = 'block';
 
