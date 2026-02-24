@@ -1276,7 +1276,7 @@
         console.log("🔄 Chargement du module Firebase...");
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         
         console.log("✅ Imports Firebase OK");
@@ -1294,6 +1294,12 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
+
+        // 🔒 Emails autorisés (prof uniquement). Vide = pas de filtrage.
+        const ALLOWED_EMAILS = [
+            // Ajouter ici les emails prof autorisés, ex :
+            // "prof@ac-versailles.fr"
+        ];
         
         // ═══════════════════════════════════════════════════════════════
         // CONNEXION GOOGLE (optimisé pour Safari iOS)
@@ -1332,9 +1338,16 @@
         console.log("✅ Fonction connexionGoogle définie");
         
         function afficherEcranConfig() {
+            // 🔒 Vérification prof uniquement (si ALLOWED_EMAILS non vide)
+            if (ALLOWED_EMAILS.length > 0 && currentUser && !ALLOWED_EMAILS.includes(currentUser.email)) {
+                alert("⛔ Accès refusé. Seul le professeur peut accéder au suivi.\n\nCompte : " + currentUser.email);
+                signOut(auth);
+                return;
+            }
+
             document.getElementById('screenLogin').classList.remove('active');
             document.getElementById('screenConfig').classList.add('active');
-            
+
             if (currentUser) {
                 document.getElementById('userEmail').textContent = '✅ ' + currentUser.email;
             }
@@ -1502,26 +1515,26 @@
             
             console.log("📱 Scan QR détecté:", eleveCode);
             
-            if (!window.ELEVES_DATA) {
+            if (!window.BDD_ELEVES) {
                 alert("Données élèves non chargées !");
                 return;
             }
-            
-            const eleve = window.ELEVES_DATA.find(e => e.code === eleveCode.toUpperCase());
+
+            const eleve = window.BDD_ELEVES.find(e => e.userCode === eleveCode.toUpperCase());
             if (!eleve) {
                 alert("Élève non trouvé: " + eleveCode);
                 return;
             }
-            
+
             console.log("✅ Élève trouvé:", eleve);
-            
+
             const selectClasse = document.getElementById('selectClasse');
             selectClasse.value = eleve.classe;
             onClasseChange();
-            
+
             window.pendingEleveFromQR = eleveCode.toUpperCase();
-            
-            showToast("📱 " + eleve.prenom + " " + eleve.nom + " (" + eleve.classe + ")", 3000);
+
+            showToast("📱 " + eleve.userCode + " (" + eleve.classe + ")", 3000);
         }
         
         function showToast(message, duration = 2000) {
@@ -1657,8 +1670,8 @@
                     commentaire: document.getElementById('checkCommentaire').checked
                 },
                 dateDebut: new Date(),
-                // 📅 UTILISER LA DATE DU CHAMP INPUT (ou date originale si reprise)
-                date: window.dateSeanceOriginale || document.getElementById('dateSeanceInput').value || new Date().toISOString().split('T')[0]
+                // 📅 TOUJOURS utiliser le champ input (pré-rempli en mode reprise, modifiable par l'utilisateur)
+                date: document.getElementById('dateSeanceInput').value || new Date().toISOString().split('T')[0]
             };
             
             // Afficher/masquer sections
@@ -1836,22 +1849,17 @@
         async function chargerDonneesEleve(code) {
             try {
                 const dateSeance = seanceConfig.date || new Date().toISOString().split('T')[0];
-                const suiviRef = collection(db, "resultats", code, "suivi");
-                const suiviSnap = await getDocs(suiviRef);
-                
-                let donneesTrouvees = null;
-                suiviSnap.forEach(docSnap => {
-                    const data = docSnap.data();
-                    if (data.date === dateSeance && data.module === seanceConfig.module) {
-                        donneesTrouvees = { id: docSnap.id, ...data };
-                    }
-                });
-                
-                if (donneesTrouvees) {
+                // Lecture directe par docId (même pattern que l'écriture) au lieu de charger toute la sous-collection
+                const docId = `${dateSeance}_${seanceConfig.module}`;
+                const docRef = doc(db, "resultats", code, "suivi", docId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const donneesTrouvees = { id: docSnap.id, ...docSnap.data() };
                     console.log("✅ Données trouvées:", donneesTrouvees);
                     preremplirFormulaire(donneesTrouvees);
                 } else {
-                    console.log("⚠️ Pas de données trouvées pour cette date/module");
+                    console.log("⚠️ Pas de données trouvées pour", docId);
                 }
             } catch (error) {
                 console.error("❌ Erreur chargement données élève:", error);
@@ -2240,35 +2248,36 @@
                 
                 // 🔒 VÉRIFICATION DOUBLON : regarder si un enregistrement existe déjà
                 const existingSnap = await getDoc(docRef);
-                if (existingSnap.exists()) {
-                    const existingData = existingSnap.data();
-                    const existingNote = existingData.noteSur20;
+                const oldDoc = existingSnap.exists() ? existingSnap.data() : null;
+
+                if (oldDoc) {
+                    const existingNote = oldDoc.noteSur20;
                     const isCurrentSession = elevesSeance.find(e => e.code === currentEleve)?.done;
-                    
+
                     // Si l'élève n'est pas déjà marqué "done" dans cette session, c'est un doublon potentiel
                     if (!isCurrentSession) {
                         const confirmation = confirm(
                             `⚠️ ATTENTION : ${currentEleve} a déjà une note pour cette date !\n\n` +
                             `📅 Date : ${data.date}\n` +
                             `📚 Module : ${seanceConfig.module}\n` +
-                            `📝 Note existante : ${existingNote}/20\n` +
+                            `📝 Note existante : ${oldDoc.absent ? 'Absent' : existingNote + '/20'}\n` +
                             `🆕 Nouvelle note : ${noteFinale}/20\n\n` +
                             `Voulez-vous REMPLACER l'ancienne note ?`
                         );
-                        
+
                         if (!confirmation) {
                             showToast("❌ Annulé - Note non modifiée", 2000);
                             return;
                         }
                     }
                 }
-                
+
                 await setDoc(docRef, data);
-                
+
                 // Archiver et supprimer l'objectif si validé (atteint ou non_atteint)
                 if (objectifPrecedent && objectifValidation) {
                     const statut = objectifValidation.value;
-                    
+
                     // Archiver l'objectif
                     const archiveId = `${new Date().toISOString()}_${objectifPrecedent.texte.substring(0, 20)}`;
                     await setDoc(doc(db, "resultats", currentEleve, "objectifs", archiveId), {
@@ -2276,15 +2285,15 @@
                         statut: statut,
                         dateValidation: new Date().toISOString()
                     });
-                    
+
                     // Supprimer l'objectif courant si atteint ou non_atteint (pas si "en_cours")
                     if (statut === 'atteint' || statut === 'non_atteint') {
                         await deleteDoc(doc(db, "resultats", currentEleve, "objectifs", "current"));
                     }
                 }
-                
-                // Mettre à jour stats
-                await updateStats(currentEleve, noteFinale, saisie);
+
+                // Mettre à jour stats (passe oldDoc pour le diff)
+                await updateStats(currentEleve, noteFinale, saisie, oldDoc);
                 
                 // Marquer fait
                 const idx = elevesSeance.findIndex(e => e.code === currentEleve);
@@ -2342,14 +2351,15 @@
             try {
                 const docId = `${data.date}_${seanceConfig.module}`;
                 const docRef = doc(db, "resultats", currentEleve, "suivi", docId);
-                
+
                 // 🔒 VÉRIFICATION DOUBLON
                 const existingSnap = await getDoc(docRef);
-                if (existingSnap.exists()) {
-                    const existingData = existingSnap.data();
-                    const existingNote = existingData.noteSur20;
-                    const wasAbsent = existingData.absent;
-                    
+                const oldDoc = existingSnap.exists() ? existingSnap.data() : null;
+
+                if (oldDoc) {
+                    const existingNote = oldDoc.noteSur20;
+                    const wasAbsent = oldDoc.absent;
+
                     const confirmation = confirm(
                         `⚠️ ATTENTION : ${currentEleve} a déjà un enregistrement pour cette date !\n\n` +
                         `📅 Date : ${data.date}\n` +
@@ -2358,16 +2368,16 @@
                         `🆕 Nouveau : Absent\n\n` +
                         `Voulez-vous REMPLACER ?`
                     );
-                    
+
                     if (!confirmation) {
                         showToast("❌ Annulé", 2000);
                         return;
                     }
                 }
-                
+
                 await setDoc(docRef, data);
-                
-                await updateStatsAbsence(currentEleve);
+
+                await updateStatsAbsence(currentEleve, oldDoc);
                 
                 const idx = elevesSeance.findIndex(e => e.code === currentEleve);
                 if (idx !== -1) {
@@ -2392,95 +2402,139 @@
             }
         };
         
-        async function updateStatsAbsence(eleveCode) {
-            try {
-                const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
-                const snap = await getDoc(ref);
-                
-                if (snap.exists()) {
-                    const current = snap.data();
-                    await updateDoc(ref, {
-                        nbAbsences: (current.nbAbsences || 0) + 1,
-                        lastUpdate: serverTimestamp()
-                    });
-                } else {
-                    await setDoc(ref, {
-                        nbSeances: 0,
-                        nbAbsences: 1,
-                        totalNotes: 0,
-                        lastUpdate: serverTimestamp()
-                    });
-                }
-            } catch (err) {
-                console.error("Erreur stats absence:", err);
+        // ═══════════════════════════════════════════════════════════════
+        // STATS — Recalcul différentiel (corrige surcomptage + NaN + réversibilité)
+        // ═══════════════════════════════════════════════════════════════
+
+        function emptyStats() {
+            return {
+                totalNotes: 0,
+                nombreSeances: 0,
+                nbAbsences: 0,
+                moyenne: 0,
+                travail: {},
+                oral: {},
+                attention: {},
+                porteVue: {},
+                coursAJour: {},
+                autonomie: {},
+                initiative: {},
+                securite: {},
+                lastUpdate: null
+            };
+        }
+
+        /**
+         * Décrémente les compteurs stats de l'ancien doc (avant remplacement)
+         * @param {object} stats - stats actuelles (mutées en place)
+         * @param {object|null} oldDoc - ancien document Firestore, ou null si création
+         */
+        function rollbackOldDoc(stats, oldDoc) {
+            if (!oldDoc) return; // Pas d'ancien doc → rien à retirer
+
+            if (oldDoc.absent) {
+                // L'ancien doc était une absence
+                stats.nbAbsences = Math.max(0, (stats.nbAbsences || 0) - 1);
+            } else {
+                // L'ancien doc était une saisie avec note
+                const oldNote = typeof oldDoc.noteSur20 === 'number' ? oldDoc.noteSur20 : 0;
+                stats.nombreSeances = Math.max(0, (stats.nombreSeances || 0) - 1);
+                stats.totalNotes = Math.max(0, (stats.totalNotes || 0) - oldNote);
+
+                // Retirer les compteurs détaillés de l'ancien doc
+                const criteres = ['travail', 'oral', 'attention', 'porteVue', 'coursAJour', 'autonomie', 'initiative', 'securite'];
+                criteres.forEach(c => {
+                    const oldVal = oldDoc[c];
+                    if (oldVal !== null && oldVal !== undefined && oldVal !== '') {
+                        if (!stats[c]) stats[c] = {};
+                        const key = String(oldVal);
+                        stats[c][key] = Math.max(0, (stats[c][key] || 0) - 1);
+                    }
+                });
             }
         }
-        
-        async function updateStats(eleveCode, note, saisieData) {
+
+        /**
+         * Met à jour les stats après enregistrement d'une note (non-absence)
+         * Gère correctement le remplacement d'un ancien doc
+         */
+        async function updateStats(eleveCode, note, saisieData, oldDoc) {
             try {
                 const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
                 const snap = await getDoc(ref);
-                
-                let stats = snap.exists() ? snap.data() : {
-                    totalNotes: 0,
-                    nombreSeances: 0,
-                    moyenne: 0,
-                    travail: { tresbien: 0, fait: 0, partiel: 0, insuffisant: 0 },
-                    oral: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 },
-                    attention: { bonne: 0, moyenne: 0, insuffisante: 0 },
-                    porteVue: { ne: 0, ok: 0, oubli: 0 },
-                    coursAJour: { ne: 0, a_jour: 0, incomplet: 0, pas_a_jour: 0 },
-                    autonomie: { ne: 0, bonne: 0, moyenne: 0, insuffisante: 0 },
-                    initiative: { ne: 0, oui: 0, parfois: 0, non: 0 },
-                    securite: { ne: 0, oui: 0, partiel: 0, non: 0 }
-                };
-                
-                // Mise à jour
-                stats.totalNotes += note;
-                stats.nombreSeances += 1;
-                stats.moyenne = Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10;
-                
-                // Compteurs détaillés
-                if (saisieData.travail) {
-                    if (!stats.travail) stats.travail = {};
-                    stats.travail[saisieData.travail] = (stats.travail[saisieData.travail] || 0) + 1;
+                let stats = snap.exists() ? snap.data() : emptyStats();
+
+                // Migrer ancien champ nbSeances → nombreSeances si besoin
+                if (stats.nbSeances !== undefined && stats.nombreSeances === undefined) {
+                    stats.nombreSeances = stats.nbSeances;
                 }
-                if (saisieData.oral !== null && saisieData.oral !== undefined) {
-                    if (!stats.oral) stats.oral = {};
-                    stats.oral[saisieData.oral] = (stats.oral[saisieData.oral] || 0) + 1;
-                }
-                if (saisieData.attention) {
-                    if (!stats.attention) stats.attention = {};
-                    stats.attention[saisieData.attention] = (stats.attention[saisieData.attention] || 0) + 1;
-                }
-                if (saisieData.porteVue) {
-                    if (!stats.porteVue) stats.porteVue = {};
-                    stats.porteVue[saisieData.porteVue] = (stats.porteVue[saisieData.porteVue] || 0) + 1;
-                }
-                if (saisieData.coursAJour) {
-                    if (!stats.coursAJour) stats.coursAJour = {};
-                    stats.coursAJour[saisieData.coursAJour] = (stats.coursAJour[saisieData.coursAJour] || 0) + 1;
-                }
-                if (saisieData.autonomie) {
-                    if (!stats.autonomie) stats.autonomie = {};
-                    stats.autonomie[saisieData.autonomie] = (stats.autonomie[saisieData.autonomie] || 0) + 1;
-                }
-                if (saisieData.initiative) {
-                    if (!stats.initiative) stats.initiative = {};
-                    stats.initiative[saisieData.initiative] = (stats.initiative[saisieData.initiative] || 0) + 1;
-                }
-                if (saisieData.securite) {
-                    if (!stats.securite) stats.securite = {};
-                    stats.securite[saisieData.securite] = (stats.securite[saisieData.securite] || 0) + 1;
-                }
-                
+                delete stats.nbSeances;
+
+                // 1) Annuler l'ancien doc (si remplacement)
+                rollbackOldDoc(stats, oldDoc);
+
+                // 2) Appliquer le nouveau doc
+                stats.nombreSeances = (stats.nombreSeances || 0) + 1;
+                stats.totalNotes = (stats.totalNotes || 0) + note;
+
+                // Recalcul moyenne (protection NaN)
+                stats.moyenne = stats.nombreSeances > 0
+                    ? Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10
+                    : 0;
+
+                // Compteurs détaillés (incrémentation)
+                const criteres = ['travail', 'oral', 'attention', 'porteVue', 'coursAJour', 'autonomie', 'initiative', 'securite'];
+                criteres.forEach(c => {
+                    const val = saisieData[c];
+                    if (val !== null && val !== undefined && val !== '') {
+                        if (!stats[c]) stats[c] = {};
+                        const key = String(val);
+                        stats[c][key] = (stats[c][key] || 0) + 1;
+                    }
+                });
+
                 stats.lastUpdate = serverTimestamp();
-                
                 await setDoc(ref, stats);
-                console.log("📊 Stats:", stats);
-                
+                console.log("📊 Stats mises à jour:", stats);
+
             } catch (err) {
                 console.error("❌ Stats error:", err);
+            }
+        }
+
+        /**
+         * Met à jour les stats après marquage absent
+         * Gère correctement le remplacement d'un ancien doc (note → absent)
+         */
+        async function updateStatsAbsence(eleveCode, oldDoc) {
+            try {
+                const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
+                const snap = await getDoc(ref);
+                let stats = snap.exists() ? snap.data() : emptyStats();
+
+                // Migrer ancien champ
+                if (stats.nbSeances !== undefined && stats.nombreSeances === undefined) {
+                    stats.nombreSeances = stats.nbSeances;
+                }
+                delete stats.nbSeances;
+
+                // 1) Annuler l'ancien doc (si remplacement)
+                rollbackOldDoc(stats, oldDoc);
+
+                // 2) Appliquer absence
+                stats.nbAbsences = (stats.nbAbsences || 0) + 1;
+
+                // Recalcul moyenne (protection NaN)
+                stats.moyenne = stats.nombreSeances > 0
+                    ? Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10
+                    : 0;
+
+                stats.lastUpdate = serverTimestamp();
+                await setDoc(ref, stats);
+                console.log("📊 Stats absence mises à jour:", stats);
+
+            } catch (err) {
+                console.error("Erreur stats absence:", err);
             }
         }
         
