@@ -709,6 +709,7 @@
           <h2 style="margin:0;">Etapes du parcours</h2>
           <button type="button" class="btn-violet" id="btn-add-step">+ Ajouter une etape</button>
         </div>
+        <div id="validation-errors" style="display:none; background:#991b1b; border-radius:8px; padding:12px 16px; margin-bottom:12px;"></div>
         <div class="step-list" id="steps-container"></div>
       </div>
 
@@ -810,6 +811,12 @@ Uniquement le JSON final`;
 
     let selectedExerciseId = null;
     let selectedAutoEvalId = null;
+    let _saving = false;
+    let _dirty = false;
+
+    window.addEventListener('beforeunload', function(e) {
+      if (_dirty) { e.preventDefault(); e.returnValue = ''; }
+    });
 
     function nowId(prefix) {
       return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6);
@@ -867,7 +874,7 @@ Uniquement le JSON final`;
       return {
         type_action: "proposer_exercice_ref",
         ref_exercice_id: "",
-        message: ""
+        message: "Revoir cet exercice pour consolider la competence."
       };
     }
 
@@ -881,7 +888,7 @@ Uniquement le JSON final`;
         blocs: [defaultBlock(1)],
         remediation: {
           si_echec: [defaultRemediationAction(1)],
-          feedback_global: ""
+          feedback_global: "Seuil non atteint. Revisez les exercices et les notions cles avant de retenter."
         }
       };
     }
@@ -1167,6 +1174,7 @@ Uniquement le JSON final`;
 
     function syncModelFromHeaderForm() {
       if (!currentParcours) return;
+      _dirty = true;
       currentParcours.titre = document.getElementById("p-titre").value.trim();
       currentParcours.module = document.getElementById("p-module").value.trim();
       currentParcours.niveau = document.getElementById("p-niveau").value;
@@ -1356,16 +1364,24 @@ Uniquement le JSON final`;
     }
 
     async function saveCurrent(forcePublie = null) {
-      if (!currentParcours) return;
+      if (!currentParcours || _saving) return;
+      _saving = true;
+      try {
       syncModelFromHeaderForm();
 
       if (forcePublie === true) currentParcours.publie = true;
       if (forcePublie === false) currentParcours.publie = false;
 
       const check = validateParcoursData(currentParcours);
+      var errBox = document.getElementById("validation-errors");
+      if (errBox) errBox.style.display = "none";
       if (!check.ok) {
         showToast("Validation echouee. Corrigez le parcours avant sauvegarde.", true);
-        openImportErrors(check.errors);
+        if (errBox) {
+          errBox.innerHTML = '<div style="color:#fca5a5;font-weight:700;margin-bottom:6px;">Erreurs de validation :</div>' + check.errors.map(function(e) { return '<div style="color:#fef2f2;font-size:0.85rem;padding:2px 0;">⚠️ ' + esc(e) + '</div>'; }).join('');
+          errBox.style.display = "block";
+          errBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
         return;
       }
 
@@ -1379,14 +1395,22 @@ Uniquement le JSON final`;
       };
       if (!currentParcoursId) payload.createdAt = serverTimestamp();
 
-      await setDoc(doc(db, COL_PARCOURS, id), payload, { merge: true });
-      currentParcoursId = id;
-      await refreshParcoursList();
-      renderAll();
-      showToast(currentParcours.publie ? "Parcours sauvegarde et publie." : "Parcours sauvegarde.");
+      try {
+        await setDoc(doc(db, COL_PARCOURS, id), payload, { merge: true });
+        currentParcoursId = id;
+        _dirty = false;
+        await refreshParcoursList();
+        renderAll();
+        showToast(currentParcours.publie ? "Parcours sauvegarde et publie." : "Parcours sauvegarde.");
+      } catch (e) {
+        console.error("Erreur sauvegarde parcours:", e);
+        showToast("Erreur sauvegarde: " + e.message, true);
+      }
+      } finally { _saving = false; }
     }
 
     async function deleteCurrent() {
+      if (_saving) return;
       if (!currentParcoursId) {
         createNewParcours();
         showToast("Brouillon local efface.");
@@ -1394,12 +1418,19 @@ Uniquement le JSON final`;
       }
       const ok = window.confirm("Supprimer ce parcours de la banque ?");
       if (!ok) return;
-      await deleteDoc(doc(db, COL_PARCOURS, currentParcoursId));
-      currentParcoursId = null;
-      currentParcours = null;
-      closeEditor();
-      await refreshParcoursList();
-      showToast("Parcours supprime.");
+      _saving = true;
+      try {
+        await deleteDoc(doc(db, COL_PARCOURS, currentParcoursId));
+        currentParcoursId = null;
+        currentParcours = null;
+        _dirty = false;
+        closeEditor();
+        await refreshParcoursList();
+        showToast("Parcours supprime.");
+      } catch (e) {
+        console.error("Erreur suppression parcours:", e);
+        showToast("Erreur suppression: " + e.message, true);
+      } finally { _saving = false; }
     }
 
     function duplicateCurrent() {
@@ -1416,6 +1447,7 @@ Uniquement le JSON final`;
 
     function moveStep(stepIndex, delta) {
       if (!currentParcours) return;
+      _dirty = true;
       const arr = currentParcours.etapes;
       const next = stepIndex + delta;
       if (next < 0 || next >= arr.length) return;
@@ -1427,12 +1459,14 @@ Uniquement le JSON final`;
 
     function addStep() {
       if (!currentParcours) return;
+      _dirty = true;
       currentParcours.etapes.push(defaultEtape(currentParcours.etapes.length + 1));
       renderAll();
     }
 
     function deleteStep(stepIndex) {
       if (!currentParcours) return;
+      _dirty = true;
       if (currentParcours.etapes.length <= 1) {
         showToast("Le parcours doit garder au moins une etape.", true);
         return;
@@ -1443,6 +1477,7 @@ Uniquement le JSON final`;
 
     function setStepField(stepIndex, field, value) {
       if (!currentParcours) return;
+      _dirty = true;
       const et = currentParcours.etapes[stepIndex];
       if (!et) return;
       if (field === "seuil_validation") et[field] = clampInt(value, 0, 100, 70);
@@ -1453,6 +1488,7 @@ Uniquement le JSON final`;
     function addBlock(stepIndex) {
       const et = currentParcours?.etapes?.[stepIndex];
       if (!et) return;
+      _dirty = true;
       et.blocs.push(defaultBlock(et.blocs.length + 1));
       renderAll();
     }
@@ -1460,6 +1496,7 @@ Uniquement le JSON final`;
     function removeBlock(stepIndex, blockIndex) {
       const et = currentParcours?.etapes?.[stepIndex];
       if (!et) return;
+      _dirty = true;
       if (et.blocs.length <= 1) {
         showToast("Chaque etape doit contenir au moins un bloc.", true);
         return;
@@ -1471,6 +1508,7 @@ Uniquement le JSON final`;
     function setBlockField(stepIndex, blockIndex, field, value) {
       const b = currentParcours?.etapes?.[stepIndex]?.blocs?.[blockIndex];
       if (!b) return;
+      _dirty = true;
       if (field === "poids") b[field] = Math.max(0, Number(value || 0));
       else b[field] = value;
       renderPreview();
@@ -1479,6 +1517,7 @@ Uniquement le JSON final`;
     function addRemediation(stepIndex) {
       const arr = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec;
       if (!arr) return;
+      _dirty = true;
       arr.push(defaultRemediationAction(arr.length + 1));
       renderAll();
     }
@@ -1486,6 +1525,7 @@ Uniquement le JSON final`;
     function removeRemediation(stepIndex, remIndex) {
       const arr = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec;
       if (!arr) return;
+      _dirty = true;
       arr.splice(remIndex, 1);
       if (!arr.length) arr.push(defaultRemediationAction(1));
       renderAll();
@@ -1494,6 +1534,7 @@ Uniquement le JSON final`;
     function setRemField(stepIndex, remIndex, field, value) {
       const a = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec?.[remIndex];
       if (!a) return;
+      _dirty = true;
       a[field] = value;
       renderPreview();
     }
@@ -1501,6 +1542,7 @@ Uniquement le JSON final`;
     function setFeedbackGlobal(stepIndex, value) {
       const rem = currentParcours?.etapes?.[stepIndex]?.remediation;
       if (!rem) return;
+      _dirty = true;
       rem.feedback_global = value;
       renderPreview();
     }
@@ -1591,6 +1633,7 @@ Uniquement le JSON final`;
         return true;
       });
 
+      var totalExFiltered = rows.length;
       rows = rows.slice(0, 160);
 
       if (!rows.length) {
@@ -1610,6 +1653,9 @@ Uniquement le JSON final`;
           </div>
         </div>`;
       }).join("");
+      if (totalExFiltered > 160) {
+        host.innerHTML += '<div class="hint" style="padding:8px;text-align:center;">Affichage limite a 160 / ' + totalExFiltered + '. Utilisez les filtres.</div>';
+      }
     }
 
     function renderAutoEvalPicker() {
@@ -1622,6 +1668,7 @@ Uniquement le JSON final`;
         return txt.includes(key);
       });
 
+      var totalAeFiltered = rows.length;
       rows = rows.slice(0, 120);
 
       if (!rows.length) {
@@ -1642,6 +1689,9 @@ Uniquement le JSON final`;
           </div>
         </div>`;
       }).join("");
+      if (totalAeFiltered > 120) {
+        host.innerHTML += '<div class="hint" style="padding:8px;text-align:center;">Affichage limite a 120 / ' + totalAeFiltered + '. Utilisez le filtre.</div>';
+      }
     }
 
     function openImportModal() {
@@ -1649,7 +1699,19 @@ Uniquement le JSON final`;
       document.getElementById("import-input").value = "";
       document.getElementById("import-errors").style.display = "none";
       document.getElementById("import-errors").textContent = "";
-      document.getElementById("import-prompt").textContent = IMPORT_PROMPT;
+
+      // Enrichir le prompt avec les vrais IDs du catalogue
+      var enriched = IMPORT_PROMPT;
+      if (exerciseBank.length > 0) {
+        var exIds = exerciseBank.slice(0, 50).map(function(e) { return e.id + " (" + (e.titre || e.type || "-") + ")"; }).join("\n- ");
+        enriched += "\n\nExercices disponibles (ref_exercice_id):\n- " + exIds;
+        if (exerciseBank.length > 50) enriched += "\n... et " + (exerciseBank.length - 50) + " autres.";
+      }
+      if (autoEvalBank.length > 0) {
+        var aeIds = autoEvalBank.slice(0, 10).map(function(e) { return e.id + " (" + (e.titre || "-") + ")"; }).join("\n- ");
+        enriched += "\n\nAutoEvaluations disponibles (ref_autoeval_id):\n- " + aeIds;
+      }
+      document.getElementById("import-prompt").textContent = enriched;
     }
 
     function closeImportModal() {
@@ -1710,14 +1772,19 @@ Uniquement le JSON final`;
           e.stopPropagation();
           const ok = window.confirm("Supprimer ce parcours ?");
           if (!ok) return;
-          await deleteDoc(doc(db, COL_PARCOURS, delId));
-          if (currentParcoursId === delId) {
-            currentParcoursId = null;
-            currentParcours = null;
-            closeEditor();
+          try {
+            await deleteDoc(doc(db, COL_PARCOURS, delId));
+            if (currentParcoursId === delId) {
+              currentParcoursId = null;
+              currentParcours = null;
+              closeEditor();
+            }
+            await refreshParcoursList();
+            showToast("Parcours supprime.");
+          } catch (err) {
+            console.error("Erreur suppression parcours:", err);
+            showToast("Erreur suppression: " + err.message, true);
           }
-          await refreshParcoursList();
-          showToast("Parcours supprime.");
           return;
         }
 
@@ -1782,8 +1849,9 @@ Uniquement le JSON final`;
       document.getElementById("btn-run-import").addEventListener("click", runImport);
       document.getElementById("btn-copy-prompt").addEventListener("click", async () => {
         try {
-          await navigator.clipboard.writeText(IMPORT_PROMPT);
-          showToast("Prompt IA copie.");
+          var txt = document.getElementById("import-prompt").textContent || IMPORT_PROMPT;
+          await navigator.clipboard.writeText(txt);
+          showToast("Prompt IA copie (avec catalogue).");
         } catch {
           showToast("Impossible de copier automatiquement.", true);
         }
