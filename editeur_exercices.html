@@ -4266,8 +4266,8 @@ Important:
             if (!data.colonnes && data.columns) { data.colonnes = data.columns; delete data.columns; }
             if (!data.lignes && data.rows) { data.lignes = data.rows; delete data.rows; }
             if (!data.categories && data.groups) { data.categories = data.groups; delete data.groups; }
-            // Normaliser les questions internes
-            if (Array.isArray(data.questions)) {
+            // Normaliser les questions internes (sauf types DUERP qui utilisent "consigne" intentionnellement)
+            if (Array.isArray(data.questions) && data.type !== 'duer_mission_directeur') {
                 data.questions.forEach(function(q) {
                     if (!q.question && q.consigne) { q.question = q.consigne; delete q.consigne; }
                     if (!q.choix && q.choices) { q.choix = q.choices; delete q.choices; }
@@ -4366,8 +4366,11 @@ Important:
         }
 
         // Cas fréquent : JSON "QCM" multi-questions → on convertit vers Quiz Chrono
+        // Guard : ne pas convertir les types DUERP qui ont leur propre schema complexe
         if (
             data &&
+            data.type !== 'duer_mission_directeur' &&
+            !(Array.isArray(data.situations) && data.rappels && data.entreprise) &&
             Array.isArray(data.questions) &&
             data.questions.length > 0 &&
             !data.question &&
