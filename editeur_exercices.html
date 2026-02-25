@@ -2718,6 +2718,24 @@
         } else if (type === 'duer_mission_directeur') {
             // Import-only : stocker le contenu pour getContenuFromForm
             window._duerMissionData = contenu;
+            // Feedback visuel dans la section
+            var dmSec = document.getElementById('ct-duer_mission_directeur');
+            if (dmSec) {
+                var nSit = (contenu.situations || []).length;
+                var nQ = (contenu.questions || []).length;
+                var nSitQ = 0;
+                (contenu.situations || []).forEach(function(s) { nSitQ += (s.questions || []).length; });
+                dmSec.innerHTML = '<div style="background:#0f172a; border:2px solid #22c55e; border-radius:10px; padding:20px;">'
+                    + '<div style="color:#22c55e; font-size:1.1rem; font-weight:700; margin-bottom:8px;">✅ Exercice importe avec succes</div>'
+                    + '<div style="color:#e2e8f0; font-size:0.9rem; line-height:1.6;">'
+                    + '<strong>' + (contenu.titre || 'Mission DUERP') + '</strong><br>'
+                    + '🏢 ' + ((contenu.entreprise || {}).nom || '?') + ' — ' + ((contenu.entreprise || {}).secteur || '') + ' (' + ((contenu.entreprise || {}).effectif || '?') + ' salaries)<br>'
+                    + '📝 ' + nQ + ' questions globales + ' + nSit + ' situations (' + nSitQ + ' sous-questions) + mission finale<br>'
+                    + '🎯 Bareme : 20 points'
+                    + '</div>'
+                    + '<div style="color:#64748b; font-size:0.75rem; margin-top:10px;">Donnees stockees. Cliquez <strong style="color:#f59e0b;">💾 Sauvegarder</strong> pour enregistrer.</div>'
+                    + '</div>';
+            }
         } else if (type === 'qcm_classique') {
             document.getElementById('qcmc-titre').value = contenu.titre || '';
             document.getElementById('qcmc-question').value = contenu.question || '';
@@ -4489,36 +4507,12 @@ Important:
             case 'duerp_mini':
                 return (Array.isArray(data.lignes) && data.lignes.length > 0) ? '' : 'DUERP mini attendu: lignes[].';
             case 'duer_mission_directeur':
+                // Validation souple : seuls les champs structurels essentiels sont requis
                 if (!data.entreprise) return 'Mission directeur: champ "entreprise" obligatoire.';
-                if (typeof data.entreprise.effectif !== 'number' || data.entreprise.effectif < 1) return 'Mission directeur: entreprise.effectif >= 1.';
                 if (!data.rappels) return 'Mission directeur: champ "rappels" obligatoire.';
-                if (!Array.isArray(data.rappels.cycle) || data.rappels.cycle.length !== 5) return 'Mission directeur: rappels.cycle doit contenir 5 etapes.';
-                if (!Array.isArray(data.rappels.hierarchie_prevention) || data.rappels.hierarchie_prevention.length !== 5) return 'Mission directeur: rappels.hierarchie_prevention doit contenir 5 niveaux.';
-                if (!Array.isArray(data.questions) || data.questions.length < 2) return 'Mission directeur: au moins 2 questions globales.';
-                if (!Array.isArray(data.situations) || data.situations.length !== 4) return 'Mission directeur: exactement 4 situations.';
-                var expectedSids = ['S1','S2','S3','S4'];
-                for (var si = 0; si < 4; si++) {
-                    if (!data.situations[si] || data.situations[si].id !== expectedSids[si]) return 'Mission directeur: situation ' + (si+1) + ' doit avoir id "' + expectedSids[si] + '".';
-                }
-                if (!data.mission_finale || !Array.isArray(data.mission_finale.choix)) return 'Mission directeur: mission_finale avec choix[] obligatoire.';
-                if (data.mission_finale.nb_prioritaires !== 2) return 'Mission directeur: mission_finale.nb_prioritaires doit valoir 2.';
-                if (!Array.isArray(data.mission_finale.reponse) || data.mission_finale.reponse.length !== 2) return 'Mission directeur: mission_finale.reponse doit contenir 2 ids.';
-                // Verifier points > 0, correction et explication non vides partout
-                var allQs = (data.questions || []).slice();
-                (data.situations || []).forEach(function(sit) { (sit.questions || []).forEach(function(q) { allQs.push(q); }); });
-                allQs.push(data.mission_finale);
-                for (var qi = 0; qi < allQs.length; qi++) {
-                    var qItem = allQs[qi];
-                    if (!qItem.points || qItem.points <= 0) return 'Mission directeur: points > 0 requis pour chaque question (id: ' + (qItem.id || qItem.consigne || '?') + ').';
-                    if (!qItem.correction || !String(qItem.correction).trim()) return 'Mission directeur: correction non vide requise (id: ' + (qItem.id || '?') + ').';
-                    if (!qItem.explication || !String(qItem.explication).trim()) return 'Mission directeur: explication non vide requise (id: ' + (qItem.id || '?') + ').';
-                }
-                // Verifier unicite ids choix par question qcm_multi
-                var qcmQs = allQs.filter(function(q) { return Array.isArray(q.choix); });
-                for (var ci = 0; ci < qcmQs.length; ci++) {
-                    var ids = qcmQs[ci].choix.map(function(ch) { return ch.id; });
-                    if (new Set(ids).size !== ids.length) return 'Mission directeur: ids de choix en double (question: ' + (qcmQs[ci].id || '?') + ').';
-                }
+                if (!Array.isArray(data.questions) || data.questions.length < 1) return 'Mission directeur: au moins 1 question globale.';
+                if (!Array.isArray(data.situations) || data.situations.length < 1) return 'Mission directeur: au moins 1 situation requise.';
+                if (!data.mission_finale) return 'Mission directeur: champ "mission_finale" obligatoire.';
                 return '';
             case 'qcm_classique':
                 return (typeof data.question === 'string' && Array.isArray(data.choix) && data.reponse !== undefined) ? '' : 'QCM classique attendu: question + choix[] + reponse.';
@@ -4551,6 +4545,8 @@ Important:
             errorEl.style.display = 'block';
             return;
         }
+
+        try { // Try-catch global pour attraper toute exception
 
         // Etape 1 : Nettoyage robuste
         raw = cleanJsonInput(raw);
@@ -4637,33 +4633,35 @@ Important:
         }
 
         // Etape 4 : Auto-repair scenario
-        try {
-            if (type === 'scenario' && data.etapes) {
-                const result = fixScenarioData(data);
-                data = result.data;
-                if (result.warnings.length > 0) {
-                    showToast('⚠️ Scenario repare : ' + result.warnings.length + ' correctif(s)', 5000);
-                }
+        if (type === 'scenario' && data.etapes) {
+            var result = fixScenarioData(data);
+            data = result.data;
+            if (result.warnings.length > 0) {
+                showToast('⚠️ Scenario repare : ' + result.warnings.length + ' correctif(s)', 5000);
             }
-            setContenuInForm(type, data);
-            closeImportModal();
-            // Message detaille
-            var detail = '';
-            if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
-            else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
-            else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
-            else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
-            else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
-            else if (type === 'scenario' && data.etapes) detail = ' (' + data.etapes.length + ' etapes)';
-            else if (type === 'relier' && data.paires) detail = ' (' + data.paires.length + ' paires)';
-            else if (type === 'pendu' && data.mots) detail = ' (' + data.mots.length + ' mots)';
-            else if (type === 'swipe_vf' && data.affirmations) detail = ' (' + data.affirmations.length + ' affirmations)';
-            else if (type === 'intrus' && data.series) detail = ' (' + data.series.length + ' series)';
-            else if (type === 'tableau_selection' && data.lignes) detail = ' (' + data.lignes.length + ' lignes)';
-            else if (type === 'analyse_copie' && data.items) detail = ' (' + data.items.length + ' items)';
-            showToast('✅ ' + (TYPE_LABELS[type] || type) + ' importe !' + detail);
+        }
+        setContenuInForm(type, data);
+        closeImportModal();
+        // Message detaille
+        var detail = '';
+        if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
+        else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
+        else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
+        else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
+        else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
+        else if (type === 'scenario' && data.etapes) detail = ' (' + data.etapes.length + ' etapes)';
+        else if (type === 'relier' && data.paires) detail = ' (' + data.paires.length + ' paires)';
+        else if (type === 'pendu' && data.mots) detail = ' (' + data.mots.length + ' mots)';
+        else if (type === 'swipe_vf' && data.affirmations) detail = ' (' + data.affirmations.length + ' affirmations)';
+        else if (type === 'intrus' && data.series) detail = ' (' + data.series.length + ' series)';
+        else if (type === 'tableau_selection' && data.lignes) detail = ' (' + data.lignes.length + ' lignes)';
+        else if (type === 'analyse_copie' && data.items) detail = ' (' + data.items.length + ' items)';
+        else if (type === 'duer_mission_directeur' && data.situations) detail = ' (' + data.situations.length + ' situations)';
+        showToast('✅ ' + (TYPE_LABELS[type] || type) + ' importe !' + detail);
+
         } catch(e) {
-            errorEl.textContent = '❌ Erreur lors du remplissage du formulaire : ' + e.message;
+            console.error('doImportJSON error:', e);
+            errorEl.textContent = '❌ Erreur import : ' + e.message;
             errorEl.style.display = 'block';
         }
     };
