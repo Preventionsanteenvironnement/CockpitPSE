@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editeur de parcours PSE</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #111827;
+      --line: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --accent: #3b82f6;
+      --violet: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 330px;
+      min-width: 330px;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .side-head {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .side-head h1 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .side-head a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+
+    .side-block {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .side-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .btn,
+    .btn-small,
+    .btn-ghost,
+    .btn-danger,
+    .btn-violet {
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn {
+      background: var(--ok);
+      color: #052e16;
+      padding: 10px 12px;
+      width: 100%;
+      font-size: 0.9rem;
+    }
+
+    .btn:hover { filter: brightness(1.05); }
+
+    .btn-small {
+      background: #334155;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #475569;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fecaca;
+      padding: 8px 10px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      font-size: 0.78rem;
+    }
+
+    .btn-violet {
+      background: rgba(139, 92, 246, 0.2);
+      color: #ddd6fe;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      background: #0b1220;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      outline: none;
+      font-family: inherit;
+    }
+
+    textarea { resize: vertical; min-height: 84px; }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent);
+    }
+
+    .list {
+      overflow: auto;
+      flex: 1;
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .list-item {
+      background: #0b1220;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .list-item:hover { border-color: #475569; }
+
+    .list-item.active {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.12);
+    }
+
+    .li-title {
+      font-size: 0.86rem;
+      font-weight: 700;
+      margin-right: 26px;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+
+    .li-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: #1f2937;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+    }
+
+    .chip-pub { background: #052e16; color: #bbf7d0; border-color: #166534; }
+    .chip-draft { background: #451a03; color: #fde68a; border-color: #92400e; }
+
+    .li-del {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.85rem;
+      opacity: 0;
+    }
+
+    .list-item:hover .li-del { opacity: 1; }
+    .li-del:hover { color: #fecaca; }
+
+    .main {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+    }
+
+    .empty {
+      min-height: calc(100vh - 40px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      color: var(--muted);
+      text-align: center;
+      gap: 8px;
+    }
+
+    .editor {
+      display: none;
+      max-width: 1120px;
+      margin: 0 auto;
+      gap: 14px;
+      display: grid;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 8px;
+    }
+
+    .col-12 { grid-column: span 12; }
+    .col-8 { grid-column: span 8; }
+    .col-6 { grid-column: span 6; }
+    .col-4 { grid-column: span 4; }
+    .col-3 { grid-column: span 3; }
+
+    .field label {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      margin-bottom: 5px;
+      font-weight: 700;
+    }
+
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 10px;
+    }
+
+    .picker-list {
+      max-height: 260px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0b1220;
+      padding: 6px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .picker-item {
+      border: 1px solid #243244;
+      border-radius: 8px;
+      background: #0f172a;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    .picker-item:hover { border-color: var(--accent); }
+    .picker-item.active { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.12); }
+
+    .pi-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pi-meta {
+      color: var(--muted);
+      font-size: 0.68rem;
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step-card {
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      background: #0f172a;
+      display: grid;
+      gap: 10px;
+    }
+
+    .step-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .step-head strong { font-size: 0.9rem; }
+
+    .block-list,
+    .rem-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .block-row,
+    .rem-row {
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .divider {
+      border-top: 1px solid #334155;
+      margin: 4px 0;
+    }
+
+    .actions-bottom {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 0.86rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: none;
+      z-index: 999;
+      max-width: min(90vw, 680px);
+      text-align: center;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal {
+      width: min(940px, 96vw);
+      max-height: 90vh;
+      overflow: auto;
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .modal h3 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .modal pre {
+      white-space: pre-wrap;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px;
+      color: #cbd5e1;
+      max-height: 270px;
+      overflow: auto;
+    }
+
+    .error-box {
+      margin-top: 8px;
+      background: rgba(127, 29, 29, 0.4);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fecaca;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.8rem;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    .preview {
+      background: #0b1220;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    @media (max-width: 1020px) {
+      body { display: block; overflow: auto; }
+      .sidebar { width: 100%; min-width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+      .main { padding: 12px; }
+      .split { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .form-row { grid-template-columns: repeat(6, 1fr); }
+      .col-12, .col-8, .col-6, .col-4, .col-3 { grid-column: span 6; }
+      .actions-bottom .btn-small,
+      .actions-bottom .btn-ghost,
+      .actions-bottom .btn-danger,
+      .actions-bottom .btn-violet { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="side-head">
+      <h1>Editeur de parcours PSE</h1>
+      <a href="index.html">Cockpit</a>
+    </div>
+
+    <div class="side-block">
+      <button class="btn" id="btn-new">+ Nouveau parcours</button>
+    </div>
+
+    <div class="side-block">
+      <label class="side-label">Filtre</label>
+      <input type="text" id="list-filter" placeholder="Rechercher titre, module, niveau...">
+    </div>
+
+    <div class="list" id="parcours-list">
+      <div class="hint">Chargement...</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="empty" id="empty-state">
+      <div style="font-size:2rem;">Parcours progressif</div>
+      <div>Creer un nouveau parcours ou ouvrir un parcours existant.</div>
+    </section>
+
+    <section class="editor" id="editor">
+      <div class="card">
+        <h2>Metadonnees du parcours</h2>
+        <div class="form-row">
+          <div class="field col-8">
+            <label>Titre *</label>
+            <input type="text" id="p-titre" placeholder="Parcours PSE - PAD Prevention">
+          </div>
+          <div class="field col-4">
+            <label>Type</label>
+            <input type="text" id="p-type" value="parcours_progressif" readonly class="mono">
+          </div>
+          <div class="field col-4">
+            <label>Module *</label>
+            <input type="text" id="p-module" placeholder="C11 / D2 / PAD-Prevention">
+          </div>
+          <div class="field col-3">
+            <label>Niveau *</label>
+            <select id="p-niveau">
+              <option value="cap">cap</option>
+              <option value="bacpro">bacpro</option>
+              <option value="mixte">mixte</option>
+            </select>
+          </div>
+          <div class="field col-2">
+            <label>Version</label>
+            <input type="number" id="p-version" value="1" min="1" step="1">
+          </div>
+          <div class="field col-3">
+            <label>Publication</label>
+            <select id="p-publie">
+              <option value="false">Brouillon</option>
+              <option value="true">Publie</option>
+            </select>
+          </div>
+          <div class="field col-12">
+            <label>Description</label>
+            <textarea id="p-description" placeholder="Objectif du parcours en 2-4 phrases"></textarea>
+          </div>
+          <div class="field col-12">
+            <label>Competences cibles (separees par virgules)</label>
+            <input type="text" id="p-competences" placeholder="C1, C2, C4, C5">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Regles</h2>
+        <div class="form-row">
+          <div class="field col-4">
+            <label>Mode progression</label>
+            <select id="r-mode">
+              <option value="sequentiel">sequentiel</option>
+            </select>
+          </div>
+          <div class="field col-4">
+            <label>Seuil reussite etape (0-100)</label>
+            <input type="number" id="r-seuil" min="0" max="100" value="70">
+          </div>
+          <div class="field col-4">
+            <label>Max tentatives / exercice</label>
+            <input type="number" id="r-max" min="1" max="20" value="3">
+          </div>
+          <div class="field col-4">
+            <label>Autoriser saut autoevaluation</label>
+            <select id="r-saut">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div class="field col-4">
+            <label>Autoriser recommencer autoevaluation</label>
+            <select id="r-recommencer">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div class="field col-4">
+            <label>Autoriser envoyer autoevaluation</label>
+            <select id="r-envoyer">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card split">
+        <div>
+          <h2>Liaison autoevaluation</h2>
+          <div class="form-row">
+            <div class="field col-12">
+              <label>Mode</label>
+              <select id="ae-mode">
+                <option value="ref_existante">ref_existante</option>
+              </select>
+            </div>
+            <div class="field col-12">
+              <label>ref_autoeval_id *</label>
+              <div class="inline-actions">
+                <input type="text" id="ae-ref" class="mono" placeholder="ae_c11_01">
+                <button class="btn-small" id="ae-use-selected" type="button">Utiliser autoeval selectionnee</button>
+              </div>
+            </div>
+            <div class="field col-12">
+              <label>Titre bouton</label>
+              <input type="text" id="ae-btn" value="Lancer l auto-evaluation">
+            </div>
+            <div class="field col-12">
+              <label>Consigne prealable</label>
+              <textarea id="ae-consigne"></textarea>
+            </div>
+            <div class="field col-6">
+              <label>Score moyen recommande</label>
+              <input type="number" id="ae-score" value="70" min="0" max="100">
+            </div>
+            <div class="field col-6">
+              <label>Etapes min reussies</label>
+              <input type="number" id="ae-min" value="1" min="0">
+            </div>
+            <div class="field col-12">
+              <label>Feedback fin - reussite</label>
+              <textarea id="ae-ok"></textarea>
+            </div>
+            <div class="field col-12">
+              <label>Feedback fin - echec</label>
+              <textarea id="ae-ko"></textarea>
+            </div>
+            <div class="field col-12">
+              <label>Feedback fin - abandon</label>
+              <textarea id="ae-abandon"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2>Catalogue autoevaluations</h2>
+          <div class="form-row">
+            <div class="field col-12">
+              <label>Recherche autoevaluation</label>
+              <input type="text" id="ae-filter" placeholder="Titre, module, classe, id...">
+            </div>
+          </div>
+          <div id="ae-list" class="picker-list"></div>
+        </div>
+      </div>
+
+      <div class="card split">
+        <div>
+          <h2>Catalogue exercices</h2>
+          <div class="form-row">
+            <div class="field col-3">
+              <label>Type</label>
+              <select id="ex-filter-type"></select>
+            </div>
+            <div class="field col-3">
+              <label>Module</label>
+              <select id="ex-filter-module"></select>
+            </div>
+            <div class="field col-3">
+              <label>Niveau</label>
+              <select id="ex-filter-level"></select>
+            </div>
+            <div class="field col-3">
+              <label>Mot-cle</label>
+              <input type="text" id="ex-filter-key" placeholder="titre ou id">
+            </div>
+          </div>
+          <div class="hint">Cliquez un exercice, puis utilisez "Appliquer exercice selectionne" sur un bloc d'etape.</div>
+          <div id="exercise-list" class="picker-list"></div>
+        </div>
+
+        <div>
+          <h2>Apercu eleve</h2>
+          <div class="preview" id="preview"></div>
+          <div class="divider"></div>
+          <h2>Options UI</h2>
+          <div class="form-row">
+            <div class="field col-6">
+              <label>Couleurs pastilles</label>
+              <select id="ui-pastilles"><option value="true">true</option><option value="false">false</option></select>
+            </div>
+            <div class="field col-6">
+              <label>Progression par etape</label>
+              <select id="ui-steps"><option value="true">true</option><option value="false">false</option></select>
+            </div>
+            <div class="field col-6">
+              <label>Score global</label>
+              <select id="ui-score"><option value="true">true</option><option value="false">false</option></select>
+            </div>
+            <div class="field col-6">
+              <label>Conseils</label>
+              <select id="ui-tips"><option value="true">true</option><option value="false">false</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="inline-actions" style="justify-content: space-between; align-items:center;">
+          <h2 style="margin:0;">Etapes du parcours</h2>
+          <button type="button" class="btn-violet" id="btn-add-step">+ Ajouter une etape</button>
+        </div>
+        <div class="step-list" id="steps-container"></div>
+      </div>
+
+      <div class="card">
+        <div class="actions-bottom">
+          <button class="btn-small" id="btn-save" type="button">Sauvegarder brouillon</button>
+          <button class="btn-violet" id="btn-publish" type="button">Publier</button>
+          <button class="btn-ghost" id="btn-unpublish" type="button">Depublier</button>
+          <button class="btn-ghost" id="btn-duplicate" type="button">Dupliquer</button>
+          <button class="btn-ghost" id="btn-preview-student" type="button">Ouvrir page eleve</button>
+          <button class="btn-violet" id="btn-import" type="button">Importer JSON</button>
+          <button class="btn-danger" id="btn-delete" type="button">Supprimer</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-overlay" id="import-modal">
+    <div class="modal">
+      <h3>Importer un parcours_progressif (JSON)</h3>
+      <div class="hint">L import remplace le parcours en cours dans l editeur (sans sauvegarde automatique).</div>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer; color:#cbd5e1;">Voir prompt IA</summary>
+        <pre id="import-prompt"></pre>
+        <div class="inline-actions" style="margin-top:8px;">
+          <button class="btn-small" type="button" id="btn-copy-prompt">Copier prompt IA</button>
+        </div>
+      </details>
+      <div class="field" style="margin-top:8px;">
+        <label>JSON</label>
+        <textarea id="import-input" rows="14" class="mono" placeholder="Collez le JSON ici..."></textarea>
+      </div>
+      <div class="error-box" id="import-errors"></div>
+      <div class="inline-actions" style="margin-top:10px;">
+        <button class="btn-small" type="button" id="btn-run-import">Importer</button>
+        <button class="btn-ghost" type="button" id="btn-close-import">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="data_modules.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+      authDomain: "devoirs-pse.firebaseapp.com",
+      projectId: "devoirs-pse",
+      storageBucket: "devoirs-pse.firebasestorage.app",
+      messagingSenderId: "614730413904",
+      appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const COL_PARCOURS = "parcours_banque";
+    const COL_EXOS = "exercices_banque";
+    const COL_EVALS = "eval_banque";
+
+    const IMPORT_PROMPT = `Tu es un generateur de parcours d apprentissage PSE.
+Genere un JSON STRICTEMENT VALIDE de type "parcours_progressif".
+
+Objectif :
+Construire un parcours de preparation avant auto-evaluation a partir d exercices existants.
+Le parcours doit etre progressif, pedagogique, avec remediations et feedbacks.
+
+Contraintes :
+- Utiliser exactement le schema demande
+- Niveau [cap|bacpro] selon la consigne de l utilisateur
+- Consignes style PSE (verbe a l infinitif en premier)
+- Prevoir 2 a 4 etapes
+- Chaque etape contient 1 a 3 blocs de type "exercice_ref" (ref_exercice_id plausibles)
+- Ajouter une remediation si echec pour chaque etape
+- Ajouter feedback_global pedagogique pour chaque etape
+- Lier une autoevaluation existante via autoevaluation.ref_autoeval_id
+- Pas de texte hors JSON
+- JSON parsable directement
+
+Le theme peut etre :
+- PAD / prevention
+- DUERP
+- budget
+- C11 analyse de situation de travail
+- autre module PSE
+
+Sortie :
+Uniquement le JSON final`;
+
+    let allParcours = [];
+    let exerciseBank = [];
+    let autoEvalBank = [];
+
+    let currentParcoursId = null;
+    let currentParcours = null;
+
+    let selectedExerciseId = null;
+    let selectedAutoEvalId = null;
+
+    function nowId(prefix) {
+      return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6);
+    }
+
+    function deepClone(v) {
+      return JSON.parse(JSON.stringify(v));
+    }
+
+    function toBool(v) {
+      return v === true || v === "true";
+    }
+
+    function toInt(v, fallback = 0) {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.round(n) : fallback;
+    }
+
+    function clampInt(v, min, max, fallback) {
+      const n = toInt(v, fallback);
+      if (n < min) return min;
+      if (n > max) return max;
+      return n;
+    }
+
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      t.style.background = isError ? "#991b1b" : "#1d4ed8";
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => { t.style.display = "none"; }, 2600);
+    }
+
+    function defaultBlock(index) {
+      return {
+        id: "B" + index,
+        type_bloc: "exercice_ref",
+        ref_exercice_id: "",
+        label: "",
+        poids: 1
+      };
+    }
+
+    function defaultRemediationAction(index) {
+      return {
+        type_action: "proposer_exercice_ref",
+        ref_exercice_id: "",
+        message: ""
+      };
+    }
+
+    function defaultEtape(index) {
+      return {
+        id: "E" + index,
+        titre: "Etape " + index,
+        objectif: "",
+        consigne: "Realiser les exercices de l etape puis atteindre le seuil",
+        seuil_validation: 70,
+        blocs: [defaultBlock(1)],
+        remediation: {
+          si_echec: [defaultRemediationAction(1)],
+          feedback_global: ""
+        }
+      };
+    }
+
+    function defaultParcours() {
+      return {
+        type: "parcours_progressif",
+        titre: "",
+        module: "",
+        niveau: "cap",
+        version: 1,
+        description: "",
+        regles: {
+          mode_progression: "sequentiel",
+          seuil_reussite_etape: 70,
+          max_tentatives_par_exercice: 3,
+          autoriser_saut_autoevaluation: true,
+          autoriser_recommencer_autoevaluation: true,
+          autoriser_envoyer_autoevaluation: true
+        },
+        competences_cibles: [],
+        etapes: [defaultEtape(1)],
+        autoevaluation: {
+          mode: "ref_existante",
+          ref_autoeval_id: "",
+          titre_bouton: "Lancer l auto-evaluation",
+          consigne_prealable: "Vous pouvez lancer l auto-evaluation maintenant ou continuer a vous entrainer",
+          conditions_suggerees: {
+            score_moyen_parcours_recommande: 70,
+            etapes_min_reussies: 1
+          },
+          feedback_fin: {
+            si_reussite: "Message de valorisation + proposition d envoi",
+            si_echec: "Message de remediation + proposition de refaire des exercices",
+            si_abandon: "Message neutre de reprise ulterieure"
+          }
+        },
+        ui: {
+          couleurs_pastilles: true,
+          afficher_progression_par_etape: true,
+          afficher_score_global: true,
+          afficher_conseils: true
+        },
+        publie: false
+      };
+    }
+
+    function ensureParcoursShape(input) {
+      const base = defaultParcours();
+      const src = (input && typeof input === "object") ? deepClone(input) : {};
+
+      const p = {
+        ...base,
+        ...src,
+        regles: { ...base.regles, ...(src.regles || {}) },
+        autoevaluation: {
+          ...base.autoevaluation,
+          ...(src.autoevaluation || {}),
+          conditions_suggerees: {
+            ...base.autoevaluation.conditions_suggerees,
+            ...((src.autoevaluation || {}).conditions_suggerees || {})
+          },
+          feedback_fin: {
+            ...base.autoevaluation.feedback_fin,
+            ...((src.autoevaluation || {}).feedback_fin || {})
+          }
+        },
+        ui: { ...base.ui, ...(src.ui || {}) }
+      };
+
+      if (!Array.isArray(p.competences_cibles)) p.competences_cibles = [];
+
+      if (!Array.isArray(p.etapes) || p.etapes.length === 0) {
+        p.etapes = [defaultEtape(1)];
+      }
+
+      p.etapes = p.etapes.map((et, idx) => {
+        const stepBase = defaultEtape(idx + 1);
+        const merged = {
+          ...stepBase,
+          ...(et || {}),
+          remediation: {
+            ...stepBase.remediation,
+            ...((et || {}).remediation || {})
+          }
+        };
+        if (!Array.isArray(merged.blocs) || merged.blocs.length === 0) merged.blocs = [defaultBlock(1)];
+        merged.blocs = merged.blocs.map((b, bi) => ({ ...defaultBlock(bi + 1), ...(b || {}) }));
+
+        if (!Array.isArray(merged.remediation.si_echec)) merged.remediation.si_echec = [defaultRemediationAction(1)];
+        if (merged.remediation.si_echec.length === 0) merged.remediation.si_echec.push(defaultRemediationAction(1));
+        merged.remediation.si_echec = merged.remediation.si_echec.map((a, ai) => ({ ...defaultRemediationAction(ai + 1), ...(a || {}) }));
+
+        return merged;
+      });
+
+      p.type = "parcours_progressif";
+      p.niveau = ["cap", "bacpro", "mixte"].includes(String(p.niveau || "").toLowerCase())
+        ? String(p.niveau).toLowerCase()
+        : "cap";
+      p.version = Math.max(1, toInt(p.version, 1));
+      p.regles.mode_progression = "sequentiel";
+      p.regles.seuil_reussite_etape = clampInt(p.regles.seuil_reussite_etape, 0, 100, 70);
+      p.regles.max_tentatives_par_exercice = Math.max(1, toInt(p.regles.max_tentatives_par_exercice, 3));
+      p.regles.autoriser_saut_autoevaluation = toBool(p.regles.autoriser_saut_autoevaluation);
+      p.regles.autoriser_recommencer_autoevaluation = toBool(p.regles.autoriser_recommencer_autoevaluation);
+      p.regles.autoriser_envoyer_autoevaluation = toBool(p.regles.autoriser_envoyer_autoevaluation);
+
+      p.autoevaluation.mode = "ref_existante";
+      p.ui.couleurs_pastilles = toBool(p.ui.couleurs_pastilles);
+      p.ui.afficher_progression_par_etape = toBool(p.ui.afficher_progression_par_etape);
+      p.ui.afficher_score_global = toBool(p.ui.afficher_score_global);
+      p.ui.afficher_conseils = toBool(p.ui.afficher_conseils);
+      p.publie = toBool(p.publie);
+
+      return p;
+    }
+
+    function cleanImportJSONString(raw) {
+      let s = String(raw || "");
+      s = s.replace(/\uFEFF/g, "");
+      s = s.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, "");
+      s = s.replace(/\u00A0/g, " ");
+      s = s.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
+      s = s.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
+
+      const codeBlock = s.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+      if (codeBlock) s = codeBlock[1].trim();
+
+      if (!s.trim().startsWith("{") && !s.trim().startsWith("[")) {
+        const first = s.indexOf("{");
+        const last = s.lastIndexOf("}");
+        if (first >= 0 && last > first) s = s.slice(first, last + 1);
+      }
+
+      s = s.replace(/^\s*\/\/.*$/gm, "");
+      s = s.replace(/,\s*([\]}])/g, "$1");
+      s = s.replace(/\bTrue\b/g, "true");
+      s = s.replace(/\bFalse\b/g, "false");
+      s = s.replace(/\bNone\b/g, "null");
+      return s.trim();
+    }
+
+    function validateParcoursData(data) {
+      const errors = [];
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return { ok: false, errors: ["Le JSON doit etre un objet."] };
+      }
+
+      const p = ensureParcoursShape(data);
+
+      if (p.type !== "parcours_progressif") errors.push('type doit etre "parcours_progressif"');
+      if (!String(p.titre || "").trim()) errors.push("titre non vide obligatoire");
+      if (!String(p.module || "").trim()) errors.push("module non vide obligatoire");
+      if (!["cap", "bacpro", "mixte"].includes(p.niveau)) errors.push("niveau doit etre cap, bacpro ou mixte");
+
+      if (!Number.isInteger(p.regles.seuil_reussite_etape) || p.regles.seuil_reussite_etape < 0 || p.regles.seuil_reussite_etape > 100) {
+        errors.push("regles.seuil_reussite_etape doit etre un entier 0-100");
+      }
+
+      if (!Array.isArray(p.etapes) || p.etapes.length < 1) errors.push("etapes doit contenir au moins une etape");
+
+      const stepIds = new Set();
+      (p.etapes || []).forEach((et, i) => {
+        const sp = "Etape " + (i + 1) + " : ";
+        if (!String(et.id || "").trim()) errors.push(sp + "id obligatoire");
+        if (stepIds.has(et.id)) errors.push(sp + "id duplique");
+        stepIds.add(et.id);
+
+        if (!Number.isInteger(et.seuil_validation) || et.seuil_validation < 0 || et.seuil_validation > 100) {
+          errors.push(sp + "seuil_validation doit etre un entier 0-100");
+        }
+
+        if (!Array.isArray(et.blocs) || et.blocs.length < 1) {
+          errors.push(sp + "blocs doit contenir au moins un bloc");
+        }
+
+        (et.blocs || []).forEach((b, bi) => {
+          const bp = sp + "bloc " + (bi + 1) + " : ";
+          if (b.type_bloc !== "exercice_ref") errors.push(bp + 'type_bloc doit etre "exercice_ref" (V1)');
+          if (!String(b.ref_exercice_id || "").trim()) errors.push(bp + "ref_exercice_id obligatoire");
+
+          const forbiddenKeys = ["question", "questions", "reponse", "reponses", "correction", "explication", "choices", "choix", "items"];
+          forbiddenKeys.forEach((k) => {
+            if (Object.prototype.hasOwnProperty.call(b, k)) {
+              errors.push(bp + "ne doit pas contenir de contenu de question/correction (references uniquement)");
+            }
+          });
+        });
+
+        const remediation = et.remediation || {};
+        if (!String(remediation.feedback_global || "").trim()) {
+          errors.push(sp + "remediation.feedback_global obligatoire");
+        }
+      });
+
+      if (!p.autoevaluation || p.autoevaluation.mode !== "ref_existante") {
+        errors.push('autoevaluation.mode doit etre "ref_existante" (V1)');
+      }
+      if (!String((p.autoevaluation || {}).ref_autoeval_id || "").trim()) {
+        errors.push("autoevaluation.ref_autoeval_id obligatoire");
+      }
+
+      return { ok: errors.length === 0, errors, normalized: p };
+    }
+
+    async function getCollectionDocsWithFallback(colName) {
+      try {
+        const snap = await getDocs(query(collection(db, colName), orderBy("updatedAt", "desc")));
+        return snap;
+      } catch (_) {
+        return await getDocs(collection(db, colName));
+      }
+    }
+
+    async function loadCatalogs() {
+      const [exSnap, aeSnap] = await Promise.all([
+        getCollectionDocsWithFallback(COL_EXOS),
+        getCollectionDocsWithFallback(COL_EVALS)
+      ]);
+
+      exerciseBank = [];
+      exSnap.forEach((d) => exerciseBank.push({ id: d.id, ...d.data() }));
+      autoEvalBank = [];
+      aeSnap.forEach((d) => autoEvalBank.push({ id: d.id, ...d.data() }));
+
+      populateExerciseFilters();
+      renderExercisePicker();
+      renderAutoEvalPicker();
+    }
+
+    async function refreshParcoursList() {
+      const snap = await getCollectionDocsWithFallback(COL_PARCOURS);
+      allParcours = [];
+      snap.forEach((d) => allParcours.push({ id: d.id, ...d.data() }));
+
+      allParcours.sort((a, b) => {
+        const ta = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : (a.updatedAt || 0);
+        const tb = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (b.updatedAt || 0);
+        return tb - ta;
+      });
+
+      renderParcoursList();
+    }
+
+    function renderParcoursList() {
+      const host = document.getElementById("parcours-list");
+      const filter = (document.getElementById("list-filter").value || "").trim().toLowerCase();
+      const filtered = allParcours.filter((p) => {
+        if (!filter) return true;
+        const txt = [p.id, p.titre, p.module, p.niveau, p.type].join(" ").toLowerCase();
+        return txt.includes(filter);
+      });
+
+      if (!filtered.length) {
+        host.innerHTML = '<div class="hint">Aucun parcours.</div>';
+        return;
+      }
+
+      host.innerHTML = filtered.map((p) => {
+        const active = currentParcoursId === p.id ? "active" : "";
+        return `<div class="list-item ${active}" data-id="${esc(p.id)}">
+          <button class="li-del" data-del-id="${esc(p.id)}" title="Supprimer">x</button>
+          <div class="li-title">${esc(p.titre || "Sans titre")}</div>
+          <div class="li-meta">
+            <span class="chip">${esc(p.module || "-")}</span>
+            <span class="chip">${esc(p.niveau || "-")}</span>
+            <span class="chip ${p.publie ? "chip-pub" : "chip-draft"}">${p.publie ? "Publie" : "Brouillon"}</span>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function openEditor() {
+      document.getElementById("empty-state").style.display = "none";
+      document.getElementById("editor").style.display = "grid";
+    }
+
+    function closeEditor() {
+      document.getElementById("empty-state").style.display = "flex";
+      document.getElementById("editor").style.display = "none";
+    }
+
+    function syncModelFromHeaderForm() {
+      if (!currentParcours) return;
+      currentParcours.titre = document.getElementById("p-titre").value.trim();
+      currentParcours.module = document.getElementById("p-module").value.trim();
+      currentParcours.niveau = document.getElementById("p-niveau").value;
+      currentParcours.version = Math.max(1, toInt(document.getElementById("p-version").value, 1));
+      currentParcours.description = document.getElementById("p-description").value.trim();
+      currentParcours.publie = toBool(document.getElementById("p-publie").value);
+      currentParcours.competences_cibles = document.getElementById("p-competences").value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+      currentParcours.regles.mode_progression = "sequentiel";
+      currentParcours.regles.seuil_reussite_etape = clampInt(document.getElementById("r-seuil").value, 0, 100, 70);
+      currentParcours.regles.max_tentatives_par_exercice = Math.max(1, toInt(document.getElementById("r-max").value, 3));
+      currentParcours.regles.autoriser_saut_autoevaluation = toBool(document.getElementById("r-saut").value);
+      currentParcours.regles.autoriser_recommencer_autoevaluation = toBool(document.getElementById("r-recommencer").value);
+      currentParcours.regles.autoriser_envoyer_autoevaluation = toBool(document.getElementById("r-envoyer").value);
+
+      currentParcours.autoevaluation.mode = "ref_existante";
+      currentParcours.autoevaluation.ref_autoeval_id = document.getElementById("ae-ref").value.trim();
+      currentParcours.autoevaluation.titre_bouton = document.getElementById("ae-btn").value.trim();
+      currentParcours.autoevaluation.consigne_prealable = document.getElementById("ae-consigne").value.trim();
+      currentParcours.autoevaluation.conditions_suggerees.score_moyen_parcours_recommande = clampInt(document.getElementById("ae-score").value, 0, 100, 70);
+      currentParcours.autoevaluation.conditions_suggerees.etapes_min_reussies = Math.max(0, toInt(document.getElementById("ae-min").value, 1));
+      currentParcours.autoevaluation.feedback_fin.si_reussite = document.getElementById("ae-ok").value.trim();
+      currentParcours.autoevaluation.feedback_fin.si_echec = document.getElementById("ae-ko").value.trim();
+      currentParcours.autoevaluation.feedback_fin.si_abandon = document.getElementById("ae-abandon").value.trim();
+
+      currentParcours.ui.couleurs_pastilles = toBool(document.getElementById("ui-pastilles").value);
+      currentParcours.ui.afficher_progression_par_etape = toBool(document.getElementById("ui-steps").value);
+      currentParcours.ui.afficher_score_global = toBool(document.getElementById("ui-score").value);
+      currentParcours.ui.afficher_conseils = toBool(document.getElementById("ui-tips").value);
+    }
+
+    function renderHeaderForm() {
+      if (!currentParcours) return;
+      const p = currentParcours;
+      document.getElementById("p-titre").value = p.titre || "";
+      document.getElementById("p-module").value = p.module || "";
+      document.getElementById("p-niveau").value = p.niveau || "cap";
+      document.getElementById("p-version").value = p.version || 1;
+      document.getElementById("p-description").value = p.description || "";
+      document.getElementById("p-publie").value = String(!!p.publie);
+      document.getElementById("p-competences").value = (p.competences_cibles || []).join(", ");
+
+      document.getElementById("r-mode").value = "sequentiel";
+      document.getElementById("r-seuil").value = p.regles.seuil_reussite_etape;
+      document.getElementById("r-max").value = p.regles.max_tentatives_par_exercice;
+      document.getElementById("r-saut").value = String(!!p.regles.autoriser_saut_autoevaluation);
+      document.getElementById("r-recommencer").value = String(!!p.regles.autoriser_recommencer_autoevaluation);
+      document.getElementById("r-envoyer").value = String(!!p.regles.autoriser_envoyer_autoevaluation);
+
+      document.getElementById("ae-mode").value = "ref_existante";
+      document.getElementById("ae-ref").value = p.autoevaluation.ref_autoeval_id || "";
+      document.getElementById("ae-btn").value = p.autoevaluation.titre_bouton || "";
+      document.getElementById("ae-consigne").value = p.autoevaluation.consigne_prealable || "";
+      document.getElementById("ae-score").value = p.autoevaluation.conditions_suggerees.score_moyen_parcours_recommande;
+      document.getElementById("ae-min").value = p.autoevaluation.conditions_suggerees.etapes_min_reussies;
+      document.getElementById("ae-ok").value = p.autoevaluation.feedback_fin.si_reussite || "";
+      document.getElementById("ae-ko").value = p.autoevaluation.feedback_fin.si_echec || "";
+      document.getElementById("ae-abandon").value = p.autoevaluation.feedback_fin.si_abandon || "";
+
+      document.getElementById("ui-pastilles").value = String(!!p.ui.couleurs_pastilles);
+      document.getElementById("ui-steps").value = String(!!p.ui.afficher_progression_par_etape);
+      document.getElementById("ui-score").value = String(!!p.ui.afficher_score_global);
+      document.getElementById("ui-tips").value = String(!!p.ui.afficher_conseils);
+    }
+
+    function renderSteps() {
+      const host = document.getElementById("steps-container");
+      if (!currentParcours) {
+        host.innerHTML = "";
+        return;
+      }
+
+      host.innerHTML = currentParcours.etapes.map((et, si) => {
+        const blocksHTML = (et.blocs || []).map((b, bi) => {
+          return `<div class="block-row">
+            <div class="form-row">
+              <div class="field col-3"><label>id</label><input value="${esc(b.id)}" oninput="window.parcoursSetBlockField(${si},${bi},'id',this.value)"></div>
+              <div class="field col-5"><label>label</label><input value="${esc(b.label)}" oninput="window.parcoursSetBlockField(${si},${bi},'label',this.value)"></div>
+              <div class="field col-4"><label>poids</label><input type="number" min="0" step="0.1" value="${esc(b.poids)}" oninput="window.parcoursSetBlockField(${si},${bi},'poids',this.value)"></div>
+              <div class="field col-12"><label>ref_exercice_id</label><input class="mono" value="${esc(b.ref_exercice_id)}" oninput="window.parcoursSetBlockField(${si},${bi},'ref_exercice_id',this.value)"></div>
+            </div>
+            <div class="inline-actions">
+              <button type="button" class="btn-small" onclick="window.parcoursApplySelectedExerciseToBlock(${si},${bi})">Appliquer exercice selectionne</button>
+              <button type="button" class="btn-danger" onclick="window.parcoursRemoveBlock(${si},${bi})">Supprimer bloc</button>
+            </div>
+          </div>`;
+        }).join("");
+
+        const remHTML = ((et.remediation || {}).si_echec || []).map((a, ai) => {
+          return `<div class="rem-row">
+            <div class="form-row">
+              <div class="field col-4"><label>type_action</label><select onchange="window.parcoursSetRemField(${si},${ai},'type_action',this.value)"><option value="proposer_exercice_ref" ${a.type_action === "proposer_exercice_ref" ? "selected" : ""}>proposer_exercice_ref</option></select></div>
+              <div class="field col-8"><label>ref_exercice_id</label><input class="mono" value="${esc(a.ref_exercice_id)}" oninput="window.parcoursSetRemField(${si},${ai},'ref_exercice_id',this.value)"></div>
+              <div class="field col-12"><label>message</label><textarea oninput="window.parcoursSetRemField(${si},${ai},'message',this.value)">${esc(a.message || "")}</textarea></div>
+            </div>
+            <div class="inline-actions">
+              <button type="button" class="btn-small" onclick="window.parcoursApplySelectedExerciseToRemediation(${si},${ai})">Appliquer exercice selectionne</button>
+              <button type="button" class="btn-danger" onclick="window.parcoursRemoveRemediation(${si},${ai})">Supprimer remediation</button>
+            </div>
+          </div>`;
+        }).join("");
+
+        return `<article class="step-card">
+          <div class="step-head">
+            <strong>Etape ${si + 1}</strong>
+            <div class="inline-actions">
+              <button type="button" class="btn-small" onclick="window.parcoursMoveStep(${si},-1)">Monter</button>
+              <button type="button" class="btn-small" onclick="window.parcoursMoveStep(${si},1)">Descendre</button>
+              <button type="button" class="btn-danger" onclick="window.parcoursDeleteStep(${si})">Supprimer etape</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field col-3"><label>id *</label><input class="mono" value="${esc(et.id)}" oninput="window.parcoursSetStepField(${si},'id',this.value)"></div>
+            <div class="field col-6"><label>titre</label><input value="${esc(et.titre)}" oninput="window.parcoursSetStepField(${si},'titre',this.value)"></div>
+            <div class="field col-3"><label>seuil_validation</label><input type="number" min="0" max="100" value="${esc(et.seuil_validation)}" oninput="window.parcoursSetStepField(${si},'seuil_validation',this.value)"></div>
+            <div class="field col-12"><label>objectif</label><input value="${esc(et.objectif)}" oninput="window.parcoursSetStepField(${si},'objectif',this.value)"></div>
+            <div class="field col-12"><label>consigne</label><textarea oninput="window.parcoursSetStepField(${si},'consigne',this.value)">${esc(et.consigne)}</textarea></div>
+          </div>
+
+          <div class="divider"></div>
+          <div>
+            <div class="inline-actions" style="justify-content:space-between; align-items:center;">
+              <strong>Blocs (exercice_ref)</strong>
+              <button type="button" class="btn-small" onclick="window.parcoursAddBlock(${si})">+ Ajouter bloc</button>
+            </div>
+            <div class="block-list">${blocksHTML}</div>
+          </div>
+
+          <div class="divider"></div>
+          <div>
+            <div class="inline-actions" style="justify-content:space-between; align-items:center;">
+              <strong>Remediation</strong>
+              <button type="button" class="btn-small" onclick="window.parcoursAddRemediation(${si})">+ Ajouter remediation</button>
+            </div>
+            <div class="field" style="margin-top:8px;"><label>feedback_global *</label><textarea oninput="window.parcoursSetFeedbackGlobal(${si},this.value)">${esc(((et.remediation || {}).feedback_global) || "")}</textarea></div>
+            <div class="rem-list">${remHTML}</div>
+          </div>
+        </article>`;
+      }).join("");
+    }
+
+    function renderPreview() {
+      const host = document.getElementById("preview");
+      if (!currentParcours) {
+        host.innerHTML = "";
+        return;
+      }
+      const p = currentParcours;
+      const etapes = p.etapes || [];
+      const blocks = etapes.reduce((acc, e) => acc + (e.blocs || []).length, 0);
+      const rems = etapes.reduce((acc, e) => acc + (((e.remediation || {}).si_echec || []).length), 0);
+
+      host.innerHTML = `
+        <div><strong>${esc(p.titre || "Sans titre")}</strong></div>
+        <div class="hint">Module: ${esc(p.module || "-")} | Niveau: ${esc(p.niveau)} | Version: ${esc(p.version)}</div>
+        <div class="hint">Etapes: ${etapes.length} | Blocs references: ${blocks} | Remediations: ${rems}</div>
+        <div class="hint">Seuil global recommande: ${esc(p.regles.seuil_reussite_etape)}%</div>
+        <div class="hint">Autoevaluation: ${esc((p.autoevaluation || {}).ref_autoeval_id || "non liee")}</div>
+      `;
+    }
+
+    function renderAll() {
+      renderHeaderForm();
+      renderSteps();
+      renderPreview();
+      renderParcoursList();
+    }
+
+    function createNewParcours() {
+      currentParcoursId = null;
+      currentParcours = defaultParcours();
+      openEditor();
+      renderAll();
+    }
+
+    function selectParcoursById(id) {
+      const found = allParcours.find((p) => p.id === id);
+      if (!found) return;
+      currentParcoursId = id;
+      currentParcours = ensureParcoursShape(found);
+      openEditor();
+      renderAll();
+    }
+
+    async function saveCurrent(forcePublie = null) {
+      if (!currentParcours) return;
+      syncModelFromHeaderForm();
+
+      if (forcePublie === true) currentParcours.publie = true;
+      if (forcePublie === false) currentParcours.publie = false;
+
+      const check = validateParcoursData(currentParcours);
+      if (!check.ok) {
+        showToast("Validation echouee. Corrigez le parcours avant sauvegarde.", true);
+        openImportErrors(check.errors);
+        return;
+      }
+
+      currentParcours = check.normalized;
+
+      const id = currentParcoursId || nowId("parcours");
+      const payload = {
+        ...deepClone(currentParcours),
+        type: "parcours_progressif",
+        updatedAt: serverTimestamp()
+      };
+      if (!currentParcoursId) payload.createdAt = serverTimestamp();
+
+      await setDoc(doc(db, COL_PARCOURS, id), payload, { merge: true });
+      currentParcoursId = id;
+      await refreshParcoursList();
+      renderAll();
+      showToast(currentParcours.publie ? "Parcours sauvegarde et publie." : "Parcours sauvegarde.");
+    }
+
+    async function deleteCurrent() {
+      if (!currentParcoursId) {
+        createNewParcours();
+        showToast("Brouillon local efface.");
+        return;
+      }
+      const ok = window.confirm("Supprimer ce parcours de la banque ?");
+      if (!ok) return;
+      await deleteDoc(doc(db, COL_PARCOURS, currentParcoursId));
+      currentParcoursId = null;
+      currentParcours = null;
+      closeEditor();
+      await refreshParcoursList();
+      showToast("Parcours supprime.");
+    }
+
+    function duplicateCurrent() {
+      if (!currentParcours) return;
+      syncModelFromHeaderForm();
+      const copy = deepClone(currentParcours);
+      copy.titre = (copy.titre || "Parcours") + " (copie)";
+      copy.publie = false;
+      currentParcoursId = null;
+      currentParcours = ensureParcoursShape(copy);
+      renderAll();
+      showToast("Copie prete. Sauvegardez pour creer un nouveau parcours.");
+    }
+
+    function moveStep(stepIndex, delta) {
+      if (!currentParcours) return;
+      const arr = currentParcours.etapes;
+      const next = stepIndex + delta;
+      if (next < 0 || next >= arr.length) return;
+      const tmp = arr[stepIndex];
+      arr[stepIndex] = arr[next];
+      arr[next] = tmp;
+      renderAll();
+    }
+
+    function addStep() {
+      if (!currentParcours) return;
+      currentParcours.etapes.push(defaultEtape(currentParcours.etapes.length + 1));
+      renderAll();
+    }
+
+    function deleteStep(stepIndex) {
+      if (!currentParcours) return;
+      if (currentParcours.etapes.length <= 1) {
+        showToast("Le parcours doit garder au moins une etape.", true);
+        return;
+      }
+      currentParcours.etapes.splice(stepIndex, 1);
+      renderAll();
+    }
+
+    function setStepField(stepIndex, field, value) {
+      if (!currentParcours) return;
+      const et = currentParcours.etapes[stepIndex];
+      if (!et) return;
+      if (field === "seuil_validation") et[field] = clampInt(value, 0, 100, 70);
+      else et[field] = value;
+      renderPreview();
+    }
+
+    function addBlock(stepIndex) {
+      const et = currentParcours?.etapes?.[stepIndex];
+      if (!et) return;
+      et.blocs.push(defaultBlock(et.blocs.length + 1));
+      renderAll();
+    }
+
+    function removeBlock(stepIndex, blockIndex) {
+      const et = currentParcours?.etapes?.[stepIndex];
+      if (!et) return;
+      if (et.blocs.length <= 1) {
+        showToast("Chaque etape doit contenir au moins un bloc.", true);
+        return;
+      }
+      et.blocs.splice(blockIndex, 1);
+      renderAll();
+    }
+
+    function setBlockField(stepIndex, blockIndex, field, value) {
+      const b = currentParcours?.etapes?.[stepIndex]?.blocs?.[blockIndex];
+      if (!b) return;
+      if (field === "poids") b[field] = Math.max(0, Number(value || 0));
+      else b[field] = value;
+      renderPreview();
+    }
+
+    function addRemediation(stepIndex) {
+      const arr = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec;
+      if (!arr) return;
+      arr.push(defaultRemediationAction(arr.length + 1));
+      renderAll();
+    }
+
+    function removeRemediation(stepIndex, remIndex) {
+      const arr = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec;
+      if (!arr) return;
+      arr.splice(remIndex, 1);
+      if (!arr.length) arr.push(defaultRemediationAction(1));
+      renderAll();
+    }
+
+    function setRemField(stepIndex, remIndex, field, value) {
+      const a = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec?.[remIndex];
+      if (!a) return;
+      a[field] = value;
+      renderPreview();
+    }
+
+    function setFeedbackGlobal(stepIndex, value) {
+      const rem = currentParcours?.etapes?.[stepIndex]?.remediation;
+      if (!rem) return;
+      rem.feedback_global = value;
+      renderPreview();
+    }
+
+    function currentSelectedExercise() {
+      return exerciseBank.find((e) => e.id === selectedExerciseId) || null;
+    }
+
+    function currentSelectedAutoEval() {
+      return autoEvalBank.find((e) => e.id === selectedAutoEvalId) || null;
+    }
+
+    function applySelectedExerciseToBlock(stepIndex, blockIndex) {
+      const ex = currentSelectedExercise();
+      const b = currentParcours?.etapes?.[stepIndex]?.blocs?.[blockIndex];
+      if (!ex || !b) {
+        showToast("Selectionnez un exercice dans le catalogue.", true);
+        return;
+      }
+      b.ref_exercice_id = ex.id;
+      if (!b.label) b.label = ex.titre || ex.id;
+      renderAll();
+    }
+
+    function applySelectedExerciseToRemediation(stepIndex, remIndex) {
+      const ex = currentSelectedExercise();
+      const r = currentParcours?.etapes?.[stepIndex]?.remediation?.si_echec?.[remIndex];
+      if (!ex || !r) {
+        showToast("Selectionnez un exercice dans le catalogue.", true);
+        return;
+      }
+      r.ref_exercice_id = ex.id;
+      if (!r.message) r.message = "Revoir cet exercice pour consolider la competence.";
+      renderAll();
+    }
+
+    function applySelectedAutoEval() {
+      const ae = currentSelectedAutoEval();
+      if (!ae) {
+        showToast("Selectionnez une autoevaluation.", true);
+        return;
+      }
+      document.getElementById("ae-ref").value = ae.id;
+      syncModelFromHeaderForm();
+      renderPreview();
+    }
+
+    function flattenModules() {
+      const map = new Map();
+      const all = window.MODULES_PSE || {};
+      Object.keys(all).forEach((k) => {
+        (all[k] || []).forEach((m) => {
+          if (!map.has(m.id)) map.set(m.id, `${m.id} - ${m.titre}`);
+        });
+      });
+      return Array.from(map.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.id.localeCompare(b.id));
+    }
+
+    function populateExerciseFilters() {
+      const typeSel = document.getElementById("ex-filter-type");
+      const moduleSel = document.getElementById("ex-filter-module");
+      const levelSel = document.getElementById("ex-filter-level");
+
+      const types = Array.from(new Set(exerciseBank.map((e) => e.type).filter(Boolean))).sort();
+      const levels = Array.from(new Set(exerciseBank.map((e) => e.niveau).filter(Boolean))).sort();
+      const mods = flattenModules();
+
+      typeSel.innerHTML = '<option value="">Tous</option>' + types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+      levelSel.innerHTML = '<option value="">Tous</option>' + levels.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+      moduleSel.innerHTML = '<option value="">Tous</option>' + mods.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join("");
+    }
+
+    function renderExercisePicker() {
+      const host = document.getElementById("exercise-list");
+      const type = document.getElementById("ex-filter-type").value;
+      const mod = document.getElementById("ex-filter-module").value;
+      const lvl = document.getElementById("ex-filter-level").value;
+      const key = (document.getElementById("ex-filter-key").value || "").trim().toLowerCase();
+
+      let rows = exerciseBank.filter((e) => {
+        if (type && e.type !== type) return false;
+        if (mod && e.moduleId !== mod) return false;
+        if (lvl && e.niveau !== lvl) return false;
+        if (key) {
+          const txt = [e.id, e.titre, e.type, e.moduleId, e.niveau].join(" ").toLowerCase();
+          return txt.includes(key);
+        }
+        return true;
+      });
+
+      rows = rows.slice(0, 160);
+
+      if (!rows.length) {
+        host.innerHTML = '<div class="hint">Aucun exercice selon ces filtres.</div>';
+        return;
+      }
+
+      host.innerHTML = rows.map((e) => {
+        const active = selectedExerciseId === e.id ? "active" : "";
+        return `<div class="picker-item ${active}" data-ex-id="${esc(e.id)}">
+          <div class="pi-title">${esc(e.titre || e.id)}</div>
+          <div class="pi-meta">
+            <span class="chip mono">${esc(e.id)}</span>
+            <span class="chip">${esc(e.type || "-")}</span>
+            <span class="chip">${esc(e.moduleId || "-")}</span>
+            <span class="chip">${esc(e.niveau || "-")}</span>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderAutoEvalPicker() {
+      const host = document.getElementById("ae-list");
+      const key = (document.getElementById("ae-filter").value || "").trim().toLowerCase();
+
+      let rows = autoEvalBank.filter((e) => {
+        if (!key) return true;
+        const txt = [e.id, e.titre, e.moduleId, (e.classeIds || []).join(" ")].join(" ").toLowerCase();
+        return txt.includes(key);
+      });
+
+      rows = rows.slice(0, 120);
+
+      if (!rows.length) {
+        host.innerHTML = '<div class="hint">Aucune autoevaluation selon ce filtre.</div>';
+        return;
+      }
+
+      host.innerHTML = rows.map((e) => {
+        const active = selectedAutoEvalId === e.id ? "active" : "";
+        const classes = Array.isArray(e.classeIds) && e.classeIds.length ? e.classeIds.join(", ") : "Toutes";
+        return `<div class="picker-item ${active}" data-ae-id="${esc(e.id)}">
+          <div class="pi-title">${esc(e.titre || e.id)}</div>
+          <div class="pi-meta">
+            <span class="chip mono">${esc(e.id)}</span>
+            <span class="chip">${esc(e.moduleId || "-")}</span>
+            <span class="chip">${esc(classes)}</span>
+            <span class="chip">${e.publie ? "Publie" : "Brouillon"}</span>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function openImportModal() {
+      document.getElementById("import-modal").style.display = "flex";
+      document.getElementById("import-input").value = "";
+      document.getElementById("import-errors").style.display = "none";
+      document.getElementById("import-errors").textContent = "";
+      document.getElementById("import-prompt").textContent = IMPORT_PROMPT;
+    }
+
+    function closeImportModal() {
+      document.getElementById("import-modal").style.display = "none";
+    }
+
+    function openImportErrors(errors) {
+      const box = document.getElementById("import-errors");
+      box.style.display = "block";
+      box.textContent = errors.map((e) => "- " + e).join("\n");
+      document.getElementById("import-modal").style.display = "flex";
+    }
+
+    function runImport() {
+      const raw = document.getElementById("import-input").value;
+      if (!raw.trim()) {
+        openImportErrors(["Collez un JSON avant import."]);
+        return;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(cleanImportJSONString(raw));
+      } catch (e) {
+        openImportErrors(["JSON invalide: " + e.message]);
+        return;
+      }
+
+      const result = validateParcoursData(parsed);
+      if (!result.ok) {
+        openImportErrors(result.errors);
+        return;
+      }
+
+      currentParcoursId = null;
+      currentParcours = result.normalized;
+      openEditor();
+      renderAll();
+      closeImportModal();
+      showToast("Import JSON valide charge dans l editeur.");
+    }
+
+    function openStudentPage() {
+      if (!currentParcoursId) {
+        showToast("Sauvegardez le parcours avant d ouvrir la page eleve.", true);
+        return;
+      }
+      const url = `../PSE/parcours.html?id=${encodeURIComponent(currentParcoursId)}`;
+      window.open(url, "_blank");
+    }
+
+    function bindEvents() {
+      document.getElementById("btn-new").addEventListener("click", () => createNewParcours());
+      document.getElementById("list-filter").addEventListener("input", renderParcoursList);
+
+      document.getElementById("parcours-list").addEventListener("click", async (e) => {
+        const delId = e.target?.dataset?.delId;
+        if (delId) {
+          e.stopPropagation();
+          const ok = window.confirm("Supprimer ce parcours ?");
+          if (!ok) return;
+          await deleteDoc(doc(db, COL_PARCOURS, delId));
+          if (currentParcoursId === delId) {
+            currentParcoursId = null;
+            currentParcours = null;
+            closeEditor();
+          }
+          await refreshParcoursList();
+          showToast("Parcours supprime.");
+          return;
+        }
+
+        const item = e.target.closest(".list-item[data-id]");
+        if (!item) return;
+        selectParcoursById(item.dataset.id);
+      });
+
+      [
+        "p-titre", "p-module", "p-niveau", "p-version", "p-description", "p-publie", "p-competences",
+        "r-mode", "r-seuil", "r-max", "r-saut", "r-recommencer", "r-envoyer",
+        "ae-mode", "ae-ref", "ae-btn", "ae-consigne", "ae-score", "ae-min", "ae-ok", "ae-ko", "ae-abandon",
+        "ui-pastilles", "ui-steps", "ui-score", "ui-tips"
+      ].forEach((id) => {
+        const el = document.getElementById(id);
+        el.addEventListener("input", () => {
+          syncModelFromHeaderForm();
+          renderPreview();
+        });
+        el.addEventListener("change", () => {
+          syncModelFromHeaderForm();
+          renderPreview();
+        });
+      });
+
+      document.getElementById("btn-add-step").addEventListener("click", addStep);
+
+      document.getElementById("btn-save").addEventListener("click", () => saveCurrent());
+      document.getElementById("btn-publish").addEventListener("click", () => saveCurrent(true));
+      document.getElementById("btn-unpublish").addEventListener("click", () => saveCurrent(false));
+      document.getElementById("btn-duplicate").addEventListener("click", duplicateCurrent);
+      document.getElementById("btn-delete").addEventListener("click", deleteCurrent);
+      document.getElementById("btn-preview-student").addEventListener("click", openStudentPage);
+      document.getElementById("btn-import").addEventListener("click", openImportModal);
+
+      document.getElementById("ex-filter-type").addEventListener("change", renderExercisePicker);
+      document.getElementById("ex-filter-module").addEventListener("change", renderExercisePicker);
+      document.getElementById("ex-filter-level").addEventListener("change", renderExercisePicker);
+      document.getElementById("ex-filter-key").addEventListener("input", renderExercisePicker);
+
+      document.getElementById("exercise-list").addEventListener("click", (e) => {
+        const item = e.target.closest(".picker-item[data-ex-id]");
+        if (!item) return;
+        selectedExerciseId = item.dataset.exId;
+        renderExercisePicker();
+      });
+
+      document.getElementById("ae-filter").addEventListener("input", renderAutoEvalPicker);
+      document.getElementById("ae-list").addEventListener("click", (e) => {
+        const item = e.target.closest(".picker-item[data-ae-id]");
+        if (!item) return;
+        selectedAutoEvalId = item.dataset.aeId;
+        renderAutoEvalPicker();
+      });
+
+      document.getElementById("ae-use-selected").addEventListener("click", applySelectedAutoEval);
+
+      document.getElementById("import-modal").addEventListener("click", (e) => {
+        if (e.target.id === "import-modal") closeImportModal();
+      });
+      document.getElementById("btn-close-import").addEventListener("click", closeImportModal);
+      document.getElementById("btn-run-import").addEventListener("click", runImport);
+      document.getElementById("btn-copy-prompt").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(IMPORT_PROMPT);
+          showToast("Prompt IA copie.");
+        } catch {
+          showToast("Impossible de copier automatiquement.", true);
+        }
+      });
+    }
+
+    // Expose step handlers for dynamic HTML buttons
+    window.parcoursMoveStep = (i, d) => moveStep(i, d);
+    window.parcoursAddBlock = (i) => addBlock(i);
+    window.parcoursRemoveBlock = (si, bi) => removeBlock(si, bi);
+    window.parcoursSetStepField = (si, f, v) => setStepField(si, f, v);
+    window.parcoursSetBlockField = (si, bi, f, v) => setBlockField(si, bi, f, v);
+    window.parcoursAddRemediation = (si) => addRemediation(si);
+    window.parcoursRemoveRemediation = (si, ri) => removeRemediation(si, ri);
+    window.parcoursSetRemField = (si, ri, f, v) => setRemField(si, ri, f, v);
+    window.parcoursSetFeedbackGlobal = (si, v) => setFeedbackGlobal(si, v);
+    window.parcoursDeleteStep = (si) => deleteStep(si);
+    window.parcoursApplySelectedExerciseToBlock = (si, bi) => applySelectedExerciseToBlock(si, bi);
+    window.parcoursApplySelectedExerciseToRemediation = (si, ri) => applySelectedExerciseToRemediation(si, ri);
+
+    async function bootstrap() {
+      bindEvents();
+      closeEditor();
+      await Promise.all([refreshParcoursList(), loadCatalogs()]);
+      if (!allParcours.length) {
+        createNewParcours();
+      }
+    }
+
+    bootstrap().catch((e) => {
+      console.error(e);
+      showToast("Erreur de chargement: " + e.message, true);
+    });
+  </script>
+</body>
+</html>
