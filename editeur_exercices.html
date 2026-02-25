@@ -402,6 +402,7 @@
                         <option value="estimation_risque">📊 Estimation du risque</option>
                         <option value="duerp_ligne">📋 DUERP — Ligne unique</option>
                         <option value="duerp_mini">📋 DUERP — Mini (4 lignes)</option>
+                        <option value="duer_mission_directeur">📋 DUERP — Mission Directeur</option>
                         <option value="pictogramme">⚠️ Pictogrammes de securite</option>
                         <option value="analyse_copie">📝 Analyse de copie (competences)</option>
                     </select>
@@ -1182,6 +1183,21 @@
             </div>
         </div>
 
+        <!-- ====== DUER MISSION DIRECTEUR ====== -->
+        <div class="content-type-section" id="ct-duer_mission_directeur">
+            <div style="background:#1a1a2e; border-radius:10px; padding:20px; text-align:center; color:#94a3b8;">
+                <div style="font-size:1.2rem; margin-bottom:8px;">📋 DUERP — Mission Directeur</div>
+                <div style="font-size:0.8rem; margin-bottom:16px;">
+                    Cet exercice complexe est concu pour etre importe via JSON.<br>
+                    Utilisez le bouton <strong style="color:#f59e0b;">📥 Importer JSON</strong> ci-dessus pour coller le JSON genere par l'IA.
+                </div>
+                <div style="font-size:0.7rem; color:#64748b;">
+                    Structure : Contexte entreprise + rappels DUERP + 2 questions globales + 4 situations (dangers + mesures) + mission finale<br>
+                    Bareme : 20 points (Q1: 1pt, Q2: 1pt, 8 questions situations: 16pts, mission: 2pts)
+                </div>
+            </div>
+        </div>
+
         <!-- ====== QCM CLASSIQUE ====== -->
         <div class="content-type-section" id="ct-qcm_classique">
             <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="qcmc-titre" placeholder="QCM - Les risques electriques"></div>
@@ -1385,6 +1401,7 @@
         estimation_risque: '📊 Estimation',
         duerp_ligne: '📋 DUERP Ligne',
         duerp_mini: '📋 DUERP Mini',
+        duer_mission_directeur: '📋 DUERP Mission Directeur',
         pictogramme: '⚠️ Pictogrammes',
         analyse_copie: '📝 Analyse copie'
     };
@@ -1508,7 +1525,7 @@
     renderClassPills();
 
     // ========== TYPE CHANGE ==========
-    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini'];
+    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'duer_mission_directeur'];
     const AUTO_COMPETENCES_TYPES = ['analyse_copie'];
 
     window.onTypeChange = function() {
@@ -4163,6 +4180,7 @@ Important:
     // Auto-detection du type depuis la structure JSON
     function detectJsonType(src) {
         if (src.niveaux && src.danger) return 'prevention';
+        if (Array.isArray(src.lignes) && src.rappels && src.questions_globales) return 'duer_mission_directeur';
         if (Array.isArray(src.lignes) && src.lignes.length > 0 && src.lignes[0].unite_travail) return 'duerp_mini';
         if (src.unite_travail && src.choix && src.attendus) return 'duerp_ligne';
         if (src.exposition && src.declencheur && src.gravite) return 'estimation_risque';
@@ -4449,6 +4467,12 @@ Important:
                 return (data.unite_travail && data.choix && data.attendus) ? '' : 'DUERP ligne attendu: unite_travail, choix, attendus.';
             case 'duerp_mini':
                 return (Array.isArray(data.lignes) && data.lignes.length > 0) ? '' : 'DUERP mini attendu: lignes[].';
+            case 'duer_mission_directeur':
+                if (!data.entreprise) return 'Mission directeur: champ "entreprise" obligatoire.';
+                if (!data.rappels) return 'Mission directeur: champ "rappels" obligatoire.';
+                if (!Array.isArray(data.questions_globales) || data.questions_globales.length < 2) return 'Mission directeur: au moins 2 questions_globales.';
+                if (!Array.isArray(data.lignes) || data.lignes.length !== 4) return 'Mission directeur: exactement 4 situations (lignes).';
+                return '';
             case 'qcm_classique':
                 return (typeof data.question === 'string' && Array.isArray(data.choix) && data.reponse !== undefined) ? '' : 'QCM classique attendu: question + choix[] + reponse.';
             case 'qcm_series_multi':
