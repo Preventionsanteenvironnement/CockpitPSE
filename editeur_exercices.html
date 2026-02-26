@@ -400,8 +400,8 @@
                         <option value="pad">⚠️ PAD (Processus d'apparition du dommage)</option>
                         <option value="prevention">🛡️ Mesures de prevention</option>
                         <option value="estimation_risque">📊 Estimation du risque</option>
-                        <option value="duerp_ligne">📋 Mission DUERP — 1 risque</option>
-                        <option value="duerp_mini">📋 Mission DUERP — 4 risques</option>
+                        <option value="duerp_ligne">📋 Mission DUERP 1</option>
+                        <option value="duerp_mini">📋 Mission DUERP 2</option>
                         <option value="duer_mission_directeur">📋 Mission DUERP — Directeur</option>
                         <option value="pictogramme">⚠️ Pictogrammes de securite</option>
                         <option value="analyse_copie">📝 Analyse de copie (competences)</option>
@@ -424,6 +424,21 @@
                 <label>Module</label>
                 <select class="form-select" id="exo-module" disabled>
                     <option value="">— Aucun module —</option>
+                </select>
+            </div>
+            <div class="form-group" id="dossier-group" style="display:none; margin-top:10px;">
+                <label>Dossier transversal</label>
+                <select class="form-select" id="exo-dossier" onchange="onDossierChange()">
+                    <option value="">— Aucun dossier —</option>
+                </select>
+                <div style="font-size:0.72rem; color:#64748b; margin-top:3px;">
+                    Permet de classer cet exercice dans un dossier (DUERP, PAD, Outils...)
+                </div>
+            </div>
+            <div class="form-group" id="sous-dossier-group" style="display:none; margin-top:6px;">
+                <label>Sous-dossier</label>
+                <select class="form-select" id="exo-sous-dossier">
+                    <option value="">— Aucun —</option>
                 </select>
             </div>
             <div class="form-group" style="margin-top:10px;" id="categorie-group">
@@ -1399,8 +1414,8 @@
         pad: '⚠️ PAD',
         prevention: '🛡️ Prevention',
         estimation_risque: '📊 Estimation',
-        duerp_ligne: '📋 Mission DUERP 1 risque',
-        duerp_mini: '📋 Mission DUERP 4 risques',
+        duerp_ligne: '📋 Mission DUERP 1',
+        duerp_mini: '📋 Mission DUERP 2',
         duer_mission_directeur: '📋 Mission DUERP Directeur',
         pictogramme: '⚠️ Pictogrammes',
         analyse_copie: '📝 Analyse copie'
@@ -1524,8 +1539,42 @@
 
     renderClassPills();
 
+    // ========== DOSSIER TRANSVERSAL ==========
+    (function populateDossierDropdown() {
+        var sel = document.getElementById('exo-dossier');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">— Aucun dossier —</option>';
+        (window.DOSSIERS_TRANSVERSAUX || []).forEach(function(d) {
+            var opt = document.createElement('option');
+            opt.value = d.id;
+            opt.textContent = d.label.replace(/^[^\s]+\s/, '') + ' — ' + d.description;
+            sel.appendChild(opt);
+        });
+    })();
+
+    window.onDossierChange = function() {
+        var dossierId = document.getElementById('exo-dossier').value;
+        var sdGroup = document.getElementById('sous-dossier-group');
+        var sdSel = document.getElementById('exo-sous-dossier');
+        if (!sdGroup || !sdSel) return;
+        var folder = (window.DOSSIERS_TRANSVERSAUX || []).find(function(d) { return d.id === dossierId; });
+        if (folder && folder.sousDossiers && folder.sousDossiers.length > 0) {
+            sdSel.innerHTML = '<option value="">— Aucun —</option>';
+            folder.sousDossiers.forEach(function(sd) {
+                var opt = document.createElement('option');
+                opt.value = sd.id;
+                opt.textContent = sd.label;
+                sdSel.appendChild(opt);
+            });
+            sdGroup.style.display = '';
+        } else {
+            sdSel.innerHTML = '<option value="">— Aucun —</option>';
+            sdGroup.style.display = 'none';
+        }
+    };
+
     // ========== TYPE CHANGE ==========
-    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'duer_mission_directeur'];
+    const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'duer_mission_directeur', 'pictogramme'];
     const AUTO_COMPETENCES_TYPES = ['analyse_copie'];
 
     window.onTypeChange = function() {
@@ -1555,6 +1604,11 @@
             modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
             modSel.value = 'TRANSVERSAL';
             modSel.disabled = true;
+            // Hide dossier for competences types
+            var dossierGroupAC = document.getElementById('dossier-group');
+            if (dossierGroupAC) dossierGroupAC.style.display = 'none';
+            var sdGroupAC = document.getElementById('sous-dossier-group');
+            if (sdGroupAC) sdGroupAC.style.display = 'none';
         } else if (TRANSVERSAL_TYPES.includes(rawType)) {
             // PAD, Prevention, etc. : checkbox masquee, module = TRANSVERSAL
             catCheckbox.checked = false;
@@ -1564,6 +1618,23 @@
             modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
             modSel.value = 'TRANSVERSAL';
             modSel.disabled = true;
+            // Show dossier dropdown, auto-select based on type
+            var dossierGroup = document.getElementById('dossier-group');
+            var dossierSel = document.getElementById('exo-dossier');
+            if (dossierGroup && dossierSel) {
+                dossierGroup.style.display = '';
+                var autoFolder = null;
+                (window.DOSSIERS_TRANSVERSAUX || []).forEach(function(d) {
+                    if (d.autoTypes && d.autoTypes.indexOf(rawType) !== -1) autoFolder = d.id;
+                });
+                if (autoFolder) {
+                    dossierSel.value = autoFolder;
+                    dossierSel.disabled = true;
+                } else {
+                    dossierSel.disabled = false;
+                }
+                onDossierChange();
+            }
         } else {
             // Types normaux : checkbox visible et activable
             catCheckbox.disabled = false;
@@ -1577,6 +1648,14 @@
                 modSel.innerHTML = '<option value="TRANSVERSAL">Transversal (toutes classes)</option>';
                 modSel.value = 'TRANSVERSAL';
                 modSel.disabled = true;
+            }
+            // Show dossier dropdown (optional grouping for any type)
+            var dossierGroup2 = document.getElementById('dossier-group');
+            var dossierSel2 = document.getElementById('exo-dossier');
+            if (dossierGroup2 && dossierSel2) {
+                dossierGroup2.style.display = '';
+                dossierSel2.disabled = false;
+                onDossierChange();
             }
         }
     };
@@ -3194,8 +3273,10 @@
                 ? '<span class="ei-badge" style="background:#e0e7ff; color:#3730a3;">' + exClasses.join(', ') + '</span>'
                 : '';
             const moduleBadge = ex.moduleId ? '<span class="ei-badge" style="background:#fef3c7; color:#92400e;">' + ex.moduleId + '</span>' : '';
+            var inferredDossier = window.inferDossier ? window.inferDossier(ex) : (ex.dossier || null);
+            const dossierBadge = inferredDossier ? '<span class="ei-badge" style="background:#e0f2fe; color:#0369a1;">📁 ' + inferredDossier + '</span>' : '';
             item.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + '</div>' +
+                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + dossierBadge + '</div>' +
                 '<button class="ei-del" onclick="event.stopPropagation(); deleteExerciceById(\'' + ex.id + '\')">&times;</button>';
             item.onclick = () => loadExercice(ex.id);
             list.appendChild(item);
@@ -3260,6 +3341,18 @@
         window.setDifficulty(ex.difficulte || 'facile');
         clearAllForms();
         onTypeChange();
+        // Restaurer dossier et sous-dossier
+        setTimeout(function() {
+            var dossierSel = document.getElementById('exo-dossier');
+            if (dossierSel && !dossierSel.disabled) {
+                dossierSel.value = ex.dossier || '';
+            }
+            onDossierChange();
+            setTimeout(function() {
+                var sdSel = document.getElementById('exo-sous-dossier');
+                if (sdSel) sdSel.value = ex.sous_dossier || '';
+            }, 50);
+        }, 120);
         // 6f: restaurer checkbox categorie depuis Firebase
         if (ex.categorie === 'competences' && !AUTO_COMPETENCES_TYPES.includes(ex.type) && !TRANSVERSAL_TYPES.includes(ex.type)) {
             var catCb = document.getElementById('exo-categorie-competences');
@@ -3289,6 +3382,8 @@
         const classeIds = getSelectedClasseIds();
         const classeId = classeIds.length > 0 ? classeIds[0] : null;
         const moduleId = document.getElementById('exo-module').value || null;
+        const dossier = document.getElementById('exo-dossier').value || null;
+        const sous_dossier = document.getElementById('exo-sous-dossier').value || null;
         let niveau = null;
         if (classeId) {
             const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
@@ -3618,7 +3713,7 @@
         if (AUTO_COMPETENCES_TYPES.includes(type) && competences_cibles.length === 0) {
             competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
         }
-        const data = { titre, type, classeIds, classeId, moduleId, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, updatedAt: serverTimestamp() };
+        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
                 await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
@@ -3660,6 +3755,8 @@
         const classeIds = getSelectedClasseIds();
         const classeId = classeIds.length > 0 ? classeIds[0] : null;
         const moduleId = document.getElementById('exo-module').value || null;
+        const dossier = document.getElementById('exo-dossier').value || null;
+        const sous_dossier = document.getElementById('exo-sous-dossier').value || null;
         let niveau = null;
         if (classeId) {
             const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
@@ -3682,6 +3779,8 @@
             classeIds,
             classeId,
             moduleId,
+            dossier,
+            sous_dossier,
             niveau,
             difficulte: currentDifficulty,
             contenu,
@@ -4582,9 +4681,12 @@ Important:
                         var itemType = detectJsonType(item);
                         var titre = item.titre || ('Exercice ' + (i + 1));
                         var newId = 'exo_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4) + '_' + i;
+                        var dossierVal = document.getElementById('exo-dossier').value || null;
+                        var sousDossierVal = document.getElementById('exo-sous-dossier').value || null;
                         var exData = {
                             titre: titre, type: itemType, classeIds: classeIds, classeId: classeId,
-                            moduleId: moduleId, niveau: niveau, difficulte: currentDifficulty,
+                            moduleId: moduleId, dossier: dossierVal, sous_dossier: sousDossierVal,
+                            niveau: niveau, difficulte: currentDifficulty,
                             contenu: item, categorie: 'modules', competences_cibles: [],
                             publie: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                         };

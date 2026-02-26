@@ -428,6 +428,62 @@ window.calculerPointsSaisie = function(saisie, criteresActifs) {
     };
 };
 
+// ===================================================================
+// DOSSIERS TRANSVERSAUX (dossiers pour regrouper les exercices transversaux)
+// ===================================================================
+window.DOSSIERS_TRANSVERSAUX = [
+    { id: 'DUERP', label: '📋 DUERP', color: '#1e293b',
+      description: "Document Unique d'Evaluation des Risques Professionnels",
+      autoTypes: ['duerp_ligne', 'duerp_mini', 'duer_mission_directeur'] },
+    { id: 'PAD', label: '⚠️ PAD', color: '#f59e0b',
+      description: "Processus d'Apparition du Dommage",
+      autoTypes: ['pad'] },
+    { id: 'ESTIMATION', label: '📊 Estimation du risque', color: '#8b5cf6',
+      description: "Estimation du risque professionnel",
+      autoTypes: ['estimation_risque'] },
+    { id: 'PREVENTION', label: '🛡️ Prevention', color: '#22c55e',
+      description: "Mesures de prevention",
+      autoTypes: ['prevention'] },
+    { id: 'PICTOGRAMME', label: '⚠️ Pictogrammes', color: '#b45309',
+      description: "Pictogrammes de securite",
+      autoTypes: ['pictogramme'] },
+    { id: 'ACTEURS_PREV', label: '👥 Acteurs de prevention', color: '#0891b2',
+      description: "Les acteurs de prevention en entreprise",
+      autoTypes: [] },
+    { id: 'ANALYSE_RISQUES', label: '🔍 Analyse des risques professionnels', color: '#dc2626',
+      description: "Analyse des risques professionnels",
+      autoTypes: [] },
+    { id: 'ANALYSE_SITUATION', label: '🏭 Analyse situation de travail', color: '#9333ea',
+      description: "Analyse d'une situation de travail",
+      autoTypes: [] },
+    { id: 'OUTILS_ANALYSE', label: '🛠️ Outils d\'analyse', color: '#0d9488',
+      description: "Outils d'analyse des risques",
+      autoTypes: [],
+      sousDossiers: [
+          { id: 'ITAMAMI', label: 'ITAMaMi' },
+          { id: '5M', label: 'Methode des 5M' },
+          { id: 'QQOQCP', label: 'QQOQCP' },
+          { id: 'ISHIKAWA', label: 'Diagramme d\'Ishikawa' }
+      ] },
+    { id: 'CARTE_MENTALE', label: '🧠 Carte mentale', color: '#ea580c',
+      description: "Cartes mentales",
+      autoTypes: [] }
+];
+
+window.inferDossier = function(exercise) {
+    if (exercise.dossier) return exercise.dossier;
+    for (var i = 0; i < window.DOSSIERS_TRANSVERSAUX.length; i++) {
+        var d = window.DOSSIERS_TRANSVERSAUX[i];
+        if (d.autoTypes.indexOf(exercise.type) !== -1) return d.id;
+    }
+    return null;
+};
+
+window.inferSousDossier = function(exercise) {
+    return exercise.sous_dossier || null;
+};
+
 console.log("✅ Modules PSE chargés :", Object.keys(window.MODULES_PSE).length, "niveaux");
 console.log("✅ Classes configurées :", Object.keys(window.CLASSES_CONFIG).length);
 console.log("✅ Groupes :", Object.keys(window.GROUPES_CLASSES).length);
+console.log("✅ Dossiers transversaux :", window.DOSSIERS_TRANSVERSAUX.length);
