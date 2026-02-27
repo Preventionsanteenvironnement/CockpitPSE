@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur Lire/Ecrire — PSE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: white; height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        #sidebar {
+            width: 320px; min-width: 320px; background: #1e293b; display: flex; flex-direction: column;
+            border-right: 1px solid #334155; overflow-y: auto;
+        }
+        #sidebar::-webkit-scrollbar { width: 4px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .sidebar-header {
+            padding: 16px; border-bottom: 1px solid #334155; display: flex;
+            align-items: center; justify-content: space-between;
+        }
+        .sidebar-header h2 { font-size: 1.1rem; }
+        .sidebar-header a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
+        .sidebar-header a:hover { color: white; }
+
+        .sidebar-section { padding: 14px; border-bottom: 1px solid #334155; }
+        .sidebar-section label {
+            font-size: 0.7rem; color: #64748b; text-transform: uppercase;
+            letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+
+        .filter-select {
+            width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #475569;
+            border-radius: 6px; color: white; font-size: 0.8rem; cursor: pointer; outline: none;
+            margin-bottom: 8px;
+        }
+
+        #btn-new-exo {
+            width: 100%; padding: 12px; background: #22c55e; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #btn-new-exo:hover { opacity: 0.85; }
+
+        #btn-import {
+            width: 100%; padding: 10px; background: #6366f1; color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: opacity 0.2s; margin-top: 8px;
+        }
+        #btn-import:hover { opacity: 0.85; }
+
+        .exo-list { display: flex; flex-direction: column; gap: 4px; }
+        .exo-list-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent; position: relative;
+        }
+        .exo-list-item:hover { border-color: #475569; }
+        .exo-list-item.active { border-color: #3b82f6; background: #1e3a5f; }
+        .exo-list-item .ei-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 2px; padding-right: 28px; }
+        .exo-list-item .ei-meta { font-size: 0.7rem; color: #64748b; }
+        .exo-list-item .ei-del {
+            position: absolute; top: 8px; right: 8px;
+            background: transparent; border: none; color: #64748b;
+            font-size: 0.85rem; cursor: pointer; padding: 2px 5px; border-radius: 4px;
+            opacity: 0; transition: 0.2s;
+        }
+        .exo-list-item:hover .ei-del { opacity: 1; }
+        .exo-list-item .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .exo-list-item .ei-badge {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 0.65rem; font-weight: 700; margin-right: 4px;
+        }
+        .badge-images { background: #dbeafe; color: #1e40af; }
+        .badge-mots { background: #dcfce7; color: #166534; }
+        .badge-lecture { background: #fef3c7; color: #92400e; }
+        .badge-publie { background: #22c55e; color: white; }
+        .badge-brouillon { background: #64748b; color: white; }
+
+        /* === MAIN === */
+        #main {
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto;
+            padding: 30px; background: #0f172a;
+        }
+
+        #main-empty {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; flex: 1; text-align: center; color: #64748b;
+        }
+        #main-empty .big-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        #main-editor { display: none; flex-direction: column; gap: 20px; max-width: 800px; width: 100%; margin: 0 auto; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        .form-input, .form-textarea {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none;
+        }
+        .form-input:focus, .form-textarea:focus { border-color: #3b82f6; }
+        .form-input::placeholder, .form-textarea::placeholder { color: #64748b; }
+        .form-select {
+            padding: 10px 14px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 8px; color: white; font-size: 0.95rem; outline: none; cursor: pointer;
+        }
+        .form-select:focus { border-color: #3b82f6; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row > * { flex: 1; }
+
+        .meta-card {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        .meta-card h3 { font-size: 1rem; margin-bottom: 16px; color: #f1f5f9; }
+
+        /* Template fields zone */
+        #template-fields {
+            background: #1e293b; border-radius: 12px; padding: 20px;
+            border: 1px solid #334155;
+        }
+        #template-fields h3 { font-size: 1rem; margin-bottom: 16px; color: #f1f5f9; }
+
+        /* Tags input (distracteurs) */
+        .tags-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .tag-item {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; background: #3b82f6; color: white;
+            border-radius: 6px; font-size: 0.85rem; font-weight: 600;
+        }
+        .tag-item .tag-remove {
+            background: none; border: none; color: rgba(255,255,255,0.7);
+            font-size: 1rem; cursor: pointer; padding: 0 2px; line-height: 1;
+        }
+        .tag-item .tag-remove:hover { color: white; }
+        .tag-input-row { display: flex; gap: 8px; margin-top: 6px; }
+        .tag-input-row input { flex: 1; }
+        .tag-input-row button {
+            padding: 8px 14px; background: #3b82f6; color: white; border: none;
+            border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem;
+        }
+        .tag-input-row button:hover { background: #2563eb; }
+
+        /* Image preview */
+        .image-preview {
+            margin-top: 8px; border-radius: 8px; overflow: hidden;
+            background: #0f172a; border: 1px solid #334155; display: none;
+            padding: 8px; text-align: center;
+        }
+        .image-preview img { max-width: 100%; max-height: 200px; border-radius: 6px; }
+
+        /* Checkbox toggle */
+        .toggle-row {
+            display: flex; align-items: center; gap: 12px; margin-top: 8px;
+        }
+        .toggle-row input[type="checkbox"] {
+            width: 20px; height: 20px; accent-color: #22c55e; cursor: pointer;
+        }
+        .toggle-row label { font-size: 0.9rem; color: #e2e8f0; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+        /* Bottom actions */
+        .bottom-actions {
+            display: flex; gap: 10px; margin-top: 20px; padding-top: 20px;
+            border-top: 1px solid #334155; flex-wrap: wrap;
+        }
+        .btn-save {
+            flex: 1; padding: 14px; background: #3b82f6; color: white;
+            border: none; border-radius: 10px; font-weight: 800; font-size: 1rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-save:hover { background: #2563eb; }
+        .btn-delete {
+            padding: 14px 20px; background: #7f1d1d; color: #fca5a5;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-delete:hover { background: #ef4444; color: white; }
+        .btn-duplicate {
+            padding: 14px 20px; background: #334155; color: #94a3b8;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-duplicate:hover { background: #475569; color: white; }
+        .btn-test {
+            padding: 14px 20px; background: #0ea5e9; color: white;
+            border: none; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-test:hover { background: #0284c7; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #22c55e; color: white;
+            border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+            z-index: 1000; display: none;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* === IMPORT JSON MODAL === */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1100; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1e293b; border-radius: 16px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; border: 1px solid #334155; }
+        .modal-content h3 { margin: 0 0 12px; color: #e2e8f0; }
+        .modal-textarea { width: 100%; font-family: monospace; font-size: 0.85rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: vertical; box-sizing: border-box; }
+        .import-prompt-details { margin: 12px 0; }
+        .import-prompt-details summary { cursor: pointer; color: #94a3b8; font-size: 0.85rem; }
+        .import-prompt-details pre { white-space: pre-wrap; font-size: 0.7rem; max-height: 300px; overflow-y: auto; background: #0f172a; padding: 12px; border-radius: 8px; color: #94a3b8; margin-top: 8px; }
+        .btn-import-json { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+        .btn-import-json:hover { background: #4f46e5; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 12px; }
+        .btn-modal-save { flex: 1; padding: 10px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+        .btn-modal-save:hover { opacity: 0.85; }
+        .btn-modal-cancel { padding: 10px 20px; background: #334155; color: #94a3b8; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+        .btn-modal-cancel:hover { background: #475569; color: white; }
+
+        /* === HAMBURGER MENU === */
+        .menu-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); z-index:999; }
+        .menu-btn { display:none; border:none; background:#1e293b; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); }
+        body.menu-open #sidebar { transform:translateX(0); }
+        body.menu-open .menu-overlay { display:block; }
+        .close-sidebar-btn { display:none; }
+
+        /* === MOBILE 768px === */
+        @media (max-width:768px) {
+            body { height:auto; overflow:auto; display:block; }
+            #sidebar { position:fixed; top:0; left:0; bottom:0; height:100vh; width:min(86vw,320px); min-width:0; transform:translateX(-110%); transition:transform 0.25s ease; z-index:1000; overflow-y:auto; }
+            #main { padding:16px; min-height:100vh; }
+            .menu-btn { display:inline-flex; margin-bottom:12px; }
+            .close-sidebar-btn { display:block; position:absolute; top:15px; right:15px; background:none; border:none; color:white; font-size:24px; cursor:pointer; z-index:1002; }
+            .form-row { flex-direction:column; gap:10px; }
+            .bottom-actions { flex-direction: column; }
+        }
+
+        @media (max-width:480px) {
+            #main { padding:10px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Menu overlay -->
+<div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <button class="close-sidebar-btn" onclick="closeMenu()">&#10005;</button>
+    <div class="sidebar-header">
+        <h2>📖 Lire / Ecrire</h2>
+        <a href="index.html">&larr; Cockpit</a>
+    </div>
+
+    <div class="sidebar-section">
+        <button id="btn-new-exo" onclick="newExercice()">+ Nouvel exercice</button>
+        <button id="btn-import" onclick="openImportModal()">📥 Importer JSON</button>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Filtrer</label>
+        <select class="filter-select" id="filter-categorie" onchange="applyFilters()">
+            <option value="">Toutes les categories</option>
+            <option value="images">🖼️ Images</option>
+            <option value="mots">✏️ Mots</option>
+            <option value="lecture">📄 Lecture</option>
+        </select>
+        <select class="filter-select" id="filter-template" onchange="applyFilters()">
+            <option value="">Tous les templates</option>
+        </select>
+    </div>
+
+    <div class="sidebar-section">
+        <label>Exercices (<span id="exo-count">0</span>)</label>
+        <div class="exo-list" id="exo-list"></div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">&#9776;</button>
+    <!-- Empty state -->
+    <div id="main-empty">
+        <div class="big-icon">📖</div>
+        <h2 style="margin-bottom:8px;">Editeur Lire / Ecrire</h2>
+        <p>Creez un nouvel exercice ou selectionnez-en un dans la liste.</p>
+    </div>
+
+    <!-- Editor -->
+    <div id="main-editor">
+        <!-- Metadonnees -->
+        <div class="meta-card">
+            <h3>Informations de l'exercice</h3>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Titre *</label>
+                <input type="text" class="form-input" id="exo-titre" placeholder="Ex: Le casque de chantier">
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Categorie</label>
+                    <select class="form-select" id="exo-categorie" onchange="onCategorieChange()">
+                        <option value="images">🖼️ Images</option>
+                        <option value="mots">✏️ Mots</option>
+                        <option value="lecture">📄 Lecture</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Template</label>
+                    <select class="form-select" id="exo-template" onchange="onTemplateChange()">
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="margin-bottom:12px;">
+                <div class="form-group">
+                    <label>Difficulte</label>
+                    <select class="form-select" id="exo-difficulte">
+                        <option value="facile">Facile</option>
+                        <option value="moyen">Moyen</option>
+                        <option value="difficile">Difficile</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="toggle-row" style="margin-top:22px;">
+                        <input type="checkbox" id="exo-publie">
+                        <label for="exo-publie">Publie (visible par les eleves)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic template fields -->
+        <div id="template-fields">
+            <h3 id="template-fields-title">Contenu de l'exercice</h3>
+            <div id="template-fields-container"></div>
+        </div>
+
+        <!-- Prompt JSON source -->
+        <details id="prompt-section" style="margin-top:20px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:0;">
+            <summary style="padding:12px 16px; cursor:pointer; font-weight:700; font-size:0.9rem; color:#94a3b8;">📋 Prompt JSON source</summary>
+            <div style="padding:0 16px 16px;">
+                <textarea class="form-textarea" id="exo-source-prompt" rows="8" placeholder="Le JSON original importe sera affiche ici..." style="font-family:monospace; font-size:0.8rem; width:100%; background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:8px;"></textarea>
+                <small style="color:#64748b; display:block; margin-top:6px;">Sauvegarde automatiquement. Modifiable pour re-importer.</small>
+            </div>
+        </details>
+
+        <!-- Save / Delete / Duplicate / Test -->
+        <div class="bottom-actions">
+            <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
+            <button class="btn-test" id="btn-test" onclick="testerExercice()" style="display:none;">👁️ Tester</button>
+            <button class="btn-duplicate" id="btn-duplicate" onclick="duplicateExercice()" style="display:none;">📋 Dupliquer</button>
+            <button class="btn-delete" id="btn-delete" onclick="deleteExercice()" style="display:none;">🗑️ Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Import modal -->
+<div class="modal-overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
+    <div class="modal-content">
+        <h3>📥 Importer des exercices Lire/Ecrire (JSON)</h3>
+        <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:12px;">
+            Collez un JSON genere par une IA. Accepte un objet unique ou un tableau d'exercices.
+        </p>
+        <details class="import-prompt-details">
+            <summary>📋 Voir le prompt IA</summary>
+            <pre id="import-prompt-text"></pre>
+            <button type="button" onclick="copyImportPrompt()" class="btn-import-json" style="margin-top:8px;">📋 Copier le prompt</button>
+        </details>
+        <textarea id="import-json" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="import-errors" style="display:none; color:#ef4444; background:#1a0505; border:1px solid #7f1d1d; border-radius:8px; padding:10px; margin-top:8px; font-size:0.8rem;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal-save" onclick="executeImport()">✅ Importer</button>
+            <button type="button" class="btn-modal-cancel" onclick="closeImportModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// === MENU MOBILE ===
+function toggleMenu(){ document.body.classList.toggle('menu-open'); }
+function closeMenu(){ document.body.classList.remove('menu-open'); }
+
+// === TOAST ===
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+</script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // =============================================
+    // TEMPLATE CATALOG
+    // =============================================
+    const TEMPLATES = {
+        img_qcm_mot: {
+            label: "🖼️ Image → QCM mot",
+            categorie: "images",
+            fields: [
+                { key: "image", type: "text", label: "Chemin image (relatif)", placeholder: "images/pse/photo.png" },
+                { key: "mot_correct", type: "text", label: "Mot correct *", placeholder: "Ex: casque" },
+                { key: "distracteurs", type: "tags", label: "Distracteurs (3 mots)", min: 2, placeholder: "Ajouter un mot..." }
+            ]
+        },
+        mot_completer: {
+            label: "✏️ Mot a completer",
+            categorie: "mots",
+            fields: [
+                { key: "mot", type: "text", label: "Mot complet *", placeholder: "Ex: securite" },
+                { key: "lettres_visibles", type: "text", label: "Lettres visibles *", placeholder: "Ex: s_c_r_te" },
+                { key: "indice", type: "text", label: "Indice (facultatif)", placeholder: "Ex: Contraire du danger" }
+            ]
+        },
+        mot_phrase_trou: {
+            label: "📝 Phrase a trous",
+            categorie: "mots",
+            fields: [
+                { key: "phrase", type: "textarea", label: "Phrase avec ___ *", placeholder: "Il faut porter un ___ sur le chantier." },
+                { key: "mot_correct", type: "text", label: "Mot correct *", placeholder: "Ex: casque" },
+                { key: "distracteurs", type: "tags", label: "Distracteurs (2-3 mots)", min: 1, placeholder: "Ajouter un mot..." }
+            ]
+        },
+        mot_copier: {
+            label: "📋 Recopier un mot",
+            categorie: "mots",
+            fields: [
+                { key: "mot", type: "text", label: "Mot a recopier *", placeholder: "Ex: extincteur" },
+                { key: "phrase_contexte", type: "textarea", label: "Phrase de contexte", placeholder: "L'extincteur sert a eteindre un feu." }
+            ]
+        },
+        lec_vrai_faux: {
+            label: "✅ Vrai / Faux",
+            categorie: "lecture",
+            fields: [
+                { key: "phrase", type: "textarea", label: "Phrase a lire *", placeholder: "Le feu se propage plus vite avec du vent." },
+                { key: "reponse", type: "select", label: "Reponse *", options: [{ v: "true", l: "Vrai" }, { v: "false", l: "Faux" }] },
+                { key: "explication", type: "textarea", label: "Explication (facultatif)", placeholder: "Le vent apporte de l'oxygene." }
+            ]
+        },
+        lec_comprehension_qcm: {
+            label: "📖 Comprehension QCM",
+            categorie: "lecture",
+            fields: [
+                { key: "texte", type: "textarea", label: "Texte a lire *", placeholder: "En cas d'incendie, il faut..." },
+                { key: "question", type: "text", label: "Question *", placeholder: "Que faut-il faire en premier ?" },
+                { key: "reponse_correcte", type: "text", label: "Reponse correcte *", placeholder: "Appeler les secours" },
+                { key: "distracteurs", type: "tags", label: "Distracteurs (2 choix)", min: 1, placeholder: "Ajouter un choix..." }
+            ]
+        }
+    };
+
+    const CATEGORIE_LABELS = {
+        images: "🖼️ Images",
+        mots: "✏️ Mots",
+        lecture: "📄 Lecture"
+    };
+
+    // =============================================
+    // STATE
+    // =============================================
+    let currentExoId = null;
+    let allExercices = [];
+    let currentSourcePrompt = null;
+    let currentTagsData = {}; // { fieldKey: [tag1, tag2, ...] }
+
+    // =============================================
+    // IMPORT PROMPT
+    // =============================================
+    const IMPORT_PROMPT = `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau d'objets) pour des exercices de type "Lire et Ecrire".
+
+Chaque exercice a cette structure :
+{
+  "titre": "Titre court",
+  "categorie": "images" | "mots" | "lecture",
+  "template_id": "un des 6 templates ci-dessous",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": { ... }
+}
+
+=== 6 TEMPLATES DISPONIBLES ===
+
+1. img_qcm_mot (categorie: images)
+   L'eleve voit une image et doit choisir le bon mot parmi 3-4 propositions.
+   data: { "image": "images/pse/photo.png", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet", "sac"] }
+
+2. mot_completer (categorie: mots)
+   L'eleve doit completer un mot dont certaines lettres sont cachees.
+   data: { "mot": "securite", "lettres_visibles": "s_c_r_te", "indice": "Contraire du danger" }
+
+3. mot_phrase_trou (categorie: mots)
+   L'eleve lit une phrase avec un trou et choisit le bon mot.
+   data: { "phrase": "Il faut porter un ___ sur le chantier.", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet"] }
+
+4. mot_copier (categorie: mots)
+   L'eleve doit recopier un mot correctement.
+   data: { "mot": "extincteur", "phrase_contexte": "L'extincteur sert a eteindre un feu." }
+
+5. lec_vrai_faux (categorie: lecture)
+   L'eleve lit une phrase et dit si c'est vrai ou faux.
+   data: { "phrase": "Le feu se propage plus vite avec du vent.", "reponse": true, "explication": "Le vent apporte de l'oxygene." }
+
+6. lec_comprehension_qcm (categorie: lecture)
+   L'eleve lit un court texte puis repond a une question a choix multiples.
+   data: { "texte": "En cas d'incendie...", "question": "Que faut-il faire ?", "reponse_correcte": "Appeler les secours", "distracteurs": ["Courir", "Ouvrir les fenetres"] }
+
+=== REGLES ===
+- Genere entre 5 et 15 exercices
+- Varie les templates et les difficultes
+- Le vocabulaire doit etre simple et en lien avec la PSE (sante, securite, travail, alimentation, sommeil, etc.)
+- Pour les images, utilise des chemins placeholder comme "images/pse/nom.png"
+- Reponds UNIQUEMENT avec le JSON, sans commentaire`;
+
+    // =============================================
+    // FIREBASE REAL-TIME
+    // =============================================
+    const qBanque = query(collection(db, "lire_ecrire_banque"), orderBy("updatedAt", "desc"));
+    onSnapshot(qBanque, (snap) => {
+        allExercices = [];
+        snap.forEach(d => {
+            allExercices.push({ id: d.id, ...d.data() });
+        });
+        renderList();
+        updateFilterTemplateOptions();
+    });
+
+    // =============================================
+    // RENDER SIDEBAR LIST
+    // =============================================
+    function renderList() {
+        const container = document.getElementById('exo-list');
+        container.innerHTML = '';
+
+        const filterCat = document.getElementById('filter-categorie').value;
+        const filterTpl = document.getElementById('filter-template').value;
+
+        let filtered = allExercices;
+        if (filterCat) filtered = filtered.filter(e => e.categorie === filterCat);
+        if (filterTpl) filtered = filtered.filter(e => e.template_id === filterTpl);
+
+        document.getElementById('exo-count').textContent = filtered.length;
+
+        filtered.forEach(ex => {
+            const div = document.createElement('div');
+            div.className = 'exo-list-item' + (ex.id === currentExoId ? ' active' : '');
+            div.onclick = (e) => {
+                if (e.target.classList.contains('ei-del')) return;
+                selectExercice(ex.id);
+            };
+
+            const catBadge = '<span class="ei-badge badge-' + (ex.categorie || 'mots') + '">' + (CATEGORIE_LABELS[ex.categorie] || ex.categorie) + '</span>';
+            const tplInfo = TEMPLATES[ex.template_id] ? TEMPLATES[ex.template_id].label : ex.template_id;
+            const pubBadge = ex.publie ? '<span class="ei-badge badge-publie">Publie</span>' : '<span class="ei-badge badge-brouillon">Brouillon</span>';
+
+            div.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + catBadge + pubBadge + '</div>' +
+                '<button class="ei-del" onclick="deleteFromSidebar(\'' + ex.id + '\', event)" title="Supprimer">🗑️</button>';
+            container.appendChild(div);
+        });
+    }
+
+    function updateFilterTemplateOptions() {
+        const sel = document.getElementById('filter-template');
+        const current = sel.value;
+        const usedTemplates = new Set();
+        allExercices.forEach(ex => { if (ex.template_id) usedTemplates.add(ex.template_id); });
+
+        sel.innerHTML = '<option value="">Tous les templates</option>';
+        Object.keys(TEMPLATES).forEach(tid => {
+            if (usedTemplates.has(tid)) {
+                const opt = document.createElement('option');
+                opt.value = tid;
+                opt.textContent = TEMPLATES[tid].label;
+                sel.appendChild(opt);
+            }
+        });
+        if (usedTemplates.has(current)) sel.value = current;
+    }
+
+    window.applyFilters = function() { renderList(); };
+
+    // =============================================
+    // SELECT / LOAD EXERCICE
+    // =============================================
+    function selectExercice(exoId) {
+        const ex = allExercices.find(e => e.id === exoId);
+        if (!ex) return;
+
+        currentExoId = exoId;
+
+        document.getElementById('exo-titre').value = ex.titre || '';
+        document.getElementById('exo-categorie').value = ex.categorie || 'images';
+        document.getElementById('exo-difficulte').value = ex.difficulte || 'facile';
+        document.getElementById('exo-publie').checked = !!ex.publie;
+
+        // Update template dropdown for this category, then set value
+        populateTemplateDropdown(ex.categorie || 'images');
+        document.getElementById('exo-template').value = ex.template_id || '';
+
+        // Render template fields and fill data
+        renderTemplateFields(ex.template_id, ex.data || {});
+
+        // Source prompt
+        currentSourcePrompt = ex.sourcePrompt || null;
+        document.getElementById('exo-source-prompt').value = ex.sourcePrompt || '';
+
+        // Show buttons
+        document.getElementById('btn-delete').style.display = 'inline-block';
+        document.getElementById('btn-duplicate').style.display = 'inline-block';
+        document.getElementById('btn-test').style.display = 'inline-block';
+
+        showEditor();
+        renderList(); // update active state
+        if (window.innerWidth <= 768) closeMenu();
+    }
+
+    // =============================================
+    // NEW EXERCICE
+    // =============================================
+    window.newExercice = function() {
+        currentExoId = null;
+        currentSourcePrompt = null;
+        currentTagsData = {};
+
+        document.getElementById('exo-titre').value = '';
+        document.getElementById('exo-categorie').value = 'images';
+        document.getElementById('exo-difficulte').value = 'facile';
+        document.getElementById('exo-publie').checked = false;
+        document.getElementById('exo-source-prompt').value = '';
+
+        populateTemplateDropdown('images');
+        const firstTemplate = document.getElementById('exo-template').value;
+        renderTemplateFields(firstTemplate, {});
+
+        document.getElementById('btn-delete').style.display = 'none';
+        document.getElementById('btn-duplicate').style.display = 'none';
+        document.getElementById('btn-test').style.display = 'none';
+
+        showEditor();
+        renderList();
+        if (window.innerWidth <= 768) closeMenu();
+    };
+
+    // =============================================
+    // TEMPLATE DROPDOWN LOGIC
+    // =============================================
+    function populateTemplateDropdown(categorie) {
+        const sel = document.getElementById('exo-template');
+        sel.innerHTML = '';
+        Object.keys(TEMPLATES).forEach(tid => {
+            if (TEMPLATES[tid].categorie === categorie) {
+                const opt = document.createElement('option');
+                opt.value = tid;
+                opt.textContent = TEMPLATES[tid].label;
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    window.onCategorieChange = function() {
+        const cat = document.getElementById('exo-categorie').value;
+        populateTemplateDropdown(cat);
+        const firstTemplate = document.getElementById('exo-template').value;
+        renderTemplateFields(firstTemplate, {});
+    };
+
+    window.onTemplateChange = function() {
+        const tid = document.getElementById('exo-template').value;
+        renderTemplateFields(tid, {});
+    };
+
+    // =============================================
+    // RENDER TEMPLATE FIELDS (dynamic form)
+    // =============================================
+    function renderTemplateFields(templateId, data) {
+        const container = document.getElementById('template-fields-container');
+        container.innerHTML = '';
+        currentTagsData = {};
+
+        const tpl = TEMPLATES[templateId];
+        if (!tpl) {
+            container.innerHTML = '<p style="color:#64748b;">Selectionnez un template.</p>';
+            return;
+        }
+
+        document.getElementById('template-fields-title').textContent = tpl.label + ' — Contenu';
+
+        tpl.fields.forEach(field => {
+            const group = document.createElement('div');
+            group.className = 'form-group';
+            group.style.marginBottom = '14px';
+
+            if (field.type === 'text') {
+                group.innerHTML = '<label>' + field.label + '</label>' +
+                    '<input type="text" class="form-input" id="field-' + field.key + '" placeholder="' + (field.placeholder || '') + '" value="' + escapeAttr(data[field.key] || '') + '">';
+
+                // Image preview for image fields
+                if (field.key === 'image') {
+                    group.innerHTML += '<div class="image-preview" id="image-preview"></div>';
+                    setTimeout(() => {
+                        const inp = document.getElementById('field-image');
+                        if (inp) {
+                            inp.addEventListener('input', updateImagePreview);
+                            updateImagePreview();
+                        }
+                    }, 50);
+                }
+            } else if (field.type === 'textarea') {
+                group.innerHTML = '<label>' + field.label + '</label>' +
+                    '<textarea class="form-textarea" id="field-' + field.key + '" rows="3" placeholder="' + (field.placeholder || '') + '">' + escapeHtml(data[field.key] || '') + '</textarea>';
+            } else if (field.type === 'select') {
+                let optsHtml = '';
+                field.options.forEach(o => {
+                    const selected = (String(data[field.key]) === String(o.v)) ? ' selected' : '';
+                    optsHtml += '<option value="' + o.v + '"' + selected + '>' + o.l + '</option>';
+                });
+                group.innerHTML = '<label>' + field.label + '</label>' +
+                    '<select class="form-select" id="field-' + field.key + '">' + optsHtml + '</select>';
+            } else if (field.type === 'tags') {
+                const existingTags = Array.isArray(data[field.key]) ? data[field.key] : [];
+                currentTagsData[field.key] = [...existingTags];
+
+                group.innerHTML = '<label>' + field.label + '</label>' +
+                    '<div class="tags-container" id="tags-' + field.key + '"></div>' +
+                    '<div class="tag-input-row">' +
+                    '  <input type="text" class="form-input" id="tag-input-' + field.key + '" placeholder="' + (field.placeholder || 'Ajouter...') + '">' +
+                    '  <button type="button" onclick="addTag(\'' + field.key + '\')">+</button>' +
+                    '</div>';
+
+                // Render existing tags after DOM is ready
+                setTimeout(() => renderTags(field.key), 50);
+
+                // Enter key to add tag
+                setTimeout(() => {
+                    const inp = document.getElementById('tag-input-' + field.key);
+                    if (inp) {
+                        inp.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); window.addTag(field.key); }
+                        });
+                    }
+                }, 50);
+            }
+
+            container.appendChild(group);
+        });
+    }
+
+    function renderTags(fieldKey) {
+        const container = document.getElementById('tags-' + fieldKey);
+        if (!container) return;
+        container.innerHTML = '';
+        (currentTagsData[fieldKey] || []).forEach((tag, idx) => {
+            const span = document.createElement('span');
+            span.className = 'tag-item';
+            span.innerHTML = escapeHtml(tag) + '<button class="tag-remove" onclick="removeTag(\'' + fieldKey + '\',' + idx + ')">&times;</button>';
+            container.appendChild(span);
+        });
+    }
+
+    window.addTag = function(fieldKey) {
+        const inp = document.getElementById('tag-input-' + fieldKey);
+        if (!inp) return;
+        const val = inp.value.trim();
+        if (!val) return;
+        if (!currentTagsData[fieldKey]) currentTagsData[fieldKey] = [];
+        currentTagsData[fieldKey].push(val);
+        inp.value = '';
+        renderTags(fieldKey);
+        inp.focus();
+    };
+
+    window.removeTag = function(fieldKey, idx) {
+        if (!currentTagsData[fieldKey]) return;
+        currentTagsData[fieldKey].splice(idx, 1);
+        renderTags(fieldKey);
+    };
+
+    function updateImagePreview() {
+        const inp = document.getElementById('field-image');
+        const prev = document.getElementById('image-preview');
+        if (!inp || !prev) return;
+        const val = inp.value.trim();
+        if (val) {
+            // Try to build path - could be relative to PSE
+            const src = val.startsWith('http') ? val : '../PSE/' + val;
+            prev.innerHTML = '<img src="' + escapeAttr(src) + '" onerror="this.parentElement.style.display=\'none\'" onload="this.parentElement.style.display=\'block\'">';
+            prev.style.display = 'none'; // will show on successful load
+        } else {
+            prev.style.display = 'none';
+            prev.innerHTML = '';
+        }
+    }
+
+    // =============================================
+    // COLLECT FORM DATA
+    // =============================================
+    function collectData() {
+        const templateId = document.getElementById('exo-template').value;
+        const tpl = TEMPLATES[templateId];
+        if (!tpl) return null;
+
+        const data = {};
+        let valid = true;
+
+        tpl.fields.forEach(field => {
+            if (field.type === 'tags') {
+                data[field.key] = currentTagsData[field.key] || [];
+            } else if (field.type === 'select') {
+                const raw = document.getElementById('field-' + field.key).value;
+                // Convert "true"/"false" strings to booleans for vrai/faux
+                if (raw === 'true') data[field.key] = true;
+                else if (raw === 'false') data[field.key] = false;
+                else data[field.key] = raw;
+            } else {
+                const el = document.getElementById('field-' + field.key);
+                data[field.key] = el ? el.value.trim() : '';
+            }
+        });
+
+        return data;
+    }
+
+    // =============================================
+    // SAVE
+    // =============================================
+    window.saveExercice = async function() {
+        const titre = document.getElementById('exo-titre').value.trim();
+        if (!titre) { alert('Donnez un titre a l\'exercice !'); return; }
+
+        const categorie = document.getElementById('exo-categorie').value;
+        const templateId = document.getElementById('exo-template').value;
+        const difficulte = document.getElementById('exo-difficulte').value;
+        const publie = document.getElementById('exo-publie').checked;
+        const data = collectData();
+
+        if (!data) { alert('Erreur : template invalide.'); return; }
+
+        const sourcePromptVal = document.getElementById('exo-source-prompt').value.trim() || null;
+        currentSourcePrompt = sourcePromptVal;
+
+        const payload = {
+            titre,
+            categorie,
+            template_id: templateId,
+            difficulte,
+            publie,
+            data,
+            sourcePrompt: sourcePromptVal,
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            if (currentExoId) {
+                await setDoc(doc(db, "lire_ecrire_banque", currentExoId), payload, { merge: true });
+            } else {
+                const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                payload.createdAt = serverTimestamp();
+                await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
+                currentExoId = newId;
+                document.getElementById('btn-delete').style.display = 'inline-block';
+                document.getElementById('btn-duplicate').style.display = 'inline-block';
+                document.getElementById('btn-test').style.display = 'inline-block';
+            }
+            showToast('Exercice sauvegarde !');
+            renderList();
+        } catch(e) {
+            console.error("Erreur sauvegarde:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // =============================================
+    // DELETE
+    // =============================================
+    window.deleteExercice = async function() {
+        if (!currentExoId) return;
+        if (!confirm("Supprimer definitivement cet exercice ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "lire_ecrire_banque", currentExoId));
+            currentExoId = null;
+            document.getElementById('main-editor').style.display = 'none';
+            document.getElementById('main-empty').style.display = 'flex';
+            showToast('Exercice supprime.');
+        } catch(e) {
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    window.deleteFromSidebar = async function(exoId, event) {
+        event.stopPropagation();
+        if (!confirm("Supprimer definitivement cet exercice ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "lire_ecrire_banque", exoId));
+            if (currentExoId === exoId) {
+                currentExoId = null;
+                document.getElementById('main-editor').style.display = 'none';
+                document.getElementById('main-empty').style.display = 'flex';
+            }
+            showToast('Exercice supprime.');
+        } catch(e) {
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // =============================================
+    // DUPLICATE
+    // =============================================
+    window.duplicateExercice = function() {
+        if (!currentExoId) return;
+        const ex = allExercices.find(e => e.id === currentExoId);
+        if (!ex) return;
+
+        // Keep form data but clear ID
+        currentExoId = null;
+        document.getElementById('exo-titre').value = (ex.titre || '') + ' (copie)';
+        document.getElementById('btn-delete').style.display = 'none';
+        document.getElementById('btn-duplicate').style.display = 'none';
+        document.getElementById('btn-test').style.display = 'none';
+
+        renderList();
+        showToast('Copie creee — sauvegardez pour enregistrer.');
+    };
+
+    // =============================================
+    // TESTER
+    // =============================================
+    window.testerExercice = function() {
+        if (!currentExoId) { showToast('Sauvegardez d\'abord l\'exercice.'); return; }
+        const url = '../PSE/lire_ecrire.html?preview=' + encodeURIComponent(currentExoId);
+        window.open(url, '_blank');
+    };
+
+    // =============================================
+    // IMPORT JSON
+    // =============================================
+    window.openImportModal = function() {
+        document.getElementById('import-modal').style.display = 'flex';
+        document.getElementById('import-json').value = '';
+        document.getElementById('import-errors').style.display = 'none';
+        document.getElementById('import-errors').textContent = '';
+        document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+    };
+
+    window.closeImportModal = function() {
+        document.getElementById('import-modal').style.display = 'none';
+    };
+
+    window.copyImportPrompt = function() {
+        navigator.clipboard.writeText(IMPORT_PROMPT).then(() => showToast('Prompt copie !')).catch(() => {});
+    };
+
+    window.executeImport = async function() {
+        const raw = document.getElementById('import-json').value.trim();
+        const errDiv = document.getElementById('import-errors');
+        errDiv.style.display = 'none';
+
+        if (!raw) { errDiv.textContent = 'Collez du JSON !'; errDiv.style.display = 'block'; return; }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch(e) {
+            errDiv.textContent = 'JSON invalide : ' + e.message;
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        // Accept single object or array
+        if (!Array.isArray(parsed)) parsed = [parsed];
+
+        const errors = [];
+        let imported = 0;
+
+        for (let i = 0; i < parsed.length; i++) {
+            const ex = parsed[i];
+
+            // Normalize
+            if (!ex.titre) ex.titre = 'Exercice importe ' + (i + 1);
+            if (!ex.categorie && ex.template_id && TEMPLATES[ex.template_id]) {
+                ex.categorie = TEMPLATES[ex.template_id].categorie;
+            }
+            if (!TEMPLATES[ex.template_id]) {
+                errors.push('Exercice ' + (i+1) + ' : template_id "' + ex.template_id + '" inconnu.');
+                continue;
+            }
+            if (!ex.data || typeof ex.data !== 'object') {
+                errors.push('Exercice ' + (i+1) + ' : champ "data" manquant ou invalide.');
+                continue;
+            }
+
+            // Normalize distracteurs from pipe-separated string
+            if (typeof ex.data.distracteurs === 'string') {
+                ex.data.distracteurs = ex.data.distracteurs.split('|').map(s => s.trim()).filter(Boolean);
+            }
+            // Normalize reponse for vrai/faux
+            if (ex.template_id === 'lec_vrai_faux') {
+                if (typeof ex.data.reponse === 'string') {
+                    ex.data.reponse = ex.data.reponse.toLowerCase() === 'vrai' || ex.data.reponse === 'true';
+                }
+            }
+
+            const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+            const payload = {
+                titre: ex.titre,
+                categorie: ex.categorie || TEMPLATES[ex.template_id].categorie,
+                template_id: ex.template_id,
+                difficulte: ex.difficulte || 'facile',
+                publie: false,
+                data: ex.data,
+                sourcePrompt: raw,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            };
+
+            try {
+                await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
+                imported++;
+            } catch(e) {
+                errors.push('Exercice ' + (i+1) + ' : erreur Firebase — ' + e.message);
+            }
+
+            // Small delay to ensure unique IDs
+            await new Promise(r => setTimeout(r, 50));
+        }
+
+        if (errors.length > 0) {
+            errDiv.innerHTML = '<strong>' + imported + ' importe(s), ' + errors.length + ' erreur(s) :</strong><br>' + errors.join('<br>');
+            errDiv.style.display = 'block';
+        }
+
+        if (imported > 0) {
+            showToast(imported + ' exercice(s) importe(s) !');
+            if (errors.length === 0) closeImportModal();
+        }
+    };
+
+    // =============================================
+    // HELPERS
+    // =============================================
+    function showEditor() {
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-editor').style.display = 'flex';
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // =============================================
+    // INIT
+    // =============================================
+    populateTemplateDropdown('images');
+
+</script>
+</body>
+</html>
