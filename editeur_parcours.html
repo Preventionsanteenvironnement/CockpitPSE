@@ -716,6 +716,15 @@
         <div class="step-list" id="steps-container"></div>
       </div>
 
+      <!-- Prompt JSON source -->
+      <details id="prompt-section" style="margin-top:20px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:0;">
+          <summary style="padding:12px 16px; cursor:pointer; font-weight:700; font-size:0.9rem; color:#94a3b8;">📋 Prompt JSON source</summary>
+          <div style="padding:0 16px 16px;">
+              <textarea id="parcours-source-prompt" rows="8" placeholder="Le JSON original importe sera affiche ici..." style="font-family:monospace; font-size:0.8rem; width:100%; background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:8px; resize:vertical;"></textarea>
+              <small style="color:#64748b; display:block; margin-top:6px;">Sauvegarde automatiquement. Modifiable pour re-importer.</small>
+          </div>
+      </details>
+
       <div class="card">
         <div class="actions-bottom">
           <button class="btn-small" id="btn-save" type="button">Sauvegarder brouillon</button>
@@ -842,6 +851,7 @@ Uniquement le JSON final`;
 
     let currentParcoursId = null;
     let currentParcours = null;
+    var currentSourcePrompt = null;
 
     let selectedExerciseId = null;
     let selectedAutoEvalId = null;
@@ -1384,6 +1394,10 @@ Uniquement le JSON final`;
     function createNewParcours() {
       currentParcoursId = null;
       currentParcours = defaultParcours();
+      // Reset sourcePrompt
+      currentSourcePrompt = null;
+      var pf = document.getElementById('parcours-source-prompt');
+      if (pf) pf.value = '';
       openEditor();
       renderAll();
     }
@@ -1393,6 +1407,10 @@ Uniquement le JSON final`;
       if (!found) return;
       currentParcoursId = id;
       currentParcours = ensureParcoursShape(found);
+      // Restore sourcePrompt
+      currentSourcePrompt = found.sourcePrompt || null;
+      var pf = document.getElementById('parcours-source-prompt');
+      if (pf) pf.value = found.sourcePrompt || '';
       openEditor();
       renderAll();
     }
@@ -1422,9 +1440,11 @@ Uniquement le JSON final`;
       currentParcours = check.normalized;
 
       const id = currentParcoursId || nowId("parcours");
+      var sourcePromptVal = (document.getElementById('parcours-source-prompt') || {}).value || currentSourcePrompt || null;
       const payload = {
         ...deepClone(currentParcours),
         type: "parcours_progressif",
+        sourcePrompt: sourcePromptVal,
         updatedAt: serverTimestamp()
       };
       if (!currentParcoursId) payload.createdAt = serverTimestamp();
@@ -1765,6 +1785,11 @@ Uniquement le JSON final`;
         openImportErrors(["Collez un JSON avant import."]);
         return;
       }
+      // Sauvegarder le prompt source brut
+      currentSourcePrompt = raw.trim();
+      var promptField = document.getElementById('parcours-source-prompt');
+      if (promptField) promptField.value = raw.trim();
+
       let parsed;
       try {
         parsed = JSON.parse(cleanImportJSONString(raw));
