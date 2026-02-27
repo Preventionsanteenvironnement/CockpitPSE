@@ -1330,12 +1330,22 @@
             </div>
         </div>
 
+        <!-- PROMPT SOURCE -->
+        <details id="prompt-section" style="margin-top:20px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:0;">
+            <summary style="padding:12px 16px; cursor:pointer; font-weight:700; font-size:0.9rem; color:#94a3b8;">📋 Prompt JSON source</summary>
+            <div style="padding:0 16px 16px;">
+                <textarea class="form-textarea" id="exo-source-prompt" rows="8" placeholder="Le JSON original importe sera affiche ici..." style="font-family:monospace; font-size:0.8rem;"></textarea>
+                <small style="color:#64748b; display:block; margin-top:6px;">Sauvegarde automatiquement. Modifiable pour re-importer.</small>
+            </div>
+        </details>
+
         <!-- ACTIONS -->
         <div class="bottom-actions">
             <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
             <button class="btn-duplicate" id="btn-duplicate" onclick="duplicateExercice()">📄 Dupliquer</button>
             <button class="btn-publish" id="btn-publish" onclick="publishExercice()">🚀 Publier</button>
             <button class="btn-unpublish" id="btn-unpublish" onclick="unpublishExercice()">⏸️ Depublier</button>
+            <button class="btn-test" id="btn-test" onclick="testerExercice()" style="display:none; background:#0ea5e9; color:#fff; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-size:0.85rem;">👁️ Tester</button>
             <button class="btn-delete" id="btn-delete" onclick="deleteExercice()">🗑️ Supprimer</button>
         </div>
     </div>
@@ -1394,6 +1404,7 @@
 
     let currentExoId = null;
     let allExercices = [];
+    var currentSourcePrompt = null;
     const exoFilters = {
         classeId: '',
         moduleId: '',
@@ -2367,6 +2378,10 @@
         var status = document.getElementById('ac-import-status');
         try {
             var rawOriginal = input.value.trim();
+            /* Sauvegarder le prompt brut */
+            currentSourcePrompt = rawOriginal;
+            var _pf = document.getElementById('exo-source-prompt');
+            if (_pf) _pf.value = rawOriginal;
             var raw = cleanJsonInput(rawOriginal);
             var data;
             try {
@@ -3362,6 +3377,11 @@
         document.getElementById('btn-duplicate').style.display = '';
         document.getElementById('btn-unpublish').style.display = 'none';
         document.getElementById('btn-publish').style.display = '';
+        document.getElementById('btn-test').style.display = 'none';
+        // Reset sourcePrompt
+        currentSourcePrompt = null;
+        var pf = document.getElementById('exo-source-prompt');
+        if (pf) pf.value = '';
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
         if (window.innerWidth <= 768) closeMenu();
@@ -3403,8 +3423,13 @@
             });
         }
         setContenuInForm(ex.type, ex.contenu);
+        // Restore sourcePrompt
+        currentSourcePrompt = ex.sourcePrompt || null;
+        var pf = document.getElementById('exo-source-prompt');
+        if (pf) pf.value = ex.sourcePrompt || '';
         document.getElementById('btn-delete').style.display = 'block';
         document.getElementById('btn-duplicate').style.display = 'block';
+        document.getElementById('btn-test').style.display = 'inline-block';
         updatePublishButtons(!!ex.publie);
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
@@ -3750,7 +3775,8 @@
         if (AUTO_COMPETENCES_TYPES.includes(type) && competences_cibles.length === 0) {
             competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
         }
-        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, updatedAt: serverTimestamp() };
+        var sourcePromptVal = (document.getElementById('exo-source-prompt') || {}).value || currentSourcePrompt || null;
+        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, sourcePrompt: sourcePromptVal, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
                 await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
@@ -3764,7 +3790,14 @@
                 document.getElementById('btn-duplicate').style.display = 'block';
             }
             showToast('Exercice sauvegarde !');
+            document.getElementById('btn-test').style.display = 'inline-block';
         } catch(e) { alert('Erreur : ' + e.message); }
+    };
+
+    window.testerExercice = function() {
+        if (!currentExoId) { showToast('Sauvegardez d\'abord l\'exercice.'); return; }
+        var url = '../PSE/exercices.html?preview=' + encodeURIComponent(currentExoId);
+        window.open(url, '_blank');
     };
 
     window.duplicateExercice = async function() {
@@ -3823,6 +3856,7 @@
             contenu,
             categorie,
             competences_cibles,
+            sourcePrompt: (document.getElementById('exo-source-prompt') || {}).value || currentSourcePrompt || null,
             publie: false,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -3866,6 +3900,7 @@
         await deleteDoc(doc(db, "exercices_banque", currentExoId));
         currentExoId = null;
         document.getElementById('btn-duplicate').style.display = '';
+        document.getElementById('btn-test').style.display = 'none';
         document.getElementById('main-editor').style.display = 'none';
         document.getElementById('main-empty').style.display = 'flex';
         showToast('Exercice supprime.');
@@ -4673,6 +4708,10 @@ Important:
 
     window.doImportJSON = function() {
         let raw = document.getElementById('import-json-input').value.trim();
+        /* Sauvegarder le prompt brut avant nettoyage */
+        currentSourcePrompt = raw;
+        var _promptField = document.getElementById('exo-source-prompt');
+        if (_promptField) _promptField.value = raw;
         const errorEl = document.getElementById('import-error');
         errorEl.style.display = 'none';
 
@@ -4725,6 +4764,7 @@ Important:
                             moduleId: moduleId, dossier: dossierVal, sous_dossier: sousDossierVal,
                             niveau: niveau, difficulte: currentDifficulty,
                             contenu: item, categorie: 'modules', competences_cibles: [],
+                            sourcePrompt: raw,
                             publie: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                         };
                         created++;
