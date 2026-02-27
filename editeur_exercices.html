@@ -337,6 +337,9 @@
                 <select id="filter-module" class="filter-select">
                     <option value="">Tous les modules</option>
                 </select>
+                <select id="filter-type" class="filter-select">
+                    <option value="">Tous les types</option>
+                </select>
                 <select id="filter-periode" class="filter-select">
                     <option value="all">Toutes les dates</option>
                     <option value="7d">7 derniers jours</option>
@@ -1394,6 +1397,7 @@
     const exoFilters = {
         classeId: '',
         moduleId: '',
+        type: '',
         period: 'all',
         dateFrom: '',
         dateTo: ''
@@ -3129,6 +3133,7 @@
     function exoMatchesFilters(ex) {
         if (!exoMatchesClassFilter(ex, exoFilters.classeId)) return false;
         if (exoFilters.moduleId && (ex.moduleId || '') !== exoFilters.moduleId) return false;
+        if (exoFilters.type && (ex.type || '') !== exoFilters.type) return false;
         if (!exoMatchesPeriodFilter(ex)) return false;
         return true;
     }
@@ -3177,23 +3182,48 @@
         });
         moduleSel.value = moduleSet.has(prevModule) ? prevModule : '';
         exoFilters.moduleId = moduleSel.value;
+
+        /* --- filtre par type d'exercice --- */
+        const typeSel = document.getElementById('filter-type');
+        if (typeSel) {
+            const prevType = exoFilters.type || '';
+            const typeSet = new Set();
+            allExercices.forEach(ex => { if (ex && ex.type) typeSet.add(ex.type); });
+            const types = Array.from(typeSet).sort((a, b) => {
+                const la = (TYPE_LABELS[a] || a).replace(/^[^\w]*/,'');
+                const lb = (TYPE_LABELS[b] || b).replace(/^[^\w]*/,'');
+                return la.localeCompare(lb, 'fr', { sensitivity: 'base' });
+            });
+            typeSel.innerHTML = '<option value="">Tous les types</option>';
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = TYPE_LABELS[t] || t;
+                typeSel.appendChild(opt);
+            });
+            typeSel.value = typeSet.has(prevType) ? prevType : '';
+            exoFilters.type = typeSel.value;
+        }
     }
 
     function resetSidebarFilters() {
         exoFilters.classeId = '';
         exoFilters.moduleId = '';
+        exoFilters.type = '';
         exoFilters.period = 'all';
         exoFilters.dateFrom = '';
         exoFilters.dateTo = '';
 
         const classSel = document.getElementById('filter-classe');
         const moduleSel = document.getElementById('filter-module');
+        const typeSel = document.getElementById('filter-type');
         const periodSel = document.getElementById('filter-periode');
         const fromInput = document.getElementById('filter-date-from');
         const toInput = document.getElementById('filter-date-to');
 
         if (classSel) classSel.value = '';
         if (moduleSel) moduleSel.value = '';
+        if (typeSel) typeSel.value = '';
         if (periodSel) periodSel.value = 'all';
         if (fromInput) fromInput.value = '';
         if (toInput) toInput.value = '';
@@ -3222,6 +3252,13 @@
             exoFilters.moduleId = this.value || '';
             renderExoList();
         });
+        var typeSel = document.getElementById('filter-type');
+        if (typeSel) {
+            typeSel.addEventListener('change', function() {
+                exoFilters.type = this.value || '';
+                renderExoList();
+            });
+        }
         periodSel.addEventListener('change', function() {
             exoFilters.period = this.value || 'all';
             if (exoFilters.period !== 'custom') {
