@@ -897,6 +897,15 @@
             <ul id="validation-list"></ul>
         </div>
 
+        <!-- Prompt JSON source -->
+        <details id="prompt-section" style="margin-top:20px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:0;">
+            <summary style="padding:12px 16px; cursor:pointer; font-weight:700; font-size:0.9rem; color:#94a3b8;">📋 Prompt JSON source</summary>
+            <div style="padding:0 16px 16px;">
+                <textarea class="form-textarea" id="eval-source-prompt" rows="8" placeholder="Le JSON original importe sera affiche ici..." style="font-family:monospace; font-size:0.8rem; width:100%; background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:8px;"></textarea>
+                <small style="color:#64748b; display:block; margin-top:6px;">Sauvegarde automatiquement. Modifiable pour re-importer.</small>
+            </div>
+        </details>
+
         <!-- Save / Publish / Delete -->
         <div class="bottom-actions">
             <button class="btn-save-eval" onclick="saveEval()">💾 Sauvegarder (brouillon)</button>
@@ -942,6 +951,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let currentBareme = 20;
     let currentModeEval = 'libre';
     let currentModeNotation = 'notee';
+    var currentSourcePrompt = null;
     let currentNonNote = false; // compat legacy
     let currentCorrectionDifferee = false;
     let currentPastilleNiveau = 'moyen';
@@ -1694,6 +1704,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             pastilleNiveau: normalizePastilleNiveau(ev.pastilleNiveau, 'moyen'),
             documents: ev.documents ? JSON.parse(JSON.stringify(ev.documents)) : [],
             questions: ev.questions ? JSON.parse(JSON.stringify(ev.questions)) : [],
+            sourcePrompt: ev.sourcePrompt || null,
             publie: false,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -1731,6 +1742,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         questions = [];
         documents = [];
         editingIndex = -1;
+        // Reset sourcePrompt
+        currentSourcePrompt = null;
+        var pf = document.getElementById('eval-source-prompt');
+        if (pf) pf.value = '';
         currentBareme = 20;
         currentModeEval = 'libre';
         currentModeNotation = 'notee';
@@ -1792,6 +1807,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         setModeNotation(currentModeNotation);
         setCorrectionDifferee(currentCorrectionDifferee);
         setPastilleNiveau(currentPastilleNiveau);
+
+        // Restore sourcePrompt
+        currentSourcePrompt = ev.sourcePrompt || null;
+        var pf = document.getElementById('eval-source-prompt');
+        if (pf) pf.value = ev.sourcePrompt || '';
 
         document.getElementById('btn-delete-eval').style.display = 'block';
         setDuplicateButtonEnabled(true);
@@ -2254,6 +2274,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             niveau = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
         }
 
+        var sourcePromptVal = (document.getElementById('eval-source-prompt') || {}).value || currentSourcePrompt || null;
         const evalData = {
             titre,
             classeId,
@@ -2269,6 +2290,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             pastilleNiveau: normalizePastilleNiveau(currentPastilleNiveau, 'moyen'),
             documents: documents,
             questions: questions,
+            sourcePrompt: sourcePromptVal,
             updatedAt: serverTimestamp()
         };
 
@@ -2855,6 +2877,11 @@ window.executeImport = function() {
         errDiv.style.display = 'block';
         return;
     }
+
+    // Sauvegarder le prompt source brut
+    currentSourcePrompt = jsonStr;
+    var promptField = document.getElementById('eval-source-prompt');
+    if (promptField) promptField.value = jsonStr;
 
     const result = validateImportJSON(jsonStr);
     if (!result.ok) {

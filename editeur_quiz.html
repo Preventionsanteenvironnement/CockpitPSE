@@ -503,6 +503,15 @@
             <div id="questions-container"></div>
         </div>
 
+        <!-- Prompt JSON source -->
+        <details id="prompt-section" style="margin-top:20px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:0;">
+            <summary style="padding:12px 16px; cursor:pointer; font-weight:700; font-size:0.9rem; color:#94a3b8;">📋 Prompt JSON source</summary>
+            <div style="padding:0 16px 16px;">
+                <textarea class="form-textarea" id="quiz-source-prompt" rows="8" placeholder="Le JSON original importe sera affiche ici..." style="font-family:monospace; font-size:0.8rem; width:100%; background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:8px;"></textarea>
+                <small style="color:#64748b; display:block; margin-top:6px;">Sauvegarde automatiquement. Modifiable pour re-importer.</small>
+            </div>
+        </details>
+
         <!-- Save / Delete -->
         <div class="bottom-actions">
             <button class="btn-save-quiz" onclick="saveQuiz()">💾 Sauvegarder le quiz</button>
@@ -628,6 +637,7 @@ function resetMediaForm(prefix) {
     let vfAnswer = true; // for VF form
     let allQuizzes = []; // list from Firebase
     let editingIndex = -1; // -1 = adding, >= 0 = editing question at index
+    var currentSourcePrompt = null;
 
     // === POPULATE CLASSE DROPDOWN ===
     function populateClasses() {
@@ -756,6 +766,10 @@ function resetMediaForm(prefix) {
     window.newQuiz = function() {
         currentQuizId = null;
         questions = [];
+        // Reset sourcePrompt
+        currentSourcePrompt = null;
+        var pf = document.getElementById('quiz-source-prompt');
+        if (pf) pf.value = '';
         document.getElementById('quiz-titre').value = '';
         document.getElementById('quiz-type').value = 'diagnostique';
         document.getElementById('quiz-type-autre').value = '';
@@ -807,6 +821,11 @@ function resetMediaForm(prefix) {
         setTimeout(() => {
             document.getElementById('quiz-module').value = q.moduleId || '';
         }, 100);
+
+        // Restore sourcePrompt
+        currentSourcePrompt = q.sourcePrompt || null;
+        var pf = document.getElementById('quiz-source-prompt');
+        if (pf) pf.value = q.sourcePrompt || '';
 
         document.getElementById('btn-delete-quiz').style.display = 'block';
         hideAddForm();
@@ -1151,6 +1170,7 @@ function resetMediaForm(prefix) {
             niveau = window.getNiveauClasse ? window.getNiveauClasse(classesInGroup[0]) : null;
         }
 
+        var sourcePromptVal = (document.getElementById('quiz-source-prompt') || {}).value || currentSourcePrompt || null;
         const quizData = {
             titre,
             type,
@@ -1158,6 +1178,7 @@ function resetMediaForm(prefix) {
             moduleId,
             niveau,
             questions: questions,
+            sourcePrompt: sourcePromptVal,
             updatedAt: serverTimestamp()
         };
 
@@ -1550,6 +1571,11 @@ REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
             errDiv.style.display = 'block';
             return;
         }
+
+        // Sauvegarder le prompt source brut
+        currentSourcePrompt = jsonStr;
+        var promptField = document.getElementById('quiz-source-prompt');
+        if (promptField) promptField.value = jsonStr;
 
         const result = validateQuizJSON(jsonStr);
 
