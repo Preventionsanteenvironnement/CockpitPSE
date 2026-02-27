@@ -2872,6 +2872,68 @@ TYPES DE QUESTIONS AUTORISÉS :
 - "mot" : Réponse courte. reponse (string non vide)
 - "nombre" : Réponse numérique. reponse (number), tolerance (optionnel, number >= 0)
 - "ordonner" : Remettre dans l'ordre. elements (tableau >= 3 éléments, tous différents, dans l'ordre correct)
+- "pad" : Processus d'Apparition du Dommage (analyse de risque). Champs obligatoires :
+  - situation (string) : description du contexte de travail
+  - danger (string) : le danger identifié (ex: "Lame de cutter")
+  - distracteurs_danger (tableau de strings) : 3 mauvaises réponses plausibles pour le danger
+  - situation_dangereuse (string) : la situation dangereuse (ex: "Découpe rapide sans gant")
+  - distracteurs_situation_dangereuse (tableau de strings) : 3 mauvaises réponses plausibles
+  - evenement_declencheur (string) : l'événement déclencheur (ex: "Le cutter dérape")
+  - distracteurs_evenement_declencheur (tableau de strings) : 3 mauvaises réponses plausibles
+  - dommage (string) : le dommage subi (ex: "Coupure profonde")
+  - distracteurs_dommage (tableau de strings) : 3 mauvaises réponses plausibles
+  - points : généralement 4
+- "prevention" : Mesures de prévention (5 niveaux obligatoires). Champs obligatoires :
+  - situation (string) : description du contexte de travail
+  - danger (string) : le danger identifié
+  - niveaux (tableau de 5 objets, un par niveau, TOUS obligatoires dans cet ordre) :
+    - { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "...", "distracteurs": ["...", "...", "..."] }
+    - { "niveau": "reduire", "label": "Réduire le risque à la source", "bonne_reponse": "...", "distracteurs": ["...", "...", "..."] }
+    - { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "...", "distracteurs": ["...", "...", "..."] }
+    - { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "...", "distracteurs": ["...", "...", "..."] }
+    - { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "...", "distracteurs": ["...", "...", "..."] }
+  - Chaque niveau a une bonne_reponse (string, la mesure de prévention correcte) et des distracteurs (tableau de 3 mauvaises réponses plausibles)
+  - points : généralement 5
+
+EXEMPLES JSON PAD ET PRÉVENTION :
+
+Exemple question PAD :
+{
+  "type": "pad",
+  "consigne": "Analysez le processus d'apparition du dommage dans cette situation professionnelle.",
+  "situation": "Un employé de restauration découpe des légumes avec un couteau de cuisine usé sur un plan de travail humide.",
+  "danger": "Lame du couteau usé",
+  "distracteurs_danger": ["Four chaud", "Sol glissant", "Bruit ambiant"],
+  "situation_dangereuse": "Découpe rapide de légumes sur surface humide avec couteau usé",
+  "distracteurs_situation_dangereuse": ["Nettoyage du plan de travail", "Rangement de la vaisselle", "Transport d'un plateau"],
+  "evenement_declencheur": "Le couteau dérape sur la surface humide",
+  "distracteurs_evenement_declencheur": ["Le four s'éteint", "Un collègue appelle", "La sonnerie retentit"],
+  "dommage": "Coupure profonde à la main",
+  "distracteurs_dommage": ["Mal de dos", "Brûlure légère", "Fatigue visuelle"],
+  "points": 4,
+  "competence": "C2",
+  "correction": "Le danger est la lame usée, la situation dangereuse est la découpe sur surface humide...",
+  "document_id": null
+}
+
+Exemple question Prévention :
+{
+  "type": "prevention",
+  "consigne": "Proposez les mesures de prévention adaptées à chaque niveau pour cette situation.",
+  "situation": "Un employé manipule des produits chimiques corrosifs pour le nettoyage industriel.",
+  "danger": "Projection de produit corrosif",
+  "niveaux": [
+    { "niveau": "supprimer", "label": "Supprimer le risque", "bonne_reponse": "Remplacer le produit corrosif par un produit non dangereux", "distracteurs": ["Porter des gants", "Afficher une consigne", "Former les employés"] },
+    { "niveau": "reduire", "label": "Réduire le risque à la source", "bonne_reponse": "Diminuer la concentration du produit chimique", "distracteurs": ["Installer un casque", "Afficher un panneau", "Distribuer des masques"] },
+    { "niveau": "collective", "label": "Protection collective", "bonne_reponse": "Installer un écran de protection et une aspiration à la source", "distracteurs": ["Porter des lunettes", "Former les employés", "Utiliser un autre procédé"] },
+    { "niveau": "individuelle", "label": "Protection individuelle (EPI)", "bonne_reponse": "Lunettes de protection et gants adaptés aux produits chimiques", "distracteurs": ["Ventilation générale", "Remplacement du produit", "Affichage de sécurité"] },
+    { "niveau": "formation", "label": "Information et formation", "bonne_reponse": "Briefing sécurité et consignes de manipulation des produits chimiques", "distracteurs": ["Installer un capotage", "Fournir des EPI", "Remplacer le produit"] }
+  ],
+  "points": 5,
+  "competence": "C4",
+  "correction": "Les 5 niveaux de prévention suivent les principes généraux de prévention...",
+  "document_id": null
+}
 
 TYPES DE DOCUMENTS :
 - "texte" : champs obligatoires = id, type, titre, contenu
@@ -3167,6 +3229,47 @@ function normalizeImportJSON(data) {
             if (!q.elements && q.ordre) { q.elements = q.ordre; delete q.ordre; }
             // Si choix est utilise a la place de elements
             if (!q.elements && Array.isArray(q.choix)) { q.elements = q.choix; delete q.choix; }
+        }
+
+        if (resolvedType === 'pad') {
+            // Aliases pour situation
+            if (!q.situation && q.contexte) { q.situation = q.contexte; delete q.contexte; }
+            if (!q.situation && q.description) { q.situation = q.description; delete q.description; }
+            // Aliases pour situation_dangereuse
+            if (!q.situation_dangereuse && q.situation_danger) { q.situation_dangereuse = q.situation_danger; delete q.situation_danger; }
+            if (!q.situation_dangereuse && q.sit_dangereuse) { q.situation_dangereuse = q.sit_dangereuse; delete q.sit_dangereuse; }
+            // Aliases pour evenement_declencheur
+            if (!q.evenement_declencheur && q.evenement) { q.evenement_declencheur = q.evenement; delete q.evenement; }
+            if (!q.evenement_declencheur && q.declencheur) { q.evenement_declencheur = q.declencheur; delete q.declencheur; }
+            if (!q.evenement_declencheur && q.event) { q.evenement_declencheur = q.event; delete q.event; }
+            // Normaliser les distracteurs string → tableau (pipe-separated)
+            ['distracteurs_danger', 'distracteurs_situation_dangereuse', 'distracteurs_evenement_declencheur', 'distracteurs_dommage'].forEach(function(field) {
+                if (typeof q[field] === 'string') {
+                    q[field] = q[field].split('|').map(function(s) { return s.trim(); }).filter(Boolean);
+                }
+            });
+        }
+
+        if (resolvedType === 'prevention') {
+            // Aliases pour situation
+            if (!q.situation && q.contexte) { q.situation = q.contexte; delete q.contexte; }
+            if (!q.situation && q.description) { q.situation = q.description; delete q.description; }
+            // Normaliser niveaux : aliases
+            if (!q.niveaux && q.mesures) { q.niveaux = q.mesures; delete q.mesures; }
+            if (!q.niveaux && q.levels) { q.niveaux = q.levels; delete q.levels; }
+            if (!q.niveaux && q.prevention) { q.niveaux = q.prevention; delete q.prevention; }
+            // Normaliser les distracteurs string → tableau dans chaque niveau
+            if (Array.isArray(q.niveaux)) {
+                q.niveaux.forEach(function(n) {
+                    if (n && typeof n.distracteurs === 'string') {
+                        n.distracteurs = n.distracteurs.split('|').map(function(s) { return s.trim(); }).filter(Boolean);
+                    }
+                    // Aliases pour bonne_reponse
+                    if (n && !n.bonne_reponse && n.reponse) { n.bonne_reponse = n.reponse; delete n.reponse; }
+                    if (n && !n.bonne_reponse && n.answer) { n.bonne_reponse = n.answer; delete n.answer; }
+                    if (n && !n.bonne_reponse && n.correct) { n.bonne_reponse = n.correct; delete n.correct; }
+                });
+            }
         }
 
         // 7. Default document_id a null si absent
