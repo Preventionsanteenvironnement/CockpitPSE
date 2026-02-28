@@ -389,6 +389,13 @@
                 <label>Titre de l'exercice</label>
                 <input type="text" class="form-input" id="exo-titre" placeholder="Ex: Vocabulaire energie — B5">
             </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Image d'illustration (optionnel)</label>
+                <input type="text" class="form-input" id="exo-image" placeholder="nom_image.jpg ou https://...">
+                <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">
+                    Si vous entrez juste un nom de fichier, le chemin <code>images/exercices/</code> sera ajoute automatiquement.
+                </div>
+            </div>
             <div class="form-row" style="margin-bottom:14px;">
                 <div class="form-group">
                     <label>Type d'exercice</label>
@@ -2008,6 +2015,21 @@
         card.querySelector('.ec-texte-area').style.display = sel.value === 'texte' ? '' : 'none';
     };
 
+    function normalizeGlobalExoImagePath(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (raw.startsWith('http') || raw.startsWith('data:') || raw.startsWith('/') || raw.startsWith('images/')) return raw;
+        if (raw.indexOf('/') !== -1) return raw;
+        return 'images/exercices/' + raw;
+    }
+
+    function stripGlobalExoImageBase(value) {
+        const raw = String(value || '').trim();
+        const base = 'images/exercices/';
+        if (raw.startsWith(base)) return raw.substring(base.length);
+        return raw;
+    }
+
     // ========== GET CONTENU FROM FORM ==========
     function getContenuFromForm() {
         const rawType = document.getElementById('exo-type').value;
@@ -2762,6 +2784,8 @@
     // ========== SET CONTENU IN FORM ==========
     function setContenuInForm(type, contenu) {
         if (type === 'hierarchiser') type = 'ordre';
+        const exoImageInput = document.getElementById('exo-image');
+        if (exoImageInput) exoImageInput.value = stripGlobalExoImageBase((contenu && contenu.image) || '');
         if (!contenu) return;
         if (type === 'texte_trous') {
             document.getElementById('tt-consigne').value = contenu.consigne || '';
@@ -3054,6 +3078,7 @@
     }
 
     function clearAllForms() {
+        document.getElementById('exo-image').value = '';
         document.getElementById('tt-texte').value = '';
         document.getElementById('tt-consigne').value = 'Completez le texte suivant';
         document.getElementById('tt-indice').checked = false;
@@ -3601,6 +3626,9 @@
             niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
         }
         const contenu = getContenuFromForm();
+        const globalImage = normalizeGlobalExoImagePath((document.getElementById('exo-image') || {}).value || '');
+        if (globalImage) contenu.image = globalImage;
+        else if (contenu && Object.prototype.hasOwnProperty.call(contenu, 'image')) delete contenu.image;
         // === VALIDATION PAD ===
         if (type === 'pad') {
             const c = contenu;
@@ -3982,6 +4010,9 @@
             niveau = window.getNiveauClasse ? window.getNiveauClasse(cig[0]) : null;
         }
         const contenu = getContenuFromForm();
+        const globalImage = normalizeGlobalExoImagePath((document.getElementById('exo-image') || {}).value || '');
+        if (globalImage) contenu.image = globalImage;
+        else if (contenu && Object.prototype.hasOwnProperty.call(contenu, 'image')) delete contenu.image;
 
         const catCb = document.getElementById('exo-categorie-competences');
         const categorie = (catCb.checked || AUTO_COMPETENCES_TYPES.includes(type)) ? 'competences' : 'modules';
@@ -4283,10 +4314,20 @@ Important:
 - Réponds UNIQUEMENT avec du JSON valide, sans texte autour, sans markdown.`;
     }
 
+    const GLOBAL_IMAGE_PROMPT_SUFFIX = '\n\nIMAGE OPTIONNELLE (tous les types sauf pictogrammes) :\nAjoute au niveau racine du JSON :\n"image": "nom_image.jpg"\nou\n"image": "https://..."\nSi tu mets seulement un nom de fichier, le systeme ajoutera automatiquement le prefixe images/exercices/.';
+
+    function appendGlobalImagePrompt(type, prompt) {
+        if (!prompt) return '';
+        if (type === 'pictogramme') return prompt;
+        return prompt + GLOBAL_IMAGE_PROMPT_SUFFIX;
+    }
+
     function getImportPrompt(type) {
-        if (type === 'qcm_classique') return buildQcmClassiquePrompt();
-        if (type === 'analyse_copie') return buildAnalyseCopiePrompt();
-        return PROMPTS[type] || '';
+        let prompt = '';
+        if (type === 'qcm_classique') prompt = buildQcmClassiquePrompt();
+        else if (type === 'analyse_copie') prompt = buildAnalyseCopiePrompt();
+        else prompt = PROMPTS[type] || '';
+        return appendGlobalImagePrompt(type, prompt);
     }
 
     window.openImportModal = function() {
