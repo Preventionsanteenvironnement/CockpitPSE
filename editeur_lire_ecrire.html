@@ -415,7 +415,7 @@ function showToast(msg) {
             label: "🖼️ Image → QCM mot",
             categorie: "images",
             fields: [
-                { key: "image", type: "text", label: "Chemin image (relatif)", placeholder: "images/pse/photo.png" },
+                { key: "image", type: "text", label: "Nom du fichier image", placeholder: "casque.png" },
                 { key: "mot_correct", type: "text", label: "Mot correct *", placeholder: "Ex: casque" },
                 { key: "distracteurs", type: "tags", label: "Distracteurs (3 mots)", min: 2, placeholder: "Ajouter un mot..." }
             ]
@@ -485,16 +485,17 @@ function showToast(msg) {
     // IMPORT PROMPT
     // =============================================
     const REGLES_COMMUNES = `
-=== REGLES ===
-- Genere entre 5 et 15 exercices
-- Varie les difficultes (facile, moyen, difficile)
-- Le vocabulaire doit etre simple et en lien avec la PSE (sante, securite, travail, alimentation, sommeil, hygiene, etc.)
-- Reponds UNIQUEMENT avec le JSON (tableau), sans commentaire ni explication`;
+=== RÈGLES IMPORTANTES ===
+- Génère entre 5 et 15 exercices
+- Varie les difficultés (facile, moyen, difficile)
+- Le vocabulaire doit être simple et en lien avec la PSE (santé, sécurité, travail, alimentation, sommeil, hygiène, etc.)
+- IMPORTANT : garde TOUS les accents français (é, è, ê, à, ù, ç, î, ô, û, etc.) dans les mots et les phrases. N'enlève JAMAIS les accents.
+- Réponds UNIQUEMENT avec le JSON (tableau), sans commentaire ni explication`;
 
     const IMPORT_PROMPTS = {
-        img_qcm_mot: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Image -> QCM mot".
-L'eleve voit une image et doit choisir le bon mot parmi 3-4 propositions.
+        img_qcm_mot: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Image → QCM mot".
+L'élève voit une image et doit choisir le bon mot parmi 3-4 propositions.
 
 Structure de chaque exercice :
 {
@@ -503,7 +504,7 @@ Structure de chaque exercice :
   "template_id": "img_qcm_mot",
   "difficulte": "facile" | "moyen" | "difficile",
   "data": {
-    "image": "images/pse/nom_image.png",
+    "image": "casque.png",
     "mot_correct": "casque",
     "distracteurs": ["chapeau", "bonnet", "sac"]
   }
@@ -512,12 +513,12 @@ Structure de chaque exercice :
 Exemple :
 [
   {
-    "titre": "EPI sur chantier",
+    "titre": "Équipement de protection",
     "categorie": "images",
     "template_id": "img_qcm_mot",
     "difficulte": "facile",
     "data": {
-      "image": "images/pse/casque.png",
+      "image": "casque.png",
       "mot_correct": "casque",
       "distracteurs": ["chapeau", "bonnet", "sac"]
     }
@@ -526,13 +527,14 @@ Exemple :
 
 Notes :
 - Chaque exercice doit avoir exactement 3 distracteurs (mots proches ou confondants)
-- Les images sont des chemins placeholder (images/pse/nom.png)
-- Le mot_correct doit etre un mot simple, courant, en lien avec la PSE
+- Pour "image", mets juste le nom du fichier (ex: "casque.png"), le chemin sera ajouté automatiquement
+- Le mot_correct doit être un mot simple, courant, en lien avec la PSE
+- GARDE TOUS LES ACCENTS : écris "sécurité" et non "securite", "hygiène" et non "hygiene"
 ` + REGLES_COMMUNES,
 
-        mot_completer: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Mot a completer".
-L'eleve voit un mot avec des lettres cachees (remplacees par _) et doit taper le mot complet.
+        mot_completer: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Mot à compléter".
+L'élève voit un mot avec des lettres cachées (remplacées par _) et doit taper le mot complet.
 
 Structure de chaque exercice :
 {
@@ -541,8 +543,8 @@ Structure de chaque exercice :
   "template_id": "mot_completer",
   "difficulte": "facile" | "moyen" | "difficile",
   "data": {
-    "mot": "securite",
-    "lettres_visibles": "s_c_r_te",
+    "mot": "sécurité",
+    "lettres_visibles": "s_c_r_té",
     "indice": "Contraire du danger"
   }
 }
@@ -550,7 +552,7 @@ Structure de chaque exercice :
 Exemple :
 [
   {
-    "titre": "Mot a completer - hygiene",
+    "titre": "Compléter — hygiène",
     "categorie": "mots",
     "template_id": "mot_completer",
     "difficulte": "facile",
@@ -559,19 +561,31 @@ Exemple :
       "lettres_visibles": "s_v_n",
       "indice": "On l'utilise pour se laver les mains"
     }
+  },
+  {
+    "titre": "Compléter — sécurité",
+    "categorie": "mots",
+    "template_id": "mot_completer",
+    "difficulte": "moyen",
+    "data": {
+      "mot": "sécurité",
+      "lettres_visibles": "s_c_r_té",
+      "indice": "C'est le contraire du danger"
+    }
   }
 ]
 
 Notes :
-- "lettres_visibles" : remplacer certaines lettres par _ (underscore)
-- Facile : 1-2 lettres cachees. Moyen : 3-4. Difficile : la moitie ou plus
-- "indice" est facultatif mais recommande
-- Les mots doivent etre en lien avec la PSE
+- "lettres_visibles" : remplacer certaines lettres par _ (underscore), GARDER les accents sur les lettres visibles
+- Facile : 1-2 lettres cachées. Moyen : 3-4. Difficile : la moitié ou plus
+- "indice" est facultatif mais recommandé
+- Les mots doivent être en lien avec la PSE
+- GARDE TOUS LES ACCENTS : "sécurité", "hygiène", "prévention", etc.
 ` + REGLES_COMMUNES,
 
-        mot_phrase_trou: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Phrase a trous".
-L'eleve lit une phrase avec un trou (___) et choisit le bon mot parmi 2-3 propositions.
+        mot_phrase_trou: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Phrase à trous".
+L'élève lit une phrase avec un trou (___) et choisit le bon mot parmi 2-3 propositions.
 
 Structure de chaque exercice :
 {
@@ -589,7 +603,7 @@ Structure de chaque exercice :
 Exemple :
 [
   {
-    "titre": "Phrase hygiene",
+    "titre": "Phrase — hygiène",
     "categorie": "mots",
     "template_id": "mot_phrase_trou",
     "difficulte": "facile",
@@ -602,14 +616,15 @@ Exemple :
 ]
 
 Notes :
-- La phrase contient exactement un trou represente par ___
-- 2 a 3 distracteurs par exercice (mots plausibles mais incorrects)
-- Les phrases doivent etre courtes et simples
+- La phrase contient exactement un trou représenté par ___
+- 2 à 3 distracteurs par exercice (mots plausibles mais incorrects)
+- Les phrases doivent être courtes et simples
+- GARDE TOUS LES ACCENTS dans les phrases et les mots
 ` + REGLES_COMMUNES,
 
-        mot_copier: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Recopier un mot".
-L'eleve voit un mot affiche en grand et doit le recopier correctement au clavier.
+        mot_copier: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Recopier un mot".
+L'élève voit un mot affiché en grand et doit le recopier correctement au clavier.
 
 Structure de chaque exercice :
 {
@@ -619,14 +634,14 @@ Structure de chaque exercice :
   "difficulte": "facile" | "moyen" | "difficile",
   "data": {
     "mot": "extincteur",
-    "phrase_contexte": "L'extincteur sert a eteindre un feu."
+    "phrase_contexte": "L'extincteur sert à éteindre un feu."
   }
 }
 
 Exemple :
 [
   {
-    "titre": "Copier - danger",
+    "titre": "Recopier — danger",
     "categorie": "mots",
     "template_id": "mot_copier",
     "difficulte": "facile",
@@ -634,18 +649,28 @@ Exemple :
       "mot": "danger",
       "phrase_contexte": "Le panneau rouge signale un danger."
     }
+  },
+  {
+    "titre": "Recopier — sécurité",
+    "categorie": "mots",
+    "template_id": "mot_copier",
+    "difficulte": "moyen",
+    "data": {
+      "mot": "sécurité",
+      "phrase_contexte": "La sécurité au travail est très importante."
+    }
   }
 ]
 
 Notes :
-- Facile : mots courts (4-5 lettres). Moyen : 6-8 lettres. Difficile : 9+ lettres ou mots complexes
-- "phrase_contexte" est facultatif mais aide l'eleve a comprendre le mot
-- Les mots doivent etre en lien avec la PSE
+- Facile : mots courts (4-5 lettres). Moyen : 6-8 lettres. Difficile : 9+ lettres ou mots avec accents
+- "phrase_contexte" est facultatif mais aide l'élève à comprendre le mot
+- GARDE TOUS LES ACCENTS : écris "sécurité" et non "securite"
 ` + REGLES_COMMUNES,
 
-        lec_vrai_faux: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Vrai ou Faux".
-L'eleve lit une phrase et doit dire si c'est vrai ou faux.
+        lec_vrai_faux: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Vrai ou Faux".
+L'élève lit une phrase et doit dire si c'est vrai ou faux.
 
 Structure de chaque exercice :
 {
@@ -656,25 +681,25 @@ Structure de chaque exercice :
   "data": {
     "phrase": "Le feu se propage plus vite avec du vent.",
     "reponse": true,
-    "explication": "Le vent apporte de l'oxygene au feu."
+    "explication": "Le vent apporte de l'oxygène au feu."
   }
 }
 
 Exemple :
 [
   {
-    "titre": "VF - sommeil",
+    "titre": "VF — sommeil",
     "categorie": "lecture",
     "template_id": "lec_vrai_faux",
     "difficulte": "facile",
     "data": {
-      "phrase": "Dormir 8 heures par nuit est bon pour la sante.",
+      "phrase": "Dormir 8 heures par nuit est bon pour la santé.",
       "reponse": true,
-      "explication": "Le sommeil aide le corps a recuperer."
+      "explication": "Le sommeil aide le corps à récupérer."
     }
   },
   {
-    "titre": "VF - alimentation",
+    "titre": "VF — alimentation",
     "categorie": "lecture",
     "template_id": "lec_vrai_faux",
     "difficulte": "moyen",
@@ -687,15 +712,16 @@ Exemple :
 ]
 
 Notes :
-- "reponse" est true ou false (pas une chaine)
-- "explication" est facultatif mais tres utile pour l'apprentissage
-- Varier les reponses vraies et fausses (environ 50/50)
-- Les phrases doivent etre courtes et claires
+- "reponse" est true ou false (pas une chaîne de texte)
+- "explication" est facultatif mais très utile pour l'apprentissage
+- Varier les réponses vraies et fausses (environ 50/50)
+- Les phrases doivent être courtes et claires
+- GARDE TOUS LES ACCENTS dans les phrases et explications
 ` + REGLES_COMMUNES,
 
-        lec_comprehension_qcm: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau) d'exercices "Comprehension QCM".
-L'eleve lit un court texte puis repond a une question a choix multiples (3 choix).
+        lec_comprehension_qcm: `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau) d'exercices "Compréhension QCM".
+L'élève lit un court texte puis répond à une question à choix multiples (3 choix).
 
 Structure de chaque exercice :
 {
@@ -707,20 +733,20 @@ Structure de chaque exercice :
     "texte": "En cas d'incendie, il faut rester calme et sortir par la sortie de secours.",
     "question": "Que faut-il faire en cas d'incendie ?",
     "reponse_correcte": "Sortir par la sortie de secours",
-    "distracteurs": ["Se cacher sous la table", "Ouvrir les fenetres"]
+    "distracteurs": ["Se cacher sous la table", "Ouvrir les fenêtres"]
   }
 }
 
 Exemple :
 [
   {
-    "titre": "Lecture - produits chimiques",
+    "titre": "Lecture — produits chimiques",
     "categorie": "lecture",
     "template_id": "lec_comprehension_qcm",
     "difficulte": "moyen",
     "data": {
-      "texte": "Les produits chimiques dangereux ont une etiquette orange avec un symbole noir. Il ne faut jamais les melanger.",
-      "question": "Quelle couleur a l'etiquette des produits dangereux ?",
+      "texte": "Les produits chimiques dangereux ont une étiquette orange avec un symbole noir. Il ne faut jamais les mélanger.",
+      "question": "Quelle couleur a l'étiquette des produits dangereux ?",
       "reponse_correcte": "Orange",
       "distracteurs": ["Bleu", "Vert"]
     }
@@ -728,16 +754,17 @@ Exemple :
 ]
 
 Notes :
-- Le texte doit etre court (2-4 phrases maximum)
-- La question porte sur le texte lu (comprehension)
-- 2 distracteurs (reponses plausibles mais incorrectes)
-- Facile : reponse explicite dans le texte. Difficile : necessite une inference
+- Le texte doit être court (2-4 phrases maximum)
+- La question porte sur le texte lu (compréhension)
+- 2 distracteurs (réponses plausibles mais incorrectes)
+- Facile : réponse explicite dans le texte. Difficile : nécessite une inférence
+- GARDE TOUS LES ACCENTS dans le texte, la question et les réponses
 ` + REGLES_COMMUNES
     };
 
-    // Prompt generique (tous templates)
-    const IMPORT_PROMPT_ALL = `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
-Genere un JSON (tableau d'objets) pour des exercices de type "Lire et Ecrire".
+    // Prompt générique (tous templates)
+    const IMPORT_PROMPT_ALL = `Tu es un générateur d'exercices pour des élèves allophones ou faibles lecteurs en CAP.
+Génère un JSON (tableau d'objets) pour des exercices de type "Lire et Écrire".
 
 Chaque exercice a cette structure :
 {
@@ -750,23 +777,23 @@ Chaque exercice a cette structure :
 
 === 6 TEMPLATES DISPONIBLES ===
 
-1. img_qcm_mot (categorie: images)
-   data: { "image": "images/pse/photo.png", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet", "sac"] }
+1. img_qcm_mot (catégorie: images)
+   data: { "image": "casque.png", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet", "sac"] }
 
-2. mot_completer (categorie: mots)
-   data: { "mot": "securite", "lettres_visibles": "s_c_r_te", "indice": "Contraire du danger" }
+2. mot_completer (catégorie: mots)
+   data: { "mot": "sécurité", "lettres_visibles": "s_c_r_té", "indice": "Contraire du danger" }
 
-3. mot_phrase_trou (categorie: mots)
+3. mot_phrase_trou (catégorie: mots)
    data: { "phrase": "Il faut porter un ___ sur le chantier.", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet"] }
 
-4. mot_copier (categorie: mots)
-   data: { "mot": "extincteur", "phrase_contexte": "L'extincteur sert a eteindre un feu." }
+4. mot_copier (catégorie: mots)
+   data: { "mot": "extincteur", "phrase_contexte": "L'extincteur sert à éteindre un feu." }
 
-5. lec_vrai_faux (categorie: lecture)
-   data: { "phrase": "Le feu se propage plus vite avec du vent.", "reponse": true, "explication": "Le vent apporte de l'oxygene." }
+5. lec_vrai_faux (catégorie: lecture)
+   data: { "phrase": "Le feu se propage plus vite avec du vent.", "reponse": true, "explication": "Le vent apporte de l'oxygène." }
 
-6. lec_comprehension_qcm (categorie: lecture)
-   data: { "texte": "En cas d'incendie...", "question": "Que faut-il faire ?", "reponse_correcte": "Appeler les secours", "distracteurs": ["Courir", "Ouvrir les fenetres"] }
+6. lec_comprehension_qcm (catégorie: lecture)
+   data: { "texte": "En cas d'incendie...", "question": "Que faut-il faire ?", "reponse_correcte": "Appeler les secours", "distracteurs": ["Courir", "Ouvrir les fenêtres"] }
 ` + REGLES_COMMUNES;
 
     // =============================================
@@ -954,6 +981,13 @@ Chaque exercice a cette structure :
 
                 // Image preview for image fields
                 if (field.key === 'image') {
+                    // Strip base path prefix to show only filename in the field
+                    setTimeout(() => {
+                        const inp = document.getElementById('field-image');
+                        if (inp && inp.value.startsWith(IMAGE_BASE_PATH)) {
+                            inp.value = inp.value.replace(IMAGE_BASE_PATH, '');
+                        }
+                    }, 10);
                     group.innerHTML += '<div class="image-preview" id="image-preview"></div>';
                     setTimeout(() => {
                         const inp = document.getElementById('field-image');
@@ -1033,15 +1067,24 @@ Chaque exercice a cette structure :
         renderTags(fieldKey);
     };
 
+    const IMAGE_BASE_PATH = 'images/lire_ecrire/';
+
+    function getFullImagePath(filename) {
+        if (!filename) return '';
+        if (filename.startsWith('http') || filename.startsWith('images/')) return filename;
+        return IMAGE_BASE_PATH + filename;
+    }
+
     function updateImagePreview() {
         const inp = document.getElementById('field-image');
         const prev = document.getElementById('image-preview');
         if (!inp || !prev) return;
         const val = inp.value.trim();
         if (val) {
-            // Try to build path - could be relative to PSE
-            const src = val.startsWith('http') ? val : '../PSE/' + val;
-            prev.innerHTML = '<img src="' + escapeAttr(src) + '" onerror="this.parentElement.style.display=\'none\'" onload="this.parentElement.style.display=\'block\'">';
+            const fullPath = getFullImagePath(val);
+            const src = fullPath.startsWith('http') ? fullPath : '../PSE/' + fullPath;
+            prev.innerHTML = '<img src="' + escapeAttr(src) + '" onerror="this.parentElement.style.display=\'none\'" onload="this.parentElement.style.display=\'block\'">' +
+                '<div style="font-size:0.75rem; color:#64748b; padding:4px; text-align:center;">Chemin : ' + escapeHtml(fullPath) + '</div>';
             prev.style.display = 'none'; // will show on successful load
         } else {
             prev.style.display = 'none';
@@ -1071,7 +1114,12 @@ Chaque exercice a cette structure :
                 else data[field.key] = raw;
             } else {
                 const el = document.getElementById('field-' + field.key);
-                data[field.key] = el ? el.value.trim() : '';
+                let val = el ? el.value.trim() : '';
+                // Auto-prefix image filenames with base path
+                if (field.key === 'image' && val) {
+                    val = getFullImagePath(val);
+                }
+                data[field.key] = val;
             }
         });
 
@@ -1271,6 +1319,10 @@ Chaque exercice a cette structure :
             // Normalize distracteurs from pipe-separated string
             if (typeof ex.data.distracteurs === 'string') {
                 ex.data.distracteurs = ex.data.distracteurs.split('|').map(s => s.trim()).filter(Boolean);
+            }
+            // Auto-prefix image path if it's just a filename
+            if (ex.data.image) {
+                ex.data.image = getFullImagePath(ex.data.image);
             }
             // Normalize reponse for vrai/faux
             if (ex.template_id === 'lec_vrai_faux') {
