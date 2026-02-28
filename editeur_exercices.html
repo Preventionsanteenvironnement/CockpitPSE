@@ -372,14 +372,14 @@
 
     <div id="main-editor">
         <!-- IMAGE PATH INFO -->
-        <div style="background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #334155;border-left:4px solid #6366f1;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.78em;">
+        <div id="image-path-banner" style="background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #334155;border-left:4px solid #6366f1;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.78em;">
             <div style="font-weight:700;color:#a5b4fc;margin-bottom:4px;">📁 Chemin images pour le prompt</div>
             <div style="color:#94a3b8;line-height:1.5;">
                 <strong style="color:#f1f5f9;">Champ JSON :</strong> <code style="background:#334155;padding:2px 6px;border-radius:4px;color:#22c55e;">"image"</code><br>
-                <strong style="color:#f1f5f9;">Chemin :</strong> <code style="background:#334155;padding:2px 6px;border-radius:4px;color:#fbbf24;">images/exercices/nom_image.jpg</code><br>
-                <strong style="color:#f1f5f9;">Exemple :</strong> <code style="background:#334155;padding:2px 6px;border-radius:4px;color:#94a3b8;">"image": "images/exercices/basket.jpeg"</code>
+                <strong style="color:#f1f5f9;">Chemin :</strong> <code id="image-path-display" style="background:#334155;padding:2px 6px;border-radius:4px;color:#fbbf24;">images/exercices/nom_image.jpg</code><br>
+                <strong style="color:#f1f5f9;">Exemple :</strong> <code id="image-path-example" style="background:#334155;padding:2px 6px;border-radius:4px;color:#94a3b8;">"image": "images/exercices/basket.jpeg"</code>
             </div>
-            <div style="margin-top:6px;color:#64748b;font-size:.9em;">Placez vos images dans le dossier <strong>images/exercices/</strong></div>
+            <div style="margin-top:6px;color:#64748b;font-size:.9em;">Placez vos images dans le dossier <strong id="image-path-folder">images/exercices/</strong></div>
         </div>
 
         <!-- META CARD -->
@@ -1777,6 +1777,15 @@
                 onDossierChange();
             }
         }
+
+        // Update image path banner based on type
+        var imgBase = getImageBaseForType(rawType);
+        var pathDisplay = document.getElementById('image-path-display');
+        var pathExample = document.getElementById('image-path-example');
+        var pathFolder = document.getElementById('image-path-folder');
+        if (pathDisplay) pathDisplay.textContent = imgBase + 'nom_image.jpg';
+        if (pathExample) pathExample.textContent = '"image": "' + imgBase + 'exemple.jpg"';
+        if (pathFolder) pathFolder.textContent = imgBase;
     };
 
     function getSelectedCompetences() {
@@ -2015,18 +2024,27 @@
         card.querySelector('.ec-texte-area').style.display = sel.value === 'texte' ? '' : 'none';
     };
 
+    function getImageBaseForType(type) {
+        if (type === 'pictogramme') return 'pictogrammes/images/';
+        if (type === 'acteurs_prevention') return 'flashcard_acteur_prevention/images/';
+        return 'images/exercices/';
+    }
+
     function normalizeGlobalExoImagePath(value) {
         const raw = String(value || '').trim();
         if (!raw) return '';
-        if (raw.startsWith('http') || raw.startsWith('data:') || raw.startsWith('/') || raw.startsWith('images/')) return raw;
+        if (raw.startsWith('http') || raw.startsWith('data:') || raw.startsWith('/') || raw.startsWith('images/') || raw.startsWith('pictogrammes/') || raw.startsWith('flashcard_')) return raw;
         if (raw.indexOf('/') !== -1) return raw;
-        return 'images/exercices/' + raw;
+        const type = document.getElementById('exo-type') ? document.getElementById('exo-type').value : '';
+        return getImageBaseForType(type) + raw;
     }
 
     function stripGlobalExoImageBase(value) {
         const raw = String(value || '').trim();
-        const base = 'images/exercices/';
-        if (raw.startsWith(base)) return raw.substring(base.length);
+        const bases = ['images/exercices/', 'pictogrammes/images/', 'flashcard_acteur_prevention/images/'];
+        for (const base of bases) {
+            if (raw.startsWith(base)) return raw.substring(base.length);
+        }
         return raw;
     }
 
@@ -4314,12 +4332,11 @@ Important:
 - Réponds UNIQUEMENT avec du JSON valide, sans texte autour, sans markdown.`;
     }
 
-    const GLOBAL_IMAGE_PROMPT_SUFFIX = '\n\nIMAGE OPTIONNELLE (tous les types sauf pictogrammes) :\nAjoute au niveau racine du JSON :\n"image": "nom_image.jpg"\nou\n"image": "https://..."\nSi tu mets seulement un nom de fichier, le systeme ajoutera automatiquement le prefixe images/exercices/.';
-
     function appendGlobalImagePrompt(type, prompt) {
         if (!prompt) return '';
         if (type === 'pictogramme') return prompt;
-        return prompt + GLOBAL_IMAGE_PROMPT_SUFFIX;
+        var base = getImageBaseForType(type);
+        return prompt + '\n\nIMAGE OPTIONNELLE :\nAjoute au niveau racine du JSON :\n"image": "nom_image.jpg"\nou\n"image": "https://..."\nSi tu mets seulement un nom de fichier, le systeme ajoutera automatiquement le prefixe ' + base + '.';
     }
 
     function getImportPrompt(type) {
