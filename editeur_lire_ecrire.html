@@ -484,7 +484,259 @@ function showToast(msg) {
     // =============================================
     // IMPORT PROMPT
     // =============================================
-    const IMPORT_PROMPT = `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+    const REGLES_COMMUNES = `
+=== REGLES ===
+- Genere entre 5 et 15 exercices
+- Varie les difficultes (facile, moyen, difficile)
+- Le vocabulaire doit etre simple et en lien avec la PSE (sante, securite, travail, alimentation, sommeil, hygiene, etc.)
+- Reponds UNIQUEMENT avec le JSON (tableau), sans commentaire ni explication`;
+
+    const IMPORT_PROMPTS = {
+        img_qcm_mot: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Image -> QCM mot".
+L'eleve voit une image et doit choisir le bon mot parmi 3-4 propositions.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court et descriptif",
+  "categorie": "images",
+  "template_id": "img_qcm_mot",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "image": "images/pse/nom_image.png",
+    "mot_correct": "casque",
+    "distracteurs": ["chapeau", "bonnet", "sac"]
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "EPI sur chantier",
+    "categorie": "images",
+    "template_id": "img_qcm_mot",
+    "difficulte": "facile",
+    "data": {
+      "image": "images/pse/casque.png",
+      "mot_correct": "casque",
+      "distracteurs": ["chapeau", "bonnet", "sac"]
+    }
+  }
+]
+
+Notes :
+- Chaque exercice doit avoir exactement 3 distracteurs (mots proches ou confondants)
+- Les images sont des chemins placeholder (images/pse/nom.png)
+- Le mot_correct doit etre un mot simple, courant, en lien avec la PSE
+` + REGLES_COMMUNES,
+
+        mot_completer: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Mot a completer".
+L'eleve voit un mot avec des lettres cachees (remplacees par _) et doit taper le mot complet.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_completer",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "mot": "securite",
+    "lettres_visibles": "s_c_r_te",
+    "indice": "Contraire du danger"
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "Mot a completer - hygiene",
+    "categorie": "mots",
+    "template_id": "mot_completer",
+    "difficulte": "facile",
+    "data": {
+      "mot": "savon",
+      "lettres_visibles": "s_v_n",
+      "indice": "On l'utilise pour se laver les mains"
+    }
+  }
+]
+
+Notes :
+- "lettres_visibles" : remplacer certaines lettres par _ (underscore)
+- Facile : 1-2 lettres cachees. Moyen : 3-4. Difficile : la moitie ou plus
+- "indice" est facultatif mais recommande
+- Les mots doivent etre en lien avec la PSE
+` + REGLES_COMMUNES,
+
+        mot_phrase_trou: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Phrase a trous".
+L'eleve lit une phrase avec un trou (___) et choisit le bon mot parmi 2-3 propositions.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_phrase_trou",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "phrase": "Il faut porter un ___ sur le chantier.",
+    "mot_correct": "casque",
+    "distracteurs": ["chapeau", "bonnet"]
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "Phrase hygiene",
+    "categorie": "mots",
+    "template_id": "mot_phrase_trou",
+    "difficulte": "facile",
+    "data": {
+      "phrase": "Je me lave les ___ avant de manger.",
+      "mot_correct": "mains",
+      "distracteurs": ["pieds", "cheveux"]
+    }
+  }
+]
+
+Notes :
+- La phrase contient exactement un trou represente par ___
+- 2 a 3 distracteurs par exercice (mots plausibles mais incorrects)
+- Les phrases doivent etre courtes et simples
+` + REGLES_COMMUNES,
+
+        mot_copier: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Recopier un mot".
+L'eleve voit un mot affiche en grand et doit le recopier correctement au clavier.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_copier",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "mot": "extincteur",
+    "phrase_contexte": "L'extincteur sert a eteindre un feu."
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "Copier - danger",
+    "categorie": "mots",
+    "template_id": "mot_copier",
+    "difficulte": "facile",
+    "data": {
+      "mot": "danger",
+      "phrase_contexte": "Le panneau rouge signale un danger."
+    }
+  }
+]
+
+Notes :
+- Facile : mots courts (4-5 lettres). Moyen : 6-8 lettres. Difficile : 9+ lettres ou mots complexes
+- "phrase_contexte" est facultatif mais aide l'eleve a comprendre le mot
+- Les mots doivent etre en lien avec la PSE
+` + REGLES_COMMUNES,
+
+        lec_vrai_faux: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Vrai ou Faux".
+L'eleve lit une phrase et doit dire si c'est vrai ou faux.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court",
+  "categorie": "lecture",
+  "template_id": "lec_vrai_faux",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "phrase": "Le feu se propage plus vite avec du vent.",
+    "reponse": true,
+    "explication": "Le vent apporte de l'oxygene au feu."
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "VF - sommeil",
+    "categorie": "lecture",
+    "template_id": "lec_vrai_faux",
+    "difficulte": "facile",
+    "data": {
+      "phrase": "Dormir 8 heures par nuit est bon pour la sante.",
+      "reponse": true,
+      "explication": "Le sommeil aide le corps a recuperer."
+    }
+  },
+  {
+    "titre": "VF - alimentation",
+    "categorie": "lecture",
+    "template_id": "lec_vrai_faux",
+    "difficulte": "moyen",
+    "data": {
+      "phrase": "Manger des bonbons tous les jours est bon pour les dents.",
+      "reponse": false,
+      "explication": "Le sucre provoque des caries."
+    }
+  }
+]
+
+Notes :
+- "reponse" est true ou false (pas une chaine)
+- "explication" est facultatif mais tres utile pour l'apprentissage
+- Varier les reponses vraies et fausses (environ 50/50)
+- Les phrases doivent etre courtes et claires
+` + REGLES_COMMUNES,
+
+        lec_comprehension_qcm: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) d'exercices "Comprehension QCM".
+L'eleve lit un court texte puis repond a une question a choix multiples (3 choix).
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court",
+  "categorie": "lecture",
+  "template_id": "lec_comprehension_qcm",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "texte": "En cas d'incendie, il faut rester calme et sortir par la sortie de secours.",
+    "question": "Que faut-il faire en cas d'incendie ?",
+    "reponse_correcte": "Sortir par la sortie de secours",
+    "distracteurs": ["Se cacher sous la table", "Ouvrir les fenetres"]
+  }
+}
+
+Exemple :
+[
+  {
+    "titre": "Lecture - produits chimiques",
+    "categorie": "lecture",
+    "template_id": "lec_comprehension_qcm",
+    "difficulte": "moyen",
+    "data": {
+      "texte": "Les produits chimiques dangereux ont une etiquette orange avec un symbole noir. Il ne faut jamais les melanger.",
+      "question": "Quelle couleur a l'etiquette des produits dangereux ?",
+      "reponse_correcte": "Orange",
+      "distracteurs": ["Bleu", "Vert"]
+    }
+  }
+]
+
+Notes :
+- Le texte doit etre court (2-4 phrases maximum)
+- La question porte sur le texte lu (comprehension)
+- 2 distracteurs (reponses plausibles mais incorrectes)
+- Facile : reponse explicite dans le texte. Difficile : necessite une inference
+` + REGLES_COMMUNES
+    };
+
+    // Prompt generique (tous templates)
+    const IMPORT_PROMPT_ALL = `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
 Genere un JSON (tableau d'objets) pour des exercices de type "Lire et Ecrire".
 
 Chaque exercice a cette structure :
@@ -499,35 +751,23 @@ Chaque exercice a cette structure :
 === 6 TEMPLATES DISPONIBLES ===
 
 1. img_qcm_mot (categorie: images)
-   L'eleve voit une image et doit choisir le bon mot parmi 3-4 propositions.
    data: { "image": "images/pse/photo.png", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet", "sac"] }
 
 2. mot_completer (categorie: mots)
-   L'eleve doit completer un mot dont certaines lettres sont cachees.
    data: { "mot": "securite", "lettres_visibles": "s_c_r_te", "indice": "Contraire du danger" }
 
 3. mot_phrase_trou (categorie: mots)
-   L'eleve lit une phrase avec un trou et choisit le bon mot.
    data: { "phrase": "Il faut porter un ___ sur le chantier.", "mot_correct": "casque", "distracteurs": ["chapeau", "bonnet"] }
 
 4. mot_copier (categorie: mots)
-   L'eleve doit recopier un mot correctement.
    data: { "mot": "extincteur", "phrase_contexte": "L'extincteur sert a eteindre un feu." }
 
 5. lec_vrai_faux (categorie: lecture)
-   L'eleve lit une phrase et dit si c'est vrai ou faux.
    data: { "phrase": "Le feu se propage plus vite avec du vent.", "reponse": true, "explication": "Le vent apporte de l'oxygene." }
 
 6. lec_comprehension_qcm (categorie: lecture)
-   L'eleve lit un court texte puis repond a une question a choix multiples.
    data: { "texte": "En cas d'incendie...", "question": "Que faut-il faire ?", "reponse_correcte": "Appeler les secours", "distracteurs": ["Courir", "Ouvrir les fenetres"] }
-
-=== REGLES ===
-- Genere entre 5 et 15 exercices
-- Varie les templates et les difficultes
-- Le vocabulaire doit etre simple et en lien avec la PSE (sante, securite, travail, alimentation, sommeil, etc.)
-- Pour les images, utilise des chemins placeholder comme "images/pse/nom.png"
-- Reponds UNIQUEMENT avec le JSON, sans commentaire`;
+` + REGLES_COMMUNES;
 
     // =============================================
     // FIREBASE REAL-TIME
@@ -953,12 +1193,25 @@ Chaque exercice a cette structure :
     // =============================================
     // IMPORT JSON
     // =============================================
+    let currentImportPrompt = '';
+
     window.openImportModal = function() {
         document.getElementById('import-modal').style.display = 'flex';
         document.getElementById('import-json').value = '';
         document.getElementById('import-errors').style.display = 'none';
         document.getElementById('import-errors').textContent = '';
-        document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+
+        // Choisir le prompt selon le template selectionne
+        const tplId = document.getElementById('exo-template').value;
+        const tplInfo = TEMPLATES[tplId];
+        if (tplId && IMPORT_PROMPTS[tplId]) {
+            currentImportPrompt = IMPORT_PROMPTS[tplId];
+            document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer — ' + (tplInfo ? tplInfo.label : tplId);
+        } else {
+            currentImportPrompt = IMPORT_PROMPT_ALL;
+            document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer des exercices Lire/Ecrire (JSON)';
+        }
+        document.getElementById('import-prompt-text').textContent = currentImportPrompt;
     };
 
     window.closeImportModal = function() {
@@ -966,7 +1219,7 @@ Chaque exercice a cette structure :
     };
 
     window.copyImportPrompt = function() {
-        navigator.clipboard.writeText(IMPORT_PROMPT).then(() => showToast('Prompt copie !')).catch(() => {});
+        navigator.clipboard.writeText(currentImportPrompt).then(() => showToast('Prompt copie !')).catch(() => {});
     };
 
     window.executeImport = async function() {
@@ -976,9 +1229,16 @@ Chaque exercice a cette structure :
 
         if (!raw) { errDiv.textContent = 'Collez du JSON !'; errDiv.style.display = 'block'; return; }
 
+        // Nettoyer guillemets typographiques (copie depuis ChatGPT/Word)
+        const cleaned = raw
+            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+            .replace(/[\u2013\u2014]/g, '-')
+            .replace(/[\u2026]/g, '...');
+
         let parsed;
         try {
-            parsed = JSON.parse(raw);
+            parsed = JSON.parse(cleaned);
         } catch(e) {
             errDiv.textContent = 'JSON invalide : ' + e.message;
             errDiv.style.display = 'block';
