@@ -2649,23 +2649,26 @@ QN80,Wael HWORI</pre>
         }
     };
 
-    // Load Foucher pack (Prevention + PAD + Estimation + DUERP)
+    // Load Foucher pack (Prevention + PAD + Estimation + DUERP + ITaMaMi)
     window.loadPackFoucher = async function() {
         try {
-            const [respPrev, respPad, respEst, respDuerp] = await Promise.all([
+            const [respPrev, respPad, respEst, respDuerp, respIta] = await Promise.all([
                 fetch('bibliotheque_prevention.json'),
                 fetch('bibliotheque_pad.json'),
                 fetch('bibliotheque_estimation.json'),
-                fetch('bibliotheque_duerp.json')
+                fetch('bibliotheque_duerp.json'),
+                fetch('bibliotheque_itamami.json')
             ]);
             if (!respPrev.ok) throw new Error('Fichier prevention non trouvé');
             if (!respPad.ok) throw new Error('Fichier PAD non trouvé');
             if (!respEst.ok) throw new Error('Fichier estimation non trouvé');
             if (!respDuerp.ok) throw new Error('Fichier DUERP non trouvé');
+            if (!respIta.ok) throw new Error('Fichier ITaMaMi non trouvé');
             const prevItems = await respPrev.json();
             const padItems = await respPad.json();
             const estItems = await respEst.json();
             const duerpItems = await respDuerp.json();
+            const itaItems = await respIta.json();
 
             // Deduplication par titre (tous types confondus)
             const existingTitres = new Set(allBiblioItems.map(i => i.titre));
@@ -2736,7 +2739,23 @@ QN80,Wael HWORI</pre>
                 await new Promise(r => setTimeout(r, 50));
             }
 
-            showToast('📦 ' + added + ' exercice(s) ajouté(s) (Prevention + PAD + Estimation + DUERP) !');
+            // ITaMaMi exercises
+            for (const item of itaItems) {
+                if (existingTitres.has(item.titre)) continue;
+                const newId = 'bib_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                await setDoc(doc(db, 'bibliotheque', newId), {
+                    categorie: 'exercice',
+                    type: 'itamami',
+                    moduleId: null,
+                    titre: item.titre,
+                    contenu: item,
+                    createdAt: serverTimestamp()
+                });
+                added++;
+                await new Promise(r => setTimeout(r, 50));
+            }
+
+            showToast('📦 ' + added + ' exercice(s) ajouté(s) (Prevention + PAD + Estimation + DUERP + ITaMaMi) !');
         } catch(e) {
             showToast('❌ Erreur : ' + e.message);
         }
