@@ -4607,6 +4607,8 @@ Important:
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
+        // Priorite etude_cas avant QCM serie : une etude de cas contient aussi questions[]
+        if (Array.isArray(src.questions) && (src.scenario !== undefined || src.contexte !== undefined || src.cas !== undefined || src.case !== undefined)) return 'etude_cas';
         if (Array.isArray(src.questions) && src.questions[0] && typeof src.questions[0].question === 'string' && Array.isArray(src.questions[0].choix) && src.questions[0].reponse !== undefined) return 'qcm_series_multi';
         if (typeof src.question === 'string' && Array.isArray(src.choix) && src.reponse !== undefined) return 'qcm_classique';
         if (src.texte && src.texte.includes('{{')) return 'texte_trous';
@@ -4675,6 +4677,11 @@ Important:
             if (!data.colonnes && data.columns) { data.colonnes = data.columns; delete data.columns; }
             if (!data.lignes && data.rows) { data.lignes = data.rows; delete data.rows; }
             if (!data.categories && data.groups) { data.categories = data.groups; delete data.groups; }
+            // Etude de cas : aliases frequents pour "scenario"
+            if ((data.scenario === undefined || data.scenario === null) && typeof data.contexte === 'string') data.scenario = data.contexte;
+            if ((data.scenario === undefined || data.scenario === null) && typeof data.context === 'string') data.scenario = data.context;
+            if ((data.scenario === undefined || data.scenario === null) && typeof data.cas === 'string') data.scenario = data.cas;
+            if ((data.scenario === undefined || data.scenario === null) && typeof data.case === 'string') data.scenario = data.case;
             // Normaliser les questions internes (sauf types DUERP qui utilisent "consigne" intentionnellement)
             if (Array.isArray(data.questions) && data.type !== 'duer_mission_directeur') {
                 data.questions.forEach(function(q) {
@@ -4856,7 +4863,8 @@ Important:
                     ? ''
                     : 'Tableau selection attendu: colonnes[] + lignes[].bonnes[]';
             case 'etude_cas':
-                return (typeof data.scenario === 'string' && Array.isArray(data.questions)) ? '' : 'Etude de cas attendue: "scenario" + "questions[]".';
+                // "scenario" peut etre absent selon le modele IA; on accepte questions[] et on laisse scenario vide.
+                return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'Etude de cas attendue: "questions[]".';
             case 'pad':
                 var padCore = ['danger', 'situation_dangereuse', 'evenement_declencheur', 'dommage'];
                 for (var pi = 0; pi < padCore.length; pi++) {
@@ -4966,10 +4974,19 @@ Important:
 
         // Etape 2a : Import en lot si tableau d'exercices mixtes (PAD, Prevention, etc.)
         if (Array.isArray(data) && data.length > 1) {
-            var allDetectable = data.every(function(item) {
-                return item && typeof item === 'object' && !Array.isArray(item) && detectJsonType(item);
+            var detectedTypes = data.map(function(item) {
+                if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+                return detectJsonType(item);
             });
+            var allDetectable = detectedTypes.every(function(t) { return !!t; });
             if (allDetectable) {
+                // Cas special : tableau de questions QCM -> UN SEUL exercice multi-questions
+                // (on laisse normalizeImportedData le convertir en qcm_series_multi)
+                var uniqueTypes = Array.from(new Set(detectedTypes));
+                var isQcmQuestionArray = (uniqueTypes.length === 1 && uniqueTypes[0] === 'qcm_classique');
+                if (isQcmQuestionArray) {
+                    // continue import normal (pas d'import en lot)
+                } else {
                 if (!confirm('📦 ' + data.length + ' exercices detectes. Importer tous en lot (brouillon) ?')) return;
                 var created = 0, batchErrors = [];
                 var classeIds = getSelectedClasseIds();
@@ -5011,6 +5028,7 @@ Important:
                     errorEl.style.display = 'block';
                 });
                 return;
+                }
             }
         }
 
