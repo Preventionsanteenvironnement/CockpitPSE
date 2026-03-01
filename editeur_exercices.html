@@ -2850,7 +2850,37 @@
         } else if (type === 'qcm_image') {
             document.getElementById('qimg-consigne').value = contenu.consigne || '';
             document.getElementById('qimg-questions').innerHTML = '';
-            (contenu.questions || []).forEach(q => addQcmImageQuestion(q));
+            (contenu.questions || []).forEach(function(q) {
+                var qq = q || {};
+                var choixTextes = Array.isArray(qq.choix)
+                    ? qq.choix.map(function(ch) {
+                        if (typeof ch === 'string') return ch;
+                        if (ch && typeof ch === 'object') return ch.texte || ch.label || ch.text || '';
+                        return String(ch || '');
+                    }).map(function(s) { return String(s || '').trim(); }).filter(Boolean)
+                    : [];
+                var correctIdx = qq.correct;
+                if (correctIdx === undefined && qq.reponse !== undefined) {
+                    if (typeof qq.reponse === 'number') {
+                        correctIdx = qq.reponse;
+                    } else if (typeof qq.reponse === 'string') {
+                        var idxById = Array.isArray(qq.choix) ? qq.choix.findIndex(function(ch) {
+                            return ch && typeof ch === 'object' && String(ch.id) === String(qq.reponse);
+                        }) : -1;
+                        var idxByTexte = choixTextes.indexOf(String(qq.reponse));
+                        correctIdx = idxById >= 0 ? idxById : (idxByTexte >= 0 ? idxByTexte : 0);
+                    }
+                }
+                var safeCorrect = parseInt(correctIdx, 10);
+                if (isNaN(safeCorrect)) safeCorrect = 0;
+                addQcmImageQuestion({
+                    image: qq.image || '',
+                    question: qq.question || '',
+                    choix: choixTextes,
+                    correct: safeCorrect,
+                    explication: qq.explication || ''
+                });
+            });
         } else if (type === 'tableau') {
             document.getElementById('tab-consigne').value = contenu.consigne || '';
             document.getElementById('tab-colonnes').value = (contenu.colonnes || []).join(', ');
@@ -2871,9 +2901,50 @@
             document.getElementById('tabs-explication').value = contenu.explication || '';
         } else if (type === 'etude_cas') {
             document.getElementById('ec-consigne').value = contenu.consigne || '';
-            document.getElementById('ec-scenario').value = contenu.scenario || '';
+            document.getElementById('ec-scenario').value = contenu.scenario || contenu.contexte || contenu.context || contenu.cas || contenu.case || '';
             document.getElementById('ec-questions').innerHTML = '';
-            (contenu.questions || []).forEach(q => addEtudeCasQuestion(q));
+            (contenu.questions || []).forEach(function(rawQ) {
+                var q = rawQ || {};
+                var qType = q.type || (q.choix ? 'qcm' : 'texte');
+                qType = (qType === 'texte') ? 'texte' : 'qcm';
+                var rawChoix = Array.isArray(q.choix) ? q.choix : [];
+                var choixTextes = rawChoix.map(function(ch) {
+                    if (typeof ch === 'string') return ch;
+                    if (ch && typeof ch === 'object') return ch.texte || ch.label || ch.text || '';
+                    return String(ch || '');
+                }).map(function(s) { return String(s || '').trim(); }).filter(Boolean);
+
+                var correctIdx = q.correct;
+                if (qType === 'qcm' && correctIdx === undefined && q.reponse !== undefined) {
+                    var rep = Array.isArray(q.reponse) ? q.reponse[0] : q.reponse;
+                    if (typeof rep === 'number') {
+                        correctIdx = rep;
+                    } else if (typeof rep === 'string') {
+                        var idxId = rawChoix.findIndex(function(ch) {
+                            return ch && typeof ch === 'object' && String(ch.id) === String(rep);
+                        });
+                        var idxTxt = choixTextes.indexOf(String(rep));
+                        correctIdx = idxId >= 0 ? idxId : (idxTxt >= 0 ? idxTxt : 0);
+                    }
+                }
+                var safeCorrect = parseInt(correctIdx, 10);
+                if (isNaN(safeCorrect)) safeCorrect = 0;
+
+                var texteReponse = q.reponse;
+                if (texteReponse === undefined && q.answer !== undefined) texteReponse = q.answer;
+                if (texteReponse === undefined && q.response !== undefined) texteReponse = q.response;
+                if (Array.isArray(texteReponse)) texteReponse = texteReponse.join(' | ');
+                if (texteReponse === undefined || texteReponse === null) texteReponse = '';
+
+                addEtudeCasQuestion({
+                    question: q.question || q.consigne || '',
+                    type: qType,
+                    choix: choixTextes,
+                    correct: safeCorrect,
+                    reponse: String(texteReponse),
+                    explication: q.explication || q.explanation || ''
+                });
+            });
         } else if (type === 'pad') {
             // Helper : forcer un tableau (certaines IA generent des strings separees par virgules)
             function toArray(v) { if (Array.isArray(v)) return v; if (typeof v === 'string') return v.split(/[|,]/).map(function(s){return s.trim();}).filter(Boolean); return []; }
@@ -3015,20 +3086,50 @@
             document.getElementById('qcmc-question').value = contenu.question || '';
             document.getElementById('qcmc-multiple').checked = !!contenu.multiple;
             document.getElementById('qcmc-explication').value = contenu.explication || '';
-            const choix = contenu.choix || [];
-            const repIds = Array.isArray(contenu.reponse) ? contenu.reponse : [contenu.reponse];
-            const bonnes = choix.filter(c => repIds.includes(c.id)).map(c => c.texte);
-            const distracteurs = choix.filter(c => !repIds.includes(c.id)).map(c => c.texte);
+            const choix = (contenu.choix || []).map(function(c, idx) {
+                if (c && typeof c === 'object') return { id: c.id || ('c' + (idx + 1)), texte: c.texte || c.label || c.text || '' };
+                return { id: 'c' + (idx + 1), texte: String(c || '') };
+            });
+            const repRaw = Array.isArray(contenu.reponse) ? contenu.reponse : [contenu.reponse];
+            const repIds = repRaw.map(function(rep) {
+                if (typeof rep === 'number') {
+                    return choix[rep] ? choix[rep].id : null;
+                }
+                if (typeof rep === 'string') {
+                    const byId = choix.find(function(c) { return c.id === rep; });
+                    if (byId) return byId.id;
+                    const byText = choix.find(function(c) { return c.texte === rep; });
+                    return byText ? byText.id : null;
+                }
+                return null;
+            }).filter(Boolean);
+            const bonnes = choix.filter(function(c) { return repIds.includes(c.id); }).map(function(c) { return c.texte; });
+            const distracteurs = choix.filter(function(c) { return !repIds.includes(c.id); }).map(function(c) { return c.texte; });
             document.getElementById('qcmc-reponse').value = bonnes.join('\n');
             document.getElementById('qcmc-distracteurs').value = distracteurs.join(' | ');
         } else if (type === 'qcm_series_multi') {
             document.getElementById('qcms-titre').value = contenu.titre || '';
             document.getElementById('qcms-questions').innerHTML = '';
             (contenu.questions || []).forEach(q => {
-                const choix = q.choix || [];
-                const repIds = Array.isArray(q.reponse) ? q.reponse : [q.reponse];
-                const bonnes = choix.filter(c => repIds.includes(c.id)).map(c => c.texte);
-                const distracteurs = choix.filter(c => !repIds.includes(c.id)).map(c => c.texte);
+                const choix = (q.choix || []).map(function(c, idx) {
+                    if (c && typeof c === 'object') return { id: c.id || ('c' + (idx + 1)), texte: c.texte || c.label || c.text || '' };
+                    return { id: 'c' + (idx + 1), texte: String(c || '') };
+                });
+                const repRaw = Array.isArray(q.reponse) ? q.reponse : [q.reponse];
+                const repIds = repRaw.map(function(rep) {
+                    if (typeof rep === 'number') {
+                        return choix[rep] ? choix[rep].id : null;
+                    }
+                    if (typeof rep === 'string') {
+                        const byId = choix.find(function(c) { return c.id === rep; });
+                        if (byId) return byId.id;
+                        const byText = choix.find(function(c) { return c.texte === rep; });
+                        return byText ? byText.id : null;
+                    }
+                    return null;
+                }).filter(Boolean);
+                const bonnes = choix.filter(function(c) { return repIds.includes(c.id); }).map(function(c) { return c.texte; });
+                const distracteurs = choix.filter(function(c) { return !repIds.includes(c.id); }).map(function(c) { return c.texte; });
                 addQcmSeriesQuestion({
                     question: q.question || '',
                     reponses: bonnes,
@@ -3042,8 +3143,20 @@
             document.getElementById('chrono-temps').value = contenu.temps_par_question || 15;
             document.getElementById('chrono-questions').innerHTML = '';
             (contenu.questions || []).forEach(q => {
-                const choix = q.choix || [];
-                const repId = q.reponse;
+                const choix = (q.choix || []).map(function(c, idx) {
+                    if (c && typeof c === 'object') return { id: c.id || ('c' + (idx + 1)), texte: c.texte || c.label || c.text || '' };
+                    return { id: 'c' + (idx + 1), texte: String(c || '') };
+                });
+                let repId = q.reponse;
+                if (typeof repId === 'number') {
+                    repId = choix[repId] ? choix[repId].id : '';
+                } else if (typeof repId === 'string') {
+                    const byId = choix.find(function(c) { return c.id === repId; });
+                    if (!byId) {
+                        const byText = choix.find(function(c) { return c.texte === repId; });
+                        repId = byText ? byText.id : repId;
+                    }
+                }
                 const bonne = choix.find(c => c.id === repId);
                 const dist = choix.filter(c => c.id !== repId).map(c => c.texte);
                 addChronoQuestion({ question: q.question, reponse: bonne ? bonne.texte : '', distracteurs: dist.join(' | '), explication: q.explication || '' });
@@ -4607,8 +4720,16 @@ Important:
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
+        // Priorite QCM image avant QCM serie/classique
+        if (Array.isArray(src.questions) && src.questions[0] && src.questions[0].image !== undefined) return 'qcm_image';
         // Priorite etude_cas avant QCM serie : une etude de cas contient aussi questions[]
-        if (Array.isArray(src.questions) && (src.scenario !== undefined || src.contexte !== undefined || src.cas !== undefined || src.case !== undefined)) return 'etude_cas';
+        if (Array.isArray(src.questions) && (
+            src.scenario !== undefined ||
+            src.contexte !== undefined ||
+            src.cas !== undefined ||
+            src.case !== undefined ||
+            src.questions.some(function(q) { return q && (q.type === 'texte' || (q.type === 'qcm' && q.correct !== undefined)); })
+        )) return 'etude_cas';
         if (Array.isArray(src.questions) && src.questions[0] && typeof src.questions[0].question === 'string' && Array.isArray(src.questions[0].choix) && src.questions[0].reponse !== undefined) return 'qcm_series_multi';
         if (typeof src.question === 'string' && Array.isArray(src.choix) && src.reponse !== undefined) return 'qcm_classique';
         if (src.texte && src.texte.includes('{{')) return 'texte_trous';
@@ -4617,7 +4738,6 @@ Important:
         if (src.mots && src.mots[0] && src.mots[0].indice !== undefined) return 'pendu';
         if (src.mots && src.mots[0] && src.mots[0].definition !== undefined) return 'mots_croises';
         if (src.affirmations) return 'swipe_vf';
-        if (src.questions && src.questions[0] && src.questions[0].image !== undefined) return 'qcm_image';
         if (src.colonnes && Array.isArray(src.lignes) && src.lignes[0] && (src.lignes[0].bonnes || src.lignes[0].label)) return 'tableau_selection';
         if (src.colonnes && src.lignes) return 'tableau';
         if (src.scenario) return 'etude_cas';
@@ -4684,13 +4804,23 @@ Important:
             if ((data.scenario === undefined || data.scenario === null) && typeof data.case === 'string') data.scenario = data.case;
             // Normaliser les questions internes (sauf types DUERP qui utilisent "consigne" intentionnellement)
             if (Array.isArray(data.questions) && data.type !== 'duer_mission_directeur') {
+                var looksLikeEtudeCas = (
+                    data.scenario !== undefined ||
+                    data.contexte !== undefined ||
+                    data.context !== undefined ||
+                    data.cas !== undefined ||
+                    data.case !== undefined ||
+                    data.questions.some(function(q) { return q && (q.type === 'texte' || (q.type === 'qcm' && q.correct !== undefined)); })
+                );
+                var looksLikeQcmImage = data.questions.some(function(q) { return q && q.image !== undefined; });
                 data.questions.forEach(function(q) {
                     if (!q.question && q.consigne) { q.question = q.consigne; delete q.consigne; }
                     if (!q.choix && q.choices) { q.choix = q.choices; delete q.choices; }
                     if (!q.choix && q.options) { q.choix = q.options; delete q.options; }
                     if (q.reponse === undefined && q.answer !== undefined) { q.reponse = q.answer; delete q.answer; }
                     if (q.reponse === undefined && q.response !== undefined) { q.reponse = q.response; delete q.response; }
-                    if (q.reponse === undefined && q.correct !== undefined) { q.reponse = q.correct; delete q.correct; }
+                    // Pour etude_cas et qcm_image, "correct" a un sens metier specifique (index) : ne pas le forcer vers "reponse"
+                    if (!looksLikeEtudeCas && !looksLikeQcmImage && q.reponse === undefined && q.correct !== undefined) { q.reponse = q.correct; delete q.correct; }
                     if (!q.explication && q.explanation) { q.explication = q.explanation; delete q.explanation; }
                 });
             }
@@ -4748,27 +4878,29 @@ Important:
             data[0] &&
             typeof data[0].question === 'string' &&
             Array.isArray(data[0].choix) &&
-            data[0].reponse !== undefined
+            (data[0].reponse !== undefined || data[0].correct !== undefined || data[0].answer !== undefined || data[0].response !== undefined)
         ) {
             if (data.length === 1) {
                 var q0 = data[0];
+                var q0Rep = (q0.reponse !== undefined) ? q0.reponse : ((q0.correct !== undefined) ? q0.correct : ((q0.answer !== undefined) ? q0.answer : q0.response));
                 data = {
                     titre: q0.titre || 'QCM',
                     question: q0.question || '',
                     choix: q0.choix || [],
-                    reponse: q0.reponse,
-                    multiple: !!q0.multiple,
+                    reponse: q0Rep,
+                    multiple: !!q0.multiple || Array.isArray(q0Rep),
                     explication: q0.explication || ''
                 };
                 typeHint = 'qcm_classique';
                 warning = 'Conversion auto : tableau[0] -> QCM classique';
             } else {
                 var seriesQuestions = data.map(function(q) {
+                    var rep = (q.reponse !== undefined) ? q.reponse : ((q.correct !== undefined) ? q.correct : ((q.answer !== undefined) ? q.answer : q.response));
                     return {
                         question: q.question || '',
                         choix: q.choix || [],
-                        reponse: Array.isArray(q.reponse) ? q.reponse : firstRepId(q.reponse),
-                        multiple: !!q.multiple || Array.isArray(q.reponse),
+                        reponse: Array.isArray(rep) ? rep : firstRepId(rep),
+                        multiple: !!q.multiple || Array.isArray(rep),
                         explication: q.explication || ''
                     };
                 });
@@ -4980,11 +5112,17 @@ Important:
             });
             var allDetectable = detectedTypes.every(function(t) { return !!t; });
             if (allDetectable) {
-                // Cas special : tableau de questions QCM -> UN SEUL exercice multi-questions
-                // (on laisse normalizeImportedData le convertir en qcm_series_multi)
+                // Cas speciaux de tableaux "un seul exercice"
                 var uniqueTypes = Array.from(new Set(detectedTypes));
                 var isQcmQuestionArray = (uniqueTypes.length === 1 && uniqueTypes[0] === 'qcm_classique');
-                if (isQcmQuestionArray) {
+                var isIntrusSeriesArray = (
+                    uniqueTypes.length === 1 &&
+                    uniqueTypes[0] === 'ordre' &&
+                    data.every(function(item) {
+                        return item && Array.isArray(item.items) && item.intrus !== undefined;
+                    })
+                );
+                if (isQcmQuestionArray || isIntrusSeriesArray) {
                     // continue import normal (pas d'import en lot)
                 } else {
                 if (!confirm('📦 ' + data.length + ' exercices detectes. Importer tous en lot (brouillon) ?')) return;
