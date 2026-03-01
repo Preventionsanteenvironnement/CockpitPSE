@@ -4727,6 +4727,110 @@ Important:
         return raw.trim();
     }
 
+    // Nettoyage "souple" pour analyse de secours (sans extraire un seul bloc JSON)
+    function precleanJsonTextLoose(raw) {
+        if (!raw) return '';
+        raw = raw.replace(/\uFEFF/g, '');
+        raw = raw.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
+        raw = raw.replace(/\u00A0/g, ' ');
+        raw = normalizeJsonQuotes(raw);
+        raw = raw.replace(/\[cite_start\]/gi, '');
+        raw = raw.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
+        raw = raw.replace(/^\s*\/\/.*$/gm, '');
+        raw = raw.replace(/,\s*([\]}])/g, '$1');
+        raw = raw.replace(/\bTrue\b/g, 'true');
+        raw = raw.replace(/\bFalse\b/g, 'false');
+        raw = raw.replace(/\bNone\b/g, 'null');
+        return raw.trim();
+    }
+
+    function normalizeQcmChoixList(rawChoix) {
+        if (!Array.isArray(rawChoix)) return [];
+        return rawChoix.map(function(c, idx) {
+            if (c && typeof c === 'object') {
+                return { id: c.id || ('c' + (idx + 1)), texte: c.texte || c.label || c.text || '' };
+            }
+            return { id: 'c' + (idx + 1), texte: String(c || '') };
+        }).filter(function(c) {
+            return String(c.texte || '').trim() !== '';
+        });
+    }
+
+    function normalizeQcmRepFromAny(repRaw, choix) {
+        function one(rep) {
+            if (typeof rep === 'number') return choix[rep] ? choix[rep].id : null;
+            if (typeof rep === 'string') {
+                var r = rep.trim();
+                if (!r) return null;
+                if (/^\d+$/.test(r)) {
+                    var idx = parseInt(r, 10);
+                    if (choix[idx]) return choix[idx].id;
+                }
+                var byId = choix.find(function(c) { return c.id === r; });
+                if (byId) return byId.id;
+                var byTexte = choix.find(function(c) { return c.texte === r; });
+                return byTexte ? byTexte.id : null;
+            }
+            return null;
+        }
+        if (Array.isArray(repRaw)) {
+            return repRaw.map(one).filter(Boolean);
+        }
+        return one(repRaw);
+    }
+
+    function tryExtractQcmQuestionsArray(rawText) {
+        var cleaned = precleanJsonTextLoose(rawText || '');
+        if (!cleaned) return null;
+        var best = null;
+        var bestLen = 0;
+        for (var i = 0; i < cleaned.length; i++) {
+            if (cleaned.charAt(i) !== '[') continue;
+            var candidate = extractBalancedJsonAt(cleaned, i);
+            if (!candidate) continue;
+            var arr;
+            try {
+                arr = JSON.parse(candidate);
+            } catch (e) {
+                continue;
+            }
+            if (!Array.isArray(arr) || arr.length < 2) continue;
+            var normalized = [];
+            var ok = true;
+            for (var j = 0; j < arr.length; j++) {
+                var q = arr[j];
+                if (!q || typeof q !== 'object' || Array.isArray(q)) { ok = false; break; }
+                var qText = (q.question !== undefined) ? q.question : q.consigne;
+                var rawChoix = q.choix || q.choices || q.options;
+                var repRaw = (q.reponse !== undefined) ? q.reponse : ((q.correct !== undefined) ? q.correct : ((q.answer !== undefined) ? q.answer : q.response));
+                if (typeof qText !== 'string' || !Array.isArray(rawChoix) || repRaw === undefined) { ok = false; break; }
+                var choix = normalizeQcmChoixList(rawChoix);
+                if (choix.length === 0) { ok = false; break; }
+                var repNorm = normalizeQcmRepFromAny(repRaw, choix);
+                if (Array.isArray(repNorm) && repNorm.length === 0) { ok = false; break; }
+                if (!Array.isArray(repNorm) && !repNorm) { ok = false; break; }
+                normalized.push({
+                    question: qText || '',
+                    choix: choix,
+                    reponse: repNorm,
+                    multiple: !!q.multiple || Array.isArray(repNorm),
+                    explication: q.explication || q.explanation || ''
+                });
+            }
+            if (ok && normalized.length > bestLen) {
+                best = normalized;
+                bestLen = normalized.length;
+            }
+        }
+        return bestLen > 1 ? best : null;
+    }
+
+    function countQuestionTokens(rawText) {
+        if (!rawText) return 0;
+        var m = rawText.match(/["'“”]question["'“”]\s*:/gi);
+        return m ? m.length : 0;
+    }
+
     // Auto-detection du type depuis la structure JSON
     function detectJsonType(src) {
         if (src.niveaux && src.danger) return 'prevention';
@@ -5105,6 +5209,7 @@ Important:
 
     window.doImportJSON = function() {
         let raw = document.getElementById('import-json-input').value.trim();
+        var rawOriginalInput = raw;
         /* Sauvegarder le prompt brut avant nettoyage */
         currentSourcePrompt = raw;
         var _promptField = document.getElementById('exo-source-prompt');
@@ -5207,6 +5312,25 @@ Important:
         // Si l'utilisateur est sur "QCM serie", ne pas le basculer en "QCM classique"
         // quand le JSON importe une seule question.
         var selectedType = document.getElementById('exo-type').value;
+        if (selectedType === 'qcm_series_multi') {
+            var parsedQuestionCount = 0;
+            if (Array.isArray(data)) parsedQuestionCount = data.length;
+            else if (data && typeof data === 'object' && Array.isArray(data.questions)) parsedQuestionCount = data.questions.length;
+            var rawQuestionCount = countQuestionTokens(rawOriginalInput);
+            // Filet de securite : si le brut contient plusieurs "question" mais le parse en garde 1,
+            // essayer de reconstruire la serie depuis un tableau parsable du texte brut.
+            if (parsedQuestionCount <= 1 && rawQuestionCount > 1) {
+                var recoveredQuestions = tryExtractQcmQuestionsArray(rawOriginalInput);
+                if (recoveredQuestions && recoveredQuestions.length > 1) {
+                    data = {
+                        titre: (data && data.titre) || 'QCM Serie',
+                        questions: recoveredQuestions
+                    };
+                    normalized.typeHint = 'qcm_series_multi';
+                    showToast('ℹ️ Recuperation auto : ' + recoveredQuestions.length + ' questions detectees', 3500);
+                }
+            }
+        }
         if (
             selectedType === 'qcm_series_multi' &&
             data &&
