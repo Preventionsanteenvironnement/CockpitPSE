@@ -5037,8 +5037,33 @@ Important:
         data = normalized.data;
         if (normalized.warning) showToast('ℹ️ ' + normalized.warning, 3500);
 
-        // Etape 3 : Auto-detection du type (respecte le choix utilisateur si le JSON est valide pour ce type)
+        // Si l'utilisateur est sur "QCM serie", ne pas le basculer en "QCM classique"
+        // quand le JSON importe une seule question.
         var selectedType = document.getElementById('exo-type').value;
+        if (
+            selectedType === 'qcm_series_multi' &&
+            data &&
+            typeof data === 'object' &&
+            !Array.isArray(data) &&
+            typeof data.question === 'string' &&
+            Array.isArray(data.choix) &&
+            data.reponse !== undefined
+        ) {
+            data = {
+                titre: data.titre || 'QCM Serie',
+                questions: [{
+                    question: data.question || '',
+                    choix: data.choix || [],
+                    reponse: data.reponse,
+                    multiple: !!data.multiple || Array.isArray(data.reponse),
+                    explication: data.explication || ''
+                }]
+            };
+            normalized.typeHint = 'qcm_series_multi';
+            showToast('ℹ️ Conversion auto : QCM classique -> QCM serie (1 question)', 3000);
+        }
+
+        // Etape 3 : Auto-detection du type (respecte le choix utilisateur si le JSON est valide pour ce type)
         var detectedType = normalized.typeHint || detectJsonType(data);
         var type = selectedType;
         var sameOrderingFamily = (selectedType === 'hierarchiser' && detectedType === 'ordre') || (selectedType === 'ordre' && detectedType === 'hierarchiser');
