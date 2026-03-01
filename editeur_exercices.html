@@ -4559,11 +4559,11 @@ Important:
             } catch (e) {}
         }
         if (parsed.length === 0) return null;
-        // Prefer the earliest parsable root candidate, then the widest span.
-        // This avoids capturing nested arrays (e.g. series/items) instead of the root object.
+        // Prefer the widest parsable candidate first (souvent le vrai JSON racine),
+        // puis le plus tot en cas d'egalite.
         parsed.sort(function(a, b) {
-            if (a.start !== b.start) return a.start - b.start;
-            return b.len - a.len;
+            if (a.len !== b.len) return b.len - a.len;
+            return a.start - b.start;
         });
         return parsed[0].json;
     }
@@ -4676,9 +4676,38 @@ Important:
         raw = raw.replace(/\[cite_start\]/gi, '');
         raw = raw.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
         // 5. Extraire le JSON des blocs de code Markdown (```json ... ```)
-        var codeBlockMatch = raw.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-        if (codeBlockMatch) {
-            raw = codeBlockMatch[1].trim();
+        // Si plusieurs blocs sont presentes, choisir le plus pertinent (pas forcement le premier).
+        var codeBlocks = [];
+        var codeBlockRegex = /```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/g;
+        var cbMatch;
+        while ((cbMatch = codeBlockRegex.exec(raw)) !== null) {
+            var block = (cbMatch[1] || '').trim();
+            if (block) codeBlocks.push(block);
+        }
+        if (codeBlocks.length === 1) {
+            raw = codeBlocks[0];
+        } else if (codeBlocks.length > 1) {
+            var bestBlock = null;
+            var bestScore = -1;
+            codeBlocks.forEach(function(block) {
+                var score = block.length;
+                try {
+                    var parsed = JSON.parse(block);
+                    score += 100000; // bonus parsable JSON
+                    if (parsed && typeof parsed === 'object') {
+                        if (Array.isArray(parsed.questions)) score += 50000 + parsed.questions.length * 100;
+                        if (Array.isArray(parsed)) score += 10000 + parsed.length * 100;
+                        if (parsed.type) score += 2000;
+                    }
+                } catch (e) {
+                    // keep base length score
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestBlock = block;
+                }
+            });
+            raw = bestBlock || codeBlocks[codeBlocks.length - 1];
         }
         // 6. Extraire un JSON parsable si texte autour
         var parsable = extractParsableJson(raw);
