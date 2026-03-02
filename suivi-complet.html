@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Suivi de Classe - Cockpit PSE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://preventionsanteenvironnement.github.io/CockpitPSE/data_eleves.js"></script>
-    <script src="https://preventionsanteenvironnement.github.io/CockpitPSE/data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    <script src="data_modules.js"></script>
     <style>
         :root {
             --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --muted: #64748b;
@@ -193,6 +193,33 @@
         .modal-delete .delete-icon { font-size: 3em; margin-bottom: 15px; }
         .modal-delete .delete-warning { background: var(--danger-light); color: var(--danger); padding: 15px; border-radius: 10px; margin: 15px 0; font-size: 0.9em; }
         
+        /* Vue classe - grille distribution cours */
+        .vc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .vc-table { width: 100%; border-collapse: collapse; font-size: 0.82em; min-width: 600px; }
+        .vc-table th, .vc-table td { padding: 8px 10px; border: 1px solid var(--border); text-align: center; vertical-align: top; }
+        .vc-table th { background: var(--bg); font-weight: 600; font-size: 0.75em; color: var(--muted); text-transform: uppercase; position: sticky; top: 0; z-index: 2; }
+        .vc-table th.vc-student-header { text-align: left; min-width: 130px; position: sticky; left: 0; z-index: 3; background: var(--bg); }
+        .vc-table td.vc-student-cell { text-align: left; font-weight: 600; position: sticky; left: 0; background: var(--card); z-index: 1; white-space: nowrap; }
+        .vc-table tr:hover td { background: rgba(99,102,241,0.05); }
+        .vc-table tr:hover td.vc-student-cell { background: rgba(99,102,241,0.1); }
+        .vc-table .vc-summary td { background: var(--bg); font-weight: 700; font-size: 0.85em; }
+        .vc-table .vc-summary td.vc-student-cell { background: var(--bg); }
+        .vc-cours-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin: 1px; font-weight: 600; }
+        .vc-cours-tag.s1 { background: #dbeafe; color: #1e40af; }
+        .vc-cours-tag.s2 { background: #e0e7ff; color: #3730a3; }
+        .vc-cours-tag.s3 { background: #fef3c7; color: #92400e; }
+        .vc-cours-tag.s4 { background: #fce7f3; color: #9d174d; }
+        .vc-cours-tag.complet { background: #dcfce7; color: #166534; }
+        .vc-cours-tag.correction { background: #fed7aa; color: #9a3412; }
+        .vc-cours-tag.evaluation { background: #fee2e2; color: #991b1b; }
+        .vc-note { font-size: 0.8em; color: var(--muted); display: block; margin-top: 2px; }
+        .vc-note.good { color: var(--success); font-weight: 700; }
+        .vc-note.medium { color: var(--warning); }
+        .vc-note.bad { color: var(--danger); }
+        .vc-abs { color: var(--danger); font-weight: 600; font-size: 0.85em; }
+        .vc-missing { color: var(--muted); }
+        .vc-count { font-size: 0.7em; color: var(--muted); margin-left: 2px; }
+
         @media (max-width: 768px) {
             .header-content { flex-direction: column; text-align: center; }
             .container { padding: 15px; }
@@ -202,6 +229,9 @@
             .session-item { flex-direction: column; align-items: flex-start; gap: 10px; }
             .session-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
             .options-grid.cols-5, .options-grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
+            .vc-table { font-size: 0.75em; }
+            .vc-table th, .vc-table td { padding: 5px 6px; }
+            .vc-table th.vc-student-header, .vc-table td.vc-student-cell { min-width: 90px; }
         }
     </style>
 </head>
@@ -213,7 +243,7 @@
                 <span id="userStatus">--</span>
                 <button class="header-btn" onclick="openRgpdModal()">👤 Élèves</button>
                 <button class="header-btn" onclick="toggleTheme()">🌙</button>
-                <a href="indexcockpit.html" class="header-btn">🏠 Cockpit</a>
+                <a href="index.html" class="header-btn">🏠 Cockpit</a>
                 <button class="header-btn" onclick="deconnexion()">🚪</button>
             </div>
         </div>
@@ -221,7 +251,8 @@
     
     <nav class="tabs">
         <div class="tab active" data-tab="sessions" onclick="showTab('sessions')">📋 Sessions<span class="badge" id="badgeIncomplete" style="display:none">0</span></div>
-        <div class="tab" data-tab="dashboard" onclick="showTab('dashboard')">📊 Dashboard</div>
+        <div class="tab" data-tab="vueclasse" onclick="showTab('vueclasse')">📊 Vue classe</div>
+        <div class="tab" data-tab="dashboard" onclick="showTab('dashboard')">📈 Dashboard</div>
     </nav>
     
     <main class="container">
@@ -266,7 +297,20 @@
                 <div class="chart-container"><h3 class="card-title">📈 Évolution</h3><div id="chartEvo"></div></div>
             </div>
         </div>
-        
+
+        <div class="screen" id="screenVueClasse">
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">📊 Vue classe - Distribution des cours</h2></div>
+                <div class="filters">
+                    <div class="filter-group"><span class="filter-label">Classe</span><select class="filter-control" id="vcClasse" onchange="onVcClasseChange()"><option value="">-- Sélectionner --</option></select></div>
+                    <div class="filter-group"><span class="filter-label">Module</span><select class="filter-control" id="vcModule" onchange="chargerVueClasse()"><option value="">Tous</option></select></div>
+                </div>
+            </div>
+            <div class="card" id="vcContent">
+                <div class="empty-state"><div class="icon">📊</div><h3>Sélectionnez une classe</h3><p>Chargez d'abord les sessions depuis l'onglet Sessions, puis revenez ici.</p></div>
+            </div>
+        </div>
+
         <div class="screen" id="screenNew">
             <div class="card">
                 <div class="card-header"><h2 class="card-title">🆕 Nouvelle session</h2><button class="btn btn-secondary btn-sm" onclick="showTab('sessions')">← Retour</button></div>
@@ -400,7 +444,8 @@
         let objectifEleve = null;
         let consultationsData = {};
         let sessionToDelete = null; // Session à supprimer
-        
+        let sessionCache = {}; // Cache mémoire pour sessions déjà ouvertes
+
         const CLE_NOMS = 'cockpit_noms_eleves';
         const PLAFOND = { 'aucun': 20, 'rappel1': 14, 'rappel2': 10, 'rappel3': 6, 'retenu': 4 };
         const MALUS = { 'ok': 0, 'rappel1': 1, 'rappel2': 2, 'rappel3': 3, 'confisque': 5 };
@@ -441,6 +486,27 @@
             { id: "EVAL", titre: "Évaluation" },
             { id: "SEANCE", titre: "Séance standard" }
         ];
+
+        function getModulesPourClasse(classeId) {
+            if (window.getModulesForClasse) {
+                const modules = window.getModulesForClasse(classeId);
+                if (Array.isArray(modules) && modules.length) return modules;
+            }
+            return MODULES_PSE;
+        }
+
+        function getTitreModule(classeId, moduleId) {
+            if (!moduleId) return '';
+            const modules = getModulesPourClasse(classeId);
+            const moduleObj = modules.find(m => m.id === moduleId);
+            return moduleObj ? moduleObj.titre : '';
+        }
+
+        function formatLabelModule(moduleId, moduleTitre) {
+            if (!moduleId && !moduleTitre) return 'Module non renseigne';
+            if (!moduleTitre || moduleTitre === moduleId) return moduleId || moduleTitre;
+            return moduleId + ' - ' + moduleTitre;
+        }
         
         // AUTH
         onAuthStateChanged(auth, async (u) => {
@@ -545,6 +611,7 @@
             document.querySelector('.tab[data-tab="'+tab+'"]')?.classList.add('active');
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             if (tab === 'sessions') document.getElementById('screenSessions').classList.add('active');
+            else if (tab === 'vueclasse') { document.getElementById('screenVueClasse').classList.add('active'); initVueClasseFiltres(); }
             else if (tab === 'dashboard') { document.getElementById('screenDashboard').classList.add('active'); chargerDashboard(); }
         };
         
@@ -639,8 +706,12 @@
             sel.innerHTML = '<option value="">-- Sélectionner --</option>';
             if (!classeId) return;
             
-            // Utiliser getModulesForClasse de data_modules.js
-            const modules = window.getModulesForClasse ? window.getModulesForClasse(classeId) : MODULES_PSE;
+            const modules = getModulesPourClasse(classeId);
+            if (!modules.length) {
+                sel.innerHTML = '<option value="">-- Aucun module --</option>';
+                return;
+            }
+
             modules.forEach(m => {
                 const o = document.createElement('option');
                 o.value = m.id;
@@ -662,27 +733,61 @@
             container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><h3>Chargement...</h3></div>';
             
             allSuivis = [];
+            sessionCache = {};
             const sessionsMap = {};
-            
+
             try {
                 const eleves = window.BDD_ELEVES || [];
-                for (const eleve of eleves) {
-                    if (fClasse && eleve.classe !== fClasse) continue;
-                    
-                    const snap = await getDocs(collection(db, "resultats", eleve.userCode, "suivi"));
+                const filteredEleves = eleves.filter(e => !fClasse || e.classe === fClasse);
+                const snapResults = await Promise.all(
+                    filteredEleves.map(eleve =>
+                        getDocs(collection(db, "resultats", eleve.userCode, "suivi"))
+                            .then(snap => ({ eleve, snap }))
+                    )
+                );
+                for (const { eleve, snap } of snapResults) {
                     snap.forEach(docSnap => {
-                        const data = docSnap.data();
+                        const data = docSnap.data() || {};
+                        const dateSuivi = typeof data.date === 'string' ? data.date : '';
+                        const moduleSuivi = typeof data.module === 'string' ? data.module : '';
+
+                        // Ignorer les docs incomplets (anciens formats/corruptions)
+                        if (!dateSuivi || !moduleSuivi) return;
                         
                         // Filtre par mois (YYYY-MM)
-                        if (fMois && !data.date.startsWith(fMois)) return;
+                        if (fMois && !dateSuivi.startsWith(fMois)) return;
                         
-                        allSuivis.push({ id: docSnap.id, eleveCode: eleve.userCode, eleveClasse: eleve.classe, ...data });
+                        const moduleTitre = (typeof data.moduleTitre === 'string' && data.moduleTitre.trim())
+                            ? data.moduleTitre.trim()
+                            : getTitreModule(eleve.classe, moduleSuivi);
                         
-                        const key = data.date + '_' + eleve.classe + '_' + data.module;
+                        allSuivis.push({
+                            id: docSnap.id,
+                            eleveCode: eleve.userCode,
+                            eleveClasse: eleve.classe,
+                            ...data,
+                            date: dateSuivi,
+                            module: moduleSuivi,
+                            moduleTitre
+                        });
+                        
+                        const key = dateSuivi + '_' + eleve.classe + '_' + moduleSuivi;
                         if (!sessionsMap[key]) {
-                            sessionsMap[key] = { id: key, date: data.date, classe: eleve.classe, module: data.module, eleves: [], elevesWithData: [], nbNotes: 0, nbAbsents: 0, totalNotes: 0 };
+                            sessionsMap[key] = {
+                                id: key,
+                                date: dateSuivi,
+                                classe: eleve.classe,
+                                module: moduleSuivi,
+                                moduleTitre,
+                                eleves: [],
+                                elevesWithData: [],
+                                nbNotes: 0,
+                                nbAbsents: 0,
+                                totalNotes: 0
+                            };
                         }
-                        sessionsMap[key].eleves.push({ code: eleve.userCode, ...data });
+                        if (!sessionsMap[key].moduleTitre && moduleTitre) sessionsMap[key].moduleTitre = moduleTitre;
+                        sessionsMap[key].eleves.push({ code: eleve.userCode, ...data, date: dateSuivi, module: moduleSuivi, moduleTitre });
                         // Stocker les élèves qui ont des données (pour suppression)
                         sessionsMap[key].elevesWithData.push({ code: eleve.userCode, docId: docSnap.id });
                         if (data.absent) sessionsMap[key].nbAbsents++;
@@ -761,7 +866,7 @@
                 const cls = s.nbManquants === 0 ? 'complete' : 'incomplete';
                 return `<div class="session-item ${cls}">
                     <div class="session-info" onclick="ouvrirSession('${s.id}')">
-                        <h3>📅 ${d}/${m} - ${s.module}</h3>
+                        <h3>📅 ${d}/${m} - ${formatLabelModule(s.module, s.moduleTitre)}</h3>
                         <div class="meta">
                             <span>🏫 ${s.classe}</span>
                             <span>✅ ${s.nbNotes}</span>
@@ -832,6 +937,7 @@
             const classe = document.getElementById('newClasse').value;
             const module = document.getElementById('newModule').value;
             if (!date || !classe || !module) return alert('Remplissez tous les champs');
+            const moduleTitre = getTitreModule(classe, module);
             
             const criteres = {
                 travail: document.getElementById('cTravail').checked,
@@ -845,7 +951,7 @@
             };
             const coursDefaut = Array.from(document.querySelectorAll('input[name="defCours"]:checked')).map(c => c.value);
             
-            currentSession = { id: date + '_' + classe + '_' + module, date, classe, module, criteres, coursDefaut, eleves: [] };
+            currentSession = { id: date + '_' + classe + '_' + module, date, classe, module, moduleTitre, criteres, coursDefaut, eleves: [] };
             toast('✅ Session créée');
             afficherSession(currentSession);
         };
@@ -856,7 +962,8 @@
             const date = parts[0];
             const classe = parts[1];
             const module = parts.slice(2).join('_');
-            currentSession = { id: sessionId, date, classe, module, criteres: { travail:true, oral:true, attention:true, porteVue:true, coursAJour:true, autonomie:true, initiative:true, securite:true }, coursDefaut: [], eleves: [] };
+            const moduleTitre = getTitreModule(classe, module);
+            currentSession = { id: sessionId, date, classe, module, moduleTitre, criteres: { travail:true, oral:true, attention:true, porteVue:true, coursAJour:true, autonomie:true, initiative:true, securite:true }, coursDefaut: [], eleves: [] };
             await afficherSession(currentSession);
         };
         
@@ -866,24 +973,42 @@
             document.getElementById('screenSession').classList.add('active');
             
             const [y, m, d] = session.date.split('-');
-            document.getElementById('sessionTitre').textContent = '📅 ' + d + '/' + m + '/' + y + ' - ' + session.module;
+            session.moduleTitre = session.moduleTitre || getTitreModule(session.classe, session.module);
+            document.getElementById('sessionTitre').textContent = '📅 ' + d + '/' + m + '/' + y + ' - ' + formatLabelModule(session.module, session.moduleTitre);
             document.getElementById('sessionMeta').textContent = '🏫 ' + session.classe;
             
             const elevesClasse = getElevesDeClasse(session.classe);
-            let eleves = elevesClasse.map(e => ({ code: e.userCode, classe: e.classe, nom: getNom(e.userCode), note: null, absent: false, statut: 'manquant' }));
-            
-            for (let eleve of eleves) {
-                try {
-                    const docSnap = await getDoc(doc(db, "resultats", eleve.code, "suivi", session.date + '_' + session.module));
-                    if (docSnap.exists()) {
+            let eleves;
+            const cacheKey = session.id;
+
+            if (sessionCache[cacheKey]) {
+                // Utiliser le cache
+                eleves = JSON.parse(JSON.stringify(sessionCache[cacheKey]));
+                // Mettre à jour les noms (peuvent avoir changé via import CSV)
+                eleves.forEach(e => { e.nom = getNom(e.code); });
+            } else {
+                // Charger depuis Firebase en parallèle
+                eleves = elevesClasse.map(e => ({ code: e.userCode, classe: e.classe, nom: getNom(e.userCode), note: null, absent: false, statut: 'manquant' }));
+                const docId = session.date + '_' + session.module;
+                const results = await Promise.all(
+                    eleves.map(eleve =>
+                        getDoc(doc(db, "resultats", eleve.code, "suivi", docId))
+                            .then(docSnap => ({ eleve, docSnap }))
+                            .catch(() => ({ eleve, docSnap: null }))
+                    )
+                );
+                for (const { eleve, docSnap } of results) {
+                    if (docSnap && docSnap.exists()) {
                         const data = docSnap.data();
                         eleve.note = data;
                         eleve.absent = data.absent || false;
                         eleve.statut = data.absent ? 'absent' : 'fait';
                     }
-                } catch(e) {}
+                }
+                // Stocker dans le cache
+                sessionCache[cacheKey] = JSON.parse(JSON.stringify(eleves));
             }
-            
+
             currentSession.eleves = eleves;
             eleves.sort((a, b) => { const o = { manquant: 0, fait: 1, absent: 2 }; return o[a.statut] - o[b.statut] || a.code.localeCompare(b.code); });
             
@@ -1113,6 +1238,7 @@
                 heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
                 classe: currentSession.classe,
                 module: currentSession.module,
+                moduleTitre: currentSession.moduleTitre || getTitreModule(currentSession.classe, currentSession.module),
                 criteresActifs: currentSession.criteres,
                 travail: saisie.travail, oral: saisie.oral, attention: saisie.attention, porteVue: saisie.porteVue,
                 coursAJour: saisie.coursAJour, autonomie: saisie.autonomie, initiative: saisie.initiative, securite: saisie.securite,
@@ -1135,6 +1261,7 @@
                 }
                 
                 toast('✅ ' + currentEleve.code + ' - ' + noteFinale + '/20');
+                delete sessionCache[currentSession.id];
                 fermerModal();
                 await afficherSession(currentSession);
             } catch (error) {
@@ -1152,7 +1279,9 @@
             const data = {
                 date: currentSession.date,
                 heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-                classe: currentSession.classe, module: currentSession.module,
+                classe: currentSession.classe,
+                module: currentSession.module,
+                moduleTitre: currentSession.moduleTitre || getTitreModule(currentSession.classe, currentSession.module),
                 absent: true, noteSur20: null, coursDistrib: cours,
                 createdAt: serverTimestamp(), createdBy: user?.email || 'anonyme'
             };
@@ -1161,6 +1290,7 @@
                 const docId = currentSession.date + '_' + currentSession.module;
                 await setDoc(doc(db, "resultats", currentEleve.code, "suivi", docId), data);
                 toast('🚫 ' + currentEleve.code + ' - Absent');
+                delete sessionCache[currentSession.id];
                 fermerModal();
                 await afficherSession(currentSession);
             } catch (error) {
@@ -1169,6 +1299,160 @@
             }
         };
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // VUE CLASSE - Distribution des cours
+        // ═══════════════════════════════════════════════════════════════════════
+
+        function initVueClasseFiltres() {
+            const sel = document.getElementById('vcClasse');
+            if (sel.options.length > 1) return; // Déjà peuplé
+            const classes = getListeClasses();
+            classes.forEach(c => {
+                const o = document.createElement('option');
+                o.value = c;
+                o.textContent = c;
+                sel.appendChild(o);
+            });
+        }
+
+        window.onVcClasseChange = function() {
+            const classe = document.getElementById('vcClasse').value;
+            const sel = document.getElementById('vcModule');
+            sel.innerHTML = '<option value="">Tous</option>';
+            if (!classe) { chargerVueClasse(); return; }
+
+            // Peupler le filtre module avec les modules présents dans les données
+            const modules = new Set();
+            allSuivis.filter(s => s.eleveClasse === classe).forEach(s => modules.add(s.module));
+            Array.from(modules).sort().forEach(m => {
+                const o = document.createElement('option');
+                o.value = m;
+                const titre = getTitreModule(classe, m);
+                o.textContent = titre ? m + ' - ' + titre : m;
+                sel.appendChild(o);
+            });
+
+            chargerVueClasse();
+        };
+
+        window.chargerVueClasse = function() {
+            const classe = document.getElementById('vcClasse').value;
+            const moduleFilter = document.getElementById('vcModule').value;
+            const container = document.getElementById('vcContent');
+
+            if (!classe) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📊</div><h3>Sélectionnez une classe</h3><p>Chargez d\'abord les sessions depuis l\'onglet Sessions, puis revenez ici.</p></div>';
+                return;
+            }
+
+            // Filtrer allSuivis pour cette classe
+            let suivis = allSuivis.filter(s => s.eleveClasse === classe);
+            if (moduleFilter) suivis = suivis.filter(s => s.module === moduleFilter);
+
+            if (!suivis.length) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><h3>Aucune donnée</h3><p>Chargez d\'abord les sessions pour cette classe depuis l\'onglet Sessions (🔍 Rechercher), puis revenez ici.</p></div>';
+                return;
+            }
+
+            // Construire les colonnes (sessions uniques date+module, triées par date)
+            const sessionsSet = new Map();
+            suivis.forEach(s => {
+                const key = s.date + '_' + s.module;
+                if (!sessionsSet.has(key)) {
+                    sessionsSet.set(key, { date: s.date, module: s.module, moduleTitre: s.moduleTitre || getTitreModule(classe, s.module) });
+                }
+            });
+            const sessionCols = Array.from(sessionsSet.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+            // Construire le lookup élève → session → données
+            const lookup = {};
+            suivis.forEach(s => {
+                if (!lookup[s.eleveCode]) lookup[s.eleveCode] = {};
+                lookup[s.eleveCode][s.date + '_' + s.module] = s;
+            });
+
+            // Liste des élèves de la classe
+            const elevesClasse = getElevesDeClasse(classe);
+
+            // Helper pour les tags de cours
+            function coursTag(c) {
+                const labels = { seance1:'S1', seance2:'S2', seance3:'S3', seance4:'S4', complet:'Complet', correction:'Correc.', evaluation:'Éval' };
+                const classes = { seance1:'s1', seance2:'s2', seance3:'s3', seance4:'s4', complet:'complet', correction:'correction', evaluation:'evaluation' };
+                return '<span class="vc-cours-tag ' + (classes[c]||'') + '">' + (labels[c]||c) + '</span>';
+            }
+
+            // Construire le tableau
+            let html = '<div class="vc-table-wrap"><table class="vc-table"><thead><tr><th class="vc-student-header">Élève</th>';
+            sessionCols.forEach(col => {
+                const [y, m, d] = col.date.split('-');
+                html += '<th>' + d + '/' + m + '<br><span style="font-size:0.9em">' + col.module + '</span></th>';
+            });
+            html += '</tr></thead><tbody>';
+
+            // Lignes élèves
+            elevesClasse.forEach(eleve => {
+                const nom = getNom(eleve.userCode);
+                const display = nom ? nom : eleve.userCode;
+                const codeSmall = nom ? '<br><span style="font-size:0.8em;color:var(--muted)">' + eleve.userCode + '</span>' : '';
+                html += '<tr><td class="vc-student-cell">' + display + codeSmall + '</td>';
+
+                sessionCols.forEach(col => {
+                    const key = col.date + '_' + col.module;
+                    const data = lookup[eleve.userCode]?.[key];
+
+                    if (!data) {
+                        html += '<td><span class="vc-missing">-</span></td>';
+                    } else if (data.absent) {
+                        html += '<td><span class="vc-abs">ABS</span></td>';
+                    } else {
+                        let cell = '';
+                        const cours = data.coursDistrib;
+                        if (cours && cours.length) {
+                            cell += cours.map(c => coursTag(c)).join(' ');
+                        } else {
+                            cell += '<span class="vc-missing">--</span>';
+                        }
+                        if (data.noteSur20 !== null && data.noteSur20 !== undefined) {
+                            const n = data.noteSur20;
+                            const nc = n >= 12 ? 'good' : n >= 8 ? 'medium' : 'bad';
+                            cell += '<span class="vc-note ' + nc + '">' + n + '/20</span>';
+                        }
+                        html += '<td>' + cell + '</td>';
+                    }
+                });
+                html += '</tr>';
+            });
+
+            // Ligne résumé : distribution des cours par session
+            html += '<tr class="vc-summary"><td class="vc-student-cell">Distribué</td>';
+            sessionCols.forEach(col => {
+                const key = col.date + '_' + col.module;
+                const counts = {};
+                let nbPresents = 0;
+                elevesClasse.forEach(eleve => {
+                    const data = lookup[eleve.userCode]?.[key];
+                    if (data && !data.absent) {
+                        nbPresents++;
+                        if (data.coursDistrib) {
+                            data.coursDistrib.forEach(c => { counts[c] = (counts[c] || 0) + 1; });
+                        }
+                    }
+                });
+                if (Object.keys(counts).length) {
+                    html += '<td>';
+                    for (const [c, n] of Object.entries(counts).sort((a,b) => a[0].localeCompare(b[0]))) {
+                        html += coursTag(c) + '<span class="vc-count">' + n + '/' + nbPresents + '</span> ';
+                    }
+                    html += '</td>';
+                } else {
+                    html += '<td><span class="vc-missing">-</span></td>';
+                }
+            });
+            html += '</tr></tbody></table></div>';
+
+            container.innerHTML = html;
+        };
+
         // DASHBOARD
         async function chargerDashboard() {
             const elevesStats = {};
@@ -1177,7 +1461,7 @@
             const parDate = {};
             
             allSuivis.forEach(s => {
-                if (s.absent || !s.noteSur20) return;
+                if (s.absent || s.noteSur20 === null || s.noteSur20 === undefined) return;
                 
                 if (!elevesStats[s.eleveCode]) elevesStats[s.eleveCode] = { code: s.eleveCode, classe: s.eleveClasse || s.classe, totalNotes: 0, nbSeances: 0, parfaites: 0 };
                 const e = elevesStats[s.eleveCode];
@@ -1249,6 +1533,7 @@
                         date,
                         classe,
                         module,
+                        moduleTitre: getTitreModule(classe, module),
                         criteres: { travail: true, oral: true, attention: true, porteVue: false, coursAJour: false, autonomie: false, initiative: false, securite: false },
                         coursDefaut: [],
                         eleves: []
