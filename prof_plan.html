@@ -199,6 +199,7 @@
         let state = { placements: {}, structure: {}, students: [], absents: [], status: {} };
         let isArchitectMode = false;
         const TYPES = [0, 1, 2, 3, 4];
+        let projectionWindow = null;
 
         function pushLocalPlan(payload) {
             try {
@@ -219,7 +220,20 @@
             window.buildGrid();
         };
 
-        window.openScreen = () => window.open('ecran_plan.html', 'projection_salle');
+        window.openScreen = () => {
+            projectionWindow = window.open('ecran_plan.html', 'projection_salle');
+            if (projectionWindow) projectionWindow.focus();
+        };
+
+        function sendPlanToProjection(payload) {
+            try {
+                if (projectionWindow && !projectionWindow.closed) {
+                    projectionWindow.postMessage({ type: "classe_plan", payload }, "*");
+                }
+            } catch (e) {
+                console.error("Erreur postMessage vers projection:", e);
+            }
+        }
 
         function showNotif(msg, color="#27ae60") {
             const el = document.getElementById('notif-overlay');
@@ -511,7 +525,7 @@
         };
 
         window.pushToScreen = async () => {
-            window.open('ecran_plan.html', 'projection_salle');
+            projectionWindow = window.open('ecran_plan.html', 'projection_salle');
             const cls = document.getElementById('classSelect').value;
             const r = document.getElementById('nbRows').value;
             const c = document.getElementById('nbCols').value;
@@ -534,6 +548,10 @@
 
             // Toujours pousser localement pour que l'écran fonctionne même sans droits Firestore.
             pushLocalPlan(payload);
+            // Push direct à la fenêtre de projection (fallback le plus robuste en local).
+            sendPlanToProjection(payload);
+            setTimeout(() => sendPlanToProjection(payload), 400);
+            setTimeout(() => sendPlanToProjection(payload), 1200);
 
             try {
                 await setDoc(doc(db, "classe_etat", "config"), payload);
