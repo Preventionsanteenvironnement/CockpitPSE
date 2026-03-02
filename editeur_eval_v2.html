@@ -2811,6 +2811,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     window.updateDocRefDropdowns = updateDocRefDropdowns;
     window.renderFlow = renderFlow;
     window.updatePointsTotal = updatePointsTotal;
+    window.ensurePreventionLevels = ensurePreventionLevels;
     window._evalState = { get questions() { return questions; }, set questions(v) { questions = v; }, get documents() { return documents; }, set documents(v) { documents = v; } };
 
     // ========== IMPORT DEPUIS BIBLIOTHEQUE (sessionStorage) ==========
@@ -2862,8 +2863,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             <label><input type="checkbox" id="import-opt-contenu" checked disabled> Importer les documents et questions</label>
         </div>
         <textarea id="import-json-input" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="import-warning" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; align-items:center; gap:8px;">
+            <span id="import-warning-text"></span>
+            <button type="button" class="btn-import-json" style="padding:6px 10px; font-size:0.75rem;" onclick="cleanImportJSONInput()">Corriger automatiquement</button>
+        </div>
+        <div id="import-clean-report" style="display:none; color:#22c55e; margin:8px 0; font-size:0.8rem;"></div>
         <div id="import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
         <div class="modal-actions">
+            <button type="button" class="btn-import-json" onclick="cleanImportJSONInput()">🧹 Nettoyer</button>
             <button type="button" class="btn-save-q" onclick="executeImport()">✅ Importer</button>
             <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
         </div>
@@ -3003,11 +3010,247 @@ REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
 - N'ajoute aucune citation, source ou tag (interdit: [cite], [cite_start], references web)
 - N'ajoute aucun commentaire dans le JSON
 - Guillemets doubles standards uniquement (pas de guillemets typographiques)
+- Utilise uniquement des guillemets doubles standards (") et jamais “ ”
+- Ne renvoie que du JSON, sans texte autour
 - Le JSON doit commencer par { et finir par }`;
 
-window.openImportModal
+const IMPORT_DOUBLE_QUOTES_RE = /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g;
+const IMPORT_SINGLE_QUOTES_RE = /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g;
+const IMPORT_ZW_RE = /[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g;
+const IMPORT_TRAILING_COMMA_RE = /,\s*([\]}])/g;
 
- = function() {
+function countMatches(raw, regex) {
+    if (!raw) return 0;
+    const m = String(raw).match(regex);
+    return m ? m.length : 0;
+}
+
+function extractImportJsonCandidate(raw) {
+    let out = String(raw || '');
+    const codeBlockMatch = out.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+    if (codeBlockMatch) out = codeBlockMatch[1] || '';
+
+    if (out.charAt(0) !== '{' && out.charAt(0) !== '[') {
+        const firstBrace = out.indexOf('{');
+        const firstBracket = out.indexOf('[');
+        const start = firstBrace >= 0 ? firstBrace : firstBracket;
+
+        if (start >= 0) {
+            const lastBrace = out.lastIndexOf('}');
+            const lastBracket = out.lastIndexOf(']');
+            const end = out.charAt(start) === '{' ? lastBrace : lastBracket;
+            if (end > start) out = out.substring(start, end + 1);
+        }
+    }
+
+    return out.trim();
+}
+
+function cleanImportJsonText(raw) {
+    const stats = {
+        typoDoubleQuotes: countMatches(raw, IMPORT_DOUBLE_QUOTES_RE),
+        typoSingleQuotes: countMatches(raw, IMPORT_SINGLE_QUOTES_RE),
+        nbsp: countMatches(raw, /\u00A0/g),
+        zeroWidth: countMatches(raw, IMPORT_ZW_RE),
+        trailingCommas: 0
+    };
+
+    let cleaned = String(raw || '');
+    cleaned = cleaned.replace(/\uFEFF/g, '');
+    cleaned = cleaned.replace(IMPORT_ZW_RE, '');
+    cleaned = cleaned.replace(/\u00A0/g, ' ');
+    cleaned = cleaned.replace(IMPORT_DOUBLE_QUOTES_RE, '"');
+    cleaned = cleaned.replace(IMPORT_SINGLE_QUOTES_RE, "'");
+    cleaned = cleaned.replace(/\[cite_start\]/gi, '');
+    cleaned = cleaned.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
+    cleaned = extractImportJsonCandidate(cleaned);
+    cleaned = cleaned.replace(/^\s*\/\/.*$/gm, '');
+    cleaned = cleaned.replace(IMPORT_TRAILING_COMMA_RE, function(_match, closer) {
+        stats.trailingCommas += 1;
+        return closer;
+    });
+    cleaned = cleaned.replace(/\bTrue\b/g, 'true');
+    cleaned = cleaned.replace(/\bFalse\b/g, 'false');
+    cleaned = cleaned.replace(/\bNone\b/g, 'null');
+    cleaned = cleaned.trim();
+
+    return { cleaned, stats };
+}
+
+function getJsonBoundaryError(jsonText) {
+    if (!jsonText) return '❌ JSON vide après nettoyage.';
+    const first = jsonText.charAt(0);
+    const last = jsonText.charAt(jsonText.length - 1);
+    if (first !== '{' && first !== '[') {
+        return '❌ JSON tronqué : le contenu doit commencer par "{" ou "[".';
+    }
+    if (last !== '}' && last !== ']') {
+        return '❌ JSON tronqué : le contenu doit se terminer par "}" ou "]".';
+    }
+    if (first === '{' && last !== '}') {
+        return '❌ JSON tronqué : objet commencé par "{" sans "}" final.';
+    }
+    if (first === '[' && last !== ']') {
+        return '❌ JSON tronqué : tableau commencé par "[" sans "]" final.';
+    }
+    return null;
+}
+
+function indexFromLineColumn(raw, line, column) {
+    let currentLine = 1;
+    let currentColumn = 1;
+    for (let i = 0; i < raw.length; i++) {
+        if (currentLine === line && currentColumn === column) return i;
+        if (raw.charAt(i) === '\n') {
+            currentLine += 1;
+            currentColumn = 1;
+        } else {
+            currentColumn += 1;
+        }
+    }
+    return Math.max(0, raw.length - 1);
+}
+
+function lineColumnFromIndex(raw, index) {
+    const safeIndex = Math.max(0, Math.min(index, raw.length));
+    let line = 1;
+    let column = 1;
+    for (let i = 0; i < safeIndex; i++) {
+        if (raw.charAt(i) === '\n') {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    return { line, column };
+}
+
+function parseErrorLocation(errMessage, raw) {
+    const msg = String(errMessage || '');
+    let index = null;
+    let line = null;
+    let column = null;
+
+    let m = msg.match(/position\s+(\d+)/i);
+    if (m) index = Number(m[1]);
+
+    m = msg.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+    if (m) {
+        line = Number(m[1]);
+        column = Number(m[2]);
+        if (index === null && !isNaN(line) && !isNaN(column)) {
+            index = indexFromLineColumn(raw, line, column);
+        }
+    }
+
+    if (index === null || isNaN(index)) return null;
+    const lc = lineColumnFromIndex(raw, index);
+    return {
+        index,
+        line: !isNaN(line) && line !== null ? line : lc.line,
+        column: !isNaN(column) && column !== null ? column : lc.column
+    };
+}
+
+function parseErrorContext(raw, index) {
+    const safeIndex = Math.max(0, Math.min(index, raw.length));
+    const start = Math.max(0, safeIndex - 30);
+    const end = Math.min(raw.length, safeIndex + 30);
+    const snippet = raw.slice(start, end).replace(/\n/g, '\\n');
+    const pointer = ' '.repeat(Math.max(0, safeIndex - start)) + '^';
+    return { snippet, pointer };
+}
+
+function buildImportParseErrors(error, cleanedJson, stats) {
+    const messages = ['❌ JSON invalide : ' + (error && error.message ? error.message : 'Erreur inconnue')];
+    const typoCount = (stats.typoDoubleQuotes || 0) + (stats.typoSingleQuotes || 0);
+    if (typoCount > 0) {
+        messages.push('💡 Guillemets typographiques détectés : remplace-les par des guillemets doubles standards (").');
+    }
+    const loc = parseErrorLocation(error && error.message, cleanedJson);
+    if (loc) {
+        const ctx = parseErrorContext(cleanedJson, loc.index);
+        messages.push('📍 Position : index ' + loc.index + ' (ligne ' + loc.line + ', colonne ' + loc.column + ')');
+        messages.push('🔎 Contexte (±30) : ' + ctx.snippet + '\n' + ctx.pointer);
+    } else {
+        messages.push('💡 Position exacte non fournie par le navigateur. Vérifie accolades fermantes et virgules finales.');
+    }
+    return messages;
+}
+
+function updateImportQuoteWarning(raw) {
+    const warningBox = document.getElementById('import-warning');
+    const warningText = document.getElementById('import-warning-text');
+    if (!warningBox || !warningText) return;
+    const count = countMatches(raw, IMPORT_DOUBLE_QUOTES_RE) + countMatches(raw, IMPORT_SINGLE_QUOTES_RE);
+    if (count > 0) {
+        warningText.textContent = '⚠️ ' + count + ' guillemet(s) typographique(s) détecté(s). Colle en guillemets standards.';
+        warningBox.style.display = 'flex';
+    } else {
+        warningText.textContent = '';
+        warningBox.style.display = 'none';
+    }
+}
+
+function bindImportInputGuards() {
+    const input = document.getElementById('import-json-input');
+    if (!input || input.dataset.guardsBound === '1') return;
+    input.dataset.guardsBound = '1';
+    input.addEventListener('input', function() {
+        updateImportQuoteWarning(input.value || '');
+    });
+    input.addEventListener('paste', function() {
+        setTimeout(function() {
+            updateImportQuoteWarning(input.value || '');
+        }, 0);
+    });
+}
+
+window.cleanImportJSONInput = function() {
+    const input = document.getElementById('import-json-input');
+    const errDiv = document.getElementById('import-errors');
+    const report = document.getElementById('import-clean-report');
+    if (!input) return;
+
+    const raw = input.value || '';
+    if (!raw.trim()) {
+        if (errDiv) {
+            errDiv.textContent = '❌ Collez un JSON avant de lancer le nettoyage.';
+            errDiv.style.display = 'block';
+        }
+        if (report) {
+            report.style.display = 'none';
+            report.textContent = '';
+        }
+        return;
+    }
+
+    const cleaned = cleanImportJsonText(raw);
+    input.value = cleaned.cleaned;
+    updateImportQuoteWarning(cleaned.cleaned);
+
+    if (errDiv) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+    }
+
+    if (report) {
+        const typoCount = (cleaned.stats.typoDoubleQuotes || 0) + (cleaned.stats.typoSingleQuotes || 0);
+        const parts = [typoCount + ' guillemets typographiques corrigés'];
+        if (cleaned.stats.trailingCommas > 0) {
+            parts.push(cleaned.stats.trailingCommas + ' virgules finales supprimées');
+        }
+        if (cleaned.stats.nbsp > 0) {
+            parts.push(cleaned.stats.nbsp + ' espaces insécables normalisés');
+        }
+        report.textContent = '🧹 ' + parts.join(' · ');
+        report.style.display = 'block';
+    }
+};
+
+window.openImportModal = function() {
+    bindImportInputGuards();
     document.getElementById('import-modal').style.display = 'flex';
     document.getElementById('import-json-input').value = '';
     document.getElementById('import-errors').style.display = 'none';
@@ -3015,6 +3258,12 @@ window.openImportModal
     document.getElementById('import-opt-titre').checked = false;
     document.getElementById('import-opt-bareme').checked = false;
     document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+    const report = document.getElementById('import-clean-report');
+    if (report) {
+        report.style.display = 'none';
+        report.textContent = '';
+    }
+    updateImportQuoteWarning('');
 };
 
 window.closeImportModal = function() {
@@ -3035,6 +3284,40 @@ window.copyImportPrompt = function() {
         showToast('📋 Prompt copié !');
     });
 };
+
+function ensurePreventionLevelsForImport(levels) {
+    if (typeof window.ensurePreventionLevels === 'function') {
+        return window.ensurePreventionLevels(levels);
+    }
+
+    const expected = ['supprimer', 'reduire', 'collective', 'individuelle', 'formation'];
+    const labels = {
+        supprimer: 'Supprimer le risque',
+        reduire: 'Reduire le risque a la source',
+        collective: 'Protection collective',
+        individuelle: 'Protection individuelle (EPI)',
+        formation: 'Information et formation'
+    };
+
+    const source = Array.isArray(levels) ? levels : [];
+    return expected.map(function(id) {
+        const found = source.find(function(n) { return n && n.niveau === id; }) || {};
+        let distracteurs = [];
+        if (Array.isArray(found.distracteurs)) {
+            distracteurs = found.distracteurs;
+        } else if (typeof found.distracteurs === 'string') {
+            distracteurs = found.distracteurs.split('|').map(function(s) { return s.trim(); }).filter(Boolean);
+        }
+        return {
+            niveau: id,
+            label: found.label || labels[id],
+            bonne_reponse: found.bonne_reponse || '',
+            distracteurs: distracteurs
+        };
+    });
+}
+
+bindImportInputGuards();
 
 // === NORMALISATION UNIVERSELLE (accepte tout JSON d'IA) ===
 function normalizeImportJSON(data) {
@@ -3317,43 +3600,41 @@ function validateImportJSON(jsonString) {
     const errors = [];
     let data;
 
-    // 0. Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Word
-    // BOM partout
-    jsonString = jsonString.replace(/\uFEFF/g, '');
-    // Caracteres invisibles / zero-width
-    jsonString = jsonString.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
-    // NBSP → espace normal
-    jsonString = jsonString.replace(/\u00A0/g, ' ');
-    // Guillemets courbes / typographiques → droits
-    jsonString = jsonString.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
-    jsonString = jsonString.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
-    // Extraire le JSON des blocs de code Markdown
-    var codeBlockMatch = jsonString.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-    if (codeBlockMatch) jsonString = codeBlockMatch[1].trim();
-    // Extraire entre { } si texte autour
-    if (jsonString.charAt(0) !== '{' && jsonString.charAt(0) !== '[') {
-        var fb = jsonString.indexOf('{');
-        if (fb >= 0) { var lb = jsonString.lastIndexOf('}'); if (lb > fb) jsonString = jsonString.substring(fb, lb + 1); }
+    const cleanedPack = cleanImportJsonText(jsonString);
+    jsonString = cleanedPack.cleaned;
+
+    const boundaryError = getJsonBoundaryError(jsonString);
+    if (boundaryError) {
+        return {
+            ok: false,
+            data: null,
+            errors: [boundaryError, '💡 Vérifie que le JSON est complet et non tronqué.'],
+            cleanedJson: jsonString,
+            stats: cleanedPack.stats
+        };
     }
-    // Supprimer commentaires // en debut de ligne
-    jsonString = jsonString.replace(/^\s*\/\/.*$/gm, '');
-    // Trailing commas
-    jsonString = jsonString.replace(/,\s*([\]}])/g, '$1');
-    // Python booleans/None
-    jsonString = jsonString.replace(/\bTrue\b/g, 'true');
-    jsonString = jsonString.replace(/\bFalse\b/g, 'false');
-    jsonString = jsonString.replace(/\bNone\b/g, 'null');
-    jsonString = jsonString.trim();
 
     // 1. Parse
     try {
         data = JSON.parse(jsonString);
     } catch (e) {
-        return { ok: false, data: null, errors: ['❌ JSON invalide : ' + e.message] };
+        return {
+            ok: false,
+            data: null,
+            errors: buildImportParseErrors(e, jsonString, cleanedPack.stats),
+            cleanedJson: jsonString,
+            stats: cleanedPack.stats
+        };
     }
 
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-        return { ok: false, data: null, errors: ['❌ Le JSON doit être un objet { ... }'] };
+        return {
+            ok: false,
+            data: null,
+            errors: ['❌ Le JSON doit être un objet { ... }'],
+            cleanedJson: jsonString,
+            stats: cleanedPack.stats
+        };
     }
 
     // 1b. Normalisation universelle (adapte tout format d'IA au format attendu)
@@ -3393,7 +3674,7 @@ function validateImportJSON(jsonString) {
     // 4. Questions
     if (!Array.isArray(data.questions) || data.questions.length === 0) {
         errors.push('❌ questions doit être un tableau non vide');
-        return { ok: false, data, errors };
+        return { ok: false, data, errors, cleanedJson: jsonString, stats: cleanedPack.stats };
     }
 
     const validComps = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
@@ -3518,31 +3799,63 @@ function validateImportJSON(jsonString) {
         }
     });
 
-    return { ok: errors.length === 0, data, errors };
+    return { ok: errors.length === 0, data, errors, cleanedJson: jsonString, stats: cleanedPack.stats };
 }
 
 // === EXECUTE IMPORT ===
 window.executeImport = function() {
-    const jsonStr = document.getElementById('import-json-input').value.trim();
+    const inputEl = document.getElementById('import-json-input');
+    const jsonStr = inputEl ? inputEl.value : '';
     const errDiv = document.getElementById('import-errors');
+    const report = document.getElementById('import-clean-report');
 
-    if (!jsonStr) {
+    if (!jsonStr || !jsonStr.trim()) {
         errDiv.textContent = '❌ Collez un JSON avant d\'importer.';
         errDiv.style.display = 'block';
+        if (report) {
+            report.style.display = 'none';
+            report.textContent = '';
+        }
         return;
     }
-
-    // Sauvegarder le prompt source brut
-    currentSourcePrompt = jsonStr;
-    var promptField = document.getElementById('eval-source-prompt');
-    if (promptField) promptField.value = jsonStr;
 
     const result = validateImportJSON(jsonStr);
     if (!result.ok) {
         errDiv.textContent = result.errors.join('\n');
         errDiv.style.display = 'block';
+        updateImportQuoteWarning(jsonStr);
+        if (report) {
+            report.style.display = 'none';
+            report.textContent = '';
+        }
         return;
     }
+
+    const cleanedJson = result.cleanedJson || jsonStr.trim();
+    if (inputEl) inputEl.value = cleanedJson;
+    updateImportQuoteWarning(cleanedJson);
+    if (errDiv) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+    }
+    if (report) {
+        const stats = result.stats || {};
+        const typoCount = (stats.typoDoubleQuotes || 0) + (stats.typoSingleQuotes || 0);
+        if (typoCount > 0 || (stats.trailingCommas || 0) > 0) {
+            const parts = [typoCount + ' guillemets typographiques corrigés'];
+            if ((stats.trailingCommas || 0) > 0) parts.push(stats.trailingCommas + ' virgules finales supprimées');
+            report.textContent = '🧹 Import: ' + parts.join(' · ');
+            report.style.display = 'block';
+        } else {
+            report.style.display = 'none';
+            report.textContent = '';
+        }
+    }
+
+    // Sauvegarder le prompt source nettoye
+    currentSourcePrompt = cleanedJson;
+    var promptField = document.getElementById('eval-source-prompt');
+    if (promptField) promptField.value = cleanedJson;
 
     const data = result.data;
 
@@ -3628,7 +3941,7 @@ window.executeImport = function() {
         } else if (mappedType === 'prevention') {
             internalQ.situation = String(q.situation || '').trim();
             internalQ.danger = String(q.danger || '').trim();
-            internalQ.niveaux = ensurePreventionLevels(q.niveaux).map(n => ({
+            internalQ.niveaux = ensurePreventionLevelsForImport(q.niveaux).map(n => ({
                 niveau: n.niveau,
                 label: n.label,
                 bonne_reponse: n.bonne_reponse,
