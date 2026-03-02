@@ -282,39 +282,44 @@
             if(!cls) return;
             showNotif(`📊 Analyse de ${name}...`, "#34495e");
 
-            const hCol = collection(db, "classe_historique");
-            const q = query(hCol, where("className", "==", cls));
-            const snap = await getDocs(q);
-            
-            if(snap.empty) { showNotif("Pas d'historique.", "#e74c3c"); return; }
+            try {
+                const hCol = collection(db, "classe_historique");
+                const q = query(hCol, where("className", "==", cls));
+                const snap = await getDocs(q);
+                
+                if(snap.empty) { showNotif("Pas d'historique.", "#e74c3c"); return; }
 
-            let counts = { total: 0, front: 0, middle: 0, back: 0 };
-            snap.forEach(doc => {
-                const data = doc.data();
-                let idx = -1;
-                if(data.placements) {
-                    for (const [key, val] of Object.entries(data.placements)) { if (val === name) idx = parseInt(key); }
-                }
-                if(idx !== -1) {
-                    counts.total++;
-                    const row = Math.floor(idx / data.cols);
-                    if(row < 2) counts.front++;
-                    else if(row < 4) counts.middle++;
-                    else counts.back++;
-                }
-            });
+                let counts = { total: 0, front: 0, middle: 0, back: 0 };
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    let idx = -1;
+                    if(data.placements) {
+                        for (const [key, val] of Object.entries(data.placements)) { if (val === name) idx = parseInt(key); }
+                    }
+                    if(idx !== -1) {
+                        counts.total++;
+                        const row = Math.floor(idx / data.cols);
+                        if(row < 2) counts.front++;
+                        else if(row < 4) counts.middle++;
+                        else counts.back++;
+                    }
+                });
 
-            if(counts.total === 0) { showNotif(`${name} n'a jamais été placé.`, "#f39c12"); return; }
+                if(counts.total === 0) { showNotif(`${name} n'a jamais été placé.`, "#f39c12"); return; }
 
-            let profil = "";
-            let totalScore = (counts.front * 1) + (counts.middle * 3) + (counts.back * 5);
-            let average = totalScore / counts.total;
+                let profil = "";
+                let totalScore = (counts.front * 1) + (counts.middle * 3) + (counts.back * 5);
+                let average = totalScore / counts.total;
 
-            if (average < 2.5) { profil = "🦅 L'AIGLE (Toujours Devant)"; } 
-            else if (average > 3.5) { profil = "🦉 LE HIBOU (Toujours au Fond)"; } 
-            else { profil = "🦎 LE CAMÉLÉON (Au Milieu / Change)"; }
+                if (average < 2.5) { profil = "🦅 L'AIGLE (Toujours Devant)"; } 
+                else if (average > 3.5) { profil = "🦉 LE HIBOU (Toujours au Fond)"; } 
+                else { profil = "🦎 LE CAMÉLÉON (Au Milieu / Change)"; }
 
-            alert(`🕵️ RAPPORT : ${name}\n\n📍 PROFIL : ${profil}\n\n📊 Stats :\n- Devant : ${counts.front}\n- Milieu : ${counts.middle}\n- Fond : ${counts.back}\n\n(Sur ${counts.total} cours)`);
+                alert(`🕵️ RAPPORT : ${name}\n\n📍 PROFIL : ${profil}\n\n📊 Stats :\n- Devant : ${counts.front}\n- Milieu : ${counts.middle}\n- Fond : ${counts.back}\n\n(Sur ${counts.total} cours)`);
+            } catch (e) {
+                console.error("Erreur stats élève:", e);
+                showNotif("Erreur lors du calcul des stats.", "#e74c3c");
+            }
         };
 
         // --- CORE GRID ---
@@ -347,7 +352,7 @@
                 cell.dataset.idx = i;
 
                 if(isArchitectMode) cell.onclick = () => cycleType(i);
-                else if(type === 1) { cell.ondrop = (e) => dropToDesk(e, i); cell.ondragover = allowDrop; }
+                else if(type === 1) { cell.ondrop = (e) => window.dropToDesk(e, i); cell.ondragover = window.allowDrop; }
 
                 if(type === 1 && state.placements[i]) {
                     const name = state.placements[i];
@@ -359,12 +364,12 @@
                     if(!isArchitectMode) {
                         chip.draggable = true;
                         chip.ondragstart = (e) => { e.dataTransfer.setData("text", name); };
-                        chip.ondblclick = (e) => { e.stopPropagation(); toggleStatus(name); };
+                        chip.ondblclick = (e) => { e.stopPropagation(); window.toggleStatus(name); };
                         chip.oncontextmenu = (e) => { e.preventDefault(); window.showStudentStats(name); };
                         let rmBtn = document.createElement('div');
                         rmBtn.className = "remove-btn";
                         rmBtn.innerText = "✕";
-                        rmBtn.onclick = () => removeStudent(i);
+                        rmBtn.onclick = () => window.removeStudent(i);
                         cell.appendChild(rmBtn);
                     }
                     cell.appendChild(chip);
@@ -378,7 +383,7 @@
             if(!cls) return;
             state.students = [...CLASS_DATA[cls]];
             state.placements = {}; state.absents = []; state.status = {};
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         function renderPools() {
@@ -395,7 +400,7 @@
                     chip.innerText = name;
                     chip.draggable = true;
                     chip.ondragstart = (e) => e.dataTransfer.setData("text", name);
-                    chip.ondblclick = () => toggleStatus(name);
+                    chip.ondblclick = () => window.toggleStatus(name);
                     chip.oncontextmenu = (e) => { e.preventDefault(); window.showStudentStats(name); };
 
                     if(state.absents.includes(name)) absent.appendChild(chip);
@@ -421,52 +426,52 @@
             else { if(oldIdx) delete state.placements[oldIdx]; }
             state.placements[idx] = name;
             if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         window.dropToPool = (e) => {
             e.preventDefault(); const name = e.dataTransfer.getData("text");
             removePlacement(name);
             if(state.absents.includes(name)) state.absents = state.absents.filter(n => n !== name);
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         window.dropToAbsent = (e) => {
             e.preventDefault(); const name = e.dataTransfer.getData("text");
             removePlacement(name);
             if(!state.absents.includes(name)) state.absents.push(name);
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         function removePlacement(name) {
             const key = Object.keys(state.placements).find(k => state.placements[k] === name);
             if(key) delete state.placements[key];
         }
-        window.removeStudent = (idx) => { delete state.placements[idx]; buildGrid(); renderPools(); };
+        window.removeStudent = (idx) => { delete state.placements[idx]; window.buildGrid(); renderPools(); };
 
         window.toggleArchitect = () => {
             isArchitectMode = !isArchitectMode;
             document.body.classList.toggle('architect-mode');
             const btn = document.getElementById('btnArchi');
             btn.classList.toggle('active');
-            buildGrid(); 
+            window.buildGrid(); 
         };
         function cycleType(idx) {
             let next = (state.structure[idx] + 1) % TYPES.length;
             if(state.structure[idx] === 1 && next !== 1 && state.placements[idx]) {
                 delete state.placements[idx]; renderPools();
             }
-            state.structure[idx] = next; buildGrid();
+            state.structure[idx] = next; window.buildGrid();
         }
 
         window.toggleStatus = (name) => {
             if(!state.status[name]) state.status[name] = "warn";
             else if(state.status[name] === "warn") state.status[name] = "good";
             else delete state.status[name];
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
-        window.resetStatus = () => { state.status = {}; buildGrid(); renderPools(); };
-        window.resetGrid = () => { if(confirm("Vider ?")) { state.placements = {}; buildGrid(); renderPools(); } };
+        window.resetStatus = () => { state.status = {}; window.buildGrid(); renderPools(); };
+        window.resetGrid = () => { if(confirm("Vider ?")) { state.placements = {}; window.buildGrid(); renderPools(); } };
         
         window.randomizeAll = () => {
             if(!confirm("Mélanger ?")) return;
@@ -477,7 +482,7 @@
             const total = document.getElementById('nbRows').value * document.getElementById('nbCols').value;
             for(let i=0; i<total; i++) { if(state.structure[i] === 1) tableIndices.push(i); }
             active.forEach((name, i) => { if(i < tableIndices.length) state.placements[tableIndices[i]] = name; });
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         window.autoFill = () => {
@@ -489,7 +494,7 @@
                     state.placements[i] = available[r]; available.splice(r, 1);
                 }
             }
-            buildGrid(); renderPools();
+            window.buildGrid(); renderPools();
         };
 
         window.pushToScreen = async () => {
@@ -499,18 +504,27 @@
             const c = document.getElementById('nbCols').value;
             const bPos = document.getElementById('boardPos').value;
 
-            await setDoc(doc(db, "classe_etat", "config"), {
-                className: cls, rows: parseInt(r), cols: parseInt(c),
-                placements: state.placements, structure: state.structure, boardPos: bPos, timestamp: Date.now()
-            });
+            if(!cls) {
+                showNotif("Choisissez une classe avant d'envoyer.", "#e74c3c");
+                return;
+            }
 
-            if(cls) {
+            try {
+                await setDoc(doc(db, "classe_etat", "config"), {
+                    className: cls, rows: parseInt(r), cols: parseInt(c),
+                    placements: state.placements, structure: state.structure, boardPos: bPos, timestamp: Date.now()
+                });
+
                 await addDoc(collection(db, "classe_historique"), {
                     className: cls, rows: parseInt(r), cols: parseInt(c),
                     placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure // On sauve aussi les murs
                 });
+
+                showNotif("🚀 Plan Envoyé & Sauvegardé !");
+            } catch (e) {
+                console.error("Erreur push plan:", e);
+                showNotif("Erreur d'envoi (permissions/réseau). Voir console.", "#e74c3c");
             }
-            showNotif("🚀 Plan Envoyé & Sauvegardé !");
         };
 
     </script>
