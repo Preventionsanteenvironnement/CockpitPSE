@@ -3046,6 +3046,97 @@ function extractImportJsonCandidate(raw) {
     return out.trim();
 }
 
+// Normalise les guillemets typographiques sans casser les guillemets internes.
+function normalizeJsonQuotes(raw) {
+    if (!raw) return raw;
+    let out = '';
+    let inString = false;
+    let stringDelim = null; // '"' | 'curly'
+    let escaped = false;
+    let i = 0;
+
+    function isDoubleQuoteLike(ch) {
+        return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
+    }
+    function isSingleQuoteLike(ch) {
+        return /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch);
+    }
+    function nextSignificantChar(str, start) {
+        for (let k = start; k < str.length; k++) {
+            const cc = str.charAt(k);
+            if (!/\s/.test(cc)) return cc;
+        }
+        return '';
+    }
+
+    while (i < raw.length) {
+        const ch = raw.charAt(i);
+
+        if (!inString) {
+            if (isDoubleQuoteLike(ch)) {
+                inString = true;
+                stringDelim = (ch === '"') ? '"' : 'curly';
+                out += '"';
+                i++;
+                continue;
+            }
+            if (isSingleQuoteLike(ch)) {
+                out += "'";
+                i++;
+                continue;
+            }
+            out += ch;
+            i++;
+            continue;
+        }
+
+        if (escaped) {
+            out += ch;
+            escaped = false;
+            i++;
+            continue;
+        }
+        if (ch === '\\') {
+            out += ch;
+            escaped = true;
+            i++;
+            continue;
+        }
+
+        if (isDoubleQuoteLike(ch)) {
+            const next = nextSignificantChar(raw, i + 1);
+            const canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
+
+            if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
+                if (canClose) {
+                    out += '"';
+                    inString = false;
+                    stringDelim = null;
+                } else {
+                    out += '\\"';
+                }
+                i++;
+                continue;
+            }
+
+            out += '\\"';
+            i++;
+            continue;
+        }
+
+        if (isSingleQuoteLike(ch)) {
+            out += "'";
+            i++;
+            continue;
+        }
+
+        out += ch;
+        i++;
+    }
+
+    return out;
+}
+
 function cleanImportJsonText(raw) {
     const stats = {
         typoDoubleQuotes: countMatches(raw, IMPORT_DOUBLE_QUOTES_RE),
@@ -3059,8 +3150,7 @@ function cleanImportJsonText(raw) {
     cleaned = cleaned.replace(/\uFEFF/g, '');
     cleaned = cleaned.replace(IMPORT_ZW_RE, '');
     cleaned = cleaned.replace(/\u00A0/g, ' ');
-    cleaned = cleaned.replace(IMPORT_DOUBLE_QUOTES_RE, '"');
-    cleaned = cleaned.replace(IMPORT_SINGLE_QUOTES_RE, "'");
+    cleaned = normalizeJsonQuotes(cleaned);
     cleaned = cleaned.replace(/\[cite_start\]/gi, '');
     cleaned = cleaned.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
     cleaned = extractImportJsonCandidate(cleaned);
