@@ -193,9 +193,22 @@
             "VAN": ["Tilio", "Lea", "Sheryne", "Salima", "Séfana", "Benedith", "Cristina", "Allian", "Ilian", "Mory"]
         };
 
+        const LOCAL_PLAN_KEY = "classe_plan_local";
+        const LOCAL_PLAN_PING_KEY = "classe_plan_local_ping";
+
         let state = { placements: {}, structure: {}, students: [], absents: [], status: {} };
         let isArchitectMode = false;
         const TYPES = [0, 1, 2, 3, 4];
+
+        function pushLocalPlan(payload) {
+            try {
+                localStorage.setItem(LOCAL_PLAN_KEY, JSON.stringify(payload));
+                // Force un event "storage" dans les autres onglets/fenêtres.
+                localStorage.setItem(LOCAL_PLAN_PING_KEY, String(Date.now()));
+            } catch (e) {
+                console.error("Erreur sauvegarde locale du plan:", e);
+            }
+        }
 
         window.onload = () => {
             const sel = document.getElementById('classSelect');
@@ -509,21 +522,31 @@
                 return;
             }
 
+            const payload = {
+                className: cls,
+                rows: parseInt(r),
+                cols: parseInt(c),
+                placements: state.placements,
+                structure: state.structure,
+                boardPos: bPos,
+                timestamp: Date.now()
+            };
+
+            // Toujours pousser localement pour que l'écran fonctionne même sans droits Firestore.
+            pushLocalPlan(payload);
+
             try {
-                await setDoc(doc(db, "classe_etat", "config"), {
-                    className: cls, rows: parseInt(r), cols: parseInt(c),
-                    placements: state.placements, structure: state.structure, boardPos: bPos, timestamp: Date.now()
-                });
+                await setDoc(doc(db, "classe_etat", "config"), payload);
 
                 await addDoc(collection(db, "classe_historique"), {
                     className: cls, rows: parseInt(r), cols: parseInt(c),
                     placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure // On sauve aussi les murs
                 });
 
-                showNotif("🚀 Plan Envoyé & Sauvegardé !");
+                showNotif("🚀 Plan envoyé (Firebase + local) !");
             } catch (e) {
                 console.error("Erreur push plan:", e);
-                showNotif("Erreur d'envoi (permissions/réseau). Voir console.", "#e74c3c");
+                showNotif("Plan envoyé en local (Firebase refusé).", "#f39c12");
             }
         };
 
