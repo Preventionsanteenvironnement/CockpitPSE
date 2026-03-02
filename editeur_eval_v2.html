@@ -3336,8 +3336,8 @@ function inferJsonStructureIssue(raw) {
 
 function buildImportParseErrors(error, cleanedJson, stats) {
     const messages = ['❌ JSON invalide : ' + (error && error.message ? error.message : 'Erreur inconnue')];
-    const typoCount = (stats.typoDoubleQuotes || 0) + (stats.typoSingleQuotes || 0);
-    if (typoCount > 0) {
+    const typoDoubleCount = (stats.typoDoubleQuotes || 0);
+    if (typoDoubleCount > 0) {
         messages.push('💡 Guillemets typographiques détectés : remplace-les par des guillemets doubles standards (").');
     }
     const loc = parseErrorLocation(error && error.message, cleanedJson);
@@ -3363,9 +3363,9 @@ function updateImportQuoteWarning(raw) {
     const warningBox = document.getElementById('import-warning');
     const warningText = document.getElementById('import-warning-text');
     if (!warningBox || !warningText) return;
-    const count = countMatches(raw, IMPORT_DOUBLE_QUOTES_RE) + countMatches(raw, IMPORT_SINGLE_QUOTES_RE);
-    if (count > 0) {
-        warningText.textContent = '⚠️ ' + count + ' guillemet(s) typographique(s) détecté(s). Colle en guillemets standards.';
+    const doubleCount = countMatches(raw, IMPORT_DOUBLE_QUOTES_RE);
+    if (doubleCount > 0) {
+        warningText.textContent = '⚠️ ' + doubleCount + ' guillemet(s) double(s) typographique(s) détecté(s). Colle en guillemets standards.';
         warningBox.style.display = 'flex';
     } else {
         warningText.textContent = '';
@@ -3416,14 +3416,18 @@ window.cleanImportJSONInput = function() {
     }
 
     if (report) {
-        const typoCount = (cleaned.stats.typoDoubleQuotes || 0) + (cleaned.stats.typoSingleQuotes || 0);
-        const parts = [typoCount + ' guillemets typographiques corrigés'];
+        const typoDoubleCount = (cleaned.stats.typoDoubleQuotes || 0);
+        const typoSingleCount = (cleaned.stats.typoSingleQuotes || 0);
+        const parts = [];
+        if (typoDoubleCount > 0) parts.push(typoDoubleCount + ' guillemets doubles typographiques corrigés');
+        if (typoSingleCount > 0) parts.push(typoSingleCount + ' apostrophes typographiques normalisées');
         if (cleaned.stats.trailingCommas > 0) {
             parts.push(cleaned.stats.trailingCommas + ' virgules finales supprimées');
         }
         if (cleaned.stats.nbsp > 0) {
             parts.push(cleaned.stats.nbsp + ' espaces insécables normalisés');
         }
+        if (parts.length === 0) parts.push('Aucune correction nécessaire');
         report.textContent = '🧹 ' + parts.join(' · ');
         report.style.display = 'block';
     }
@@ -4020,9 +4024,12 @@ window.executeImport = function() {
     }
     if (report) {
         const stats = result.stats || {};
-        const typoCount = (stats.typoDoubleQuotes || 0) + (stats.typoSingleQuotes || 0);
-        if (typoCount > 0 || (stats.trailingCommas || 0) > 0) {
-            const parts = [typoCount + ' guillemets typographiques corrigés'];
+        const typoDoubleCount = (stats.typoDoubleQuotes || 0);
+        const typoSingleCount = (stats.typoSingleQuotes || 0);
+        if (typoDoubleCount > 0 || typoSingleCount > 0 || (stats.trailingCommas || 0) > 0) {
+            const parts = [];
+            if (typoDoubleCount > 0) parts.push(typoDoubleCount + ' guillemets doubles typographiques corrigés');
+            if (typoSingleCount > 0) parts.push(typoSingleCount + ' apostrophes typographiques normalisées');
             if ((stats.trailingCommas || 0) > 0) parts.push(stats.trailingCommas + ' virgules finales supprimées');
             report.textContent = '🧹 Import: ' + parts.join(' · ');
             report.style.display = 'block';
