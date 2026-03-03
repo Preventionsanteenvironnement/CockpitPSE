@@ -932,6 +932,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="data_modules.js"></script>
+<script src="json_import_utils.js"></script>
 <script>
 function toggleMenu(){ document.body.classList.toggle('menu-open'); }
 function closeMenu(){ document.body.classList.remove('menu-open'); }
@@ -2468,8 +2469,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         </div>
         <textarea id="import-json-input" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
         <div id="import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
+        <div id="import-warning" style="display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#92400e;">
+          <span id="import-warning-text"></span>
+          <button type="button" onclick="cleanImportJSONInputEval()" style="margin-left:8px; font-size:0.8rem; padding:2px 8px; border-radius:4px; border:1px solid #f59e0b; background:#fff7ed; cursor:pointer;">Corriger</button>
+        </div>
+        <div id="import-clean-report" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#065f46; white-space:pre-wrap;"></div>
         <div class="modal-actions">
             <button type="button" class="btn-save-q" onclick="executeImport()">✅ Importer</button>
+            <button type="button" class="btn-cancel-q" onclick="cleanImportJSONInputEval()" style="background:#fef3c7; color:#92400e; border:1px solid #f59e0b;">🧹 Nettoyer</button>
             <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
         </div>
     </div>
@@ -2556,10 +2563,15 @@ window.openImportModal = function() {
     document.getElementById('import-opt-titre').checked = false;
     document.getElementById('import-opt-bareme').checked = false;
     document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+    JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
 };
 
 window.closeImportModal = function() {
     document.getElementById('import-modal').style.display = 'none';
+};
+
+window.cleanImportJSONInputEval = function() {
+    JsonImportUtils.handleCleanButton('import-json-input', 'import-errors', 'import-clean-report', 'import-warning', 'import-warning-text');
 };
 
 window.copyImportPrompt = function() {
@@ -2704,39 +2716,22 @@ function validateImportJSON(jsonString) {
     const errors = [];
     let data;
 
-    // 0. Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Word
-    // BOM partout
-    jsonString = jsonString.replace(/\uFEFF/g, '');
-    // Caracteres invisibles / zero-width
-    jsonString = jsonString.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
-    // NBSP → espace normal
-    jsonString = jsonString.replace(/\u00A0/g, ' ');
-    // Guillemets courbes / typographiques → droits
-    jsonString = jsonString.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
-    jsonString = jsonString.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
-    // Extraire le JSON des blocs de code Markdown
-    var codeBlockMatch = jsonString.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-    if (codeBlockMatch) jsonString = codeBlockMatch[1].trim();
-    // Extraire entre { } si texte autour
-    if (jsonString.charAt(0) !== '{' && jsonString.charAt(0) !== '[') {
-        var fb = jsonString.indexOf('{');
-        if (fb >= 0) { var lb = jsonString.lastIndexOf('}'); if (lb > fb) jsonString = jsonString.substring(fb, lb + 1); }
+    // 0. Nettoyage universel via JsonImportUtils
+    var cleanResult = JsonImportUtils.cleanJsonFull(jsonString);
+    var cleaned = cleanResult.cleaned;
+
+    // Vérification des accolades/crochets
+    var boundaryErr = JsonImportUtils.getJsonBoundaryError(cleaned);
+    if (boundaryErr) {
+        return { ok: false, data: null, errors: [boundaryErr] };
     }
-    // Supprimer commentaires // en debut de ligne
-    jsonString = jsonString.replace(/^\s*\/\/.*$/gm, '');
-    // Trailing commas
-    jsonString = jsonString.replace(/,\s*([\]}])/g, '$1');
-    // Python booleans/None
-    jsonString = jsonString.replace(/\bTrue\b/g, 'true');
-    jsonString = jsonString.replace(/\bFalse\b/g, 'false');
-    jsonString = jsonString.replace(/\bNone\b/g, 'null');
-    jsonString = jsonString.trim();
 
     // 1. Parse
     try {
-        data = JSON.parse(jsonString);
-    } catch (e) {
-        return { ok: false, data: null, errors: ['❌ JSON invalide : ' + e.message] };
+        data = JSON.parse(cleaned);
+    } catch(e) {
+        var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
+        return { ok: false, data: null, errors: diagErrors };
     }
 
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {

@@ -768,14 +768,26 @@
         <textarea id="import-input" rows="14" class="mono" placeholder="Collez le JSON ici..."></textarea>
       </div>
       <div class="error-box" id="import-errors"></div>
+      <div id="import-warning" style="display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#92400e;">
+        <span id="import-warning-text"></span>
+        <button type="button" onclick="cleanImportJSONInputParcours()" style="margin-left:8px; font-size:0.8rem; padding:2px 8px; border-radius:4px; border:1px solid #f59e0b; background:#fff7ed; cursor:pointer;">Corriger</button>
+      </div>
+      <div id="import-clean-report" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#065f46; white-space:pre-wrap;"></div>
       <div class="inline-actions" style="margin-top:10px;">
         <button class="btn-small" type="button" id="btn-run-import">Importer</button>
+        <button class="btn-small" type="button" onclick="cleanImportJSONInputParcours()" style="background:#f59e0b;">🧹 Nettoyer</button>
         <button class="btn-ghost" type="button" id="btn-close-import">Annuler</button>
       </div>
     </div>
   </div>
 
   <script src="data_modules.js"></script>
+  <script src="json_import_utils.js"></script>
+  <script>
+function cleanImportJSONInputParcours() {
+    JsonImportUtils.handleCleanButton('import-input', 'import-errors', 'import-clean-report', 'import-warning', 'import-warning-text');
+}
+  </script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -1063,30 +1075,7 @@ Uniquement le JSON final`;
       return p;
     }
 
-    function cleanImportJSONString(raw) {
-      let s = String(raw || "");
-      s = s.replace(/\uFEFF/g, "");
-      s = s.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, "");
-      s = s.replace(/\u00A0/g, " ");
-      s = s.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
-      s = s.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
 
-      const codeBlock = s.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-      if (codeBlock) s = codeBlock[1].trim();
-
-      if (!s.trim().startsWith("{") && !s.trim().startsWith("[")) {
-        const first = s.indexOf("{");
-        const last = s.lastIndexOf("}");
-        if (first >= 0 && last > first) s = s.slice(first, last + 1);
-      }
-
-      s = s.replace(/^\s*\/\/.*$/gm, "");
-      s = s.replace(/,\s*([\]}])/g, "$1");
-      s = s.replace(/\bTrue\b/g, "true");
-      s = s.replace(/\bFalse\b/g, "false");
-      s = s.replace(/\bNone\b/g, "null");
-      return s.trim();
-    }
 
     function validateParcoursData(data) {
       const errors = [];
@@ -1778,6 +1767,7 @@ Uniquement le JSON final`;
         enriched += "\n\nAutoEvaluations disponibles (ref_autoeval_id):\n- " + aeIds;
       }
       document.getElementById("import-prompt").textContent = enriched;
+      JsonImportUtils.bindImportInputGuards('import-input', 'import-warning', 'import-warning-text');
     }
 
     function closeImportModal() {
@@ -1802,11 +1792,36 @@ Uniquement le JSON final`;
       var promptField = document.getElementById('parcours-source-prompt');
       if (promptField) promptField.value = raw.trim();
 
+      var cleanResult = JsonImportUtils.cleanJsonFull(raw);
+      var cleaned = cleanResult.cleaned;
+
+      // Afficher rapport nettoyage
+      var reportEl = document.getElementById('import-clean-report');
+      var corrections = [];
+      if (cleanResult.stats.typoDoubleQuotes) corrections.push(cleanResult.stats.typoDoubleQuotes + ' guillemet(s) double(s) typographique(s) corrigé(s)');
+      if (cleanResult.stats.typoSingleQuotes) corrections.push(cleanResult.stats.typoSingleQuotes + ' guillemet(s) simple(s) typographique(s) corrigé(s)');
+      if (cleanResult.stats.nbsp) corrections.push(cleanResult.stats.nbsp + ' espace(s) insécable(s) remplacé(s)');
+      if (cleanResult.stats.zeroWidth) corrections.push(cleanResult.stats.zeroWidth + ' caractère(s) invisible(s) supprimé(s)');
+      if (cleanResult.stats.trailingCommas) corrections.push(cleanResult.stats.trailingCommas + ' virgule(s) en trop supprimée(s)');
+      if (cleanResult.stats.codeBlocksFound) corrections.push(cleanResult.stats.codeBlocksFound + ' bloc(s) de code détecté(s)');
+      if (corrections.length > 0 && reportEl) {
+        reportEl.textContent = '🧹 Corrections appliquées :\n' + corrections.map(function(c) { return '  • ' + c; }).join('\n');
+        reportEl.style.display = 'block';
+      }
+
+      // Vérification des accolades/crochets
+      var boundaryErr = JsonImportUtils.getJsonBoundaryError(cleaned);
+      if (boundaryErr) {
+        openImportErrors([boundaryErr]);
+        return;
+      }
+
       let parsed;
       try {
-        parsed = JSON.parse(cleanImportJSONString(raw));
+        parsed = JSON.parse(cleaned);
       } catch (e) {
-        openImportErrors(["JSON invalide: " + e.message]);
+        var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
+        openImportErrors(diagErrors);
         return;
       }
 
