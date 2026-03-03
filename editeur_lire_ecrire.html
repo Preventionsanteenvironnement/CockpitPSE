@@ -427,6 +427,7 @@ function showToast(msg) {
             categorie: "images",
             fields: [
                 { key: "image", type: "text", label: "Nom du fichier image", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "mot_correct", type: "text", label: "Mot correct *", placeholder: "Ex: casque" },
                 { key: "distracteurs", type: "tags", label: "Distracteurs (3 mots)", min: 2, placeholder: "Ajouter un mot..." }
             ]
@@ -436,6 +437,7 @@ function showToast(msg) {
             categorie: "mots",
             fields: [
                 { key: "image", type: "text", label: "Image (optionnel)", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "mot", type: "text", label: "Mot complet *", placeholder: "Ex: securite" },
                 { key: "lettres_visibles", type: "text", label: "Lettres visibles *", placeholder: "Ex: s_c_r_te" },
                 { key: "indice", type: "text", label: "Indice (facultatif)", placeholder: "Ex: Contraire du danger" }
@@ -446,6 +448,7 @@ function showToast(msg) {
             categorie: "mots",
             fields: [
                 { key: "image", type: "text", label: "Image (optionnel)", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "phrase", type: "textarea", label: "Phrase avec ___ *", placeholder: "Il faut porter un ___ sur le chantier." },
                 { key: "mot_correct", type: "text", label: "Mot correct *", placeholder: "Ex: casque" },
                 { key: "distracteurs", type: "tags", label: "Distracteurs (2-3 mots)", min: 1, placeholder: "Ajouter un mot..." }
@@ -456,6 +459,7 @@ function showToast(msg) {
             categorie: "mots",
             fields: [
                 { key: "image", type: "text", label: "Image (optionnel)", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "mot", type: "text", label: "Mot a recopier *", placeholder: "Ex: extincteur" },
                 { key: "phrase_contexte", type: "textarea", label: "Phrase de contexte", placeholder: "L'extincteur sert a eteindre un feu." }
             ]
@@ -465,6 +469,7 @@ function showToast(msg) {
             categorie: "lecture",
             fields: [
                 { key: "image", type: "text", label: "Image (optionnel)", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "phrase", type: "textarea", label: "Phrase a lire *", placeholder: "Le feu se propage plus vite avec du vent." },
                 { key: "reponse", type: "select", label: "Reponse *", options: [{ v: "true", l: "Vrai" }, { v: "false", l: "Faux" }] },
                 { key: "explication", type: "textarea", label: "Explication (facultatif)", placeholder: "Le vent apporte de l'oxygene." }
@@ -475,6 +480,7 @@ function showToast(msg) {
             categorie: "lecture",
             fields: [
                 { key: "image", type: "text", label: "Image (optionnel)", placeholder: "casque.png" },
+                { key: "lien_url", type: "text", label: "Lien web (optionnel)", placeholder: "https://..." },
                 { key: "texte", type: "textarea", label: "Texte a lire *", placeholder: "En cas d'incendie, il faut..." },
                 { key: "question", type: "text", label: "Question *", placeholder: "Que faut-il faire en premier ?" },
                 { key: "reponse_correcte", type: "text", label: "Reponse correcte *", placeholder: "Appeler les secours" },
@@ -814,14 +820,21 @@ Chaque exercice a cette structure :
 Champ image (optionnel pour les templates 2 à 6) :
 - "image": "nom_fichier.png" ou URL complète
 - Si nom de fichier seul : le préfixe "images/lire_ecrire/" est ajouté automatiquement
+
+Champ lien (optionnel pour tous les templates) :
+- "lien_url": "https://..." pour afficher un bouton ressource à l'élève
 ` + REGLES_COMMUNES;
 
-    const OPTIONAL_IMAGE_PROMPT_NOTE = `
+    const OPTIONAL_MEDIA_PROMPT_NOTE = `
 
 Champ image optionnel :
 - Vous pouvez ajouter "image" dans data pour afficher une illustration de l'exercice
 - Exemple : "image": "casque.png" ou "image": "https://..."
-- Si seul le nom du fichier est fourni, le prefixe images/lire_ecrire/ sera ajoute automatiquement`;
+- Si seul le nom du fichier est fourni, le prefixe images/lire_ecrire/ sera ajoute automatiquement
+
+Champ lien optionnel :
+- Vous pouvez ajouter "lien_url" dans data pour afficher un bouton vers une ressource web
+- Exemple : "lien_url": "https://www.inrs.fr/"`;
 
     // =============================================
     // FIREBASE REAL-TIME
@@ -1102,6 +1115,14 @@ Champ image optionnel :
         return IMAGE_BASE_PATH + filename;
     }
 
+    function sanitizeExternalUrl(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^https?:\/\//i.test(raw)) return raw;
+        if (/^[\w.-]+\.[a-z]{2,}(?:[\/?#].*)?$/i.test(raw)) return 'https://' + raw;
+        return '';
+    }
+
     function updateImagePreview() {
         const inp = document.getElementById('field-image');
         const prev = document.getElementById('image-preview');
@@ -1145,6 +1166,8 @@ Champ image optionnel :
                 // Auto-prefix image filenames with base path
                 if (field.key === 'image' && val) {
                     val = getFullImagePath(val);
+                } else if (field.key === 'lien_url' && val) {
+                    val = sanitizeExternalUrl(val);
                 }
                 data[field.key] = val;
             }
@@ -1248,12 +1271,13 @@ Champ image optionnel :
         // Keep form data but clear ID
         currentExoId = null;
         document.getElementById('exo-titre').value = (ex.titre || '') + ' (copie)';
+        document.getElementById('exo-publie').checked = false;
         document.getElementById('btn-delete').style.display = 'none';
         document.getElementById('btn-duplicate').style.display = 'none';
         document.getElementById('btn-test').style.display = 'none';
 
         renderList();
-        showToast('Copie creee — sauvegardez pour enregistrer.');
+        showToast('Copie creee en brouillon — sauvegardez pour enregistrer.');
     };
 
     // =============================================
@@ -1269,6 +1293,177 @@ Champ image optionnel :
     // IMPORT JSON
     // =============================================
     let currentImportPrompt = '';
+    const IMPORT_DOUBLE_QUOTES_RE = /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g;
+    const IMPORT_SINGLE_QUOTES_RE = /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g;
+    const IMPORT_ZW_RE = /[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g;
+    const IMPORT_TRAILING_COMMA_RE = /,\s*([\]}])/g;
+
+    function extractImportJsonCandidate(raw) {
+        let out = String(raw || '');
+        const codeBlockMatch = out.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
+        if (codeBlockMatch) out = codeBlockMatch[1] || '';
+
+        if (out.charAt(0) !== '{' && out.charAt(0) !== '[') {
+            const firstBrace = out.indexOf('{');
+            const firstBracket = out.indexOf('[');
+            const start = firstBrace >= 0 ? firstBrace : firstBracket;
+            if (start >= 0) {
+                const lastBrace = out.lastIndexOf('}');
+                const lastBracket = out.lastIndexOf(']');
+                const end = out.charAt(start) === '{' ? lastBrace : lastBracket;
+                if (end > start) out = out.substring(start, end + 1);
+            }
+        }
+        return out.trim();
+    }
+
+    // Normalise les guillemets typographiques sans casser les guillemets internes.
+    function normalizeJsonQuotes(raw) {
+        if (!raw) return raw;
+        let out = '';
+        let inString = false;
+        let stringDelim = null; // '"' | 'curly'
+        let escaped = false;
+        let i = 0;
+
+        function isDoubleQuoteLike(ch) {
+            return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
+        }
+        function isSingleQuoteLike(ch) {
+            return /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch);
+        }
+        function nextSignificantChar(str, start) {
+            for (let k = start; k < str.length; k++) {
+                const cc = str.charAt(k);
+                if (!/\s/.test(cc)) return cc;
+            }
+            return '';
+        }
+
+        while (i < raw.length) {
+            const ch = raw.charAt(i);
+
+            if (!inString) {
+                if (isDoubleQuoteLike(ch)) {
+                    inString = true;
+                    stringDelim = (ch === '"') ? '"' : 'curly';
+                    out += '"';
+                    i++;
+                    continue;
+                }
+                if (isSingleQuoteLike(ch)) {
+                    out += "'";
+                    i++;
+                    continue;
+                }
+                out += ch;
+                i++;
+                continue;
+            }
+
+            if (escaped) {
+                out += ch;
+                escaped = false;
+                i++;
+                continue;
+            }
+            if (ch === '\\') {
+                out += ch;
+                escaped = true;
+                i++;
+                continue;
+            }
+
+            if (isDoubleQuoteLike(ch)) {
+                const next = nextSignificantChar(raw, i + 1);
+                const canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
+
+                if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
+                    if (canClose) {
+                        out += '"';
+                        inString = false;
+                        stringDelim = null;
+                    } else {
+                        out += '\\"';
+                    }
+                    i++;
+                    continue;
+                }
+
+                out += '\\"';
+                i++;
+                continue;
+            }
+
+            if (isSingleQuoteLike(ch)) {
+                out += "'";
+                i++;
+                continue;
+            }
+
+            out += ch;
+            i++;
+        }
+
+        return out;
+    }
+
+    function cleanImportJsonText(raw) {
+        let cleaned = String(raw || '');
+        cleaned = cleaned.replace(/\uFEFF/g, '');
+        cleaned = cleaned.replace(IMPORT_ZW_RE, '');
+        cleaned = cleaned.replace(/\u00A0/g, ' ');
+        cleaned = normalizeJsonQuotes(cleaned);
+        cleaned = cleaned.replace(/\[cite_start\]/gi, '');
+        cleaned = cleaned.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
+        cleaned = extractImportJsonCandidate(cleaned);
+        cleaned = cleaned.replace(/^\s*\/\/.*$/gm, '');
+        cleaned = cleaned.replace(IMPORT_TRAILING_COMMA_RE, '$1');
+        cleaned = cleaned.replace(/\bTrue\b/g, 'true');
+        cleaned = cleaned.replace(/\bFalse\b/g, 'false');
+        cleaned = cleaned.replace(/\bNone\b/g, 'null');
+        return cleaned.trim();
+    }
+
+    function normalizeImportedExerciseShape(ex, fallbackTemplateId) {
+        if (!ex || typeof ex !== 'object' || Array.isArray(ex)) return null;
+        const out = { ...ex };
+
+        if (!out.titre && out.title) out.titre = out.title;
+        if (!out.template_id && out.templateId) out.template_id = out.templateId;
+        if (!out.template_id && fallbackTemplateId && TEMPLATES[fallbackTemplateId]) {
+            out.template_id = fallbackTemplateId;
+        }
+
+        if (!out.data || typeof out.data !== 'object' || Array.isArray(out.data)) {
+            const tpl = TEMPLATES[out.template_id];
+            if (tpl) {
+                const mappedData = {};
+                tpl.fields.forEach((field) => {
+                    if (out[field.key] !== undefined) mappedData[field.key] = out[field.key];
+                });
+                if (Object.keys(mappedData).length > 0) out.data = mappedData;
+            }
+        } else {
+            out.data = { ...out.data };
+        }
+
+        if (out.data && typeof out.data === 'object') {
+            if (!out.data.image && out.data.image_url) out.data.image = out.data.image_url;
+            if (!out.data.lien_url) {
+                out.data.lien_url =
+                    out.data.lien ||
+                    out.data.url ||
+                    out.data.link ||
+                    out.data.lien_internet ||
+                    out.data.website ||
+                    out.data.href ||
+                    '';
+            }
+        }
+
+        return out;
+    }
 
     window.openImportModal = function() {
         document.getElementById('import-modal').style.display = 'flex';
@@ -1280,7 +1475,7 @@ Champ image optionnel :
         const tplId = document.getElementById('exo-template').value;
         const tplInfo = TEMPLATES[tplId];
         if (tplId && IMPORT_PROMPTS[tplId]) {
-            currentImportPrompt = IMPORT_PROMPTS[tplId] + (tplId === 'img_qcm_mot' ? '' : OPTIONAL_IMAGE_PROMPT_NOTE);
+            currentImportPrompt = IMPORT_PROMPTS[tplId] + OPTIONAL_MEDIA_PROMPT_NOTE;
             document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer — ' + (tplInfo ? tplInfo.label : tplId);
         } else {
             currentImportPrompt = IMPORT_PROMPT_ALL;
@@ -1298,26 +1493,31 @@ Champ image optionnel :
     };
 
     window.executeImport = async function() {
-        const raw = document.getElementById('import-json').value.trim();
+        const rawInput = document.getElementById('import-json').value;
+        const raw = rawInput.trim();
         const errDiv = document.getElementById('import-errors');
         errDiv.style.display = 'none';
 
         if (!raw) { errDiv.textContent = 'Collez du JSON !'; errDiv.style.display = 'block'; return; }
 
-        // Nettoyer guillemets typographiques (copie depuis ChatGPT/Word)
-        const cleaned = raw
-            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
-            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
-            .replace(/[\u2013\u2014]/g, '-')
-            .replace(/[\u2026]/g, '...');
+        const selectedTemplateId = document.getElementById('exo-template').value || '';
+        const cleaned = cleanImportJsonText(raw);
 
         let parsed;
         try {
             parsed = JSON.parse(cleaned);
         } catch(e) {
-            errDiv.textContent = 'JSON invalide : ' + e.message;
+            const typoQuotes = (rawInput.match(IMPORT_DOUBLE_QUOTES_RE) || []).length;
+            errDiv.textContent = 'JSON invalide : ' + e.message + (typoQuotes > 0 ? ' (guillemets typographiques detectes)' : '');
             errDiv.style.display = 'block';
             return;
+        }
+
+        // Accepter aussi les wrappers IA courants
+        if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.exercices)) parsed = parsed.exercices;
+            else if (Array.isArray(parsed.exercises)) parsed = parsed.exercises;
+            else if (Array.isArray(parsed.items)) parsed = parsed.items;
         }
 
         // Accept single object or array
@@ -1327,17 +1527,20 @@ Champ image optionnel :
         let imported = 0;
 
         for (let i = 0; i < parsed.length; i++) {
-            const ex = parsed[i];
+            const ex = normalizeImportedExerciseShape(parsed[i], selectedTemplateId);
+            if (!ex) {
+                errors.push('Exercice ' + (i + 1) + ' : format invalide.');
+                continue;
+            }
 
             // Normalize
             if (!ex.titre) ex.titre = 'Exercice importe ' + (i + 1);
-            if (!ex.categorie && ex.template_id && TEMPLATES[ex.template_id]) {
-                ex.categorie = TEMPLATES[ex.template_id].categorie;
-            }
-            if (!TEMPLATES[ex.template_id]) {
+            if (!ex.template_id || !TEMPLATES[ex.template_id]) {
                 errors.push('Exercice ' + (i+1) + ' : template_id "' + ex.template_id + '" inconnu.');
                 continue;
             }
+            const templateInfo = TEMPLATES[ex.template_id];
+            ex.categorie = templateInfo.categorie; // Force la categorie du template (evite les incoherences de routage)
             if (!ex.data || typeof ex.data !== 'object') {
                 errors.push('Exercice ' + (i+1) + ' : champ "data" manquant ou invalide.');
                 continue;
@@ -1346,10 +1549,15 @@ Champ image optionnel :
             // Normalize distracteurs from pipe-separated string
             if (typeof ex.data.distracteurs === 'string') {
                 ex.data.distracteurs = ex.data.distracteurs.split('|').map(s => s.trim()).filter(Boolean);
+            } else if (Array.isArray(ex.data.distracteurs)) {
+                ex.data.distracteurs = ex.data.distracteurs.map(v => String(v || '').trim()).filter(Boolean);
             }
             // Auto-prefix image path if it's just a filename
             if (ex.data.image) {
                 ex.data.image = getFullImagePath(ex.data.image);
+            }
+            if (ex.data.lien_url) {
+                ex.data.lien_url = sanitizeExternalUrl(ex.data.lien_url);
             }
             // Normalize reponse for vrai/faux
             if (ex.template_id === 'lec_vrai_faux') {
@@ -1361,12 +1569,12 @@ Champ image optionnel :
             const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
             const payload = {
                 titre: ex.titre,
-                categorie: ex.categorie || TEMPLATES[ex.template_id].categorie,
+                categorie: ex.categorie,
                 template_id: ex.template_id,
                 difficulte: ex.difficulte || 'facile',
                 publie: false,
                 data: ex.data,
-                sourcePrompt: raw,
+                sourcePrompt: cleaned,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
