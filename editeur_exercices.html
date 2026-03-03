@@ -4639,7 +4639,7 @@ Important:
 
             if (isDoubleQuoteLike(ch)) {
                 var next = nextSignificantChar(raw, i + 1);
-                var canClose = (next === ':' || next === ',' || next === '}' || next === ']');
+                var canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
 
                 if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
                     if (canClose) {
@@ -5029,6 +5029,27 @@ Important:
         if (!cleaned) return null;
         var best = null;
         var bestLen = 0;
+
+        function normalizeOneQuestion(q) {
+            if (!q || typeof q !== 'object' || Array.isArray(q)) return null;
+            var qText = (q.question !== undefined) ? q.question : q.consigne;
+            var rawChoix = q.choix || q.choices || q.options;
+            var repRaw = (q.reponse !== undefined) ? q.reponse : ((q.correct !== undefined) ? q.correct : ((q.answer !== undefined) ? q.answer : q.response));
+            if (typeof qText !== 'string' || !Array.isArray(rawChoix) || repRaw === undefined) return null;
+            var choix = normalizeQcmChoixList(rawChoix);
+            if (choix.length === 0) return null;
+            var repNorm = normalizeQcmRepFromAny(repRaw, choix);
+            if (Array.isArray(repNorm) && repNorm.length === 0) return null;
+            if (!Array.isArray(repNorm) && !repNorm) return null;
+            return {
+                question: qText || '',
+                choix: choix,
+                reponse: repNorm,
+                multiple: !!q.multiple || Array.isArray(repNorm),
+                explication: q.explication || q.explanation || ''
+            };
+        }
+
         for (var i = 0; i < cleaned.length; i++) {
             if (cleaned.charAt(i) !== '[') continue;
             var candidate = extractBalancedJsonAt(cleaned, i);
@@ -5043,31 +5064,60 @@ Important:
             var normalized = [];
             var ok = true;
             for (var j = 0; j < arr.length; j++) {
-                var q = arr[j];
-                if (!q || typeof q !== 'object' || Array.isArray(q)) { ok = false; break; }
-                var qText = (q.question !== undefined) ? q.question : q.consigne;
-                var rawChoix = q.choix || q.choices || q.options;
-                var repRaw = (q.reponse !== undefined) ? q.reponse : ((q.correct !== undefined) ? q.correct : ((q.answer !== undefined) ? q.answer : q.response));
-                if (typeof qText !== 'string' || !Array.isArray(rawChoix) || repRaw === undefined) { ok = false; break; }
-                var choix = normalizeQcmChoixList(rawChoix);
-                if (choix.length === 0) { ok = false; break; }
-                var repNorm = normalizeQcmRepFromAny(repRaw, choix);
-                if (Array.isArray(repNorm) && repNorm.length === 0) { ok = false; break; }
-                if (!Array.isArray(repNorm) && !repNorm) { ok = false; break; }
-                normalized.push({
-                    question: qText || '',
-                    choix: choix,
-                    reponse: repNorm,
-                    multiple: !!q.multiple || Array.isArray(repNorm),
-                    explication: q.explication || q.explanation || ''
-                });
+                var normalizedOne = normalizeOneQuestion(arr[j]);
+                if (!normalizedOne) { ok = false; break; }
+                normalized.push(normalizedOne);
             }
             if (ok && normalized.length > bestLen) {
                 best = normalized;
                 bestLen = normalized.length;
             }
         }
-        return bestLen > 1 ? best : null;
+        if (bestLen > 1) return best;
+
+        // Fallback: cibler explicitement questions[] et parser question par question.
+        var keyMatch = cleaned.match(/"questions"\s*:/i);
+        if (!keyMatch) return null;
+        var keyIndex = keyMatch.index;
+        var arrStart = cleaned.indexOf('[', keyIndex);
+        if (arrStart < 0) return null;
+
+        var arrCandidate = extractBalancedJsonAt(cleaned, arrStart);
+        if (arrCandidate) {
+            try {
+                var parsedArray = JSON.parse(arrCandidate);
+                if (Array.isArray(parsedArray) && parsedArray.length > 1) {
+                    var normalizedArray = [];
+                    var allValid = true;
+                    for (var ai = 0; ai < parsedArray.length; ai++) {
+                        var n = normalizeOneQuestion(parsedArray[ai]);
+                        if (!n) { allValid = false; break; }
+                        normalizedArray.push(n);
+                    }
+                    if (allValid && normalizedArray.length > 1) return normalizedArray;
+                }
+            } catch (e) {}
+        }
+
+        var arrEnd = cleaned.lastIndexOf(']');
+        if (arrEnd <= arrStart) arrEnd = cleaned.length;
+        var zone = cleaned.substring(arrStart + 1, arrEnd);
+        var recovered = [];
+        for (var p = 0; p < zone.length; p++) {
+            if (zone.charAt(p) !== '{') continue;
+            var qObjRaw = extractBalancedJsonAt(zone, p);
+            if (!qObjRaw) continue;
+            p += qObjRaw.length - 1;
+            var parsedQ;
+            try {
+                parsedQ = JSON.parse(qObjRaw);
+            } catch (e) {
+                continue;
+            }
+            var normalizedQ = normalizeOneQuestion(parsedQ);
+            if (normalizedQ) recovered.push(normalizedQ);
+        }
+        return recovered.length > 1 ? recovered : null;
     }
 
     function countQuestionTokens(rawText) {
@@ -5604,6 +5654,10 @@ Important:
                     };
                     normalized.typeHint = 'qcm_series_multi';
                     showToast('ℹ️ Recuperation auto : ' + recoveredQuestions.length + ' questions detectees', 3500);
+                } else if (rawQuestionCount >= 3) {
+                    errorEl.textContent = '❌ Import incomplet detecte : le JSON semble contenir plusieurs questions, mais une seule a pu etre lue. Relance le prompt avec guillemets standards (") puis reimporte.';
+                    errorEl.style.display = 'block';
+                    return;
                 }
             }
         }
@@ -5635,11 +5689,16 @@ Important:
         var type = selectedType;
         var sameOrderingFamily = (selectedType === 'hierarchiser' && detectedType === 'ordre') || (selectedType === 'ordre' && detectedType === 'hierarchiser');
         var selectedTypeValid = !validateImportedData(selectedType, data);
+        var keepSelectedTypeStrict = (selectedType === 'etude_cas');
         if (detectedType && detectedType !== selectedType && !sameOrderingFamily && !selectedTypeValid) {
-            type = detectedType;
-            document.getElementById('exo-type').value = type;
-            onTypeChange();
-            showToast('🔄 Type auto-detecte : ' + (TYPE_LABELS[type] || type), 3000);
+            if (keepSelectedTypeStrict) {
+                showToast('ℹ️ JSON detecte comme ' + (TYPE_LABELS[detectedType] || detectedType) + ' — type "Etude de cas" conserve', 3500);
+            } else {
+                type = detectedType;
+                document.getElementById('exo-type').value = type;
+                onTypeChange();
+                showToast('🔄 Type auto-detecte : ' + (TYPE_LABELS[type] || type), 3000);
+            }
         }
 
         var importError = validateImportedData(type, data);
