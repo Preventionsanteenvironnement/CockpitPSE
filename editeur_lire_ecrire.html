@@ -502,6 +502,7 @@ function showToast(msg) {
     let allExercices = [];
     let currentSourcePrompt = null;
     let currentTagsData = {}; // { fieldKey: [tag1, tag2, ...] }
+    let currentSeriesData = null; // tableau d'items pour un exercice serie
 
     // =============================================
     // IMPORT PROMPT
@@ -876,9 +877,11 @@ Champ lien optionnel :
             const catBadge = '<span class="ei-badge badge-' + (ex.categorie || 'mots') + '">' + (CATEGORIE_LABELS[ex.categorie] || ex.categorie) + '</span>';
             const tplInfo = TEMPLATES[ex.template_id] ? TEMPLATES[ex.template_id].label : ex.template_id;
             const pubBadge = ex.publie ? '<span class="ei-badge badge-publie">Publie</span>' : '<span class="ei-badge badge-brouillon">Brouillon</span>';
+            const seriesCount = Number(ex.series_count || (Array.isArray(ex.series) ? ex.series.length : 0)) || 0;
+            const seriesBadge = seriesCount > 1 ? '<span class="ei-badge badge-mots">Serie x' + seriesCount + '</span>' : '';
 
             div.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + catBadge + pubBadge + '</div>' +
+                '<div class="ei-meta">' + catBadge + pubBadge + seriesBadge + '</div>' +
                 '<button class="ei-del" onclick="deleteFromSidebar(\'' + ex.id + '\', event)" title="Supprimer">🗑️</button>';
             container.appendChild(div);
         });
@@ -912,6 +915,7 @@ Champ lien optionnel :
         if (!ex) return;
 
         currentExoId = exoId;
+        currentSeriesData = Array.isArray(ex.series) && ex.series.length > 0 ? JSON.parse(JSON.stringify(ex.series)) : null;
 
         document.getElementById('exo-titre').value = ex.titre || '';
         document.getElementById('exo-categorie').value = ex.categorie || 'images';
@@ -923,7 +927,9 @@ Champ lien optionnel :
         document.getElementById('exo-template').value = ex.template_id || '';
 
         // Render template fields and fill data
-        renderTemplateFields(ex.template_id, ex.data || {});
+        const firstSeriesItem = currentSeriesData && currentSeriesData[0] ? currentSeriesData[0] : null;
+        const dataToEdit = firstSeriesItem && firstSeriesItem.data ? firstSeriesItem.data : (ex.data || {});
+        renderTemplateFields(ex.template_id, dataToEdit);
 
         // Source prompt
         currentSourcePrompt = ex.sourcePrompt || null;
@@ -946,6 +952,7 @@ Champ lien optionnel :
         currentExoId = null;
         currentSourcePrompt = null;
         currentTagsData = {};
+        currentSeriesData = null;
 
         document.getElementById('exo-titre').value = '';
         document.getElementById('exo-categorie').value = 'images';
@@ -983,6 +990,7 @@ Champ lien optionnel :
     }
 
     window.onCategorieChange = function() {
+        currentSeriesData = null;
         const cat = document.getElementById('exo-categorie').value;
         populateTemplateDropdown(cat);
         const firstTemplate = document.getElementById('exo-template').value;
@@ -990,6 +998,7 @@ Champ lien optionnel :
     };
 
     window.onTemplateChange = function() {
+        currentSeriesData = null;
         const tid = document.getElementById('exo-template').value;
         renderTemplateFields(tid, {});
     };
@@ -1204,6 +1213,16 @@ Champ lien optionnel :
             sourcePrompt: sourcePromptVal,
             updatedAt: serverTimestamp()
         };
+
+        if (Array.isArray(currentSeriesData) && currentSeriesData.length > 0) {
+            const updatedSeries = JSON.parse(JSON.stringify(currentSeriesData));
+            if (!updatedSeries[0] || typeof updatedSeries[0] !== 'object') updatedSeries[0] = {};
+            updatedSeries[0].titre = titre;
+            updatedSeries[0].difficulte = difficulte;
+            updatedSeries[0].data = data;
+            payload.series = updatedSeries;
+            payload.series_count = updatedSeries.length;
+        }
 
         try {
             if (currentExoId) {
@@ -1465,6 +1484,21 @@ Champ lien optionnel :
         return out;
     }
 
+    function normalizeExerciseDataForTemplate(templateId, data) {
+        const out = { ...(data || {}) };
+        if (typeof out.distracteurs === 'string') {
+            out.distracteurs = out.distracteurs.split('|').map(s => s.trim()).filter(Boolean);
+        } else if (Array.isArray(out.distracteurs)) {
+            out.distracteurs = out.distracteurs.map(v => String(v || '').trim()).filter(Boolean);
+        }
+        if (out.image) out.image = getFullImagePath(out.image);
+        if (out.lien_url) out.lien_url = sanitizeExternalUrl(out.lien_url);
+        if (templateId === 'lec_vrai_faux' && typeof out.reponse === 'string') {
+            out.reponse = out.reponse.toLowerCase() === 'vrai' || out.reponse === 'true';
+        }
+        return out;
+    }
+
     window.openImportModal = function() {
         document.getElementById('import-modal').style.display = 'flex';
         document.getElementById('import-json').value = '';
@@ -1525,6 +1559,7 @@ Champ lien optionnel :
 
         const errors = [];
         let imported = 0;
+        const normalizedItems = [];
 
         for (let i = 0; i < parsed.length; i++) {
             const ex = normalizeImportedExerciseShape(parsed[i], selectedTemplateId);
@@ -1532,40 +1567,73 @@ Champ lien optionnel :
                 errors.push('Exercice ' + (i + 1) + ' : format invalide.');
                 continue;
             }
-
-            // Normalize
             if (!ex.titre) ex.titre = 'Exercice importe ' + (i + 1);
             if (!ex.template_id || !TEMPLATES[ex.template_id]) {
-                errors.push('Exercice ' + (i+1) + ' : template_id "' + ex.template_id + '" inconnu.');
+                errors.push('Exercice ' + (i + 1) + ' : template_id "' + ex.template_id + '" inconnu.');
+                continue;
+            }
+            if (!ex.data || typeof ex.data !== 'object') {
+                errors.push('Exercice ' + (i + 1) + ' : champ "data" manquant ou invalide.');
                 continue;
             }
             const templateInfo = TEMPLATES[ex.template_id];
             ex.categorie = templateInfo.categorie; // Force la categorie du template (evite les incoherences de routage)
-            if (!ex.data || typeof ex.data !== 'object') {
-                errors.push('Exercice ' + (i+1) + ' : champ "data" manquant ou invalide.');
-                continue;
-            }
+            ex.data = normalizeExerciseDataForTemplate(ex.template_id, ex.data);
+            normalizedItems.push(ex);
+        }
 
-            // Normalize distracteurs from pipe-separated string
-            if (typeof ex.data.distracteurs === 'string') {
-                ex.data.distracteurs = ex.data.distracteurs.split('|').map(s => s.trim()).filter(Boolean);
-            } else if (Array.isArray(ex.data.distracteurs)) {
-                ex.data.distracteurs = ex.data.distracteurs.map(v => String(v || '').trim()).filter(Boolean);
-            }
-            // Auto-prefix image path if it's just a filename
-            if (ex.data.image) {
-                ex.data.image = getFullImagePath(ex.data.image);
-            }
-            if (ex.data.lien_url) {
-                ex.data.lien_url = sanitizeExternalUrl(ex.data.lien_url);
-            }
-            // Normalize reponse for vrai/faux
-            if (ex.template_id === 'lec_vrai_faux') {
-                if (typeof ex.data.reponse === 'string') {
-                    ex.data.reponse = ex.data.reponse.toLowerCase() === 'vrai' || ex.data.reponse === 'true';
+        // Import en "serie" : un seul document avec plusieurs items (meme template)
+        if (errors.length === 0 && normalizedItems.length > 1) {
+            let uniformTemplateId = normalizedItems[0].template_id;
+            let canBundleSeries = true;
+            for (let i = 1; i < normalizedItems.length; i++) {
+                if (normalizedItems[i].template_id !== uniformTemplateId) {
+                    canBundleSeries = false;
+                    break;
                 }
             }
 
+            if (canBundleSeries) {
+                const templateInfo = TEMPLATES[uniformTemplateId];
+                const seriesItems = normalizedItems.map((ex) => ({
+                    titre: ex.titre,
+                    difficulte: ex.difficulte || 'facile',
+                    data: ex.data
+                }));
+                const titleSet = Array.from(new Set(seriesItems.map(item => String(item.titre || '').trim()).filter(Boolean)));
+                const serieTitle = titleSet.length === 1
+                    ? titleSet[0]
+                    : ((normalizedItems[0].titre || templateInfo.label || 'Serie Lire/Ecrire') + ' (' + seriesItems.length + ' items)');
+
+                const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+                const payload = {
+                    titre: serieTitle,
+                    categorie: templateInfo.categorie,
+                    template_id: uniformTemplateId,
+                    difficulte: normalizedItems[0].difficulte || 'facile',
+                    publie: false,
+                    data: seriesItems[0].data,
+                    series: seriesItems,
+                    series_count: seriesItems.length,
+                    sourcePrompt: cleaned,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+
+                try {
+                    await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
+                    imported = 1;
+                    showToast('1 exercice serie importe (' + seriesItems.length + ' items) !');
+                    closeImportModal();
+                    return;
+                } catch (e) {
+                    errors.push('Serie : erreur Firebase — ' + e.message);
+                }
+            }
+        }
+
+        for (let i = 0; i < normalizedItems.length; i++) {
+            const ex = normalizedItems[i];
             const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
             const payload = {
                 titre: ex.titre,
