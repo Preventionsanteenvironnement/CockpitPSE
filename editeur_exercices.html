@@ -1480,6 +1480,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="data_modules.js"></script>
+<script src="json_import_utils.js"></script>
 <script>
     function toggleMenu(){ document.body.classList.toggle('menu-open'); }
     function closeMenu(){ document.body.classList.remove('menu-open'); }
@@ -4467,16 +4468,20 @@ Important:
     }
 
     window.openImportModal = function() {
-        bindImportInputGuardsExo();
+        JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
         const type = document.getElementById('exo-type').value;
-        document.getElementById('import-prompt-guide').textContent = '💡 Prompt a copier dans ChatGPT/Claude :\n\n' + getImportPrompt(type);
+        // Auto-remplacement de [MODULE] par le module selectionne
+        var moduleEl = document.getElementById('exo-module');
+        var moduleName = moduleEl && moduleEl.selectedIndex > 0 ? moduleEl.options[moduleEl.selectedIndex].text : '[MODULE]';
+        var promptText = getImportPrompt(type).replace(/\[MODULE\]/g, moduleName);
+        document.getElementById('import-prompt-guide').textContent = '💡 Prompt a copier dans ChatGPT/Claude :\n\n' + promptText;
         document.getElementById('import-json-guide').textContent = 'Format JSON attendu pour "' + (TYPE_LABELS[type] || type) + '"';
         document.getElementById('import-json-input').value = '';
         document.getElementById('import-error').style.display = 'none';
         document.getElementById('import-error').textContent = '';
         var report = document.getElementById('import-clean-report');
         if (report) { report.style.display = 'none'; report.textContent = ''; }
-        updateImportQuoteWarningExo('');
+        JsonImportUtils.updateImportQuoteWarning('', 'import-warning', 'import-warning-text');
         document.getElementById('import-modal').classList.add('show');
     };
     window.closeImportModal = function() {
@@ -4513,481 +4518,27 @@ Important:
         return { data, warnings };
     }
 
-    // Extrait un bloc JSON équilibré ({...} ou [...]) à partir d'une position donnée.
-    function extractBalancedJsonAt(raw, start) {
-        if (!raw || start < 0 || start >= raw.length) return null;
-        var stack = [];
-        var inString = false;
-        var escaped = false;
+    // === Aliases vers JsonImportUtils (fonctions partagees) ===
+    var extractBalancedJsonAt = JsonImportUtils.extractBalancedJsonAt;
+    var extractBalancedJson = JsonImportUtils.extractBalancedJson;
+    var extractParsableJson = JsonImportUtils.extractParsableJson;
 
-        for (var j = start; j < raw.length; j++) {
-            var ch = raw.charAt(j);
-            if (inString) {
-                if (escaped) escaped = false;
-                else if (ch === '\\') escaped = true;
-                else if (ch === '"') inString = false;
-                continue;
-            }
-            if (ch === '"') { inString = true; continue; }
-            if (ch === '{' || ch === '[') {
-                stack.push(ch);
-                continue;
-            }
-            if (ch === '}' || ch === ']') {
-                if (stack.length === 0) return null;
-                var last = stack.pop();
-                if ((last === '{' && ch !== '}') || (last === '[' && ch !== ']')) return null;
-                if (stack.length === 0) return raw.substring(start, j + 1);
-            }
-        }
-        return null;
+    // Fonctions de nettoyage JSON partagees via JsonImportUtils
+    function cleanJsonInput(raw) {
+        return JsonImportUtils.cleanJsonFull(raw).cleaned;
     }
-
-    // Extrait le premier bloc JSON équilibré ({...} ou [...]) même si texte autour.
-    function extractBalancedJson(raw) {
-        if (!raw) return null;
-        for (var i = 0; i < raw.length; i++) {
-            var c = raw.charAt(i);
-            if (c !== '{' && c !== '[') continue;
-            var candidate = extractBalancedJsonAt(raw, i);
-            if (candidate) return candidate;
-        }
-        return null;
-    }
-
-    // Cherche le premier bloc JSON réellement parsable (évite de capturer un faux bloc du prompt).
-    function extractParsableJson(raw) {
-        if (!raw) return null;
-        var parsed = [];
-        for (var i = 0; i < raw.length; i++) {
-            var c = raw.charAt(i);
-            if (c !== '{' && c !== '[') continue;
-            var candidate = extractBalancedJsonAt(raw, i);
-            if (!candidate) continue;
-            try {
-                JSON.parse(candidate);
-                parsed.push({ json: candidate, start: i, len: candidate.length, isArray: c === '[' });
-            } catch (e) {}
-        }
-        if (parsed.length === 0) return null;
-        // Prefer the widest parsable candidate first (souvent le vrai JSON racine),
-        // puis le plus tot en cas d'egalite.
-        parsed.sort(function(a, b) {
-            if (a.len !== b.len) return b.len - a.len;
-            return a.start - b.start;
-        });
-        return parsed[0].json;
-    }
-
-    // Normalise les guillemets typographiques sans casser le contenu texte.
-    // - Convertit les délimiteurs de chaînes en "
-    // - Conserve les guillemets décoratifs internes via échappement \"
-    function normalizeJsonQuotes(raw) {
-        if (!raw) return raw;
-        var out = '';
-        var inString = false;
-        var stringDelim = null; // '"' | 'curly'
-        var escaped = false;
-        var i = 0;
-
-        function isDoubleQuoteLike(ch) {
-            return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
-        }
-        function nextSignificantChar(str, start) {
-            for (var k = start; k < str.length; k++) {
-                var cc = str.charAt(k);
-                if (!/\s/.test(cc)) return cc;
-            }
-            return '';
-        }
-
-        while (i < raw.length) {
-            var ch = raw.charAt(i);
-
-            if (!inString) {
-                if (isDoubleQuoteLike(ch)) {
-                    inString = true;
-                    stringDelim = (ch === '"') ? '"' : 'curly';
-                    out += '"';
-                    i++;
-                    continue;
-                }
-                // Apostrophes typographiques simples -> apostrophe standard
-                if (/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch)) {
-                    out += "'";
-                    i++;
-                    continue;
-                }
-                out += ch;
-                i++;
-                continue;
-            }
-
-            // inString === true
-            if (escaped) {
-                out += ch;
-                escaped = false;
-                i++;
-                continue;
-            }
-            if (ch === '\\') {
-                out += ch;
-                escaped = true;
-                i++;
-                continue;
-            }
-
-            if (isDoubleQuoteLike(ch)) {
-                var next = nextSignificantChar(raw, i + 1);
-                var canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
-
-                if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
-                    if (canClose) {
-                        out += '"';
-                        inString = false;
-                        stringDelim = null;
-                    } else {
-                        out += '\\"';
-                    }
-                    i++;
-                    continue;
-                }
-
-                // Quote-like différente du délimiteur courant -> texte interne
-                out += '\\"';
-                i++;
-                continue;
-            }
-
-            // Apostrophes typographiques simples -> apostrophe standard dans la string
-            if (/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch)) {
-                out += "'";
-                i++;
-                continue;
-            }
-
-            out += ch;
-            i++;
-        }
-
-        return out;
-    }
-
-    const EXO_IMPORT_DOUBLE_QUOTES_RE = /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g;
-    const EXO_IMPORT_SINGLE_QUOTES_RE = /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g;
-
-    function countMatchesExo(raw, regex) {
-        if (!raw) return 0;
-        var m = String(raw).match(regex);
-        return m ? m.length : 0;
-    }
-
-    function lineColumnFromIndexExo(raw, index) {
-        var safeIndex = Math.max(0, Math.min(index, raw.length));
-        var line = 1, column = 1;
-        for (var i = 0; i < safeIndex; i++) {
-            if (raw.charAt(i) === '\n') { line += 1; column = 1; }
-            else column += 1;
-        }
-        return { line: line, column: column };
-    }
-
-    function indexFromLineColumnExo(raw, line, column) {
-        var currentLine = 1, currentColumn = 1;
-        for (var i = 0; i < raw.length; i++) {
-            if (currentLine === line && currentColumn === column) return i;
-            if (raw.charAt(i) === '\n') { currentLine += 1; currentColumn = 1; }
-            else currentColumn += 1;
-        }
-        return Math.max(0, raw.length - 1);
-    }
-
-    function parseErrorLocationExo(message, raw) {
-        var msg = String(message || '');
-        var index = null, line = null, column = null;
-
-        var m = msg.match(/position\s+(\d+)/i);
-        if (m) index = Number(m[1]);
-
-        m = msg.match(/line\s+(\d+)\s+column\s+(\d+)/i);
-        if (m) {
-            line = Number(m[1]);
-            column = Number(m[2]);
-            if (index === null && !isNaN(line) && !isNaN(column)) {
-                index = indexFromLineColumnExo(raw, line, column);
-            }
-        }
-
-        if (index === null || isNaN(index)) return null;
-        var lc = lineColumnFromIndexExo(raw, index);
-        return {
-            index: index,
-            line: (!isNaN(line) && line !== null) ? line : lc.line,
-            column: (!isNaN(column) && column !== null) ? column : lc.column
-        };
-    }
-
-    function parseErrorContextExo(raw, index) {
-        var safeIndex = Math.max(0, Math.min(index, raw.length));
-        var start = Math.max(0, safeIndex - 30);
-        var end = Math.min(raw.length, safeIndex + 30);
-        var snippet = raw.slice(start, end).replace(/\n/g, '\\n');
-        var pointer = Array(Math.max(0, safeIndex - start) + 1).join(' ') + '^';
-        return { snippet: snippet, pointer: pointer };
-    }
-
-    function inferJsonStructureIssueExo(raw) {
-        if (!raw) return null;
-        var stack = [];
-        var inString = false;
-        var escaped = false;
-        var line = 1;
-        var column = 1;
-        var openToClose = { '{': '}', '[': ']' };
-
-        for (var i = 0; i < raw.length; i++) {
-            var ch = raw.charAt(i);
-
-            if (inString) {
-                if (escaped) escaped = false;
-                else if (ch === '\\') escaped = true;
-                else if (ch === '"') inString = false;
-            } else {
-                if (ch === '"') {
-                    inString = true;
-                } else if (ch === '{' || ch === '[') {
-                    stack.push({ ch: ch, index: i, line: line, column: column });
-                } else if (ch === '}' || ch === ']') {
-                    if (stack.length === 0) {
-                        return {
-                            index: i,
-                            line: line,
-                            column: column,
-                            message: 'Fermeture inattendue "' + ch + '" (sans ouverture correspondante).'
-                        };
-                    }
-                    var top = stack.pop();
-                    var expected = openToClose[top.ch];
-                    if (ch !== expected) {
-                        return {
-                            index: i,
-                            line: line,
-                            column: column,
-                            message: 'Fermeture "' + ch + '" inattendue. "' + top.ch + '" ouvert en ligne ' + top.line + ', colonne ' + top.column + ' attend "' + expected + '".'
-                        };
-                    }
-                }
-            }
-
-            if (ch === '\n') { line += 1; column = 1; }
-            else column += 1;
-        }
-
-        if (inString) {
-            var idx = Math.max(0, raw.length - 1);
-            var lc = lineColumnFromIndexExo(raw, idx);
-            return {
-                index: idx,
-                line: lc.line,
-                column: lc.column,
-                message: 'Chaîne non fermée: guillemet double manquant (").'
-            };
-        }
-
-        if (stack.length > 0) {
-            var last = stack[stack.length - 1];
-            return {
-                index: last.index,
-                line: last.line,
-                column: last.column,
-                message: 'Bloc non fermé: "' + last.ch + '" ouvert ici attend "' + openToClose[last.ch] + '".'
-            };
-        }
-
-        return null;
-    }
-
-    function buildImportParseErrorsExo(error, cleanedJson, stats) {
-        var messages = ['❌ JSON invalide : ' + (error && error.message ? error.message : 'Erreur inconnue')];
-        if ((stats && stats.typoDoubleQuotes) > 0) {
-            messages.push('💡 Guillemets doubles typographiques détectés : remplace-les par des guillemets standards (").');
-        }
-        var loc = parseErrorLocationExo(error && error.message, cleanedJson);
-        if (loc) {
-            var ctx = parseErrorContextExo(cleanedJson, loc.index);
-            messages.push('📍 Position : index ' + loc.index + ' (ligne ' + loc.line + ', colonne ' + loc.column + ')');
-            messages.push('🔎 Contexte (±30) : ' + ctx.snippet + '\n' + ctx.pointer);
-            return messages.join('\n');
-        }
-
-        var inferred = inferJsonStructureIssueExo(cleanedJson);
-        if (inferred) {
-            var ictx = parseErrorContextExo(cleanedJson, inferred.index);
-            messages.push('📍 Position (estimée) : ligne ' + inferred.line + ', colonne ' + inferred.column);
-            messages.push('🔧 Diagnostic : ' + inferred.message);
-            messages.push('🔎 Contexte (±30) : ' + ictx.snippet + '\n' + ictx.pointer);
-        } else {
-            messages.push('💡 Position exacte non fournie par le navigateur. Vérifie crochets/accolades fermants et virgules finales.');
-        }
-
-        return messages.join('\n');
-    }
-
-    function getJsonBoundaryErrorExo(raw) {
-        if (!raw) return '❌ JSON vide après nettoyage.';
-        var first = raw.charAt(0);
-        var last = raw.charAt(raw.length - 1);
-        if (first !== '{' && first !== '[') return '❌ JSON tronqué : le contenu doit commencer par "{" ou "[".';
-        if (last !== '}' && last !== ']') return '❌ JSON tronqué : le contenu doit se terminer par "}" ou "]".';
-        if (first === '{' && last !== '}') return '❌ JSON tronqué : objet commencé par "{" sans "}" final.';
-        if (first === '[' && last !== ']') return '❌ JSON tronqué : tableau commencé par "[" sans "]" final.';
-        return null;
-    }
-
-    function updateImportQuoteWarningExo(raw) {
-        var warningBox = document.getElementById('import-warning');
-        var warningText = document.getElementById('import-warning-text');
-        if (!warningBox || !warningText) return;
-        var doubleCount = countMatchesExo(raw, EXO_IMPORT_DOUBLE_QUOTES_RE);
-        if (doubleCount > 0) {
-            warningText.textContent = '⚠️ ' + doubleCount + ' guillemet(s) double(s) typographique(s) détecté(s).';
-            warningBox.style.display = 'flex';
-        } else {
-            warningText.textContent = '';
-            warningBox.style.display = 'none';
-        }
-    }
-
-    function bindImportInputGuardsExo() {
-        var input = document.getElementById('import-json-input');
-        if (!input || input.dataset.guardsBound === '1') return;
-        input.dataset.guardsBound = '1';
-        input.addEventListener('input', function() {
-            updateImportQuoteWarningExo(input.value || '');
-        });
-        input.addEventListener('paste', function() {
-            setTimeout(function() { updateImportQuoteWarningExo(input.value || ''); }, 0);
-        });
+    function precleanJsonTextLoose(raw) {
+        return JsonImportUtils.cleanJsonLight(raw).cleaned;
     }
 
     window.cleanImportJSONInputExo = function() {
-        var input = document.getElementById('import-json-input');
-        var errorEl = document.getElementById('import-error');
-        var report = document.getElementById('import-clean-report');
-        if (!input) return;
-
-        var raw = input.value || '';
-        if (!raw.trim()) {
-            if (errorEl) {
-                errorEl.textContent = '❌ Collez du JSON avant le nettoyage.';
-                errorEl.style.display = 'block';
-            }
-            if (report) { report.style.display = 'none'; report.textContent = ''; }
-            return;
-        }
-
-        var cleaned = cleanJsonInput(raw);
-        input.value = cleaned;
-        updateImportQuoteWarningExo(cleaned);
-        if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
-
-        if (report) {
-            var parts = [];
-            var d = countMatchesExo(raw, EXO_IMPORT_DOUBLE_QUOTES_RE);
-            var s = countMatchesExo(raw, EXO_IMPORT_SINGLE_QUOTES_RE);
-            if (d > 0) parts.push(d + ' guillemets doubles typographiques corrigés');
-            if (s > 0) parts.push(s + ' apostrophes typographiques normalisées');
-            var tc = countMatchesExo(raw, /,\s*([\]}])/g);
-            if (tc > 0) parts.push(tc + ' virgules finales supprimées');
-            if (parts.length === 0) parts.push('Aucune correction nécessaire');
-            report.textContent = '🧹 ' + parts.join(' · ');
-            report.style.display = 'block';
-        }
+        JsonImportUtils.handleCleanButton(
+            'import-json-input', 'import-error', 'import-clean-report',
+            'import-warning', 'import-warning-text'
+        );
     };
 
-    bindImportInputGuardsExo();
-
-    // Nettoyage universel du JSON colle depuis ChatGPT/Claude/Gemini/Mistral/Word
-    function cleanJsonInput(raw) {
-        // 1. Supprimer BOM partout (pas seulement au debut)
-        raw = raw.replace(/\uFEFF/g, '');
-        // 2. Supprimer les caracteres invisibles / zero-width
-        raw = raw.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
-        // 3. Remplacer NBSP par espace normal
-        raw = raw.replace(/\u00A0/g, ' ');
-        // 4. Normalisation des guillemets typographiques (sans casser les strings)
-        raw = normalizeJsonQuotes(raw);
-        // 4b. Supprimer artefacts de citations IA (Gemini/Perplexity/etc.)
-        raw = raw.replace(/\[cite_start\]/gi, '');
-        raw = raw.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
-        // 5. Extraire le JSON des blocs de code Markdown (```json ... ```)
-        // Si plusieurs blocs sont presentes, choisir le plus pertinent (pas forcement le premier).
-        var codeBlocks = [];
-        var codeBlockRegex = /```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/g;
-        var cbMatch;
-        while ((cbMatch = codeBlockRegex.exec(raw)) !== null) {
-            var block = (cbMatch[1] || '').trim();
-            if (block) codeBlocks.push(block);
-        }
-        if (codeBlocks.length === 1) {
-            raw = codeBlocks[0];
-        } else if (codeBlocks.length > 1) {
-            var bestBlock = null;
-            var bestScore = -1;
-            codeBlocks.forEach(function(block) {
-                var score = block.length;
-                try {
-                    var parsed = JSON.parse(block);
-                    score += 100000; // bonus parsable JSON
-                    if (parsed && typeof parsed === 'object') {
-                        if (Array.isArray(parsed.questions)) score += 50000 + parsed.questions.length * 100;
-                        if (Array.isArray(parsed)) score += 10000 + parsed.length * 100;
-                        if (parsed.type) score += 2000;
-                    }
-                } catch (e) {
-                    // keep base length score
-                }
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestBlock = block;
-                }
-            });
-            raw = bestBlock || codeBlocks[codeBlocks.length - 1];
-        }
-        // 6. Extraire un JSON parsable si texte autour
-        var parsable = extractParsableJson(raw);
-        if (parsable) raw = parsable;
-        else {
-            var balanced = extractBalancedJson(raw);
-            if (balanced) raw = balanced;
-        }
-        // 7. Supprimer les commentaires // en debut de ligne
-        raw = raw.replace(/^\s*\/\/.*$/gm, '');
-        // 8. Supprimer les trailing commas avant } et ]
-        raw = raw.replace(/,\s*([\]}])/g, '$1');
-        // 9. Remplacer Python booleans/None (certaines IA generent du Python)
-        raw = raw.replace(/\bTrue\b/g, 'true');
-        raw = raw.replace(/\bFalse\b/g, 'false');
-        raw = raw.replace(/\bNone\b/g, 'null');
-        return raw.trim();
-    }
-
-    // Nettoyage "souple" pour analyse de secours (sans extraire un seul bloc JSON)
-    function precleanJsonTextLoose(raw) {
-        if (!raw) return '';
-        raw = raw.replace(/\uFEFF/g, '');
-        raw = raw.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
-        raw = raw.replace(/\u00A0/g, ' ');
-        raw = normalizeJsonQuotes(raw);
-        raw = raw.replace(/\[cite_start\]/gi, '');
-        raw = raw.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
-        raw = raw.replace(/^\s*\/\/.*$/gm, '');
-        raw = raw.replace(/,\s*([\]}])/g, '$1');
-        raw = raw.replace(/\bTrue\b/g, 'true');
-        raw = raw.replace(/\bFalse\b/g, 'false');
-        raw = raw.replace(/\bNone\b/g, 'null');
-        return raw.trim();
-    }
+    JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
 
     function normalizeQcmChoixList(rawChoix) {
         if (!Array.isArray(rawChoix)) return [];
@@ -5505,13 +5056,12 @@ Important:
     window.doImportJSON = function() {
         var inputEl = document.getElementById('import-json-input');
         let raw = inputEl ? inputEl.value : '';
-        var rawOriginalInput = raw;
         const errorEl = document.getElementById('import-error');
         var report = document.getElementById('import-clean-report');
         errorEl.style.display = 'none';
         errorEl.textContent = '';
         if (report) { report.style.display = 'none'; report.textContent = ''; }
-        updateImportQuoteWarningExo(raw);
+        JsonImportUtils.updateImportQuoteWarning(raw, 'import-warning', 'import-warning-text');
 
         if (!raw || !raw.trim()) {
             errorEl.textContent = '❌ Collez du JSON dans le champ ci-dessus';
@@ -5522,11 +5072,12 @@ Important:
         try { // Try-catch global pour attraper toute exception
 
         // Etape 1 : Nettoyage robuste
-        raw = cleanJsonInput(raw);
+        var cleanResult = JsonImportUtils.cleanJsonFull(raw);
+        raw = cleanResult.cleaned;
         if (inputEl) inputEl.value = raw;
-        updateImportQuoteWarningExo(raw);
+        JsonImportUtils.updateImportQuoteWarning(raw, 'import-warning', 'import-warning-text');
 
-        var boundaryError = getJsonBoundaryErrorExo(raw);
+        var boundaryError = JsonImportUtils.getJsonBoundaryError(raw);
         if (boundaryError) {
             errorEl.textContent = boundaryError + '\n💡 Vérifie que le JSON est complet et non tronqué.';
             errorEl.style.display = 'block';
@@ -5538,10 +5089,7 @@ Important:
         try {
             data = JSON.parse(raw);
         } catch(e) {
-            errorEl.textContent = buildImportParseErrorsExo(e, raw, {
-                typoDoubleQuotes: countMatchesExo(rawOriginalInput, EXO_IMPORT_DOUBLE_QUOTES_RE),
-                typoSingleQuotes: countMatchesExo(rawOriginalInput, EXO_IMPORT_SINGLE_QUOTES_RE)
-            });
+            errorEl.textContent = JsonImportUtils.buildImportParseErrors(e, raw, cleanResult.stats);
             errorEl.style.display = 'block';
             return;
         }
@@ -5552,12 +5100,10 @@ Important:
         if (_promptField) _promptField.value = raw;
         if (report) {
             var parts = [];
-            var d = countMatchesExo(rawOriginalInput, EXO_IMPORT_DOUBLE_QUOTES_RE);
-            var s = countMatchesExo(rawOriginalInput, EXO_IMPORT_SINGLE_QUOTES_RE);
-            var tc = countMatchesExo(rawOriginalInput, /,\s*([\]}])/g);
-            if (d > 0) parts.push(d + ' guillemets doubles typographiques corrigés');
-            if (s > 0) parts.push(s + ' apostrophes typographiques normalisées');
-            if (tc > 0) parts.push(tc + ' virgules finales supprimées');
+            var st = cleanResult.stats;
+            if (st.typoDoubleQuotes > 0) parts.push(st.typoDoubleQuotes + ' guillemets doubles typographiques corrigés');
+            if (st.typoSingleQuotes > 0) parts.push(st.typoSingleQuotes + ' apostrophes typographiques normalisées');
+            if (st.trailingCommas > 0) parts.push(st.trailingCommas + ' virgules finales supprimées');
             if (parts.length > 0) {
                 report.textContent = '🧹 Import: ' + parts.join(' · ');
                 report.style.display = 'block';

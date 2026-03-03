@@ -1113,6 +1113,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="data_modules.js"></script>
+<script src="json_import_utils.js"></script>
 <script>
 function toggleMenu(){ document.body.classList.toggle('menu-open'); }
 function closeMenu(){ document.body.classList.remove('menu-open'); }
@@ -3014,10 +3015,11 @@ REPONDS UNIQUEMENT AVEC UN JSON VALIDE.
 - Ne renvoie que du JSON, sans texte autour
 - Le JSON doit commencer par { et finir par }`;
 
-const IMPORT_DOUBLE_QUOTES_RE = /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g;
-const IMPORT_SINGLE_QUOTES_RE = /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g;
-const IMPORT_ZW_RE = /[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g;
-const IMPORT_TRAILING_COMMA_RE = /,\s*([\]}])/g;
+// === Fonctions de nettoyage JSON via JsonImportUtils (json_import_utils.js) ===
+const IMPORT_DOUBLE_QUOTES_RE = JsonImportUtils.DOUBLE_QUOTES_RE;
+const IMPORT_SINGLE_QUOTES_RE = JsonImportUtils.SINGLE_QUOTES_RE;
+const IMPORT_ZW_RE = JsonImportUtils.ZW_RE;
+const IMPORT_TRAILING_COMMA_RE = JsonImportUtils.TRAILING_COMMA_RE;
 
 function countMatches(raw, regex) {
     if (!raw) return 0;
@@ -3025,416 +3027,24 @@ function countMatches(raw, regex) {
     return m ? m.length : 0;
 }
 
-function extractImportJsonCandidate(raw) {
-    let out = String(raw || '');
-    const codeBlockMatch = out.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-    if (codeBlockMatch) out = codeBlockMatch[1] || '';
-
-    if (out.charAt(0) !== '{' && out.charAt(0) !== '[') {
-        const firstBrace = out.indexOf('{');
-        const firstBracket = out.indexOf('[');
-        const start = firstBrace >= 0 ? firstBrace : firstBracket;
-
-        if (start >= 0) {
-            const lastBrace = out.lastIndexOf('}');
-            const lastBracket = out.lastIndexOf(']');
-            const end = out.charAt(start) === '{' ? lastBrace : lastBracket;
-            if (end > start) out = out.substring(start, end + 1);
-        }
-    }
-
-    return out.trim();
-}
-
-// Normalise les guillemets typographiques sans casser les guillemets internes.
-function normalizeJsonQuotes(raw) {
-    if (!raw) return raw;
-    let out = '';
-    let inString = false;
-    let stringDelim = null; // '"' | 'curly'
-    let escaped = false;
-    let i = 0;
-
-    function isDoubleQuoteLike(ch) {
-        return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
-    }
-    function isSingleQuoteLike(ch) {
-        return /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch);
-    }
-    function nextSignificantChar(str, start) {
-        for (let k = start; k < str.length; k++) {
-            const cc = str.charAt(k);
-            if (!/\s/.test(cc)) return cc;
-        }
-        return '';
-    }
-
-    while (i < raw.length) {
-        const ch = raw.charAt(i);
-
-        if (!inString) {
-            if (isDoubleQuoteLike(ch)) {
-                inString = true;
-                stringDelim = (ch === '"') ? '"' : 'curly';
-                out += '"';
-                i++;
-                continue;
-            }
-            if (isSingleQuoteLike(ch)) {
-                out += "'";
-                i++;
-                continue;
-            }
-            out += ch;
-            i++;
-            continue;
-        }
-
-        if (escaped) {
-            out += ch;
-            escaped = false;
-            i++;
-            continue;
-        }
-        if (ch === '\\') {
-            out += ch;
-            escaped = true;
-            i++;
-            continue;
-        }
-
-        if (isDoubleQuoteLike(ch)) {
-            const next = nextSignificantChar(raw, i + 1);
-            const canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
-
-            if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
-                if (canClose) {
-                    out += '"';
-                    inString = false;
-                    stringDelim = null;
-                } else {
-                    out += '\\"';
-                }
-                i++;
-                continue;
-            }
-
-            out += '\\"';
-            i++;
-            continue;
-        }
-
-        if (isSingleQuoteLike(ch)) {
-            out += "'";
-            i++;
-            continue;
-        }
-
-        out += ch;
-        i++;
-    }
-
-    return out;
-}
-
-function cleanImportJsonText(raw) {
-    const stats = {
-        typoDoubleQuotes: countMatches(raw, IMPORT_DOUBLE_QUOTES_RE),
-        typoSingleQuotes: countMatches(raw, IMPORT_SINGLE_QUOTES_RE),
-        nbsp: countMatches(raw, /\u00A0/g),
-        zeroWidth: countMatches(raw, IMPORT_ZW_RE),
-        trailingCommas: 0
-    };
-
-    let cleaned = String(raw || '');
-    cleaned = cleaned.replace(/\uFEFF/g, '');
-    cleaned = cleaned.replace(IMPORT_ZW_RE, '');
-    cleaned = cleaned.replace(/\u00A0/g, ' ');
-    cleaned = normalizeJsonQuotes(cleaned);
-    cleaned = cleaned.replace(/\[cite_start\]/gi, '');
-    cleaned = cleaned.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
-    cleaned = extractImportJsonCandidate(cleaned);
-    cleaned = cleaned.replace(/^\s*\/\/.*$/gm, '');
-    cleaned = cleaned.replace(IMPORT_TRAILING_COMMA_RE, function(_match, closer) {
-        stats.trailingCommas += 1;
-        return closer;
-    });
-    cleaned = cleaned.replace(/\bTrue\b/g, 'true');
-    cleaned = cleaned.replace(/\bFalse\b/g, 'false');
-    cleaned = cleaned.replace(/\bNone\b/g, 'null');
-    cleaned = cleaned.trim();
-
-    return { cleaned, stats };
-}
-
-function getJsonBoundaryError(jsonText) {
-    if (!jsonText) return '❌ JSON vide après nettoyage.';
-    const first = jsonText.charAt(0);
-    const last = jsonText.charAt(jsonText.length - 1);
-    if (first !== '{' && first !== '[') {
-        return '❌ JSON tronqué : le contenu doit commencer par "{" ou "[".';
-    }
-    if (last !== '}' && last !== ']') {
-        return '❌ JSON tronqué : le contenu doit se terminer par "}" ou "]".';
-    }
-    if (first === '{' && last !== '}') {
-        return '❌ JSON tronqué : objet commencé par "{" sans "}" final.';
-    }
-    if (first === '[' && last !== ']') {
-        return '❌ JSON tronqué : tableau commencé par "[" sans "]" final.';
-    }
-    return null;
-}
-
-function indexFromLineColumn(raw, line, column) {
-    let currentLine = 1;
-    let currentColumn = 1;
-    for (let i = 0; i < raw.length; i++) {
-        if (currentLine === line && currentColumn === column) return i;
-        if (raw.charAt(i) === '\n') {
-            currentLine += 1;
-            currentColumn = 1;
-        } else {
-            currentColumn += 1;
-        }
-    }
-    return Math.max(0, raw.length - 1);
-}
-
-function lineColumnFromIndex(raw, index) {
-    const safeIndex = Math.max(0, Math.min(index, raw.length));
-    let line = 1;
-    let column = 1;
-    for (let i = 0; i < safeIndex; i++) {
-        if (raw.charAt(i) === '\n') {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-    }
-    return { line, column };
-}
-
-function parseErrorLocation(errMessage, raw) {
-    const msg = String(errMessage || '');
-    let index = null;
-    let line = null;
-    let column = null;
-
-    let m = msg.match(/position\s+(\d+)/i);
-    if (m) index = Number(m[1]);
-
-    m = msg.match(/line\s+(\d+)\s+column\s+(\d+)/i);
-    if (m) {
-        line = Number(m[1]);
-        column = Number(m[2]);
-        if (index === null && !isNaN(line) && !isNaN(column)) {
-            index = indexFromLineColumn(raw, line, column);
-        }
-    }
-
-    if (index === null || isNaN(index)) return null;
-    const lc = lineColumnFromIndex(raw, index);
-    return {
-        index,
-        line: !isNaN(line) && line !== null ? line : lc.line,
-        column: !isNaN(column) && column !== null ? column : lc.column
-    };
-}
-
-function parseErrorContext(raw, index) {
-    const safeIndex = Math.max(0, Math.min(index, raw.length));
-    const start = Math.max(0, safeIndex - 30);
-    const end = Math.min(raw.length, safeIndex + 30);
-    const snippet = raw.slice(start, end).replace(/\n/g, '\\n');
-    const pointer = ' '.repeat(Math.max(0, safeIndex - start)) + '^';
-    return { snippet, pointer };
-}
-
-function inferJsonStructureIssue(raw) {
-    if (!raw) return null;
-
-    const stack = [];
-    let inString = false;
-    let escaped = false;
-    let line = 1;
-    let column = 1;
-
-    const openToClose = { '{': '}', '[': ']' };
-
-    for (let i = 0; i < raw.length; i++) {
-        const ch = raw.charAt(i);
-
-        if (inString) {
-            if (escaped) {
-                escaped = false;
-            } else if (ch === '\\') {
-                escaped = true;
-            } else if (ch === '"') {
-                inString = false;
-            }
-        } else {
-            if (ch === '"') {
-                inString = true;
-            } else if (ch === '{' || ch === '[') {
-                stack.push({ ch, index: i, line, column });
-            } else if (ch === '}' || ch === ']') {
-                if (stack.length === 0) {
-                    return {
-                        index: i,
-                        line,
-                        column,
-                        message: 'Fermeture inattendue "' + ch + '" (sans ouverture correspondante).'
-                    };
-                }
-                const top = stack.pop();
-                const expected = openToClose[top.ch];
-                if (ch !== expected) {
-                    return {
-                        index: i,
-                        line,
-                        column,
-                        message: 'Fermeture "' + ch + '" inattendue. "' + top.ch + '" ouvert en ligne ' + top.line + ', colonne ' + top.column + ' attend "' + expected + '".'
-                    };
-                }
-            }
-        }
-
-        if (ch === '\n') {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-    }
-
-    if (inString) {
-        const idx = Math.max(0, raw.length - 1);
-        const lc = lineColumnFromIndex(raw, idx);
-        return {
-            index: idx,
-            line: lc.line,
-            column: lc.column,
-            message: 'Chaîne non fermée: guillemet double manquant (").'
-        };
-    }
-
-    if (stack.length > 0) {
-        const top = stack[stack.length - 1];
-        const expected = openToClose[top.ch];
-        return {
-            index: top.index,
-            line: top.line,
-            column: top.column,
-            message: 'Bloc non fermé: "' + top.ch + '" ouvert ici attend "' + expected + '".'
-        };
-    }
-
-    return null;
-}
-
-function buildImportParseErrors(error, cleanedJson, stats) {
-    const messages = ['❌ JSON invalide : ' + (error && error.message ? error.message : 'Erreur inconnue')];
-    const typoDoubleCount = (stats.typoDoubleQuotes || 0);
-    if (typoDoubleCount > 0) {
-        messages.push('💡 Guillemets typographiques détectés : remplace-les par des guillemets doubles standards (").');
-    }
-    const loc = parseErrorLocation(error && error.message, cleanedJson);
-    if (loc) {
-        const ctx = parseErrorContext(cleanedJson, loc.index);
-        messages.push('📍 Position : index ' + loc.index + ' (ligne ' + loc.line + ', colonne ' + loc.column + ')');
-        messages.push('🔎 Contexte (±30) : ' + ctx.snippet + '\n' + ctx.pointer);
-    } else {
-        const inferred = inferJsonStructureIssue(cleanedJson);
-        if (inferred) {
-            const ctx = parseErrorContext(cleanedJson, inferred.index);
-            messages.push('📍 Position (estimée) : ligne ' + inferred.line + ', colonne ' + inferred.column);
-            messages.push('🔧 Diagnostic : ' + inferred.message);
-            messages.push('🔎 Contexte (±30) : ' + ctx.snippet + '\n' + ctx.pointer);
-        } else {
-            messages.push('💡 Position exacte non fournie par le navigateur. Vérifie accolades fermantes et virgules finales.');
-        }
-    }
-    return messages;
-}
-
-function updateImportQuoteWarning(raw) {
-    const warningBox = document.getElementById('import-warning');
-    const warningText = document.getElementById('import-warning-text');
-    if (!warningBox || !warningText) return;
-    const doubleCount = countMatches(raw, IMPORT_DOUBLE_QUOTES_RE);
-    if (doubleCount > 0) {
-        warningText.textContent = '⚠️ ' + doubleCount + ' guillemet(s) double(s) typographique(s) détecté(s). Colle en guillemets standards.';
-        warningBox.style.display = 'flex';
-    } else {
-        warningText.textContent = '';
-        warningBox.style.display = 'none';
-    }
-}
-
-function bindImportInputGuards() {
-    const input = document.getElementById('import-json-input');
-    if (!input || input.dataset.guardsBound === '1') return;
-    input.dataset.guardsBound = '1';
-    input.addEventListener('input', function() {
-        updateImportQuoteWarning(input.value || '');
-    });
-    input.addEventListener('paste', function() {
-        setTimeout(function() {
-            updateImportQuoteWarning(input.value || '');
-        }, 0);
-    });
-}
+function extractImportJsonCandidate(raw) { return JsonImportUtils.extractImportJsonCandidate(raw); }
+function normalizeJsonQuotes(raw) { return JsonImportUtils.normalizeJsonQuotes(raw); }
+function cleanImportJsonText(raw) { return JsonImportUtils.cleanJsonFull(raw); }
+function getJsonBoundaryError(jsonText) { return JsonImportUtils.getJsonBoundaryError(jsonText); }
+function parseErrorLocation(msg, raw) { return JsonImportUtils.parseErrorLocation(msg, raw); }
+function parseErrorContext(raw, idx) { return JsonImportUtils.parseErrorContext(raw, idx); }
+function inferJsonStructureIssue(raw) { return JsonImportUtils.inferJsonStructureIssue(raw); }
+function buildImportParseErrors(error, cleaned, stats) { return JsonImportUtils.buildImportParseErrors(error, cleaned, stats); }
 
 window.cleanImportJSONInput = function() {
-    const input = document.getElementById('import-json-input');
-    const errDiv = document.getElementById('import-errors');
-    const report = document.getElementById('import-clean-report');
-    if (!input) return;
-
-    const raw = input.value || '';
-    if (!raw.trim()) {
-        if (errDiv) {
-            errDiv.textContent = '❌ Collez un JSON avant de lancer le nettoyage.';
-            errDiv.style.display = 'block';
-        }
-        if (report) {
-            report.style.display = 'none';
-            report.textContent = '';
-        }
-        return;
-    }
-
-    const cleaned = cleanImportJsonText(raw);
-    input.value = cleaned.cleaned;
-    updateImportQuoteWarning(cleaned.cleaned);
-
-    if (errDiv) {
-        errDiv.style.display = 'none';
-        errDiv.textContent = '';
-    }
-
-    if (report) {
-        const typoDoubleCount = (cleaned.stats.typoDoubleQuotes || 0);
-        const typoSingleCount = (cleaned.stats.typoSingleQuotes || 0);
-        const parts = [];
-        if (typoDoubleCount > 0) parts.push(typoDoubleCount + ' guillemets doubles typographiques corrigés');
-        if (typoSingleCount > 0) parts.push(typoSingleCount + ' apostrophes typographiques normalisées');
-        if (cleaned.stats.trailingCommas > 0) {
-            parts.push(cleaned.stats.trailingCommas + ' virgules finales supprimées');
-        }
-        if (cleaned.stats.nbsp > 0) {
-            parts.push(cleaned.stats.nbsp + ' espaces insécables normalisés');
-        }
-        if (parts.length === 0) parts.push('Aucune correction nécessaire');
-        report.textContent = '🧹 ' + parts.join(' · ');
-        report.style.display = 'block';
-    }
+    JsonImportUtils.handleCleanButton(
+        'import-json-input', 'import-errors', 'import-clean-report',
+        'import-warning', 'import-warning-text'
+    );
 };
 
 window.openImportModal = function() {
-    bindImportInputGuards();
+    JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
     document.getElementById('import-modal').style.display = 'flex';
     document.getElementById('import-json-input').value = '';
     document.getElementById('import-errors').style.display = 'none';
@@ -3447,7 +3057,7 @@ window.openImportModal = function() {
         report.style.display = 'none';
         report.textContent = '';
     }
-    updateImportQuoteWarning('');
+    JsonImportUtils.updateImportQuoteWarning('', 'import-warning', 'import-warning-text');
 };
 
 window.closeImportModal = function() {
@@ -3501,7 +3111,7 @@ function ensurePreventionLevelsForImport(levels) {
     });
 }
 
-bindImportInputGuards();
+JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
 
 // === NORMALISATION UNIVERSELLE (accepte tout JSON d'IA) ===
 function normalizeImportJSON(data) {
@@ -4007,7 +3617,7 @@ window.executeImport = function() {
     if (!result.ok) {
         errDiv.textContent = result.errors.join('\n');
         errDiv.style.display = 'block';
-        updateImportQuoteWarning(jsonStr);
+        JsonImportUtils.updateImportQuoteWarning(jsonStr, 'import-warning', 'import-warning-text');
         if (report) {
             report.style.display = 'none';
             report.textContent = '';
@@ -4017,7 +3627,7 @@ window.executeImport = function() {
 
     const cleanedJson = result.cleanedJson || jsonStr.trim();
     if (inputEl) inputEl.value = cleanedJson;
-    updateImportQuoteWarning(cleanedJson);
+    JsonImportUtils.updateImportQuoteWarning(cleanedJson, 'import-warning', 'import-warning-text');
     if (errDiv) {
         errDiv.style.display = 'none';
         errDiv.textContent = '';

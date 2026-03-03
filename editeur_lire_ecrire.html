@@ -381,14 +381,21 @@
             <button type="button" onclick="copyImportPrompt()" class="btn-import-json" style="margin-top:8px;">📋 Copier le prompt</button>
         </details>
         <textarea id="import-json" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
-        <div id="import-errors" style="display:none; color:#ef4444; background:#1a0505; border:1px solid #7f1d1d; border-radius:8px; padding:10px; margin-top:8px; font-size:0.8rem;"></div>
+        <div id="import-warning" style="display:none; align-items:center; gap:8px; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:0.82rem; color:#92400e;">
+            <span id="import-warning-text"></span>
+            <button type="button" onclick="cleanImportJSONInputLE()" style="margin-left:auto; background:#f59e0b; color:#fff; border:none; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;">Corriger</button>
+        </div>
+        <div id="import-clean-report" style="display:none; background:#d1fae5; border:1px solid #10b981; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:0.82rem; color:#065f46;"></div>
+        <div id="import-errors" style="display:none; color:#ef4444; background:#1a0505; border:1px solid #7f1d1d; border-radius:8px; padding:10px; margin-top:8px; font-size:0.8rem; white-space:pre-wrap;"></div>
         <div class="modal-actions">
+            <button type="button" class="btn-modal-save" onclick="cleanImportJSONInputLE()" style="background:#6b7280;">🧹 Nettoyer</button>
             <button type="button" class="btn-modal-save" onclick="executeImport()">✅ Importer</button>
             <button type="button" class="btn-modal-cancel" onclick="closeImportModal()">Annuler</button>
         </div>
     </div>
 </div>
 
+<script src="json_import_utils.js"></script>
 <script>
 // === MENU MOBILE ===
 function toggleMenu(){ document.body.classList.toggle('menu-open'); }
@@ -400,6 +407,14 @@ function showToast(msg) {
     t.textContent = msg;
     t.style.display = 'block';
     setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+// === CLEAN JSON BUTTON HANDLER ===
+function cleanImportJSONInputLE() {
+    JsonImportUtils.handleCleanButton(
+        'import-json', 'import-errors', 'import-clean-report',
+        'import-warning', 'import-warning-text'
+    );
 }
 </script>
 
@@ -1312,138 +1327,6 @@ Champ lien optionnel :
     // IMPORT JSON
     // =============================================
     let currentImportPrompt = '';
-    const IMPORT_DOUBLE_QUOTES_RE = /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g;
-    const IMPORT_SINGLE_QUOTES_RE = /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g;
-    const IMPORT_ZW_RE = /[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g;
-    const IMPORT_TRAILING_COMMA_RE = /,\s*([\]}])/g;
-
-    function extractImportJsonCandidate(raw) {
-        let out = String(raw || '');
-        const codeBlockMatch = out.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-        if (codeBlockMatch) out = codeBlockMatch[1] || '';
-
-        if (out.charAt(0) !== '{' && out.charAt(0) !== '[') {
-            const firstBrace = out.indexOf('{');
-            const firstBracket = out.indexOf('[');
-            const start = firstBrace >= 0 ? firstBrace : firstBracket;
-            if (start >= 0) {
-                const lastBrace = out.lastIndexOf('}');
-                const lastBracket = out.lastIndexOf(']');
-                const end = out.charAt(start) === '{' ? lastBrace : lastBracket;
-                if (end > start) out = out.substring(start, end + 1);
-            }
-        }
-        return out.trim();
-    }
-
-    // Normalise les guillemets typographiques sans casser les guillemets internes.
-    function normalizeJsonQuotes(raw) {
-        if (!raw) return raw;
-        let out = '';
-        let inString = false;
-        let stringDelim = null; // '"' | 'curly'
-        let escaped = false;
-        let i = 0;
-
-        function isDoubleQuoteLike(ch) {
-            return ch === '"' || /[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/.test(ch);
-        }
-        function isSingleQuoteLike(ch) {
-            return /[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/.test(ch);
-        }
-        function nextSignificantChar(str, start) {
-            for (let k = start; k < str.length; k++) {
-                const cc = str.charAt(k);
-                if (!/\s/.test(cc)) return cc;
-            }
-            return '';
-        }
-
-        while (i < raw.length) {
-            const ch = raw.charAt(i);
-
-            if (!inString) {
-                if (isDoubleQuoteLike(ch)) {
-                    inString = true;
-                    stringDelim = (ch === '"') ? '"' : 'curly';
-                    out += '"';
-                    i++;
-                    continue;
-                }
-                if (isSingleQuoteLike(ch)) {
-                    out += "'";
-                    i++;
-                    continue;
-                }
-                out += ch;
-                i++;
-                continue;
-            }
-
-            if (escaped) {
-                out += ch;
-                escaped = false;
-                i++;
-                continue;
-            }
-            if (ch === '\\') {
-                out += ch;
-                escaped = true;
-                i++;
-                continue;
-            }
-
-            if (isDoubleQuoteLike(ch)) {
-                const next = nextSignificantChar(raw, i + 1);
-                const canClose = (next === ':' || next === ',' || next === '}' || next === ']' || next === '');
-
-                if ((stringDelim === '"' && ch === '"') || (stringDelim === 'curly' && ch !== '"')) {
-                    if (canClose) {
-                        out += '"';
-                        inString = false;
-                        stringDelim = null;
-                    } else {
-                        out += '\\"';
-                    }
-                    i++;
-                    continue;
-                }
-
-                out += '\\"';
-                i++;
-                continue;
-            }
-
-            if (isSingleQuoteLike(ch)) {
-                out += "'";
-                i++;
-                continue;
-            }
-
-            out += ch;
-            i++;
-        }
-
-        return out;
-    }
-
-    function cleanImportJsonText(raw) {
-        let cleaned = String(raw || '');
-        cleaned = cleaned.replace(/\uFEFF/g, '');
-        cleaned = cleaned.replace(IMPORT_ZW_RE, '');
-        cleaned = cleaned.replace(/\u00A0/g, ' ');
-        cleaned = normalizeJsonQuotes(cleaned);
-        cleaned = cleaned.replace(/\[cite_start\]/gi, '');
-        cleaned = cleaned.replace(/\[cite(?:\s*:\s*[^\]]*)?\]/gi, '');
-        cleaned = extractImportJsonCandidate(cleaned);
-        cleaned = cleaned.replace(/^\s*\/\/.*$/gm, '');
-        cleaned = cleaned.replace(IMPORT_TRAILING_COMMA_RE, '$1');
-        cleaned = cleaned.replace(/\bTrue\b/g, 'true');
-        cleaned = cleaned.replace(/\bFalse\b/g, 'false');
-        cleaned = cleaned.replace(/\bNone\b/g, 'null');
-        return cleaned.trim();
-    }
-
     function normalizeImportedExerciseShape(ex, fallbackTemplateId) {
         if (!ex || typeof ex !== 'object' || Array.isArray(ex)) return null;
         const out = { ...ex };
@@ -1499,18 +1382,170 @@ Champ lien optionnel :
         return out;
     }
 
+    // Prompts par categorie (regroupent les templates d'une meme categorie)
+    const IMPORT_PROMPTS_BY_CAT = {
+        images: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) de 10 exercices "Image -> QCM mot".
+L'eleve voit une image et doit choisir le bon mot parmi 3-4 propositions.
+
+Structure de chaque exercice :
+{
+  "titre": "Titre court et descriptif",
+  "categorie": "images",
+  "template_id": "img_qcm_mot",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "image": "casque.png",
+    "mot_correct": "casque",
+    "distracteurs": ["chapeau", "bonnet", "sac"],
+    "lien_url": ""
+  }
+}
+
+IMPORTANT :
+- Genere EXACTEMENT 10 exercices (un tableau de 10 objets)
+- Chaque exercice a exactement 3 distracteurs
+- Pour "image", mets juste le nom du fichier (ex: "casque.png")
+- Chaque exercice peut avoir un champ optionnel "lien_url" pour une ressource web
+- Varie les difficultes (facile, moyen, difficile)
+- Le vocabulaire doit etre en lien avec la PSE
+- GARDE TOUS LES ACCENTS (e, e, a, c, etc.)
+- Reponds UNIQUEMENT avec le JSON (tableau), sans commentaire`,
+
+        mots: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) de 10 exercices pour la categorie "Mots".
+
+Tu peux utiliser 3 types de templates. Choisis le type le plus adapte ou melange-les :
+
+=== Template 1 : mot_completer ===
+L'eleve voit un mot avec des lettres cachees (_) et doit taper le mot complet.
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_completer",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "mot": "securite",
+    "lettres_visibles": "s_c_r_te",
+    "indice": "Contraire du danger",
+    "image": "",
+    "lien_url": ""
+  }
+}
+Facile : 1-2 lettres cachees. Moyen : 3-4. Difficile : la moitie ou plus.
+
+=== Template 2 : mot_phrase_trou ===
+L'eleve lit une phrase avec un trou (___) et choisit le bon mot parmi 2-3 propositions.
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_phrase_trou",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "phrase": "Il faut porter un ___ sur le chantier.",
+    "mot_correct": "casque",
+    "distracteurs": ["chapeau", "bonnet"],
+    "image": "",
+    "lien_url": ""
+  }
+}
+
+=== Template 3 : mot_copier ===
+L'eleve voit un mot affiche en grand et doit le recopier correctement.
+{
+  "titre": "Titre court",
+  "categorie": "mots",
+  "template_id": "mot_copier",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "mot": "extincteur",
+    "phrase_contexte": "L'extincteur sert a eteindre un feu.",
+    "image": "",
+    "lien_url": ""
+  }
+}
+Facile : mots courts (4-5 lettres). Moyen : 6-8. Difficile : 9+ ou accents.
+
+IMPORTANT :
+- Genere EXACTEMENT 10 exercices (un tableau de 10 objets)
+- Chaque exercice a un champ "image" (optionnel, mettre "" si vide) et "lien_url" (optionnel)
+- Varie les difficultes et les types de templates
+- Le vocabulaire doit etre en lien avec la PSE
+- GARDE TOUS LES ACCENTS (e, e, a, c, etc.)
+- Reponds UNIQUEMENT avec le JSON (tableau), sans commentaire`,
+
+        lecture: `Tu es un generateur d'exercices pour des eleves allophones ou faibles lecteurs en CAP.
+Genere un JSON (tableau) de 10 exercices pour la categorie "Lecture".
+
+Tu peux utiliser 2 types de templates. Choisis le type le plus adapte ou melange-les :
+
+=== Template 1 : lec_vrai_faux ===
+L'eleve lit une phrase et dit si c'est vrai ou faux.
+{
+  "titre": "Titre court",
+  "categorie": "lecture",
+  "template_id": "lec_vrai_faux",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "phrase": "Le feu se propage plus vite avec du vent.",
+    "reponse": true,
+    "explication": "Le vent apporte de l'oxygene au feu.",
+    "image": "",
+    "lien_url": ""
+  }
+}
+"reponse" est true ou false (boolean, pas une chaine).
+
+=== Template 2 : lec_comprehension_qcm ===
+L'eleve lit un court texte puis repond a une question a choix multiples.
+{
+  "titre": "Titre court",
+  "categorie": "lecture",
+  "template_id": "lec_comprehension_qcm",
+  "difficulte": "facile" | "moyen" | "difficile",
+  "data": {
+    "texte": "En cas d'incendie, il faut rester calme et sortir par la sortie de secours.",
+    "question": "Que faut-il faire en cas d'incendie ?",
+    "reponse_correcte": "Sortir par la sortie de secours",
+    "distracteurs": ["Se cacher sous la table", "Ouvrir les fenetres"],
+    "image": "",
+    "lien_url": ""
+  }
+}
+Facile : reponse explicite dans le texte. Difficile : necessite une inference.
+
+IMPORTANT :
+- Genere EXACTEMENT 10 exercices (un tableau de 10 objets)
+- Chaque exercice a un champ "image" et "lien_url" (optionnels, mettre "" si vide)
+- Pour les vrai/faux, varier les reponses (environ 50/50)
+- Varie les difficultes et les types de templates
+- Le vocabulaire doit etre en lien avec la PSE
+- GARDE TOUS LES ACCENTS (e, e, a, c, etc.)
+- Reponds UNIQUEMENT avec le JSON (tableau), sans commentaire`
+    };
+
     window.openImportModal = function() {
+        JsonImportUtils.bindImportInputGuards('import-json', 'import-warning', 'import-warning-text');
         document.getElementById('import-modal').style.display = 'flex';
         document.getElementById('import-json').value = '';
         document.getElementById('import-errors').style.display = 'none';
         document.getElementById('import-errors').textContent = '';
+        const report = document.getElementById('import-clean-report');
+        if (report) { report.style.display = 'none'; report.textContent = ''; }
+        JsonImportUtils.updateImportQuoteWarning('', 'import-warning', 'import-warning-text');
 
-        // Choisir le prompt selon le template selectionne
+        // Choisir le prompt : par template si selectionne, sinon par categorie, sinon generique
         const tplId = document.getElementById('exo-template').value;
         const tplInfo = TEMPLATES[tplId];
+        const catId = document.getElementById('exo-categorie').value;
+
         if (tplId && IMPORT_PROMPTS[tplId]) {
             currentImportPrompt = IMPORT_PROMPTS[tplId] + OPTIONAL_MEDIA_PROMPT_NOTE;
             document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer — ' + (tplInfo ? tplInfo.label : tplId);
+        } else if (catId && IMPORT_PROMPTS_BY_CAT[catId]) {
+            currentImportPrompt = IMPORT_PROMPTS_BY_CAT[catId];
+            const catLabels = { images: '🖼️ Images', mots: '✏️ Mots', lecture: '📄 Lecture' };
+            document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer — ' + (catLabels[catId] || catId);
         } else {
             currentImportPrompt = IMPORT_PROMPT_ALL;
             document.querySelector('#import-modal .modal-content h3').textContent = '📥 Importer des exercices Lire/Ecrire (JSON)';
@@ -1530,21 +1565,50 @@ Champ lien optionnel :
         const rawInput = document.getElementById('import-json').value;
         const raw = rawInput.trim();
         const errDiv = document.getElementById('import-errors');
+        const report = document.getElementById('import-clean-report');
         errDiv.style.display = 'none';
+        errDiv.textContent = '';
+        if (report) { report.style.display = 'none'; report.textContent = ''; }
 
         if (!raw) { errDiv.textContent = 'Collez du JSON !'; errDiv.style.display = 'block'; return; }
 
         const selectedTemplateId = document.getElementById('exo-template').value || '';
-        const cleaned = cleanImportJsonText(raw);
+        const cleanResult = JsonImportUtils.cleanJsonFull(raw);
+        const cleaned = cleanResult.cleaned;
+
+        // Mettre a jour le textarea avec le JSON nettoye
+        const inputEl = document.getElementById('import-json');
+        if (inputEl) inputEl.value = cleaned;
+        JsonImportUtils.updateImportQuoteWarning(cleaned, 'import-warning', 'import-warning-text');
+
+        // Verifier les limites JSON
+        const boundaryError = JsonImportUtils.getJsonBoundaryError(cleaned);
+        if (boundaryError) {
+            errDiv.textContent = boundaryError + '\n💡 Verifie que le JSON est complet et non tronque.';
+            errDiv.style.display = 'block';
+            return;
+        }
 
         let parsed;
         try {
             parsed = JSON.parse(cleaned);
         } catch(e) {
-            const typoQuotes = (rawInput.match(IMPORT_DOUBLE_QUOTES_RE) || []).length;
-            errDiv.textContent = 'JSON invalide : ' + e.message + (typoQuotes > 0 ? ' (guillemets typographiques detectes)' : '');
+            errDiv.textContent = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
             errDiv.style.display = 'block';
             return;
+        }
+
+        // Afficher rapport de nettoyage
+        if (report) {
+            const st = cleanResult.stats;
+            const parts = [];
+            if (st.typoDoubleQuotes > 0) parts.push(st.typoDoubleQuotes + ' guillemets corriges');
+            if (st.typoSingleQuotes > 0) parts.push(st.typoSingleQuotes + ' apostrophes normalisees');
+            if (st.trailingCommas > 0) parts.push(st.trailingCommas + ' virgules finales supprimees');
+            if (parts.length > 0) {
+                report.textContent = '🧹 ' + parts.join(' · ');
+                report.style.display = 'block';
+            }
         }
 
         // Accepter aussi les wrappers IA courants

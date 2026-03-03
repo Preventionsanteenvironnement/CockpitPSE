@@ -535,6 +535,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="data_modules.js"></script>
+<script src="json_import_utils.js"></script>
 <script>
 function toggleMenu(){ document.body.classList.toggle('menu-open'); }
 function closeMenu(){ document.body.classList.remove('menu-open'); }
@@ -1445,12 +1446,17 @@ RÉPONDS UNIQUEMENT AVEC UN JSON VALIDE.
         return data;
     }
 
+    window.cleanImportJSONInputQuiz = function() {
+        JsonImportUtils.handleCleanButton('quiz-import-json', 'quiz-import-errors', 'quiz-import-clean-report', 'quiz-import-warning', 'quiz-import-warning-text');
+    };
+
     window.openImportModal = function() {
         document.getElementById('quiz-import-modal').style.display = 'flex';
         document.getElementById('quiz-import-json').value = '';
         document.getElementById('quiz-import-errors').style.display = 'none';
         document.getElementById('quiz-import-errors').textContent = '';
         document.getElementById('quiz-import-prompt-text').textContent = QUIZ_IMPORT_PROMPT;
+        JsonImportUtils.bindImportInputGuards('quiz-import-json', 'quiz-import-warning', 'quiz-import-warning-text');
     };
 
     window.closeImportModal = function() {
@@ -1475,45 +1481,20 @@ RÉPONDS UNIQUEMENT AVEC UN JSON VALIDE.
         const errors = [];
         let data;
 
-        // Nettoyage universel (ChatGPT, Claude, Gemini, Word, etc.)
-        // 1. BOM partout
-        let cleaned = jsonString.replace(/\uFEFF/g, '');
-        // 2. Caracteres invisibles / zero-width
-        cleaned = cleaned.replace(/[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\u00AD]/g, '');
-        // 3. NBSP → espace normal
-        cleaned = cleaned.replace(/\u00A0/g, ' ');
-        // 4. Guillemets courbes → droits (elargi avec fullwidth)
-        cleaned = cleaned.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB\uFF02]/g, '"');
-        cleaned = cleaned.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'");
-        // 5. Extraire JSON des blocs de code Markdown
-        var codeBlockMatch = cleaned.match(/```(?:json|javascript|JSON|js)?\s*\n?([\s\S]*?)```/);
-        if (codeBlockMatch) { cleaned = codeBlockMatch[1].trim(); }
-        // 6. Extraire entre { } ou [ ] si nécessaire
-        if (cleaned.charAt(0) !== '{' && cleaned.charAt(0) !== '[') {
-            var firstBrace = cleaned.indexOf('{');
-            var firstBracket = cleaned.indexOf('[');
-            if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
-                var lastBrace = cleaned.lastIndexOf('}');
-                if (lastBrace > firstBrace) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-            } else if (firstBracket >= 0) {
-                var lastBracket = cleaned.lastIndexOf(']');
-                if (lastBracket > firstBracket) cleaned = cleaned.substring(firstBracket, lastBracket + 1);
-            }
+        var cleanResult = JsonImportUtils.cleanJsonFull(jsonString);
+        var cleaned = cleanResult.cleaned;
+
+        // Vérification des accolades/crochets
+        var boundaryErr = JsonImportUtils.getJsonBoundaryError(cleaned);
+        if (boundaryErr) {
+            return { ok: false, data: null, errors: [boundaryErr] };
         }
-        // 7. Supprimer commentaires // en debut de ligne
-        cleaned = cleaned.replace(/^\s*\/\/.*$/gm, '');
-        // 8. Trailing commas
-        cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
-        // 9. Python booleans/None
-        cleaned = cleaned.replace(/\bTrue\b/g, 'true');
-        cleaned = cleaned.replace(/\bFalse\b/g, 'false');
-        cleaned = cleaned.replace(/\bNone\b/g, 'null');
-        cleaned = cleaned.trim();
 
         try {
             data = JSON.parse(cleaned);
         } catch(e) {
-            return { ok: false, data: null, errors: ['JSON invalide : ' + e.message] };
+            var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
+            return { ok: false, data: null, errors: diagErrors };
         }
 
         // Normalisation universelle (adapte tout format d'IA)
@@ -1626,9 +1607,15 @@ RÉPONDS UNIQUEMENT AVEC UN JSON VALIDE.
             <button type="button" onclick="copyImportPrompt()" style="margin-top:6px;" class="btn-import-json">📋 Copier le prompt</button>
         </details>
         <textarea id="quiz-import-json" class="modal-textarea" rows="12" placeholder="Collez le JSON ici..."></textarea>
+        <div id="quiz-import-warning" style="display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#92400e;">
+          <span id="quiz-import-warning-text"></span>
+          <button type="button" onclick="cleanImportJSONInputQuiz()" style="margin-left:8px; font-size:0.8rem; padding:2px 8px; border-radius:4px; border:1px solid #f59e0b; background:#fff7ed; cursor:pointer;">Corriger</button>
+        </div>
+        <div id="quiz-import-clean-report" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:0.85rem; color:#065f46; white-space:pre-wrap;"></div>
         <div id="quiz-import-errors" style="display:none; color:#ef4444; margin:8px 0; font-size:0.85rem; white-space:pre-wrap;"></div>
         <div class="modal-actions">
             <button type="button" class="btn-save-q" onclick="executeQuizImport()">✅ Importer</button>
+            <button type="button" class="btn-save-q" onclick="cleanImportJSONInputQuiz()" style="background:#f59e0b;">🧹 Nettoyer</button>
             <button type="button" class="btn-cancel-q" onclick="closeImportModal()">Annuler</button>
         </div>
     </div>
