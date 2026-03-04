@@ -1204,9 +1204,14 @@ Champ lien optionnel :
     function sanitizeExternalUrl(value) {
         const raw = String(value || '').trim();
         if (!raw) return '';
+        // Already has protocol
         if (/^https?:\/\//i.test(raw)) return raw;
-        if (/^[\w.-]+\.[a-z]{2,}(?:[\/?#].*)?$/i.test(raw)) return 'https://' + raw;
-        return '';
+        // Looks like a domain (e.g. "inrs.fr", "www.inrs.fr/page")
+        if (/^[\w.-]+\.[a-z]{2,}/i.test(raw)) return 'https://' + raw;
+        // Has a dot → probably a URL, prepend https://
+        if (raw.includes('.')) return 'https://' + raw;
+        // No dot, no protocol → keep as-is (don't silently erase)
+        return raw;
     }
 
     function updateImagePreview() {
@@ -1392,13 +1397,13 @@ Champ lien optionnel :
             payload.series_count = 1;
         }
 
+        // Remember existing createdAt before write
+        const existingExo = allExercices.find(e => e.id === currentExoId);
+        const preservedCreatedAt = (existingExo && existingExo.createdAt) || null;
+
         try {
             if (currentExoId) {
-                // Preserve createdAt from the existing document (or set it if missing)
-                const existingExo = allExercices.find(e => e.id === currentExoId);
-                payload.createdAt = (existingExo && existingExo.createdAt) ? existingExo.createdAt : serverTimestamp();
-                // Full document write (no merge) — ensures all fields including
-                // newly added image/lien_url are properly persisted
+                payload.createdAt = preservedCreatedAt || serverTimestamp();
                 await setDoc(doc(db, "lire_ecrire_banque", currentExoId), payload);
             } else {
                 const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
@@ -1409,6 +1414,30 @@ Champ lien optionnel :
                 document.getElementById('btn-duplicate').style.display = 'inline-block';
                 document.getElementById('btn-test').style.display = 'inline-block';
             }
+
+            // Immediately update local data so we don't depend on onSnapshot
+            // (Safari/some browsers can block the Firestore real-time channel)
+            const localCopy = {
+                id: currentExoId,
+                titre,
+                categorie,
+                template_id: templateId,
+                difficulte,
+                publie,
+                data,
+                sourcePrompt: sourcePromptVal,
+                series: JSON.parse(JSON.stringify(payload.series)),
+                series_count: payload.series_count,
+                createdAt: preservedCreatedAt || new Date(),
+                updatedAt: new Date()
+            };
+            const idx = allExercices.findIndex(e => e.id === currentExoId);
+            if (idx >= 0) {
+                allExercices[idx] = localCopy;
+            } else {
+                allExercices.unshift(localCopy);
+            }
+
             showToast('Exercice sauvegarde !');
             renderList();
         } catch(e) {
