@@ -1794,35 +1794,42 @@ IMPORTANT :
             normalizedItems.push(ex);
         }
 
-        // Import en "serie" : un seul document avec plusieurs items (meme template)
-        if (errors.length === 0 && normalizedItems.length > 1) {
-            let uniformTemplateId = normalizedItems[0].template_id;
-            let canBundleSeries = true;
-            for (let i = 1; i < normalizedItems.length; i++) {
-                if (normalizedItems[i].template_id !== uniformTemplateId) {
-                    canBundleSeries = false;
-                    break;
-                }
-            }
+        // Import en "serie" : regrouper les items par template_id
+        // Chaque groupe de meme template → 1 exercice serie
+        if (errors.length === 0 && normalizedItems.length > 0) {
+            const groups = {};
+            normalizedItems.forEach(ex => {
+                const tid = ex.template_id;
+                if (!groups[tid]) groups[tid] = [];
+                groups[tid].push(ex);
+            });
 
-            if (canBundleSeries) {
-                const templateInfo = TEMPLATES[uniformTemplateId];
-                const seriesItems = normalizedItems.map((ex) => ({
+            const groupKeys = Object.keys(groups);
+
+            for (const tid of groupKeys) {
+                const items = groups[tid];
+                const templateInfo = TEMPLATES[tid];
+                const seriesItems = items.map(ex => ({
                     titre: ex.titre,
                     difficulte: ex.difficulte || 'facile',
                     data: ex.data
                 }));
+
+                // Titre : nom commun si tous identiques, sinon label template + count
                 const titleSet = Array.from(new Set(seriesItems.map(item => String(item.titre || '').trim()).filter(Boolean)));
-                const serieTitle = titleSet.length === 1
-                    ? titleSet[0]
-                    : ((normalizedItems[0].titre || templateInfo.label || 'Serie Lire/Ecrire') + ' (' + seriesItems.length + ' items)');
+                let serieTitle;
+                if (titleSet.length === 1) {
+                    serieTitle = titleSet[0];
+                } else {
+                    serieTitle = (templateInfo ? templateInfo.label : tid) + ' (' + seriesItems.length + ' items)';
+                }
 
                 const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
                 const payload = {
                     titre: serieTitle,
-                    categorie: templateInfo.categorie,
-                    template_id: uniformTemplateId,
-                    difficulte: normalizedItems[0].difficulte || 'facile',
+                    categorie: templateInfo ? templateInfo.categorie : (items[0].categorie || 'mots'),
+                    template_id: tid,
+                    difficulte: items[0].difficulte || 'facile',
                     publie: false,
                     data: seriesItems[0].data,
                     series: seriesItems,
@@ -1834,40 +1841,24 @@ IMPORTANT :
 
                 try {
                     await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
-                    imported = 1;
-                    showToast('1 exercice serie importe (' + seriesItems.length + ' items) !');
-                    closeImportModal();
-                    return;
+                    imported++;
                 } catch (e) {
-                    errors.push('Serie : erreur Firebase — ' + e.message);
+                    errors.push((templateInfo ? templateInfo.label : tid) + ' : erreur Firebase — ' + e.message);
                 }
-            }
-        }
 
-        for (let i = 0; i < normalizedItems.length; i++) {
-            const ex = normalizedItems[i];
-            const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
-            const payload = {
-                titre: ex.titre,
-                categorie: ex.categorie,
-                template_id: ex.template_id,
-                difficulte: ex.difficulte || 'facile',
-                publie: false,
-                data: ex.data,
-                sourcePrompt: cleaned,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
-
-            try {
-                await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
-                imported++;
-            } catch(e) {
-                errors.push('Exercice ' + (i+1) + ' : erreur Firebase — ' + e.message);
+                // Small delay to ensure unique IDs
+                await new Promise(r => setTimeout(r, 50));
             }
 
-            // Small delay to ensure unique IDs
-            await new Promise(r => setTimeout(r, 50));
+            if (imported > 0 && errors.length === 0) {
+                const detail = groupKeys.map(tid => {
+                    const tpl = TEMPLATES[tid];
+                    return (tpl ? tpl.label : tid) + ' (' + groups[tid].length + ')';
+                }).join(', ');
+                showToast(imported + ' serie(s) importee(s) : ' + detail);
+                closeImportModal();
+                return;
+            }
         }
 
         if (errors.length > 0) {
