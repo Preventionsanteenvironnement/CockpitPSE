@@ -161,6 +161,45 @@
         }
         .toggle-row label { font-size: 0.9rem; color: #e2e8f0; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
+        /* Series navigation bar */
+        #series-nav {
+            display: none; /* shown via JS when series */
+            align-items: center; justify-content: space-between;
+            gap: 10px; padding: 12px 16px; margin-bottom: 14px;
+            background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+        }
+        #series-nav .sn-info {
+            font-size: 0.85rem; font-weight: 700; color: #e2e8f0;
+        }
+        #series-nav .sn-info .sn-total { color: #64748b; font-weight: 400; }
+        #series-nav .sn-btns { display: flex; gap: 6px; }
+        #series-nav .sn-btn {
+            padding: 6px 14px; border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; color: #e2e8f0; font-size: 0.8rem; font-weight: 700;
+            cursor: pointer; transition: 0.15s;
+        }
+        #series-nav .sn-btn:hover:not(:disabled) { background: #334155; border-color: #60a5fa; }
+        #series-nav .sn-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        #series-nav .sn-btn.sn-add {
+            background: #22c55e; border-color: #22c55e; color: white;
+        }
+        #series-nav .sn-btn.sn-add:hover { background: #16a34a; }
+        #series-nav .sn-btn.sn-del {
+            background: transparent; border-color: #7f1d1d; color: #fca5a5; font-size: 0.75rem;
+        }
+        #series-nav .sn-btn.sn-del:hover { background: #7f1d1d; color: white; }
+        #series-nav .sn-dots {
+            display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; flex: 1;
+        }
+        #series-nav .sn-dot {
+            width: 26px; height: 26px; border-radius: 50%; border: 2px solid #475569;
+            background: #0f172a; color: #94a3b8; font-size: 0.7rem; font-weight: 700;
+            cursor: pointer; transition: 0.15s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #series-nav .sn-dot:hover { border-color: #60a5fa; color: #60a5fa; }
+        #series-nav .sn-dot.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
         /* Bottom actions */
         .bottom-actions {
             display: flex; gap: 10px; margin-top: 20px; padding-top: 20px;
@@ -343,6 +382,21 @@
         <!-- Dynamic template fields -->
         <div id="template-fields">
             <h3 id="template-fields-title">Contenu de l'exercice</h3>
+            <!-- Series navigation (hidden when single item) -->
+            <div id="series-nav">
+                <div class="sn-btns">
+                    <button class="sn-btn" id="sn-prev" onclick="seriesGo(-1)">◀</button>
+                </div>
+                <div class="sn-dots" id="sn-dots"></div>
+                <div class="sn-info">
+                    Item <span id="sn-current">1</span><span class="sn-total"> / <span id="sn-total">1</span></span>
+                </div>
+                <div class="sn-btns">
+                    <button class="sn-btn" id="sn-next" onclick="seriesGo(1)">▶</button>
+                    <button class="sn-btn sn-add" id="sn-add" onclick="seriesAdd()" title="Ajouter un item">+</button>
+                    <button class="sn-btn sn-del" id="sn-del" onclick="seriesRemove()" title="Supprimer cet item">✕</button>
+                </div>
+            </div>
             <div id="template-fields-container"></div>
         </div>
 
@@ -518,6 +572,7 @@ function cleanImportJSONInputLE() {
     let currentSourcePrompt = null;
     let currentTagsData = {}; // { fieldKey: [tag1, tag2, ...] }
     let currentSeriesData = null; // tableau d'items pour un exercice serie
+    let currentSeriesIndex = 0; // index de l'item actuellement affiché
 
     // =============================================
     // IMPORT PROMPT
@@ -931,6 +986,7 @@ Champ lien optionnel :
 
         currentExoId = exoId;
         currentSeriesData = Array.isArray(ex.series) && ex.series.length > 0 ? JSON.parse(JSON.stringify(ex.series)) : null;
+        currentSeriesIndex = 0;
 
         document.getElementById('exo-titre').value = ex.titre || '';
         document.getElementById('exo-categorie').value = ex.categorie || 'images';
@@ -941,10 +997,10 @@ Champ lien optionnel :
         populateTemplateDropdown(ex.categorie || 'images');
         document.getElementById('exo-template').value = ex.template_id || '';
 
-        // Render template fields and fill data
-        const firstSeriesItem = currentSeriesData && currentSeriesData[0] ? currentSeriesData[0] : null;
-        const dataToEdit = firstSeriesItem && firstSeriesItem.data ? firstSeriesItem.data : (ex.data || {});
+        // Render template fields and fill data for current series item
+        const dataToEdit = getSeriesItemData(0, ex.data || {});
         renderTemplateFields(ex.template_id, dataToEdit);
+        updateSeriesNav();
 
         // Source prompt
         currentSourcePrompt = ex.sourcePrompt || null;
@@ -968,6 +1024,7 @@ Champ lien optionnel :
         currentSourcePrompt = null;
         currentTagsData = {};
         currentSeriesData = null;
+        currentSeriesIndex = 0;
 
         document.getElementById('exo-titre').value = '';
         document.getElementById('exo-categorie').value = 'images';
@@ -978,6 +1035,7 @@ Champ lien optionnel :
         populateTemplateDropdown('images');
         const firstTemplate = document.getElementById('exo-template').value;
         renderTemplateFields(firstTemplate, {});
+        updateSeriesNav();
 
         document.getElementById('btn-delete').style.display = 'none';
         document.getElementById('btn-duplicate').style.display = 'none';
@@ -1006,16 +1064,20 @@ Champ lien optionnel :
 
     window.onCategorieChange = function() {
         currentSeriesData = null;
+        currentSeriesIndex = 0;
         const cat = document.getElementById('exo-categorie').value;
         populateTemplateDropdown(cat);
         const firstTemplate = document.getElementById('exo-template').value;
         renderTemplateFields(firstTemplate, {});
+        updateSeriesNav();
     };
 
     window.onTemplateChange = function() {
         currentSeriesData = null;
+        currentSeriesIndex = 0;
         const tid = document.getElementById('exo-template').value;
         renderTemplateFields(tid, {});
+        updateSeriesNav();
     };
 
     // =============================================
@@ -1201,6 +1263,90 @@ Champ lien optionnel :
     }
 
     // =============================================
+    // SERIES NAVIGATION
+    // =============================================
+    function getSeriesItemData(index, fallbackData) {
+        if (!currentSeriesData || !currentSeriesData[index]) return fallbackData || {};
+        return currentSeriesData[index].data || fallbackData || {};
+    }
+
+    function saveCurrentItemToSeries() {
+        // Persist current form values into currentSeriesData before navigating away
+        if (!currentSeriesData || currentSeriesIndex < 0 || currentSeriesIndex >= currentSeriesData.length) return;
+        const data = collectData();
+        if (!data) return;
+        if (!currentSeriesData[currentSeriesIndex]) currentSeriesData[currentSeriesIndex] = {};
+        currentSeriesData[currentSeriesIndex].data = data;
+    }
+
+    function updateSeriesNav() {
+        const nav = document.getElementById('series-nav');
+        if (!currentSeriesData || currentSeriesData.length <= 1) {
+            nav.style.display = 'none';
+            return;
+        }
+        nav.style.display = 'flex';
+        const total = currentSeriesData.length;
+        document.getElementById('sn-current').textContent = currentSeriesIndex + 1;
+        document.getElementById('sn-total').textContent = total;
+        document.getElementById('sn-prev').disabled = currentSeriesIndex <= 0;
+        document.getElementById('sn-next').disabled = currentSeriesIndex >= total - 1;
+        document.getElementById('sn-del').style.display = total > 1 ? '' : 'none';
+
+        // Render dots
+        const dotsContainer = document.getElementById('sn-dots');
+        dotsContainer.innerHTML = '';
+        for (let i = 0; i < total; i++) {
+            const dot = document.createElement('button');
+            dot.className = 'sn-dot' + (i === currentSeriesIndex ? ' active' : '');
+            dot.textContent = i + 1;
+            dot.onclick = () => seriesGoTo(i);
+            dotsContainer.appendChild(dot);
+        }
+    }
+
+    function seriesGoTo(index) {
+        if (!currentSeriesData || index < 0 || index >= currentSeriesData.length || index === currentSeriesIndex) return;
+        saveCurrentItemToSeries();
+        currentSeriesIndex = index;
+        const templateId = document.getElementById('exo-template').value;
+        const data = getSeriesItemData(currentSeriesIndex, {});
+        renderTemplateFields(templateId, data);
+        updateSeriesNav();
+    }
+
+    window.seriesGo = function(delta) {
+        seriesGoTo(currentSeriesIndex + delta);
+    };
+
+    window.seriesAdd = function() {
+        if (!currentSeriesData) return;
+        saveCurrentItemToSeries();
+        // Clone the current item as a base for the new one, with empty data
+        const templateId = document.getElementById('exo-template').value;
+        const tpl = TEMPLATES[templateId];
+        const emptyData = {};
+        if (tpl) tpl.fields.forEach(f => { emptyData[f.key] = f.type === 'tags' ? [] : ''; });
+        currentSeriesData.push({ data: emptyData });
+        currentSeriesIndex = currentSeriesData.length - 1;
+        renderTemplateFields(templateId, emptyData);
+        updateSeriesNav();
+        showToast('Item ' + (currentSeriesIndex + 1) + ' ajoute !');
+    };
+
+    window.seriesRemove = function() {
+        if (!currentSeriesData || currentSeriesData.length <= 1) return;
+        if (!confirm('Supprimer l\'item ' + (currentSeriesIndex + 1) + ' ?')) return;
+        currentSeriesData.splice(currentSeriesIndex, 1);
+        if (currentSeriesIndex >= currentSeriesData.length) currentSeriesIndex = currentSeriesData.length - 1;
+        const templateId = document.getElementById('exo-template').value;
+        const data = getSeriesItemData(currentSeriesIndex, {});
+        renderTemplateFields(templateId, data);
+        updateSeriesNav();
+        showToast('Item supprime. Il reste ' + currentSeriesData.length + ' items.');
+    };
+
+    // =============================================
     // SAVE
     // =============================================
     window.saveExercice = async function() {
@@ -1230,11 +1376,13 @@ Champ lien optionnel :
         };
 
         if (Array.isArray(currentSeriesData) && currentSeriesData.length > 0) {
+            // Persist current form data into the active series item
+            saveCurrentItemToSeries();
             const updatedSeries = JSON.parse(JSON.stringify(currentSeriesData));
+            // Also update the first item meta for backwards compat
             if (!updatedSeries[0] || typeof updatedSeries[0] !== 'object') updatedSeries[0] = {};
             updatedSeries[0].titre = titre;
             updatedSeries[0].difficulte = difficulte;
-            updatedSeries[0].data = data;
             payload.series = updatedSeries;
             payload.series_count = updatedSeries.length;
         }
