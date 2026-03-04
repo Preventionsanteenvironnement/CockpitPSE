@@ -1385,11 +1385,21 @@ Champ lien optionnel :
             updatedSeries[0].difficulte = difficulte;
             payload.series = updatedSeries;
             payload.series_count = updatedSeries.length;
+        } else {
+            // Non-series exercise: wrap current data as a single-item series
+            // so the data model stays consistent (series always present)
+            payload.series = [{ titre, difficulte, data }];
+            payload.series_count = 1;
         }
 
         try {
             if (currentExoId) {
-                await setDoc(doc(db, "lire_ecrire_banque", currentExoId), payload, { merge: true });
+                // Preserve createdAt from the existing document (or set it if missing)
+                const existingExo = allExercices.find(e => e.id === currentExoId);
+                payload.createdAt = (existingExo && existingExo.createdAt) ? existingExo.createdAt : serverTimestamp();
+                // Full document write (no merge) — ensures all fields including
+                // newly added image/lien_url are properly persisted
+                await setDoc(doc(db, "lire_ecrire_banque", currentExoId), payload);
             } else {
                 const newId = 'le_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
                 payload.createdAt = serverTimestamp();
