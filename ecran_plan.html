@@ -16,13 +16,112 @@
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 30px 30px;
         }
 
+        /* Zone avant : tableau + repere prof */
+        .front-zone {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 22px;
+            width: 100%;
+            transition: 0.4s ease;
+        }
+        .front-zone.vertical {
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .teacher-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            padding-top: 4px;
+        }
+        .teacher-figure {
+            position: relative;
+            width: 78px;
+            height: 100px;
+            filter: drop-shadow(0 10px 14px rgba(51, 65, 85, 0.18));
+        }
+        .teacher-head {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #334155;
+            transform: translateX(-50%);
+        }
+        .teacher-body {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            width: 34px;
+            height: 42px;
+            border-radius: 16px 16px 10px 10px;
+            background: linear-gradient(180deg, #334155 0%, #1e3a5f 100%);
+            transform: translateX(-50%);
+        }
+        .teacher-arm {
+            position: absolute;
+            top: 34px;
+            left: 50%;
+            width: 58px;
+            height: 12px;
+            border-radius: 999px;
+            background: #334155;
+            transform: translateX(-50%);
+        }
+        .teacher-book {
+            position: absolute;
+            top: 37px;
+            left: 50%;
+            width: 22px;
+            height: 18px;
+            border-radius: 4px;
+            background: #f59e0b;
+            transform: translateX(8px) rotate(10deg);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+        }
+        .teacher-legs::before,
+        .teacher-legs::after {
+            content: "";
+            position: absolute;
+            bottom: 8px;
+            width: 10px;
+            height: 30px;
+            border-radius: 999px;
+            background: #334155;
+        }
+        .teacher-legs::before { left: 28px; transform: rotate(8deg); }
+        .teacher-legs::after { right: 28px; transform: rotate(-8deg); }
+        .teacher-label {
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            color: #475569;
+            font-size: 0.82rem;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            box-shadow: 0 8px 18px rgba(148, 163, 184, 0.2);
+        }
+        .teacher-floor {
+            width: 86px;
+            height: 14px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.12);
+            box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+        }
+
         /* Tableau Mobile */
         .board {
             background: #34495e; color: #bdc3c7; font-weight: bold; letter-spacing: 2px; display: flex; align-items: center; justify-content: center;
             border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-size: 1rem; margin: 20px;
         }
-        .board.horizontal { width: 60%; height: 30px; }
-        .board.vertical { width: 30px; height: 60%; writing-mode: vertical-rl; transform: rotate(180deg); }
+        .board.horizontal { width: min(68vw, 980px); height: 38px; }
+        .board.vertical { width: 38px; height: min(62vh, 720px); writing-mode: vertical-rl; transform: rotate(180deg); }
 
         /* Grille */
         #grid { display: grid; gap: 20px; padding: 20px; transition: 0.5s; }
@@ -33,8 +132,32 @@
         }
 
         /* TYPES (Identiques au prof) */
-        .cell.type-1 { background: white; box-shadow: 0 6px 0 #cbd5e1; border: 2px solid #e2e8f0; } /* Table */
-        .student-name { font-size: 1.5rem; font-weight: 800; color: #2c3e50; text-align: center; line-height: 1.1; }
+        .cell.type-1 { background: white; box-shadow: 0 6px 0 #cbd5e1; border: 2px solid #e2e8f0; overflow: hidden; } /* Table */
+        .cell.type-1.has-student {
+            animation: seatWave 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+            animation-delay: var(--delay, 0ms);
+        }
+        .cell.type-1.has-student::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 35%, rgba(191, 219, 254, 0.9), rgba(191, 219, 254, 0) 72%);
+            opacity: 0;
+            animation: seatGlow 680ms ease-out both;
+            animation-delay: var(--delay, 0ms);
+            pointer-events: none;
+        }
+        .student-name {
+            position: relative;
+            z-index: 1;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #2c3e50;
+            text-align: center;
+            line-height: 1.1;
+            animation: nameFloat 680ms ease-out both;
+            animation-delay: calc(var(--delay, 0ms) + 40ms);
+        }
 
         .cell.type-0 { border: 2px dashed rgba(203, 213, 225, 0.5); opacity: 0; } /* Vide */
 
@@ -47,8 +170,20 @@
         .cell.type-4 { background: #e0f2fe; border: 4px solid #38bdf8; opacity: 0.8; } /* Fenêtre */
         .cell.type-4::after { content: "🪟"; font-size: 2rem; }
 
-        .pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.27); }
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes seatWave {
+            0% { transform: translateY(-18px) scale(0.88) rotate(-2deg); opacity: 0; }
+            58% { transform: translateY(6px) scale(1.03) rotate(1deg); opacity: 1; }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes seatGlow {
+            0% { opacity: 0; }
+            35% { opacity: 0.85; }
+            100% { opacity: 0; }
+        }
+        @keyframes nameFloat {
+            0% { transform: translateY(10px); opacity: 0; letter-spacing: 0.02em; }
+            100% { transform: translateY(0); opacity: 1; letter-spacing: 0; }
+        }
 
         #waiting-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; color: #94a3b8; font-weight: bold; }
 
@@ -58,8 +193,21 @@
 
     <div id="header"><div id="class-title">...</div></div>
 
-    <div id="classroom">
-        <div id="board" class="board horizontal">TABLEAU</div>
+        <div id="classroom">
+        <div id="front-zone" class="front-zone">
+            <div id="teacher-marker" class="teacher-marker" aria-label="Zone professeur">
+                <div class="teacher-figure" aria-hidden="true">
+                    <span class="teacher-head"></span>
+                    <span class="teacher-body"></span>
+                    <span class="teacher-arm"></span>
+                    <span class="teacher-book"></span>
+                    <span class="teacher-legs"></span>
+                </div>
+                <div class="teacher-label">PROF</div>
+                <div class="teacher-floor" aria-hidden="true"></div>
+            </div>
+            <div id="board" class="board horizontal">TABLEAU</div>
+        </div>
         <div id="grid"></div>
         <div id="waiting-msg">En attente du plan...</div>
     </div>
@@ -122,12 +270,22 @@
             }
         );
 
+        function getAnimationDelay(index, rows, cols, boardPos) {
+            const row = Math.floor(index / cols);
+            const col = index % cols;
+            if (boardPos === 'bottom') return ((rows - 1 - row) * 70) + (col * 12);
+            if (boardPos === 'left') return (col * 70) + (row * 12);
+            if (boardPos === 'right') return ((cols - 1 - col) * 70) + (row * 12);
+            return (row * 70) + (col * 12);
+        }
+
         function renderPlan(data) {
             const grid = document.getElementById('grid');
             const title = document.getElementById('class-title');
             const wait = document.getElementById('waiting-msg');
             const board = document.getElementById('board');
             const container = document.getElementById('classroom');
+            const frontZone = document.getElementById('front-zone');
 
             if(!data.className) { wait.style.display = 'block'; title.innerText = "..."; grid.innerHTML = ""; return; }
             wait.style.display = 'none';
@@ -137,11 +295,12 @@
 
             // Position Tableau
             board.className = "board";
+            frontZone.className = "front-zone";
             const pos = data.boardPos || 'top';
             if(pos === 'top') { container.style.flexDirection = 'column'; board.classList.add('horizontal'); }
             if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
-            if(pos === 'left') { container.style.flexDirection = 'row'; board.classList.add('vertical'); }
-            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; board.classList.add('vertical'); }
+            if(pos === 'left') { container.style.flexDirection = 'row'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
+            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
 
             const total = data.rows * data.cols;
             
@@ -153,8 +312,9 @@
                 cell.className = `cell type-${type}`;
                 
                 if(type === 1 && student) {
+                    cell.classList.add('has-student');
+                    cell.style.setProperty('--delay', getAnimationDelay(i, data.rows, data.cols, pos) + 'ms');
                     cell.innerHTML = `<span class="student-name">${student}</span>`;
-                    cell.classList.add('pop');
                 }
                 grid.appendChild(cell);
             }
