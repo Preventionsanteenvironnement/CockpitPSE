@@ -438,6 +438,11 @@
                     </div>
                     <button class="btn-add-choice" id="btn-add-choice" onclick="addChoice()">+ Ajouter un choix</button>
                 </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Explication (facultatif)</label>
+                    <textarea class="form-input" id="qcm-explication" placeholder="Explication pedagogique affichee apres la correction..." style="min-height:60px; resize:vertical;"></textarea>
+                    <div class="info-text">S'affiche a l'eleve apres la correction pour comprendre la bonne reponse.</div>
+                </div>
                 <div class="q-form-actions">
                     <button class="btn-save-q" onclick="saveQuestion('qcm')">Ajouter la question</button>
                     <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
@@ -472,6 +477,11 @@
                         <button class="vf-btn" id="vf-false" onclick="setVF(false)">Faux</button>
                     </div>
                 </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Explication (facultatif)</label>
+                    <textarea class="form-input" id="vf-explication" placeholder="Explication pedagogique affichee apres la correction..." style="min-height:60px; resize:vertical;"></textarea>
+                    <div class="info-text">S'affiche a l'eleve apres la correction pour comprendre la bonne reponse.</div>
+                </div>
                 <div class="q-form-actions">
                     <button class="btn-save-q" onclick="saveQuestion('vf')">Ajouter la question</button>
                     <button class="btn-cancel-q" onclick="hideAddForm()">Annuler</button>
@@ -503,6 +513,11 @@
                     <label>Reponse attendue (1-2 mots)</label>
                     <input type="text" class="form-input" id="mot-reponse" placeholder="Ex: melatonine">
                     <div class="info-text">Les accents et majuscules seront toleres automatiquement.</div>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>Explication (facultatif)</label>
+                    <textarea class="form-input" id="mot-explication" placeholder="Explication pedagogique affichee apres la correction..." style="min-height:60px; resize:vertical;"></textarea>
+                    <div class="info-text">S'affiche a l'eleve apres la correction pour comprendre la bonne reponse.</div>
                 </div>
                 <div class="q-form-actions">
                     <button class="btn-save-q" onclick="saveQuestion('mot')">Ajouter la question</button>
@@ -892,6 +907,11 @@ function resetMediaForm(prefix) {
         editingIndex = -1;
         document.querySelectorAll('.q-form').forEach(f => { f.style.display = 'none'; f.classList.remove('edit-mode'); });
         document.querySelectorAll('.q-card').forEach(c => c.classList.remove('editing'));
+        // Reset explication fields
+        ['qcm-explication', 'vf-explication', 'mot-explication'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
     };
 
     function updateFormButtonText(type, text) {
@@ -957,6 +977,10 @@ function resetMediaForm(prefix) {
             setMediaInForm('mot', q.media || null);
             document.getElementById('mot-question').focus();
         }
+
+        // Pre-fill explication
+        const expField = document.getElementById(type + '-explication');
+        if (expField) expField.value = q.explication || '';
 
         // Scroll the form into view
         form.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1070,6 +1094,13 @@ function resetMediaForm(prefix) {
             newQ = { type: 'mot', question, reponse };
         }
 
+        // Attach explication if present
+        const expField = document.getElementById(type + '-explication');
+        if (expField) {
+            const explication = expField.value.trim();
+            if (explication) newQ.explication = explication;
+        }
+
         if (!newQ) return;
 
         // Attach media if present
@@ -1142,7 +1173,8 @@ function resetMediaForm(prefix) {
                 '</div></div>' +
                 mediaPreviewHtml +
                 '<div class="q-card-question">' + q.question + '</div>' +
-                body;
+                body +
+                (q.explication ? '<div style="margin-top:8px; font-size:0.8rem; color:#c4b5fd; opacity:0.85;">📖 ' + q.explication + '</div>' : '');
 
             container.appendChild(card);
         });
