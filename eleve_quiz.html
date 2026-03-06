@@ -348,6 +348,108 @@
             line-height: 1.6;
             font-size: 0.92rem;
         }
+        /* --- Overlay anti-triche --- */
+        .anticheat-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(10, 10, 20, 0.96);
+            backdrop-filter: blur(12px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 28px;
+            gap: 18px;
+        }
+        .anticheat-overlay.visible { display: flex; }
+        .anticheat-icon { font-size: 3.5rem; margin-bottom: 6px; }
+        .anticheat-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--danger);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .anticheat-msg {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            max-width: 400px;
+        }
+        .anticheat-count {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: var(--accent);
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 12px;
+            padding: 10px 16px;
+        }
+        .anticheat-btn {
+            margin-top: 8px;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 32px;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: #fff;
+            transition: transform 0.15s ease;
+        }
+        .anticheat-btn:hover { transform: translateY(-2px); }
+
+        /* --- Résultats améliorés --- */
+        .result-choices-list { display: grid; gap: 8px; margin-top: 10px; }
+        .result-choice-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+        .result-choice-item.is-correct {
+            background: rgba(34, 197, 94, 0.14);
+            border-color: rgba(34, 197, 94, 0.4);
+            color: #bbf7d0;
+        }
+        .result-choice-item.is-wrong-selected {
+            background: rgba(239, 68, 68, 0.14);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fecaca;
+        }
+        .result-choice-icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+            width: 28px;
+            text-align: center;
+        }
+
+        /* --- Explication pédagogique --- */
+        .result-explanation {
+            margin-top: 12px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #ddd6fe;
+            line-height: 1.6;
+            font-size: 0.92rem;
+        }
+        .result-explanation strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #c4b5fd;
+            font-size: 0.95rem;
+        }
+
         @media (max-width: 640px) {
             body { padding: 12px; }
             .screen { padding: 16px; border-radius: 20px; }
@@ -355,10 +457,22 @@
             .question-timer { font-size: 1.6rem; }
             .choice-btn { padding: 14px; }
             .brand { align-items: flex-start; flex-direction: column; }
+            .anticheat-title { font-size: 1.3rem; }
+            .anticheat-icon { font-size: 2.8rem; }
         }
     </style>
 </head>
 <body>
+<!-- Overlay anti-triche -->
+<div class="anticheat-overlay" id="anticheat-overlay">
+    <div class="anticheat-icon">🚨</div>
+    <div class="anticheat-title">Retour au quiz !</div>
+    <div class="anticheat-msg">Tu as quitté la page du quiz. Toute sortie d'écran est enregistrée et signalée au professeur.</div>
+    <div class="anticheat-count" id="anticheat-count">Sorties détectées : 1</div>
+    <div class="anticheat-msg" style="color: var(--danger); font-weight: 700;">⚠️ Plusieurs sorties peuvent entraîner la déconnexion du quiz.</div>
+    <button class="anticheat-btn" onclick="window.dismissAnticheat()">Revenir au quiz</button>
+</div>
+
 <div class="shell">
     <div class="brand">
         <div>
@@ -1012,45 +1126,94 @@
 
         if (!currentQuestion) return;
 
+        /* --- Bandeau résultat principal --- */
         if (!currentResponse) {
             const missing = document.createElement('div');
             missing.className = 'result-chip neutral';
-            missing.textContent = 'Aucune réponse envoyée pour cette question.';
+            missing.textContent = '⏳ Aucune réponse envoyée pour cette question.';
             resultsBox.appendChild(missing);
         } else {
             const result = document.createElement('div');
             result.className = 'result-chip ' + (currentResponse.correct ? 'ok' : 'bad');
             result.textContent = currentResponse.correct
-                ? '✅ Bonne réponse'
-                : '❌ Réponse incorrecte';
+                ? '✅ Bonne réponse !'
+                : '❌ Mauvaise réponse';
             resultsBox.appendChild(result);
         }
 
+        /* --- Type "mot" (réponse libre) --- */
         if (currentQuestion.type === 'mot') {
             if (currentResponse?.answerText) {
                 const mine = document.createElement('div');
-                mine.className = 'result-chip neutral';
+                mine.className = 'result-chip ' + (currentResponse.correct ? 'ok' : 'bad');
                 mine.innerHTML = '<strong>Ta réponse :</strong><br>' + escapeHtml(currentResponse.answerText);
                 resultsBox.appendChild(mine);
             }
             const expected = document.createElement('div');
-            expected.className = 'result-chip neutral';
-            expected.innerHTML = '<strong>Réponse attendue :</strong><br>' + escapeHtml(currentQuestion.reponse || '');
+            expected.className = 'result-chip ok';
+            expected.innerHTML = '<strong>✅ Réponse attendue :</strong><br>' + escapeHtml(currentQuestion.reponse || '');
             resultsBox.appendChild(expected);
+            appendExplanation(resultsBox);
             return;
         }
 
-        const chosen = document.createElement('div');
-        chosen.className = 'result-chip neutral';
-        chosen.innerHTML = '<strong>Ta réponse :</strong><br>' + (currentResponse
-            ? escapeHtml(currentQuestion.choices[currentResponse.answer] || 'Réponse inconnue')
-            : 'Aucune');
-        resultsBox.appendChild(chosen);
+        /* --- Type QCM : afficher TOUS les choix avec couleurs --- */
+        const choicesList = document.createElement('div');
+        choicesList.className = 'result-choices-list';
 
-        const correct = document.createElement('div');
-        correct.className = 'result-chip neutral';
-        correct.innerHTML = '<strong>Bonne réponse :</strong><br>' + escapeHtml(currentQuestion.choices[currentQuestion.correct] || '');
-        resultsBox.appendChild(correct);
+        const correctIndex = Number(currentQuestion.correct);
+        const selectedIndex = currentResponse ? Number(currentResponse.answer) : -1;
+
+        (currentQuestion.choices || []).forEach((choiceText, idx) => {
+            const item = document.createElement('div');
+            item.className = 'result-choice-item';
+
+            const isCorrectChoice = idx === correctIndex;
+            const isSelected = idx === selectedIndex;
+
+            let icon = '';
+            if (isCorrectChoice) {
+                item.classList.add('is-correct');
+                icon = '✅';
+            } else if (isSelected && !isCorrectChoice) {
+                item.classList.add('is-wrong-selected');
+                icon = '❌';
+            } else {
+                icon = '◻️';
+            }
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'result-choice-icon';
+            iconSpan.textContent = icon;
+            item.appendChild(iconSpan);
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = choiceText;
+            if (isSelected && !isCorrectChoice) {
+                textSpan.innerHTML = escapeHtml(choiceText) + ' <span style="opacity:0.7;font-size:0.85em;">(ta réponse)</span>';
+            } else if (isCorrectChoice && isSelected) {
+                textSpan.innerHTML = escapeHtml(choiceText) + ' <span style="opacity:0.7;font-size:0.85em;">(ta réponse ✓)</span>';
+            } else {
+                textSpan.textContent = choiceText;
+            }
+            item.appendChild(textSpan);
+
+            choicesList.appendChild(item);
+        });
+
+        resultsBox.appendChild(choicesList);
+
+        /* --- Explication pédagogique --- */
+        appendExplanation(resultsBox);
+    }
+
+    function appendExplanation(container) {
+        const explication = currentQuestion?.explication || currentQuestion?.explanation || '';
+        if (!explication || !explication.trim()) return;
+        const expDiv = document.createElement('div');
+        expDiv.className = 'result-explanation';
+        expDiv.innerHTML = '<strong>📖 Explication :</strong>' + escapeHtml(explication);
+        container.appendChild(expDiv);
     }
 
     function shouldTrackFocusLoss() {
@@ -1073,8 +1236,21 @@
     function handleReturnToPage() {
         if (!pendingFocusWarning) return;
         pendingFocusWarning = false;
-        showToast('Tu as quitté l\'écran. Le professeur a été averti.', 'warn');
+        showAnticheatOverlay();
     }
+
+    function showAnticheatOverlay() {
+        const overlay = document.getElementById('anticheat-overlay');
+        const countEl = document.getElementById('anticheat-count');
+        countEl.textContent = 'Sorties détectées : ' + tabSwitchCount;
+        overlay.classList.add('visible');
+    }
+
+    function dismissAnticheat() {
+        const overlay = document.getElementById('anticheat-overlay');
+        overlay.classList.remove('visible');
+    }
+    window.dismissAnticheat = dismissAnticheat;
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
