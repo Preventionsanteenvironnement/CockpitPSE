@@ -243,6 +243,60 @@
         .podium-name { font-size: 0.9rem; font-weight: 700; margin: 4px 0; }
         .podium-score { font-size: 1.1rem; color: #94a3b8; }
 
+        /* === INDIVIDUAL STUDENT PODIUM === */
+        .student-podium { display: flex; gap: 16px; justify-content: center; align-items: flex-end; margin-bottom: 28px; flex-wrap: wrap; }
+        .student-podium-card {
+            text-align: center; border-radius: 16px; padding: 16px 20px; min-width: 140px;
+            background: #1e293b; border: 2px solid #334155; position: relative;
+            animation: fadeIn 0.6s ease both;
+        }
+        .student-podium-card.gold {
+            border-color: #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,191,36,0.08));
+            transform: scale(1.08); order: 2; box-shadow: 0 0 30px rgba(245,158,11,0.2);
+        }
+        .student-podium-card.silver {
+            border-color: #94a3b8; background: linear-gradient(135deg, rgba(148,163,184,0.12), rgba(203,213,225,0.06));
+            order: 1;
+        }
+        .student-podium-card.bronze {
+            border-color: #d97706; background: linear-gradient(135deg, rgba(217,119,6,0.1), rgba(245,158,11,0.05));
+            order: 3;
+        }
+        .student-podium-medal { font-size: 2.2rem; margin-bottom: 4px; }
+        .student-podium-pseudo { font-size: 1.1rem; font-weight: 900; color: #f8fafc; margin-bottom: 2px; }
+        .student-podium-name { font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; }
+        .student-podium-score { font-size: 1.4rem; font-weight: 900; color: #22c55e; }
+        .student-podium-pct { font-size: 0.7rem; color: #64748b; }
+
+        /* Student ranking table */
+        .student-ranking { width: 100%; max-width: 700px; margin: 0 auto 20px auto; }
+        .student-ranking-row {
+            display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+            background: #1e293b; border-radius: 10px; margin-bottom: 4px;
+            animation: fadeIn 0.4s ease both;
+        }
+        .student-ranking-row:nth-child(1) { background: rgba(245,158,11,0.1); border-left: 3px solid #f59e0b; }
+        .student-ranking-row:nth-child(2) { background: rgba(148,163,184,0.08); border-left: 3px solid #94a3b8; }
+        .student-ranking-row:nth-child(3) { background: rgba(217,119,6,0.08); border-left: 3px solid #d97706; }
+        .student-ranking-rank { width: 30px; font-weight: 900; font-size: 1rem; text-align: center; color: #64748b; }
+        .student-ranking-info { flex: 1; min-width: 0; }
+        .student-ranking-pseudo { font-weight: 700; font-size: 0.9rem; }
+        .student-ranking-meta { font-size: 0.7rem; color: #64748b; }
+        .student-ranking-score { font-weight: 900; font-size: 1.1rem; color: #22c55e; }
+        .student-ranking-pct { font-size: 0.7rem; color: #64748b; margin-left: 4px; }
+        .student-ranking-switches { font-size: 0.7rem; color: #ef4444; margin-left: 6px; }
+
+        /* Export button */
+        .export-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 24px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1); color: white;
+            font-size: 0.9rem; font-weight: 700; cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+            margin: 12px 6px;
+        }
+        .export-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+
         /* === HAMBURGER MENU INFRASTRUCTURE === */
         .menu-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); z-index:999; }
         .menu-btn { display:none; border:none; background:#1e293b; color:#fff; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); }
@@ -383,6 +437,8 @@
             <button class="ctrl-btn ctrl-next" id="btn-next" onclick="nextQuestion()" disabled style="flex:1;">⏭️ Suivante</button>
         </div>
         <button class="ctrl-btn" id="btn-results" onclick="showResultsManual()" disabled style="background:#8b5cf6; color:white;">📊 Voir resultats</button>
+        <button class="ctrl-btn" id="btn-start-correction" onclick="startCorrection()" style="display:none; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:white;">📝 Commencer la correction</button>
+        <button class="ctrl-btn" id="btn-next-correction" onclick="nextCorrection()" style="display:none; background:#8b5cf6; color:white;">➡️ Corriger la suivante</button>
         <button class="ctrl-btn" id="btn-restart" onclick="restartQuiz()" disabled style="background:#64748b; color:white;">🔄 Recommencer</button>
         <button class="ctrl-btn ctrl-end" id="btn-end" onclick="endQuiz()" disabled>🏁 Terminer</button>
     </div>
@@ -426,6 +482,12 @@
     <div id="main-summary">
         <div class="summary-title">🏁 Quiz termine !</div>
         <div class="summary-global" id="summary-global"></div>
+        <div id="student-podium-container"></div>
+        <div id="student-ranking-container"></div>
+        <div style="text-align:center; margin-bottom: 20px;">
+            <button class="export-btn" onclick="exportResultsCSV()">📥 Exporter les resultats (CSV)</button>
+            <button class="export-btn" onclick="exportResultsClipboard()" style="background:linear-gradient(135deg,#22c55e,#16a34a);">📋 Copier dans le presse-papier</button>
+        </div>
         <div class="summary-bars" id="summary-bars"></div>
     </div>
 </div>
@@ -661,6 +723,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let currentPhase = 'lobby';
     let shuffleEnabled = false;
     let autoAdvanceTimer = null; // timer for auto-advance after results
+    let inCorrectionMode = false;
+    let correctionIndex = -1;
 
     // === GAME MODE (Solo / Equipe / Battle / Duo) ===
     let gameMode = 'solo';
@@ -1067,9 +1131,43 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             document.getElementById('btn-next').disabled = !(hasSession && inResults && hasMoreQ);
         }
 
-        // VOIR RESULTATS : seulement en mode Manuel, pendant une question
-        document.getElementById('btn-results').style.display = isManual ? 'block' : 'none';
+        // VOIR RESULTATS : seulement en mode Manuel, pendant une question, et pas en correction
+        document.getElementById('btn-results').style.display = (isManual && !inCorrectionMode) ? 'block' : 'none';
         document.getElementById('btn-results').disabled = !(inQuestion && !isPaused);
+
+        // CORRECTION MODE BUTTONS
+        const isLastQuestion = currentQuestionIndex >= ACTIVE_QUESTIONS.length - 1;
+        const allQuestionsAnswered = isManual && inQuestion && isLastQuestion;
+        const showStartCorrection = isManual && !inCorrectionMode && (
+            (inResults && isLastQuestion) ||
+            (inQuestion && isLastQuestion)
+        );
+        document.getElementById('btn-start-correction').style.display = showStartCorrection ? 'block' : 'none';
+
+        const hasMoreCorrections = inCorrectionMode && correctionIndex < ACTIVE_QUESTIONS.length - 1;
+        document.getElementById('btn-next-correction').style.display = inCorrectionMode ? 'block' : 'none';
+        document.getElementById('btn-next-correction').disabled = !hasMoreCorrections;
+        document.getElementById('btn-next-correction').textContent = hasMoreCorrections
+            ? '➡️ Corriger Q' + (correctionIndex + 2)
+            : '🏁 Terminer le quiz';
+        if (inCorrectionMode && !hasMoreCorrections) {
+            document.getElementById('btn-next-correction').disabled = false;
+            document.getElementById('btn-next-correction').onclick = function() { endQuiz(); };
+        } else {
+            document.getElementById('btn-next-correction').onclick = function() { nextCorrection(); };
+        }
+
+        // Hide normal next/prev/launch during correction
+        if (inCorrectionMode) {
+            document.getElementById('btn-launch').style.display = 'none';
+            document.getElementById('btn-next').style.display = 'none';
+            document.getElementById('btn-prev').style.display = 'none';
+            document.getElementById('btn-results').style.display = 'none';
+        } else {
+            document.getElementById('btn-launch').style.display = 'block';
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-prev').style.display = 'block';
+        }
 
         document.getElementById('btn-restart').disabled = !(hasSession && quizStarted);
         document.getElementById('btn-end').disabled = !(hasSession && quizStarted && !inSummary);
@@ -1308,6 +1406,13 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         currentQuestionIndex++;
         if (currentQuestionIndex >= ACTIVE_QUESTIONS.length) {
+            if (currentMode === 'manual') {
+                // En mode manuel, on ne termine pas automatiquement
+                // Le prof peut choisir "Commencer la correction" ou "Terminer"
+                currentQuestionIndex = ACTIVE_QUESTIONS.length - 1;
+                updateButtons();
+                return;
+            }
             endQuiz();
             return;
         }
@@ -1607,6 +1712,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
         if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
         isPaused = false;
+        inCorrectionMode = false;
+        correctionIndex = -1;
 
         const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
         const snap = await getDocs(qResp);
@@ -1644,6 +1751,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
         if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
         isPaused = false;
+        inCorrectionMode = false;
+        correctionIndex = -1;
         currentPhase = 'summary';
 
         await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
@@ -1662,11 +1771,131 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         updateButtons();
     };
 
+    // === CORRECTION MODE ===
+    window.startCorrection = async function() {
+        if (!currentSessionId || ACTIVE_QUESTIONS.length === 0) return;
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+
+        inCorrectionMode = true;
+        correctionIndex = 0;
+        currentPhase = 'results';
+        currentQuestionIndex = 0;
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+            phase: 'results',
+            currentQuestionIndex: 0,
+            isOpen: false,
+            showResults: true,
+            paused: false,
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
+        }));
+
+        showMainScreen('results');
+        displayQuestion(0, 0);
+        await showResults();
+        document.getElementById('sidebar-q-info').textContent = '📝 Correction Q1/' + ACTIVE_QUESTIONS.length;
+        updateButtons();
+    };
+
+    window.nextCorrection = async function() {
+        if (!inCorrectionMode) return;
+        correctionIndex++;
+        if (correctionIndex >= ACTIVE_QUESTIONS.length) {
+            endQuiz();
+            return;
+        }
+
+        currentQuestionIndex = correctionIndex;
+        currentPhase = 'results';
+
+        await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
+            phase: 'results',
+            currentQuestionIndex: correctionIndex,
+            isOpen: false,
+            showResults: true,
+            paused: false,
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
+        }));
+
+        showMainScreen('results');
+        displayQuestion(correctionIndex, 0);
+        await showResults();
+        document.getElementById('sidebar-q-info').textContent = '📝 Correction Q' + (correctionIndex + 1) + '/' + ACTIVE_QUESTIONS.length;
+        updateButtons();
+    };
+
+    // === COMPUTE INDIVIDUAL STUDENT SCORES ===
+    function computeStudentScores() {
+        const maxQ = Math.min(currentQuestionIndex + 1, ACTIVE_QUESTIONS.length);
+        const studentMap = {};
+
+        // Init from presence
+        presenceSnapshotData.forEach(p => {
+            studentMap[p.visitorId] = {
+                visitorId: p.visitorId,
+                pseudo: p.pseudo || 'Eleve',
+                eleveCode: p.eleveCode || p.userCode || '',
+                profLabel: getProfDisplayLabel(p),
+                profMeta: getProfDisplayMeta(p),
+                tabSwitches: p.tabSwitches || 0,
+                score: 0,
+                total: maxQ,
+                answers: {}
+            };
+        });
+
+        // Also include students who responded but may have left presence
+        responsesData.forEach(r => {
+            if (!studentMap[r.visitorId]) {
+                const entry = getPresenceEntryForVisitor(r.visitorId);
+                studentMap[r.visitorId] = {
+                    visitorId: r.visitorId,
+                    pseudo: r.pseudo || 'Eleve',
+                    eleveCode: r.eleveCode || '',
+                    profLabel: entry ? getProfDisplayLabel(entry) : (r.pseudo || 'Eleve'),
+                    profMeta: entry ? getProfDisplayMeta(entry) : '',
+                    tabSwitches: entry ? (entry.tabSwitches || 0) : 0,
+                    score: 0,
+                    total: maxQ,
+                    answers: {}
+                };
+            }
+        });
+
+        // Compute scores per student
+        for (let i = 0; i < maxQ; i++) {
+            const qResp = responsesData.filter(r => r.questionIndex === i);
+            qResp.forEach(r => {
+                if (studentMap[r.visitorId]) {
+                    studentMap[r.visitorId].answers[i] = r.correct ? 1 : 0;
+                    if (r.correct) studentMap[r.visitorId].score++;
+                }
+            });
+        }
+
+        return Object.values(studentMap).sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return (a.tabSwitches || 0) - (b.tabSwitches || 0); // fewer tab switches = better rank
+        });
+    }
+
+    // Store last computed rankings for export
+    let lastStudentRankings = [];
+
     function displaySummary() {
         let totalCorrect = 0;
         let totalAnswered = 0;
         const barsContainer = document.getElementById('summary-bars');
         barsContainer.innerHTML = '';
+        const podiumContainer = document.getElementById('student-podium-container');
+        const rankingContainer = document.getElementById('student-ranking-container');
+        podiumContainer.innerHTML = '';
+        rankingContainer.innerHTML = '';
 
         // Team podium if in team mode
         if (gameMode !== 'solo' && teams.length > 0) {
@@ -1680,10 +1909,53 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                     '<div class="podium-score">' + t.pct + '%</div></div>';
             });
             podiumHtml += '</div>';
-            barsContainer.insertAdjacentHTML('beforebegin', podiumHtml);
+            podiumContainer.innerHTML = podiumHtml;
         }
 
+        // === INDIVIDUAL STUDENT PODIUM + RANKING ===
+        const students = computeStudentScores();
+        lastStudentRankings = students;
         const maxQ = Math.min(currentQuestionIndex + 1, ACTIVE_QUESTIONS.length);
+
+        if (students.length > 0) {
+            // Top 3 podium
+            const medals = ['🥇', '🥈', '🥉'];
+            const classes = ['gold', 'silver', 'bronze'];
+            let podiumHtml = '<div class="student-podium">';
+            for (let i = 0; i < Math.min(3, students.length); i++) {
+                const s = students[i];
+                const pct = s.total > 0 ? Math.round((s.score / s.total) * 100) : 0;
+                podiumHtml += '<div class="student-podium-card ' + classes[i] + '" style="animation-delay:' + (i * 0.2) + 's;">' +
+                    '<div class="student-podium-medal">' + medals[i] + '</div>' +
+                    '<div class="student-podium-pseudo">' + escapeHtml(s.pseudo) + '</div>' +
+                    '<div class="student-podium-name">' + escapeHtml(s.profLabel !== s.pseudo ? s.profLabel : '') + '</div>' +
+                    '<div class="student-podium-score">' + s.score + '/' + s.total + '</div>' +
+                    '<div class="student-podium-pct">' + pct + '%' + (s.tabSwitches > 0 ? ' · ⚠️' + s.tabSwitches + ' sortie(s)' : '') + '</div>' +
+                    '</div>';
+            }
+            podiumHtml += '</div>';
+            podiumContainer.innerHTML += podiumHtml;
+
+            // Full ranking table
+            let rankHtml = '<div class="student-ranking">';
+            students.forEach((s, i) => {
+                const pct = s.total > 0 ? Math.round((s.score / s.total) * 100) : 0;
+                const rankIcon = i < 3 ? medals[i] : '#' + (i + 1);
+                rankHtml += '<div class="student-ranking-row" style="animation-delay:' + (i * 0.08) + 's;">' +
+                    '<div class="student-ranking-rank">' + rankIcon + '</div>' +
+                    '<div class="student-ranking-info">' +
+                        '<div class="student-ranking-pseudo">' + escapeHtml(s.profLabel) + '</div>' +
+                        '<div class="student-ranking-meta">' + escapeHtml(s.profMeta) + '</div>' +
+                    '</div>' +
+                    '<div><span class="student-ranking-score">' + s.score + '/' + s.total + '</span>' +
+                    '<span class="student-ranking-pct">(' + pct + '%)</span>' +
+                    (s.tabSwitches > 0 ? '<span class="student-ranking-switches">⚠️' + s.tabSwitches + '</span>' : '') +
+                    '</div></div>';
+            });
+            rankHtml += '</div>';
+            rankingContainer.innerHTML = rankHtml;
+        }
+
         for (let i = 0; i < maxQ; i++) {
             const qResponses = responsesData.filter(r => r.questionIndex === i);
             const correct = qResponses.filter(r => r.correct).length;
@@ -1759,10 +2031,88 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('main-question').appendChild(container);
     }
 
+    // === EXPORT RESULTS ===
+    function buildResultsData() {
+        const students = lastStudentRankings.length > 0 ? lastStudentRankings : computeStudentScores();
+        const maxQ = Math.min(currentQuestionIndex + 1, ACTIVE_QUESTIONS.length);
+        const rows = [];
+
+        // Header
+        const header = ['Rang', 'Pseudo', 'Code eleve', 'Nom (annuaire)', 'Score', 'Total', 'Pourcentage', 'Sorties ecran'];
+        for (let i = 0; i < maxQ; i++) {
+            header.push('Q' + (i + 1));
+        }
+        rows.push(header);
+
+        // Data rows
+        students.forEach((s, idx) => {
+            const pct = s.total > 0 ? Math.round((s.score / s.total) * 100) : 0;
+            const privateName = getPrivateStudentName(normalizeStudentCode(s.eleveCode));
+            const row = [
+                idx + 1,
+                s.pseudo,
+                s.eleveCode || '',
+                privateName || '',
+                s.score,
+                s.total,
+                pct + '%',
+                s.tabSwitches || 0
+            ];
+            for (let i = 0; i < maxQ; i++) {
+                if (s.answers[i] !== undefined) {
+                    row.push(s.answers[i] === 1 ? 'OK' : 'FAUX');
+                } else {
+                    row.push('--');
+                }
+            }
+            rows.push(row);
+        });
+
+        return rows;
+    }
+
+    window.exportResultsCSV = function() {
+        const rows = buildResultsData();
+        const csvContent = rows.map(r => r.map(cell => {
+            const str = String(cell);
+            return str.includes(',') || str.includes('"') || str.includes('\n')
+                ? '"' + str.replace(/"/g, '""') + '"'
+                : str;
+        }).join(',')).join('\n');
+
+        // BOM for Excel compatibility
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        const quizName = document.getElementById('quiz-select').selectedOptions[0]?.textContent || 'quiz';
+        a.href = url;
+        a.download = 'resultats_quiz_' + date + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    window.exportResultsClipboard = function() {
+        const rows = buildResultsData();
+        const text = rows.map(r => r.join('\t')).join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('.export-btn[onclick*="Clipboard"]');
+            if (btn) {
+                const orig = btn.textContent;
+                btn.textContent = '✅ Copie !';
+                setTimeout(() => { btn.textContent = orig; }, 2000);
+            }
+        }).catch(() => {
+            alert('Impossible de copier. Utilisez l\'export CSV a la place.');
+        });
+    };
+
     // === AFFICHAGE ===
     function showMainScreen(name) {
         document.getElementById('main-lobby').style.display = name === 'lobby' ? 'flex' : 'none';
-        document.getElementById('main-question').style.display = name === 'question' ? 'flex' : 'none';
+        document.getElementById('main-question').style.display = (name === 'question' || name === 'results') ? 'flex' : 'none';
         document.getElementById('main-summary').style.display = name === 'summary' ? 'block' : 'none';
     }
 </script>
