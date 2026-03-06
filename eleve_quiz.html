@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSE Quiz Live - Eleve</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --panel-2: #1e293b;
+            --muted: #94a3b8;
+            --line: #334155;
+            --text: #f8fafc;
+            --accent: #f59e0b;
+            --accent-2: #22c55e;
+            --danger: #ef4444;
+            --blue: #3b82f6;
+        }
+        body {
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 30%),
+                radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.2), transparent 35%),
+                var(--bg);
+            color: var(--text);
+            padding: 18px;
+        }
+        .shell {
+            width: min(100%, 760px);
+            margin: 0 auto;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .brand-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .brand-subtitle {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-top: 4px;
+        }
+        .brand-chip {
+            padding: 9px 12px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            white-space: nowrap;
+        }
+        .toast {
+            position: sticky;
+            top: 10px;
+            z-index: 20;
+            display: none;
+            margin-bottom: 12px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            border: 1px solid transparent;
+            backdrop-filter: blur(10px);
+        }
+        .toast.info { display: block; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35); color: #bfdbfe; }
+        .toast.success { display: block; background: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.35); color: #bbf7d0; }
+        .toast.warn { display: block; background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.35); color: #fde68a; }
+        .toast.error { display: block; background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.35); color: #fecaca; }
+        .screen {
+            display: none;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 24px 60px rgba(2, 6, 23, 0.4);
+            backdrop-filter: blur(18px);
+        }
+        .screen.active { display: block; }
+        .hero {
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .hero h1 {
+            font-size: clamp(1.8rem, 6vw, 2.8rem);
+            line-height: 1.05;
+            margin-bottom: 10px;
+        }
+        .hero p {
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+        .join-grid {
+            display: grid;
+            gap: 14px;
+            margin-top: 22px;
+        }
+        .field {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 14px;
+        }
+        .field label {
+            display: block;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .field input, .field textarea {
+            width: 100%;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+        .field textarea {
+            min-height: 140px;
+            resize: vertical;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+        .field-help {
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+        .cta-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .btn {
+            flex: 1;
+            border: none;
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #fb923c);
+            color: #111827;
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .session-code {
+            font-size: clamp(2.3rem, 12vw, 4.8rem);
+            font-weight: 900;
+            letter-spacing: 0.22em;
+            color: var(--accent);
+            text-align: center;
+            margin: 16px 0;
+        }
+        .status-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 18px;
+            margin-top: 18px;
+        }
+        .status-title {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+        .status-main {
+            font-size: 1.2rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+        .status-sub {
+            margin-top: 8px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+        .team-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.06);
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+        .question-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .question-count {
+            color: var(--muted);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .question-timer {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--accent-2);
+        }
+        .question-timer.warn { color: var(--accent); }
+        .question-timer.danger { color: var(--danger); }
+        .media-box {
+            display: none;
+            margin-bottom: 16px;
+        }
+        .media-box.active { display: block; }
+        .media-box img {
+            width: 100%;
+            max-height: 280px;
+            object-fit: contain;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .media-box iframe {
+            width: 100%;
+            max-width: 100%;
+            height: 260px;
+            border: none;
+            border-radius: 18px;
+        }
+        .media-text {
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 4px solid var(--blue);
+            border-radius: 0 18px 18px 0;
+            padding: 16px 18px;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .question-box {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 22px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .question-text {
+            font-size: clamp(1.1rem, 4vw, 1.6rem);
+            font-weight: 800;
+            line-height: 1.45;
+        }
+        .question-hint {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.5;
+        }
+        .choices {
+            display: grid;
+            gap: 12px;
+        }
+        .choice-btn {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text);
+            border-radius: 18px;
+            padding: 16px 18px;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+        .choice-btn:hover { transform: translateY(-1px); border-color: rgba(245, 158, 11, 0.45); }
+        .choice-btn.selected {
+            background: rgba(245, 158, 11, 0.14);
+            border-color: rgba(245, 158, 11, 0.5);
+        }
+        .choice-letter {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            flex-shrink: 0;
+        }
+        .choice-text {
+            flex: 1;
+            font-size: 1rem;
+            line-height: 1.45;
+            font-weight: 700;
+        }
+        .answer-tools {
+            margin-top: 14px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .answer-status {
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        .result-box {
+            display: grid;
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .result-chip {
+            padding: 12px 14px;
+            border-radius: 16px;
+            font-weight: 800;
+            line-height: 1.5;
+        }
+        .result-chip.ok { background: rgba(34, 197, 94, 0.14); color: #bbf7d0; border: 1px solid rgba(34, 197, 94, 0.32); }
+        .result-chip.bad { background: rgba(239, 68, 68, 0.14); color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.32); }
+        .result-chip.neutral { background: rgba(255, 255, 255, 0.05); color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .muted-note {
+            margin-top: 18px;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 0.92rem;
+        }
+        @media (max-width: 640px) {
+            body { padding: 12px; }
+            .screen { padding: 16px; border-radius: 20px; }
+            .cta-row { flex-direction: column; }
+            .question-timer { font-size: 1.6rem; }
+            .choice-btn { padding: 14px; }
+            .brand { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="brand">
+        <div>
+            <div class="brand-title">Quiz Live PSE</div>
+            <div class="brand-subtitle">Pseudo public pour la classe, code élève privé pour l'écran prof.</div>
+        </div>
+        <div class="brand-chip" id="identity-chip">Non connecté</div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <section id="join-screen" class="screen active">
+        <div class="hero">
+            <h1>Rejoindre le quiz</h1>
+            <p>Entre le code projeté, choisis ton pseudo public et ajoute ton code élève si tu veux que le prof voie ton nom sur son écran.</p>
+        </div>
+
+        <div class="join-grid">
+            <div class="field">
+                <label for="session-code">Code de session</label>
+                <input id="session-code" type="text" maxlength="12" autocomplete="off" placeholder="Ex : LION">
+            </div>
+            <div class="field">
+                <label for="pseudo">Pseudo public</label>
+                <input id="pseudo" type="text" maxlength="24" autocomplete="nickname" placeholder="Ex : Lynx">
+                <div class="field-help">Ce pseudo est visible sur le mur et dans le classement.</div>
+            </div>
+            <div class="field">
+                <label for="eleve-code">Code élève privé</label>
+                <input id="eleve-code" type="text" maxlength="16" autocomplete="off" placeholder="Ex : AB12">
+                <div class="field-help">Optionnel mais recommandé. Le mur garde ton pseudo ; seul le prof peut relier ce code à son annuaire local.</div>
+            </div>
+        </div>
+
+        <div class="cta-row">
+            <button class="btn btn-primary" id="join-btn" onclick="joinQuiz()">Entrer dans le quiz</button>
+        </div>
+        <div class="muted-note">Astuce : ton pseudo et ton code sont mémorisés sur cet appareil pour la prochaine fois.</div>
+    </section>
+
+    <section id="lobby-screen" class="screen">
+        <div class="hero">
+            <h1>En attente du départ</h1>
+            <p>Le prof prépare la session. Garde cette page ouverte.</p>
+        </div>
+        <div class="session-code" id="lobby-code">----</div>
+        <div class="status-card">
+            <div class="status-title">Ton identité</div>
+            <div class="status-main" id="lobby-identity">Pseudo : -</div>
+            <div class="status-sub" id="lobby-private-note">Ton code élève reste privé.</div>
+            <div class="team-pill" id="lobby-team" style="display:none;"></div>
+        </div>
+    </section>
+
+    <section id="paused-screen" class="screen">
+        <div class="hero">
+            <h1>Quiz en pause</h1>
+            <p>Attends la reprise. Garde la page ouverte.</p>
+        </div>
+        <div class="status-card">
+            <div class="status-title">Session</div>
+            <div class="status-main" id="paused-session">Pause en cours</div>
+            <div class="status-sub">Toute sortie d'écran pendant une question peut être signalée au professeur.</div>
+        </div>
+    </section>
+
+    <section id="question-screen" class="screen">
+        <div class="question-top">
+            <div class="question-count" id="question-count">Question 1 / 1</div>
+            <div class="question-timer" id="question-timer">--</div>
+        </div>
+        <div class="team-pill" id="question-team" style="display:none;"></div>
+        <div class="media-box" id="question-media"></div>
+        <div class="question-box">
+            <div class="question-text" id="question-text"></div>
+            <div class="question-hint" id="question-hint"></div>
+        </div>
+        <div class="choices" id="choices"></div>
+        <div id="mot-zone" style="display:none;">
+            <div class="field">
+                <label for="mot-answer">Ta réponse</label>
+                <textarea id="mot-answer" placeholder="Écris ta réponse ici..."></textarea>
+            </div>
+            <div class="answer-tools">
+                <button class="btn btn-primary" style="flex:0 0 auto;" onclick="submitMotAnswer()">Envoyer ma réponse</button>
+                <div class="answer-status" id="mot-status">Ta réponse reste modifiable tant que le prof n'affiche pas les résultats.</div>
+            </div>
+        </div>
+        <div class="answer-tools" id="qcm-status-row">
+            <div class="answer-status" id="answer-status">Choisis une réponse pour l'envoyer immédiatement.</div>
+        </div>
+    </section>
+
+    <section id="results-screen" class="screen">
+        <div class="hero">
+            <h1>Résultats de la question</h1>
+            <p>Compare ta réponse avec la correction affichée.</p>
+        </div>
+        <div class="question-box">
+            <div class="question-text" id="results-question-text"></div>
+            <div class="question-hint" id="results-question-hint"></div>
+        </div>
+        <div class="result-box" id="results-box"></div>
+    </section>
+
+    <section id="summary-screen" class="screen">
+        <div class="hero">
+            <h1>Quiz terminé</h1>
+            <p>Merci d'avoir participé. Tu peux fermer la page ou attendre la prochaine session.</p>
+        </div>
+        <div class="status-card">
+            <div class="status-title">Identité de jeu</div>
+            <div class="status-main" id="summary-identity">Pseudo : -</div>
+            <div class="status-sub">Ton pseudo public a été conservé pour le mur. Le code élève, s'il était renseigné, n'était destiné qu'au prof.</div>
+        </div>
+    </section>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let currentSessionId = null;
+    let currentSessionCode = null;
+    let currentPseudo = '';
+    let currentEleveCode = '';
+    let currentQuestionIndex = -1;
+    let currentQuestion = null;
+    let currentQuestions = [];
+    let currentShuffle = null;
+    let currentPhase = 'join';
+    let currentResponse = null;
+    let currentTeams = [];
+    let tabSwitchCount = 0;
+    let questionTimerInterval = null;
+    let heartbeatInterval = null;
+    let pendingFocusWarning = false;
+    let lastFocusLossAt = 0;
+    let unsubConfig = null;
+
+    const visitorId = localStorage.getItem('quiz_live_visitorId') || generateVisitorId();
+    localStorage.setItem('quiz_live_visitorId', visitorId);
+
+    function generateVisitorId() {
+        return 'v_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeCode(value) {
+        return String(value || '').trim().toUpperCase();
+    }
+
+    function normalizeText(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.className = 'toast ' + type;
+        toast.textContent = message;
+        window.clearTimeout(showToast._timer);
+        showToast._timer = window.setTimeout(() => {
+            toast.className = 'toast';
+            toast.textContent = '';
+        }, type === 'warn' ? 4500 : 3200);
+    }
+
+    function showScreen(screenName) {
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.toggle('active', screen.id === screenName + '-screen');
+        });
+    }
+
+    function setIdentityChip() {
+        const chip = document.getElementById('identity-chip');
+        if (!currentPseudo) {
+            chip.textContent = 'Non connecté';
+            return;
+        }
+        chip.textContent = currentEleveCode
+            ? currentPseudo + ' · ' + currentEleveCode
+            : currentPseudo;
+    }
+
+    function renderTeamPill(elementId) {
+        const pill = document.getElementById(elementId);
+        if (!pill) return;
+        const team = getMyTeam();
+        if (!team) {
+            pill.style.display = 'none';
+            pill.textContent = '';
+            pill.style.borderColor = 'rgba(255,255,255,0.16)';
+            pill.style.color = '#e2e8f0';
+            return;
+        }
+        pill.style.display = 'inline-flex';
+        pill.style.borderColor = team.teamColor || 'rgba(255,255,255,0.16)';
+        pill.style.color = team.teamColor || '#e2e8f0';
+        pill.textContent = (team.teamEmoji || '👥') + ' ' + (team.teamName || 'Équipe');
+    }
+
+    function getMyTeam() {
+        return (currentTeams || []).find(team => {
+            return Array.isArray(team.members) && team.members.some(member => member.visitorId === visitorId);
+        }) || null;
+    }
+
+    function setLobbyIdentity() {
+        document.getElementById('lobby-code').textContent = currentSessionCode || '----';
+        document.getElementById('lobby-identity').textContent = 'Pseudo public : ' + (currentPseudo || '-');
+        document.getElementById('lobby-private-note').textContent = currentEleveCode
+            ? 'Code élève privé enregistré : ' + currentEleveCode
+            : 'Aucun code élève privé renseigné : le prof gardera ton pseudo.';
+        renderTeamPill('lobby-team');
+    }
+
+    function setPausedIdentity() {
+        document.getElementById('paused-session').textContent = 'Session ' + (currentSessionCode || '----');
+    }
+
+    function renderSummaryIdentity() {
+        document.getElementById('summary-identity').textContent = currentEleveCode
+            ? 'Pseudo : ' + currentPseudo + ' · Code privé : ' + currentEleveCode
+            : 'Pseudo : ' + currentPseudo;
+    }
+
+    function disconnectSession() {
+        stopQuestionTimer();
+        if (unsubConfig) {
+            const unsubscribe = unsubConfig;
+            unsubConfig = null;
+            unsubscribe();
+        }
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
+        currentSessionId = null;
+        currentSessionCode = null;
+        currentQuestionIndex = -1;
+        currentQuestion = null;
+        currentQuestions = [];
+        currentShuffle = null;
+        currentTeams = [];
+        currentPhase = 'join';
+        setIdentityChip();
+    }
+
+    function stopQuestionTimer() {
+        if (questionTimerInterval) {
+            clearInterval(questionTimerInterval);
+            questionTimerInterval = null;
+        }
+    }
+
+    function renderQuestionTimer(config) {
+        const timerEl = document.getElementById('question-timer');
+        stopQuestionTimer();
+
+        const baseSeconds = Number(config.timeRemaining ?? config.timer ?? 0);
+        const startedAt = Number(config.timerStartedAt || Date.now());
+        if (!baseSeconds || baseSeconds <= 0) {
+            timerEl.textContent = '✋';
+            timerEl.className = 'question-timer';
+            return;
+        }
+
+        function updateTimer() {
+            const remaining = Math.max(0, Math.ceil((startedAt + baseSeconds * 1000 - Date.now()) / 1000));
+            timerEl.textContent = remaining + 's';
+            if (remaining <= 3) timerEl.className = 'question-timer danger';
+            else if (remaining <= Math.max(3, Math.floor(baseSeconds * 0.3))) timerEl.className = 'question-timer warn';
+            else timerEl.className = 'question-timer';
+        }
+
+        updateTimer();
+        questionTimerInterval = setInterval(updateTimer, 250);
+    }
+
+    function extractYouTubeId(url) {
+        if (!url) return null;
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/);
+        return match ? match[1] : null;
+    }
+
+    function renderMediaHtml(media) {
+        if (!media || !media.type || !media.content) return '';
+        if (media.type === 'image') {
+            return '<img src="' + escapeHtml(media.content) + '" alt="Media">';
+        }
+        if (media.type === 'video') {
+            const vid = extractYouTubeId(media.content);
+            return vid ? '<iframe src="https://www.youtube-nocookie.com/embed/' + vid + '" allowfullscreen></iframe>' : '';
+        }
+        if (media.type === 'texte') {
+            return '<div class="media-text">' + escapeHtml(media.content) + '</div>';
+        }
+        return '';
+    }
+
+    function getChoiceOrder(question, shuffle) {
+        if (!question || !Array.isArray(question.choices)) return [];
+        if (Array.isArray(shuffle) && shuffle.length === question.choices.length) {
+            return shuffle.slice();
+        }
+        return question.choices.map((_, index) => index);
+    }
+
+    async function joinQuiz() {
+        const joinBtn = document.getElementById('join-btn');
+        const code = normalizeCode(document.getElementById('session-code').value);
+        const pseudo = String(document.getElementById('pseudo').value || '').trim();
+        const eleveCode = normalizeCode(document.getElementById('eleve-code').value || localStorage.getItem('userCode'));
+
+        if (!code) {
+            showToast('Entre le code de session affiché au tableau.', 'error');
+            return;
+        }
+        if (!pseudo || pseudo.length < 2) {
+            showToast('Choisis un pseudo public de 2 caractères minimum.', 'error');
+            return;
+        }
+
+        joinBtn.disabled = true;
+        joinBtn.textContent = 'Connexion...';
+        try {
+            const configSnap = await getDoc(doc(db, 'quiz_live_config', 'global'));
+            if (!configSnap.exists()) {
+                throw new Error("Aucune session active pour l'instant.");
+            }
+            const config = configSnap.data();
+            if (normalizeCode(config.sessionCode) !== code) {
+                throw new Error('Code introuvable.');
+            }
+
+            currentSessionId = config.sessionId;
+            currentSessionCode = code;
+            currentPseudo = pseudo;
+            currentEleveCode = eleveCode;
+
+            localStorage.setItem('quiz_live_pseudo', pseudo);
+            if (eleveCode) localStorage.setItem('userCode', eleveCode);
+
+            await ensurePresenceEntry();
+            setIdentityChip();
+            subscribeToConfig();
+            setLobbyIdentity();
+            showScreen('lobby');
+            showToast('Connecté au quiz live.', 'success');
+        } catch (error) {
+            showToast(error.message || 'Connexion impossible.', 'error');
+        } finally {
+            joinBtn.disabled = false;
+            joinBtn.textContent = 'Entrer dans le quiz';
+        }
+    }
+
+    function getPresenceRef() {
+        if (!currentSessionId) return null;
+        return doc(db, 'quiz_live_presence', currentSessionId + '_' + visitorId);
+    }
+
+    async function ensurePresenceEntry() {
+        const presenceRef = getPresenceRef();
+        if (!presenceRef) return;
+
+        const existingSnap = await getDoc(presenceRef);
+        let numero = null;
+        let joinedAt = Date.now();
+        let currentSwitches = tabSwitchCount;
+
+        if (existingSnap.exists()) {
+            const existing = existingSnap.data();
+            numero = existing.numero || null;
+            joinedAt = existing.joinedAt || joinedAt;
+            currentSwitches = Number(existing.tabSwitches || 0);
+        }
+        if (!numero) {
+            const presSnap = await getDocs(query(collection(db, 'quiz_live_presence'), where('sessionId', '==', currentSessionId)));
+            numero = presSnap.size + 1;
+        }
+
+        tabSwitchCount = currentSwitches;
+        await setDoc(presenceRef, {
+            sessionId: currentSessionId,
+            sessionCode: currentSessionCode,
+            visitorId,
+            pseudo: currentPseudo,
+            eleveCode: currentEleveCode || null,
+            numero,
+            tabSwitches: tabSwitchCount,
+            joinedAt,
+            lastSeen: Date.now()
+        }, { merge: true });
+    }
+
+    async function touchPresence(extra = {}) {
+        const presenceRef = getPresenceRef();
+        if (!presenceRef) return;
+        try {
+            await setDoc(presenceRef, {
+                sessionId: currentSessionId,
+                sessionCode: currentSessionCode,
+                visitorId,
+                pseudo: currentPseudo,
+                eleveCode: currentEleveCode || null,
+                lastSeen: Date.now(),
+                ...extra
+            }, { merge: true });
+        } catch (error) {
+            console.warn('Presence update failed:', error.message);
+        }
+    }
+
+    function subscribeToConfig() {
+        if (unsubConfig) unsubConfig();
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+        heartbeatInterval = setInterval(() => {
+            if (currentSessionId) touchPresence();
+        }, 20000);
+
+        unsubConfig = onSnapshot(doc(db, 'quiz_live_config', 'global'), async (snap) => {
+            if (!snap.exists()) return;
+            const config = snap.data();
+            if (config.sessionId !== currentSessionId) {
+                disconnectSession();
+                showScreen('join');
+                showToast('La session a changé. Rejoins la nouvelle session si besoin.', 'warn');
+                return;
+            }
+
+            currentQuestions = Array.isArray(config.questions) ? config.questions : [];
+            currentTeams = config.teams || [];
+            renderTeamPill('lobby-team');
+            renderTeamPill('question-team');
+            setPausedIdentity();
+
+            if (config.paused) {
+                currentPhase = 'paused';
+                stopQuestionTimer();
+                showScreen('paused');
+                return;
+            }
+
+            const phase = config.phase || 'lobby';
+            if (phase === 'lobby') {
+                currentPhase = 'lobby';
+                currentQuestionIndex = -1;
+                currentQuestion = null;
+                currentQuestions = Array.isArray(config.questions) ? config.questions : currentQuestions;
+                setLobbyIdentity();
+                showScreen('lobby');
+                return;
+            }
+
+            if (phase === 'question') {
+                const nextIndex = config.currentQuestionIndex ?? -1;
+                const questionChanged = nextIndex !== currentQuestionIndex || currentPhase !== 'question';
+                currentPhase = 'question';
+                currentQuestionIndex = nextIndex;
+                currentQuestion = currentQuestions[nextIndex] || null;
+                currentShuffle = config.shuffleMap && config.shuffleMap[visitorId] ? config.shuffleMap[visitorId] : null;
+                if (questionChanged) {
+                    await hydrateCurrentResponse();
+                    renderQuestion();
+                }
+                renderQuestionTimer(config);
+                showScreen('question');
+                touchPresence({ currentQuestionIndex: currentQuestionIndex });
+                return;
+            }
+
+            if (phase === 'results') {
+                currentPhase = 'results';
+                currentQuestionIndex = config.currentQuestionIndex ?? currentQuestionIndex;
+                currentQuestion = currentQuestions[currentQuestionIndex] || currentQuestion;
+                stopQuestionTimer();
+                await hydrateCurrentResponse();
+                renderResults();
+                showScreen('results');
+                return;
+            }
+
+            if (phase === 'summary') {
+                currentPhase = 'summary';
+                stopQuestionTimer();
+                renderSummaryIdentity();
+                showScreen('summary');
+            }
+        });
+    }
+
+    async function hydrateCurrentResponse() {
+        currentResponse = null;
+        if (!currentSessionId || currentQuestionIndex < 0) return;
+        const responseRef = doc(db, 'quiz_live_reponses', currentSessionId + '_' + currentQuestionIndex + '_' + visitorId);
+        try {
+            const snap = await getDoc(responseRef);
+            if (snap.exists()) {
+                currentResponse = snap.data();
+            }
+        } catch (error) {
+            console.warn('Response hydrate failed:', error.message);
+        }
+    }
+
+    function renderQuestion() {
+        if (!currentQuestion) return;
+        const questionCount = currentQuestionIndex + 1;
+        const totalQuestions = currentQuestions.length || questionCount;
+        document.getElementById('question-count').textContent = 'Question ' + questionCount + ' / ' + totalQuestions;
+        document.getElementById('question-text').textContent = currentQuestion.question || '';
+        document.getElementById('question-hint').textContent = currentQuestion.type === 'mot'
+            ? 'Écris ta réponse puis valide. Toute sortie d\'écran pendant la question peut être signalée.'
+            : 'Touchez une réponse pour l\'envoyer. Toute sortie d\'écran pendant la question peut être signalée.';
+
+        const mediaEl = document.getElementById('question-media');
+        const mediaHtml = renderMediaHtml(currentQuestion.media);
+        mediaEl.innerHTML = mediaHtml;
+        mediaEl.classList.toggle('active', !!mediaHtml);
+
+        renderTeamPill('question-team');
+
+        const qcmContainer = document.getElementById('choices');
+        const motZone = document.getElementById('mot-zone');
+        const qcmStatus = document.getElementById('answer-status');
+        qcmContainer.innerHTML = '';
+
+        if (currentQuestion.type === 'mot') {
+            qcmContainer.style.display = 'none';
+            motZone.style.display = 'block';
+            document.getElementById('qcm-status-row').style.display = 'none';
+            document.getElementById('mot-answer').value = currentResponse?.answerText || '';
+            document.getElementById('mot-status').textContent = currentResponse
+                ? 'Réponse envoyée. Tu peux encore la modifier tant que les résultats ne sont pas affichés.'
+                : 'Ta réponse reste modifiable tant que le prof n\'affiche pas les résultats.';
+            return;
+        }
+
+        qcmContainer.style.display = 'grid';
+        motZone.style.display = 'none';
+        document.getElementById('qcm-status-row').style.display = 'flex';
+
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const order = getChoiceOrder(currentQuestion, currentShuffle);
+        order.forEach((choiceIndex, displayIndex) => {
+            const button = document.createElement('button');
+            button.className = 'choice-btn';
+            if (currentResponse && currentResponse.answer === choiceIndex) {
+                button.classList.add('selected');
+            }
+            button.onclick = () => submitChoice(choiceIndex);
+            button.innerHTML = '<span class="choice-letter">' + letters[displayIndex] + '</span>' +
+                '<span class="choice-text">' + escapeHtml(currentQuestion.choices[choiceIndex]) + '</span>';
+            qcmContainer.appendChild(button);
+        });
+
+        qcmStatus.textContent = currentResponse
+            ? 'Réponse envoyée. Tu peux encore changer avant les résultats.'
+            : 'Choisis une réponse pour l\'envoyer immédiatement.';
+    }
+
+    async function submitChoice(choiceIndex) {
+        if (!currentSessionId || currentPhase !== 'question' || !currentQuestion) return;
+        const isCorrect = Number(choiceIndex) === Number(currentQuestion.correct);
+        currentResponse = {
+            sessionId: currentSessionId,
+            visitorId,
+            pseudo: currentPseudo,
+            eleveCode: currentEleveCode || null,
+            questionIndex: currentQuestionIndex,
+            answer: choiceIndex,
+            correct: isCorrect,
+            answeredAt: Date.now()
+        };
+        try {
+            await setDoc(doc(db, 'quiz_live_reponses', currentSessionId + '_' + currentQuestionIndex + '_' + visitorId), currentResponse, { merge: true });
+            document.querySelectorAll('.choice-btn').forEach((button, index) => {
+                const order = getChoiceOrder(currentQuestion, currentShuffle);
+                button.classList.toggle('selected', order[index] === choiceIndex);
+            });
+            document.getElementById('answer-status').textContent = 'Réponse envoyée. Tu peux encore changer avant les résultats.';
+            touchPresence({ lastAnswerAt: Date.now(), currentQuestionIndex: currentQuestionIndex });
+        } catch (error) {
+            showToast('Envoi impossible. Vérifie la connexion puis réessaie.', 'error');
+        }
+    }
+
+    async function submitMotAnswer() {
+        if (!currentSessionId || currentPhase !== 'question' || !currentQuestion) return;
+        const answerText = String(document.getElementById('mot-answer').value || '').trim();
+        if (!answerText) {
+            showToast('Écris une réponse avant de valider.', 'error');
+            return;
+        }
+        const isCorrect = normalizeText(answerText) === normalizeText(currentQuestion.reponse || '');
+        currentResponse = {
+            sessionId: currentSessionId,
+            visitorId,
+            pseudo: currentPseudo,
+            eleveCode: currentEleveCode || null,
+            questionIndex: currentQuestionIndex,
+            answer: null,
+            answerText,
+            correct: isCorrect,
+            answeredAt: Date.now()
+        };
+        try {
+            await setDoc(doc(db, 'quiz_live_reponses', currentSessionId + '_' + currentQuestionIndex + '_' + visitorId), currentResponse, { merge: true });
+            document.getElementById('mot-status').textContent = 'Réponse envoyée. Tu peux encore la modifier tant que les résultats ne sont pas affichés.';
+            touchPresence({ lastAnswerAt: Date.now(), currentQuestionIndex: currentQuestionIndex });
+        } catch (error) {
+            showToast('Envoi impossible. Vérifie la connexion puis réessaie.', 'error');
+        }
+    }
+
+    function renderResults() {
+        document.getElementById('results-question-text').textContent = currentQuestion?.question || '';
+        document.getElementById('results-question-hint').textContent = currentQuestion?.type === 'mot'
+            ? 'Correction de la réponse courte.'
+            : 'Correction de la question.';
+
+        const resultsBox = document.getElementById('results-box');
+        resultsBox.innerHTML = '';
+
+        if (!currentQuestion) return;
+
+        if (!currentResponse) {
+            const missing = document.createElement('div');
+            missing.className = 'result-chip neutral';
+            missing.textContent = 'Aucune réponse envoyée pour cette question.';
+            resultsBox.appendChild(missing);
+        } else {
+            const result = document.createElement('div');
+            result.className = 'result-chip ' + (currentResponse.correct ? 'ok' : 'bad');
+            result.textContent = currentResponse.correct
+                ? '✅ Bonne réponse'
+                : '❌ Réponse incorrecte';
+            resultsBox.appendChild(result);
+        }
+
+        if (currentQuestion.type === 'mot') {
+            if (currentResponse?.answerText) {
+                const mine = document.createElement('div');
+                mine.className = 'result-chip neutral';
+                mine.innerHTML = '<strong>Ta réponse :</strong><br>' + escapeHtml(currentResponse.answerText);
+                resultsBox.appendChild(mine);
+            }
+            const expected = document.createElement('div');
+            expected.className = 'result-chip neutral';
+            expected.innerHTML = '<strong>Réponse attendue :</strong><br>' + escapeHtml(currentQuestion.reponse || '');
+            resultsBox.appendChild(expected);
+            return;
+        }
+
+        const chosen = document.createElement('div');
+        chosen.className = 'result-chip neutral';
+        chosen.innerHTML = '<strong>Ta réponse :</strong><br>' + (currentResponse
+            ? escapeHtml(currentQuestion.choices[currentResponse.answer] || 'Réponse inconnue')
+            : 'Aucune');
+        resultsBox.appendChild(chosen);
+
+        const correct = document.createElement('div');
+        correct.className = 'result-chip neutral';
+        correct.innerHTML = '<strong>Bonne réponse :</strong><br>' + escapeHtml(currentQuestion.choices[currentQuestion.correct] || '');
+        resultsBox.appendChild(correct);
+    }
+
+    function shouldTrackFocusLoss() {
+        return !!currentSessionId && currentPhase === 'question';
+    }
+
+    async function reportFocusLoss() {
+        if (!shouldTrackFocusLoss()) return;
+        const now = Date.now();
+        if (now - lastFocusLossAt < 900) return;
+        lastFocusLossAt = now;
+        tabSwitchCount += 1;
+        pendingFocusWarning = true;
+        touchPresence({
+            tabSwitches: tabSwitchCount,
+            lastFocusLossAt: now
+        });
+    }
+
+    function handleReturnToPage() {
+        if (!pendingFocusWarning) return;
+        pendingFocusWarning = false;
+        showToast('Tu as quitté l\'écran. Le professeur a été averti.', 'warn');
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            reportFocusLoss();
+        } else if (document.visibilityState === 'visible') {
+            handleReturnToPage();
+        }
+    });
+
+    window.addEventListener('blur', () => {
+        reportFocusLoss();
+    });
+
+    window.addEventListener('focus', () => {
+        handleReturnToPage();
+    });
+
+    window.joinQuiz = joinQuiz;
+    window.submitMotAnswer = submitMotAnswer;
+
+    document.getElementById('session-code').addEventListener('keydown', event => {
+        if (event.key === 'Enter') joinQuiz();
+    });
+    document.getElementById('pseudo').addEventListener('keydown', event => {
+        if (event.key === 'Enter') joinQuiz();
+    });
+    document.getElementById('eleve-code').addEventListener('keydown', event => {
+        if (event.key === 'Enter') joinQuiz();
+    });
+
+    function prefillFromStorage() {
+        const params = new URLSearchParams(window.location.search);
+        const codeParam = normalizeCode(params.get('code'));
+        const savedPseudo = localStorage.getItem('quiz_live_pseudo') || '';
+        const savedCode = normalizeCode(localStorage.getItem('userCode') || '');
+
+        if (codeParam) document.getElementById('session-code').value = codeParam;
+        if (savedPseudo) document.getElementById('pseudo').value = savedPseudo;
+        if (savedCode) document.getElementById('eleve-code').value = savedCode;
+    }
+
+    prefillFromStorage();
+    setIdentityChip();
+</script>
+</body>
+</html>

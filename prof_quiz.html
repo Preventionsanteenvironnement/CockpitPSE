@@ -87,8 +87,26 @@
             padding: 6px 8px; background: #0f172a; border-radius: 6px; margin-bottom: 4px;
             font-size: 0.85rem;
         }
+        .presence-left { min-width: 0; }
         .presence-pseudo { font-weight: 700; }
+        .presence-meta {
+            color: #94a3b8; font-size: 0.7rem; margin-top: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .presence-num { color: #64748b; font-size: 0.75rem; }
+
+        /* Annuaire local */
+        .annuaire-box {
+            background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+            padding: 10px;
+        }
+        .annuaire-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+        .annuaire-btn {
+            flex: 1; padding: 9px 10px; border: none; border-radius: 8px;
+            background: #334155; color: white; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+        }
+        .annuaire-btn.secondary { background: transparent; border: 1px solid #475569; color: #cbd5e1; }
+        .annuaire-status { font-size: 0.75rem; color: #94a3b8; line-height: 1.5; }
 
         /* === MAIN AREA === */
         #main {
@@ -300,6 +318,18 @@
         <div class="quiz-info" id="quiz-info"></div>
     </div>
 
+    <div class="sidebar-section">
+        <label>Annuaire Prof</label>
+        <div class="annuaire-box">
+            <input type="file" id="csv-import" accept=".csv,.txt" style="display:none;" onchange="importCSVEleves(event)">
+            <div class="annuaire-actions">
+                <button class="annuaire-btn" onclick="document.getElementById('csv-import').click()">📁 Importer mes_eleves.csv</button>
+                <button class="annuaire-btn secondary" onclick="clearImportedEleves()">🧹 Effacer</button>
+            </div>
+            <div class="annuaire-status" id="annuaire-status">⚠️ Aucun nom chargé. Le prof verra les pseudos.</div>
+        </div>
+    </div>
+
     <!-- Mode de jeu -->
     <div class="sidebar-section">
         <label>Mode de jeu</label>
@@ -429,6 +459,111 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     const STUDENT_QUIZ_PATHS = ['/eleve_quiz.html', '/PSE/eleve_quiz.html'];
     let resolvedStudentQuizUrl = null;
+    const CLE_ELEVES = 'cockpit_eleves_noms';
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function readElevesMap() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(CLE_ELEVES) || '{}');
+            return raw && typeof raw === 'object' ? raw : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function normalizeStudentCode(code) {
+        return String(code || '').trim().toUpperCase();
+    }
+
+    function getPrivateStudentName(code) {
+        const normalized = normalizeStudentCode(code);
+        if (!normalized) return null;
+        const eleves = readElevesMap();
+        return eleves[normalized] || null;
+    }
+
+    function getPresenceEntryForVisitor(visitorId) {
+        return presenceSnapshotData.find(function(entry) {
+            return entry.visitorId === visitorId;
+        }) || null;
+    }
+
+    function getProfDisplayLabel(entry) {
+        if (!entry) return 'Eleve';
+        const code = normalizeStudentCode(entry.eleveCode || entry.userCode);
+        const privateName = getPrivateStudentName(code);
+        return privateName || entry.pseudo || code || 'Eleve';
+    }
+
+    function getProfDisplayMeta(entry) {
+        if (!entry) return '';
+        const parts = [];
+        const code = normalizeStudentCode(entry.eleveCode || entry.userCode);
+        const privateName = getPrivateStudentName(code);
+        const pseudo = String(entry.pseudo || '').trim();
+        if (pseudo && (!privateName || pseudo !== privateName)) {
+            parts.push('@' + pseudo);
+        }
+        if (code) {
+            parts.push(code);
+        }
+        return parts.join(' · ');
+    }
+
+    function updateStudentNameStatus() {
+        const statusEl = document.getElementById('annuaire-status');
+        if (!statusEl) return;
+        const eleves = readElevesMap();
+        const nb = Object.keys(eleves).length;
+        if (nb > 0) {
+            statusEl.innerHTML = '✅ ' + nb + ' nom(s) chargé(s).<br>Affichage privé uniquement sur cet écran prof.';
+            statusEl.style.color = '#22c55e';
+        } else {
+            statusEl.innerHTML = '⚠️ Aucun nom chargé.<br>Le prof verra les pseudos, avec le code élève si renseigné.';
+            statusEl.style.color = '#f59e0b';
+        }
+    }
+
+    window.importCSVEleves = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            const lignes = String(loadEvent.target.result || '').split(/\r?\n/);
+            const eleves = readElevesMap();
+            let nb = 0;
+            lignes.forEach(function(ligne) {
+                const trimmed = ligne.trim();
+                if (!trimmed) return;
+                const parts = trimmed.split(/[,;]/);
+                if (parts.length < 2) return;
+                const code = normalizeStudentCode(parts[0]);
+                const nom = parts.slice(1).join(' ').trim();
+                if (!code || !nom) return;
+                eleves[code] = nom;
+                nb += 1;
+            });
+            localStorage.setItem(CLE_ELEVES, JSON.stringify(eleves));
+            event.target.value = '';
+            updateStudentNameStatus();
+            if (currentSessionId) setupListeners();
+        };
+        reader.readAsText(file, 'UTF-8');
+    };
+
+    window.clearImportedEleves = function() {
+        localStorage.removeItem(CLE_ELEVES);
+        updateStudentNameStatus();
+        if (currentSessionId) setupListeners();
+    };
 
     function fallbackStudentQuizUrl() {
         const origin = window.location.origin;
@@ -467,6 +602,13 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     getStudentQuizUrl();
+    updateStudentNameStatus();
+    window.addEventListener('storage', function(event) {
+        if (event.key === CLE_ELEVES) {
+            updateStudentNameStatus();
+            if (currentSessionId) setupListeners();
+        }
+    });
 
     // === QUESTIONS DE DEMO ===
     const DEFAULT_DEMO = [
@@ -696,9 +838,18 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const card = document.createElement('div');
             card.className = 'team-card';
             card.style.borderLeftColor = t.teamColor;
-            const membersHtml = t.members.map(m => '<span class="team-member-badge">' + m.pseudo + '</span>').join('');
-            card.innerHTML = '<div class="team-card-header" style="color:' + t.teamColor + ';">' + t.teamEmoji + ' ' + t.teamName + ' <span style="font-size:0.65rem;color:#64748b;">(' + t.members.length + ')</span></div>' +
-                '<div class="team-card-members">' + membersHtml + '</div>';
+            card.innerHTML = '<div class="team-card-header" style="color:' + t.teamColor + ';">' + t.teamEmoji + ' ' + escapeHtml(t.teamName) + ' <span style="font-size:0.65rem;color:#64748b;">(' + t.members.length + ')</span></div>' +
+                '<div class="team-card-members"></div>';
+            const membersWrap = card.querySelector('.team-card-members');
+            t.members.forEach(member => {
+                const entry = getPresenceEntryForVisitor(member.visitorId) || member;
+                const badge = document.createElement('span');
+                badge.className = 'team-member-badge';
+                badge.textContent = getProfDisplayLabel(entry);
+                const meta = getProfDisplayMeta(entry);
+                if (meta) badge.title = meta;
+                membersWrap.appendChild(badge);
+            });
             container.appendChild(card);
         });
     }
@@ -1003,7 +1154,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             isOpen: false,
             showResults: false,
             paused: false,
-            shuffleMap: null
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
         }));
 
         document.getElementById('session-code-display').textContent = currentSessionCode;
@@ -1050,7 +1203,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             isOpen: false,
             showResults: false,
             paused: false,
-            shuffleMap: null
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
         }));
 
         showMainScreen('lobby');
@@ -1078,11 +1233,52 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 presenceSnapshotData.push(data);
                 const item = document.createElement('div');
                 item.className = 'presence-item';
-                const switches = data.tabSwitches || 0;
-                const alertBadge = switches > 0 ? ' <span style="color:#ef4444;font-size:0.7rem;" title="' + switches + ' sortie(s) de page">⚠️' + switches + '</span>' : '';
+                const left = document.createElement('div');
+                left.className = 'presence-left';
+
+                const main = document.createElement('div');
+                main.className = 'presence-pseudo';
+                main.textContent = getProfDisplayLabel(data);
+
                 const team = getTeamForVisitor(data.visitorId);
-                const teamBadge = team ? '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:' + team.teamColor + ';color:white;margin-left:4px;">' + team.teamEmoji + '</span>' : '';
-                item.innerHTML = '<span class="presence-pseudo">' + data.pseudo + teamBadge + alertBadge + '</span><span class="presence-num">n°' + data.numero + '</span>';
+                if (team) {
+                    const teamBadge = document.createElement('span');
+                    teamBadge.style.fontSize = '0.6rem';
+                    teamBadge.style.padding = '1px 4px';
+                    teamBadge.style.borderRadius = '3px';
+                    teamBadge.style.background = team.teamColor;
+                    teamBadge.style.color = 'white';
+                    teamBadge.style.marginLeft = '4px';
+                    teamBadge.textContent = team.teamEmoji;
+                    main.appendChild(teamBadge);
+                }
+
+                const switches = data.tabSwitches || 0;
+                if (switches > 0) {
+                    const alertBadge = document.createElement('span');
+                    alertBadge.style.color = '#ef4444';
+                    alertBadge.style.fontSize = '0.7rem';
+                    alertBadge.style.marginLeft = '4px';
+                    alertBadge.title = switches + ' sortie(s) de page';
+                    alertBadge.textContent = '⚠️' + switches;
+                    main.appendChild(alertBadge);
+                }
+
+                left.appendChild(main);
+                const meta = getProfDisplayMeta(data);
+                if (meta) {
+                    const metaEl = document.createElement('div');
+                    metaEl.className = 'presence-meta';
+                    metaEl.textContent = meta;
+                    left.appendChild(metaEl);
+                }
+
+                const num = document.createElement('span');
+                num.className = 'presence-num';
+                num.textContent = 'n°' + (data.numero || '?');
+
+                item.appendChild(left);
+                item.appendChild(num);
                 list.appendChild(item);
             });
             // Update team options chips when students connect/disconnect
@@ -1130,7 +1326,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 isOpen: true,
                 showResults: false,
                 paused: false,
-                shuffleMap: shuffleMap
+                shuffleMap: shuffleMap,
+                timeRemaining: timer,
+                timerStartedAt: Date.now()
             }));
         } catch(e) {
             console.error("Erreur lancement question:", e);
@@ -1143,7 +1341,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                     isOpen: true,
                     showResults: false,
                     paused: false,
-                    shuffleMap: shuffleMap
+                    shuffleMap: shuffleMap,
+                    timeRemaining: timer,
+                    timerStartedAt: Date.now()
                 }));
             } catch(e2) {
                 alert("Erreur reseau : la question n'a pas pu etre envoyee. Verifie ta connexion et reessaie.");
@@ -1255,7 +1455,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 isOpen: true,
                 showResults: false,
                 paused: false,
-                shuffleMap: null
+                shuffleMap: null,
+                timeRemaining: pausedTimeRemaining,
+                timerStartedAt: Date.now()
             }));
 
             if (currentMode === 'auto' && pausedTimeRemaining > 0) {
@@ -1278,7 +1480,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 isOpen: true,
                 showResults: false,
                 paused: true,
-                shuffleMap: null
+                shuffleMap: null,
+                timeRemaining: pausedTimeRemaining,
+                timerStartedAt: null
             }));
 
             document.getElementById('main-timer').textContent = '⏸️';
@@ -1300,7 +1504,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             isOpen: false,
             showResults: true,
             paused: false,
-            shuffleMap: null
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
         }));
 
         const q = ACTIVE_QUESTIONS[currentQuestionIndex];
@@ -1420,7 +1626,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             isOpen: false,
             showResults: false,
             paused: false,
-            shuffleMap: null
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
         }));
 
         showMainScreen('lobby');
@@ -1444,7 +1652,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             isOpen: false,
             showResults: false,
             paused: false,
-            shuffleMap: null
+            shuffleMap: null,
+            timeRemaining: 0,
+            timerStartedAt: null
         }));
 
         showMainScreen('summary');
