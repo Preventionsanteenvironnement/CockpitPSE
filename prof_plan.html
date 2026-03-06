@@ -44,6 +44,102 @@
             background: #1a1a1a; border-radius: 20px; border: 1px solid #333; transition: 0.3s;
         }
         
+        .front-zone {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 18px;
+            width: 100%;
+            transition: 0.3s ease;
+        }
+        .front-zone.vertical {
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+        .teacher-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 7px;
+            min-width: 90px;
+        }
+        .teacher-figure {
+            position: relative;
+            width: 62px;
+            height: 82px;
+            filter: drop-shadow(0 8px 12px rgba(0,0,0,0.28));
+        }
+        .teacher-head {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ecf0f1;
+            transform: translateX(-50%);
+        }
+        .teacher-body {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            width: 28px;
+            height: 34px;
+            border-radius: 14px 14px 8px 8px;
+            background: linear-gradient(180deg, #95a5a6 0%, #34495e 100%);
+            transform: translateX(-50%);
+        }
+        .teacher-arm {
+            position: absolute;
+            top: 28px;
+            left: 50%;
+            width: 48px;
+            height: 10px;
+            border-radius: 999px;
+            background: #95a5a6;
+            transform: translateX(-50%);
+        }
+        .teacher-book {
+            position: absolute;
+            top: 31px;
+            left: 50%;
+            width: 18px;
+            height: 14px;
+            border-radius: 4px;
+            background: #f39c12;
+            transform: translateX(8px) rotate(10deg);
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.18);
+        }
+        .teacher-legs::before,
+        .teacher-legs::after {
+            content: "";
+            position: absolute;
+            bottom: 7px;
+            width: 9px;
+            height: 24px;
+            border-radius: 999px;
+            background: #ecf0f1;
+        }
+        .teacher-legs::before { left: 21px; transform: rotate(8deg); }
+        .teacher-legs::after { right: 21px; transform: rotate(-8deg); }
+        .teacher-label {
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: rgba(236, 240, 241, 0.12);
+            color: #bdc3c7;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+        .teacher-floor {
+            width: 70px;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(52, 152, 219, 0.16);
+        }
+
         .board {
             background: #34495e; color: #bdc3c7; font-weight: bold; letter-spacing: 2px;
             display: flex; align-items: center; justify-content: center; border-radius: 8px;
@@ -153,9 +249,22 @@
         </div>
     </div>
 
-    <div id="main">
+        <div id="main">
         <div id="room-container">
-            <div id="board" class="board horizontal">TABLEAU</div>
+            <div id="front-zone" class="front-zone">
+                <div id="teacher-marker" class="teacher-marker" aria-label="Zone professeur">
+                    <div class="teacher-figure" aria-hidden="true">
+                        <span class="teacher-head"></span>
+                        <span class="teacher-body"></span>
+                        <span class="teacher-arm"></span>
+                        <span class="teacher-book"></span>
+                        <span class="teacher-legs"></span>
+                    </div>
+                    <div class="teacher-label">Prof</div>
+                    <div class="teacher-floor" aria-hidden="true"></div>
+                </div>
+                <div id="board" class="board horizontal">TABLEAU</div>
+            </div>
             <div id="grid"></div>
         </div>
     </div>
@@ -218,6 +327,7 @@
             });
             initStructure(100);
             window.buildGrid();
+            window.updateBoardPosition();
         };
 
         window.openScreen = () => {
@@ -289,6 +399,7 @@
             
             document.getElementById('nbRows').value = data.rows || 5;
             document.getElementById('nbCols').value = data.cols || 6;
+            document.getElementById('boardPos').value = data.boardPos || 'top';
             
             state.placements = data.placements || {};
             // Si l'historique n'a pas de structure (vieux plans), on met tout en tables
@@ -297,6 +408,7 @@
             // Recharger la grille
             initStructure(data.rows * data.cols);
             window.buildGrid();
+            window.updateBoardPosition();
             renderPools();
             
             document.getElementById('history-modal').style.display = 'none';
@@ -354,11 +466,13 @@
             const pos = document.getElementById('boardPos').value;
             const container = document.getElementById('room-container');
             const board = document.getElementById('board');
+            const frontZone = document.getElementById('front-zone');
             board.className = "board";
+            frontZone.className = "front-zone";
             if(pos === 'top') { container.style.flexDirection = 'column'; board.classList.add('horizontal'); }
             if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
-            if(pos === 'left') { container.style.flexDirection = 'row'; board.classList.add('vertical'); }
-            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; board.classList.add('vertical'); }
+            if(pos === 'left') { container.style.flexDirection = 'row'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
+            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
         };
 
         function initStructure(n) { for(let i=0; i<n; i++) if(state.structure[i] === undefined) state.structure[i] = 1; }
@@ -558,7 +672,7 @@
 
                 await addDoc(collection(db, "classe_historique"), {
                     className: cls, rows: parseInt(r), cols: parseInt(c),
-                    placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure // On sauve aussi les murs
+                    placements: state.placements, date: new Date().toISOString(), timestamp: Date.now(), structure: state.structure, boardPos: bPos // On sauve aussi les murs
                 });
 
                 showNotif("🚀 Plan envoyé (Firebase + local) !");
