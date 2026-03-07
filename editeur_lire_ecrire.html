@@ -1934,6 +1934,7 @@ IMPORTANT :
         // Chaque groupe de meme template → 1 exercice serie
         if (errors.length === 0 && normalizedItems.length > 0) {
             const groups = {};
+            const importedIds = [];
             normalizedItems.forEach(ex => {
                 const tid = ex.template_id;
                 if (!groups[tid]) groups[tid] = [];
@@ -1978,6 +1979,23 @@ IMPORTANT :
                 try {
                     await setDoc(doc(db, "lire_ecrire_banque", newId), payload);
                     imported++;
+                    importedIds.push(newId);
+
+                    const localCopy = {
+                        id: newId,
+                        titre: payload.titre,
+                        categorie: payload.categorie,
+                        template_id: payload.template_id,
+                        difficulte: payload.difficulte,
+                        publie: payload.publie,
+                        data: JSON.parse(JSON.stringify(payload.data)),
+                        series: JSON.parse(JSON.stringify(payload.series)),
+                        series_count: payload.series_count,
+                        sourcePrompt: payload.sourcePrompt,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    allExercices.unshift(localCopy);
                 } catch (e) {
                     errors.push((templateInfo ? templateInfo.label : tid) + ' : erreur Firebase — ' + e.message);
                 }
@@ -1992,18 +2010,22 @@ IMPORTANT :
                     return (tpl ? tpl.label : tid) + ' (' + groups[tid].length + ')';
                 }).join(', ');
                 showToast(imported + ' serie(s) importee(s) : ' + detail);
+                renderList();
+                if (importedIds.length > 0) selectExercice(importedIds[0]);
                 closeImportModal();
                 return;
             }
         }
 
         if (errors.length > 0) {
+            renderList();
             errDiv.innerHTML = '<strong>' + imported + ' importe(s), ' + errors.length + ' erreur(s) :</strong><br>' + errors.join('<br>');
             errDiv.style.display = 'block';
         }
 
         if (imported > 0) {
             showToast(imported + ' exercice(s) importe(s) !');
+            renderList();
             if (errors.length === 0) closeImportModal();
         }
     };
