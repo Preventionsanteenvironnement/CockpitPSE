@@ -441,7 +441,7 @@
     <div class="modal-content">
         <h3>📥 Importer des exercices Lire/Ecrire (JSON)</h3>
         <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:12px;">
-            Collez un JSON genere par une IA. Accepte un objet unique ou un tableau d'exercices.
+            Collez uniquement le JSON de reponse genere par une IA. Cette fenetre n'execute pas le prompt lui-meme.
         </p>
         <details class="import-prompt-details">
             <summary>📋 Voir le prompt IA</summary>
@@ -1577,6 +1577,26 @@ Champ lien optionnel :
     // IMPORT JSON
     // =============================================
     let currentImportPrompt = '';
+    function looksLikePromptText(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return false;
+        const promptMarkers = [
+            'tu es un generateur',
+            'tu es un générateur',
+            'genere un json',
+            'génère un json',
+            'reponds uniquement avec le json',
+            'réponds uniquement avec le json',
+            'template 1',
+            'template 2',
+            'regles importantes',
+            'règles importantes'
+        ];
+        const normalized = text.toLowerCase();
+        if (!promptMarkers.some(marker => normalized.includes(marker))) return false;
+        return !/^\s*[\[{]/.test(text);
+    }
+
     function normalizeImportedExerciseShape(ex, fallbackTemplateId) {
         if (!ex || typeof ex !== 'object' || Array.isArray(ex)) return null;
         const out = { ...ex };
@@ -1830,6 +1850,11 @@ IMPORTANT :
         if (report) { report.style.display = 'none'; report.textContent = ''; }
 
         if (!raw) { errDiv.textContent = 'Collez du JSON !'; errDiv.style.display = 'block'; return; }
+        if (looksLikePromptText(raw)) {
+            errDiv.textContent = 'Vous avez colle le prompt IA, pas le JSON genere.\n\nCette fenetre n execute pas le prompt.\n1. Copiez le prompt.\n2. Collez-le dans ChatGPT/Gemini/Claude.\n3. Recollez ici uniquement la reponse JSON.';
+            errDiv.style.display = 'block';
+            return;
+        }
 
         const selectedTemplateId = document.getElementById('exo-template').value || '';
         const cleanResult = JsonImportUtils.cleanJsonFull(raw);
