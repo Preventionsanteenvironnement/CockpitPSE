@@ -1,0 +1,2555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seance Fusionnee - Cockpit PSE</title>
+    <script src="data_modules.js"></script>
+    <script src="data_eleves.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --surface: #ffffff;
+            --surface-2: #eef2ff;
+            --border: #dbe2f0;
+            --text: #142033;
+            --muted: #66748c;
+            --primary: #2563eb;
+            --primary-soft: rgba(37, 99, 235, 0.12);
+            --success: #16a34a;
+            --success-soft: rgba(22, 163, 74, 0.12);
+            --warning: #d97706;
+            --warning-soft: rgba(217, 119, 6, 0.12);
+            --danger: #dc2626;
+            --danger-soft: rgba(220, 38, 38, 0.12);
+            --radius: 16px;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            --font: "Inter", "Segoe UI", sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            background: linear-gradient(180deg, #eef3ff 0%, var(--bg) 180px);
+            color: var(--text);
+        }
+
+        a { color: inherit; }
+
+        .login-screen,
+        .loading-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .login-card,
+        .loading-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 32px 28px;
+            text-align: center;
+        }
+
+        .login-card h1,
+        .loading-card h1 {
+            margin: 0 0 8px;
+            font-size: 1.8rem;
+        }
+
+        .login-card p,
+        .loading-card p {
+            margin: 0 0 24px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .btn-google,
+        .header-btn,
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger,
+        .btn-status,
+        .btn-meteo,
+        .student-row,
+        .opt-btn,
+        .criterion-toggle {
+            font-family: inherit;
+        }
+
+        .btn-google,
+        .header-btn,
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            border: none;
+            border-radius: 14px;
+            padding: 12px 18px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .btn-google:hover,
+        .header-btn:hover,
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .btn-danger:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-google {
+            width: 100%;
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .app-shell {
+            display: none;
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .header-title p {
+            margin: 6px 0 0;
+            color: var(--muted);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .header-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .stack {
+            display: grid;
+            gap: 18px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px;
+        }
+
+        .card h2,
+        .card h3 {
+            margin: 0 0 14px;
+        }
+
+        .card p.helper {
+            margin: -4px 0 14px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        .field label {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        select,
+        textarea,
+        input[type="number"] {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 11px 12px;
+            font-size: 0.98rem;
+            color: var(--text);
+            background: #fff;
+        }
+
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .inline-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .progression-banner {
+            border: 1px dashed #9db5f3;
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(59, 130, 246, 0.03));
+            color: #1d4ed8;
+            line-height: 1.5;
+        }
+
+        .progression-banner.empty {
+            border-color: var(--border);
+            background: #f8fafc;
+            color: var(--muted);
+        }
+
+        .progression-banner strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .status-grid,
+        .meteo-grid,
+        .criteria-grid,
+        .course-grid,
+        .options-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .status-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .meteo-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .criteria-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .course-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .options-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .btn-status,
+        .btn-meteo,
+        .criterion-toggle,
+        .course-toggle,
+        .opt-btn {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px 12px;
+            background: #fff;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+            color: var(--text);
+            text-align: center;
+        }
+
+        .btn-status:hover,
+        .btn-meteo:hover,
+        .criterion-toggle:hover,
+        .course-toggle:hover,
+        .opt-btn:hover {
+            transform: translateY(-1px);
+            border-color: #8fb0f8;
+        }
+
+        .btn-status.active,
+        .btn-meteo.active,
+        .criterion-toggle.active,
+        .course-toggle.active,
+        .opt-btn.active {
+            border-color: transparent;
+            background: var(--primary-soft);
+            color: #1849c6;
+            box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+        }
+
+        .btn-status.active.realise {
+            background: var(--success-soft);
+            color: var(--success);
+            box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18);
+        }
+
+        .btn-status.active.reporte,
+        .btn-status.active.prevu {
+            background: var(--warning-soft);
+            color: var(--warning);
+            box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.18);
+        }
+
+        .btn-status.active.nonrealise {
+            background: var(--danger-soft);
+            color: var(--danger);
+            box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+        }
+
+        .criterion-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .criterion-toggle input,
+        .course-toggle input {
+            display: none;
+        }
+
+        .student-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .student-counts {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .pill.pending { background: #e2e8f0; color: #475569; }
+        .pill.done { background: var(--success-soft); color: var(--success); }
+        .pill.absent { background: var(--warning-soft); color: var(--warning); }
+
+        .student-list {
+            display: grid;
+            gap: 8px;
+            max-height: 62vh;
+            overflow: auto;
+            padding-right: 2px;
+        }
+
+        .student-row {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            background: #fff;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+        }
+
+        .student-row:hover {
+            transform: translateY(-1px);
+            border-color: #8fb0f8;
+        }
+
+        .student-row.current {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.03));
+        }
+
+        .student-row.done {
+            border-color: rgba(22, 163, 74, 0.25);
+        }
+
+        .student-row.absent {
+            border-color: rgba(217, 119, 6, 0.3);
+            background: rgba(217, 119, 6, 0.05);
+        }
+
+        .student-row .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .student-row .code {
+            font-weight: 800;
+            font-size: 1rem;
+        }
+
+        .student-row .name {
+            color: var(--muted);
+            margin-top: 4px;
+            font-size: 0.92rem;
+        }
+
+        .student-row .badge {
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 5px 9px;
+            border-radius: 999px;
+        }
+
+        .badge.pending {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .badge.done {
+            background: var(--success-soft);
+            color: var(--success);
+        }
+
+        .badge.absent {
+            background: var(--warning-soft);
+            color: var(--warning);
+        }
+
+        .student-form-empty {
+            min-height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            text-align: center;
+            border: 1px dashed var(--border);
+            border-radius: 18px;
+            background: #fbfcff;
+            padding: 24px;
+        }
+
+        .student-panel .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .student-panel .student-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .student-panel .student-header p {
+            margin: 6px 0 0;
+            color: var(--muted);
+        }
+
+        .note-preview {
+            border-radius: 18px;
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.1), rgba(59, 130, 246, 0.08));
+            border: 1px solid rgba(22, 163, 74, 0.15);
+            margin-bottom: 14px;
+        }
+
+        .note-preview .label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 800;
+        }
+
+        .note-preview .value {
+            margin-top: 6px;
+            font-size: 2rem;
+            font-weight: 900;
+        }
+
+        .preview-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+
+        .objective-box {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+            background: #fbfcff;
+            margin-bottom: 14px;
+        }
+
+        .objective-box h4 {
+            margin: 0 0 10px;
+            font-size: 1rem;
+        }
+
+        .objective-text {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .objective-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .objective-grid label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .section {
+            margin-bottom: 16px;
+        }
+
+        .section h4 {
+            margin: 0 0 8px;
+            font-size: 1rem;
+        }
+
+        .section-sub {
+            margin: -2px 0 10px;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .opt-btn .emoji {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .opt-btn .label {
+            font-size: 0.84rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .opt-btn.active.good {
+            background: var(--success-soft);
+            color: var(--success);
+            box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18);
+        }
+
+        .opt-btn.active.warning {
+            background: var(--warning-soft);
+            color: var(--warning);
+            box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.18);
+        }
+
+        .opt-btn.active.danger {
+            background: var(--danger-soft);
+            color: var(--danger);
+            box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+        }
+
+        .adjust-box {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            background: #fff;
+            margin-bottom: 16px;
+        }
+
+        .adjust-box label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .adjust-fields {
+            display: none;
+            grid-template-columns: 120px minmax(0, 1fr);
+            gap: 10px;
+        }
+
+        .sticky-actions {
+            position: sticky;
+            bottom: 12px;
+            z-index: 20;
+            margin-top: 14px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .sticky-actions .summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.94rem;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%) translateY(18px);
+            background: #111827;
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 999px;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 1100px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .student-list {
+                max-height: none;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .form-grid,
+            .status-grid,
+            .course-grid,
+            .criteria-grid,
+            .objective-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .meteo-grid,
+            .options-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <h1>Seance fusionnee</h1>
+            <p>Progression du cours et suivi des eleves sur une seule page, sans toucher aux ecrans existants.</p>
+            <button class="btn-google" id="btnGoogle">Connexion Google</button>
+        </div>
+    </div>
+
+    <div class="loading-screen hidden" id="loadingScreen">
+        <div class="loading-card">
+            <h1>Chargement</h1>
+            <p>Initialisation de la seance et recuperation du contexte.</p>
+        </div>
+    </div>
+
+    <div class="app-shell" id="appShell">
+        <div class="header">
+            <div class="header-title">
+                <h1>Seance fusionnee</h1>
+                <p>Contexte du cours, progression et notation eleve compatibles avec le suivi actuel.</p>
+            </div>
+            <div class="header-actions">
+                <a class="header-btn" href="index.html">Retour cockpit</a>
+                <a class="header-btn" href="prof_plan.html" target="_blank">Plan de classe</a>
+                <button class="header-btn" id="btnLogout" type="button">Deconnexion</button>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="stack">
+                <div class="card">
+                    <h2>Contexte de seance</h2>
+                    <p class="helper">Le contexte est saisi une seule fois puis reutilise pour le suivi eleve.</p>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="inputDate">Date</label>
+                            <input id="inputDate" type="date">
+                        </div>
+                        <div class="field">
+                            <label for="selectClasse">Classe</label>
+                            <select id="selectClasse">
+                                <option value="">-- Selectionner --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="selectModule">Module</label>
+                            <select id="selectModule">
+                                <option value="">-- Selectionner --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="inputModuleLibre">Module libre</label>
+                            <input id="inputModuleLibre" type="text" placeholder="Si le module n'est pas liste">
+                        </div>
+                        <div class="field">
+                            <label for="inputSeance">Seance</label>
+                            <input id="inputSeance" type="text" placeholder="Ex: Seance 2 / Evaluation">
+                        </div>
+                        <div class="field">
+                            <label for="selectPhase">Phase</label>
+                            <select id="selectPhase">
+                                <option value="cours">Cours</option>
+                                <option value="evaluation">Evaluation</option>
+                                <option value="correction">Correction</option>
+                                <option value="exercice">Exercice</option>
+                                <option value="revision">Revision</option>
+                            </select>
+                        </div>
+                        <div class="field full">
+                            <label>Progression prevue</label>
+                            <div class="progression-banner empty" id="progressionBanner">
+                                <strong>Aucune donnee chargee</strong>
+                                Selectionnez une classe et une date pour recuperer le prevu et la derniere saisie.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Bilan de cours</h2>
+                    <div class="field full">
+                        <label>Statut</label>
+                        <div class="status-grid" id="statusGrid"></div>
+                    </div>
+                    <div class="form-grid" style="margin-top: 12px;">
+                        <div class="field">
+                            <label for="selectSituation">Situation</label>
+                            <select id="selectSituation">
+                                <option value="Normal">Normal</option>
+                                <option value="Annule">Annule</option>
+                                <option value="PFMP">PFMP</option>
+                                <option value="CCF">CCF</option>
+                                <option value="BAC BLANC">BAC BLANC</option>
+                                <option value="Sortie scolaire">Sortie scolaire</option>
+                                <option value="Formation">Formation</option>
+                                <option value="Absence administrative">Absence administrative</option>
+                                <option value="Autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="inputArret">Arret precis</label>
+                            <input id="inputArret" type="text" placeholder="Ex: exercice 3 question 2">
+                        </div>
+                        <div class="field full">
+                            <label>Checklist de seance</label>
+                            <div class="criteria-grid" id="checklistGrid"></div>
+                        </div>
+                        <div class="field full">
+                            <label>Cours distribues par defaut</label>
+                            <div class="course-grid" id="courseDefaultGrid"></div>
+                        </div>
+                        <div class="field full">
+                            <label>Criteres actifs pour la notation</label>
+                            <div class="criteria-grid" id="criteriaToggleGrid"></div>
+                        </div>
+                        <div class="field full">
+                            <label>Meteo de seance</label>
+                            <div class="meteo-grid" id="meteoGrid"></div>
+                        </div>
+                        <div class="field full">
+                            <label for="inputTodo">Prevoir pour la prochaine seance</label>
+                            <input id="inputTodo" type="text" placeholder="Prochaine seance, rappel, copie, eval...">
+                        </div>
+                        <div class="field full">
+                            <label for="inputRemarque">Remarque de seance</label>
+                            <textarea id="inputRemarque" placeholder="Bilan libre du cours, ambiance, contenu fait, incidents, replanification..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="student-toolbar">
+                        <div>
+                            <h2 style="margin:0;">Eleves de la classe</h2>
+                            <p class="helper" style="margin:4px 0 0;">Cliquer un eleve pour saisir ou modifier sa note.</p>
+                        </div>
+                        <div class="student-counts">
+                            <span class="pill pending" id="pillPending">0 en attente</span>
+                            <span class="pill done" id="pillDone">0 notes</span>
+                            <span class="pill absent" id="pillAbsent">0 absents</span>
+                        </div>
+                    </div>
+                    <div class="student-list" id="studentList"></div>
+                </div>
+            </div>
+
+            <div class="stack">
+                <div class="card student-panel">
+                    <div id="studentPanel"></div>
+                </div>
+
+                <div class="sticky-actions">
+                    <div class="summary" id="summaryBar">
+                        <span>Aucune classe selectionnee.</span>
+                    </div>
+                    <div class="inline-actions">
+                        <button class="btn-secondary" type="button" id="btnReload">Recharger le contexte</button>
+                        <button class="btn-primary" type="button" id="btnSaveProgression">Enregistrer le bilan de seance</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import {
+            getFirestore,
+            doc,
+            getDoc,
+            setDoc,
+            updateDoc,
+            collection,
+            getDocs,
+            deleteDoc,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import {
+            getAuth,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            onAuthStateChanged,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.appspot.com",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        const LOCAL_NAMES_KEY = "cockpit_eleves_noms";
+        const COURSE_OPTIONS = [
+            { value: "seance1", label: "S1" },
+            { value: "seance2", label: "S2" },
+            { value: "seance3", label: "S3" },
+            { value: "seance4", label: "S4" },
+            { value: "complet", label: "Complet" },
+            { value: "correction", label: "Correction" },
+            { value: "evaluation", label: "Evaluation" }
+        ];
+        const CHECKLIST_ITEMS = [
+            { key: "cours_complet", label: "Cours complet" },
+            { key: "cours_seance", label: "Cours seance" },
+            { key: "docs_distribues", label: "Docs distribues" },
+            { key: "devoir_donne", label: "Devoir donne" },
+            { key: "copies_ramassees", label: "Copies ramassees" },
+            { key: "copies_corrigees", label: "Copies corrigees" },
+            { key: "copies_rendues", label: "Copies rendues" },
+            { key: "auto_eval_ligne", label: "Auto-eval ligne" },
+            { key: "exercice_en_ligne", label: "Exercice en ligne" },
+            { key: "eval_formative", label: "Eval formative" },
+            { key: "eval_sommative", label: "Eval sommative" },
+            { key: "eval_corrigee", label: "Eval corrigee" },
+            { key: "eval_rendue", label: "Eval rendue" }
+        ];
+        const STATUS_OPTIONS = [
+            { value: "Réalisé", label: "Réalisé", css: "realise" },
+            { value: "Prévu", label: "Prévu", css: "prevu" },
+            { value: "Reporté", label: "Reporté", css: "reporte" },
+            { value: "Non réalisé", label: "Non réalisé", css: "nonrealise" }
+        ];
+        const METEO_OPTIONS = [
+            { emoji: "⛈", label: "Tres difficile", score: 1 },
+            { emoji: "🌧", label: "Difficile", score: 2 },
+            { emoji: "⛅", label: "Mitige", score: 3 },
+            { emoji: "🌤", label: "Bien", score: 4 },
+            { emoji: "☀️", label: "Excellent", score: 5 }
+        ];
+        const CRITERIA_DEFAULTS = {
+            travail: true,
+            oral: true,
+            attention: true,
+            porteVue: false,
+            coursAJour: false,
+            autonomie: false,
+            initiative: false,
+            securite: false,
+            planClasse: false
+        };
+        const CRITERIA_LABELS = {
+            travail: "Travail",
+            oral: "Oral",
+            attention: "Attention",
+            porteVue: "Porte-vue",
+            coursAJour: "Cours a jour",
+            autonomie: "Autonomie",
+            initiative: "Initiative",
+            securite: "Respect du cadre",
+            planClasse: "Plan de classe"
+        };
+        const PROGRESSION_CLASS_MAP = {
+            B1AGO: "B1AGORA",
+            BTAGO: "BTAGORA",
+            B2GATL: "B2AGORA"
+        };
+        const PROGRESSION_MODULE_MAP = {
+            MA1: "A1",
+            MA2: "A2",
+            MA3: "A3",
+            MA4: "A4",
+            MA5: "A5",
+            MA6: "A6",
+            MA7: "A7",
+            MB1: "B1",
+            MB2: "B2",
+            MB3: "B3",
+            MB4: "B4",
+            MC1: "C1",
+            MC2: "C2",
+            MC3: "C3",
+            MC4: "C4",
+            MC5: "C5",
+            MC6: "C6",
+            MC7: "C7",
+            MD1: "D1",
+            MD2: "D2",
+            MD3: "D3"
+        };
+        const REVERSE_PROGRESSION_MODULE_MAP = Object.fromEntries(
+            Object.entries(PROGRESSION_MODULE_MAP).map(([source, target]) => [target, source])
+        );
+        const PLAFOND_BAVARDAGE = {
+            aucun: 20,
+            rappel1: 14,
+            rappel2: 10,
+            rappel3: 6,
+            retenu: 4,
+            ne: 20
+        };
+        const MALUS_TELEPHONE = {
+            ok: 0,
+            rappel1: 1,
+            rappel2: 2,
+            rappel3: 3,
+            confisque: 5,
+            ne: 0
+        };
+
+        let currentUser = null;
+        let currentPrevue = null;
+        let currentWeekInfo = null;
+        let currentStudentCode = null;
+        let currentObjective = null;
+        let currentLogExists = false;
+        let currentLogCreatedAt = null;
+        let studentFormState = null;
+        let selectedStatus = "";
+        let selectedMeteo = null;
+        let studentEntries = [];
+        let progressionLoadVersion = 0;
+
+        window.addEventListener("DOMContentLoaded", initPage);
+
+        function initPage() {
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById("inputDate").value = today;
+
+            renderStatusButtons();
+            renderMeteoButtons();
+            renderChecklistGrid();
+            renderCriteriaToggles();
+            renderCourseDefaultGrid();
+            populateClassSelect();
+            bindEvents();
+            applyUrlParams();
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    showApp();
+                } else {
+                    showLogin();
+                }
+            });
+
+            getRedirectResult(auth).catch((error) => {
+                if (error.code !== "auth/popup-closed-by-user") {
+                    console.warn("Redirect auth error:", error);
+                }
+            });
+        }
+
+        function bindEvents() {
+            document.getElementById("btnGoogle").addEventListener("click", async () => {
+                try {
+                    await signInWithPopup(auth, googleProvider);
+                } catch (error) {
+                    if (error.code === "auth/popup-blocked" || error.code === "auth/internal-error") {
+                        await signInWithRedirect(auth, googleProvider);
+                    } else if (error.code !== "auth/popup-closed-by-user") {
+                        showToast("Erreur de connexion");
+                    }
+                }
+            });
+
+            document.getElementById("btnLogout").addEventListener("click", () => signOut(auth));
+            document.getElementById("btnReload").addEventListener("click", async () => {
+                await refreshSessionContext({ forceProgressionPrefill: true });
+            });
+            document.getElementById("btnSaveProgression").addEventListener("click", saveProgressionLog);
+            document.getElementById("selectClasse").addEventListener("change", async () => {
+                document.getElementById("inputModuleLibre").value = "";
+                populateModuleSelect();
+                await refreshSessionContext({ forceProgressionPrefill: true });
+            });
+            document.getElementById("inputDate").addEventListener("change", async () => {
+                await refreshSessionContext({ forceProgressionPrefill: true });
+            });
+            document.getElementById("selectModule").addEventListener("change", async () => {
+                if (document.getElementById("selectModule").value) {
+                    document.getElementById("inputModuleLibre").value = "";
+                }
+                await loadStudentEntries();
+            });
+            document.getElementById("inputModuleLibre").addEventListener("input", debounce(async () => {
+                if (document.getElementById("inputModuleLibre").value.trim()) {
+                    document.getElementById("selectModule").value = "";
+                }
+                await loadStudentEntries();
+            }, 180));
+        }
+
+        function applyUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const date = params.get("date");
+            const classe = params.get("classe");
+            const module = params.get("module");
+
+            if (date) document.getElementById("inputDate").value = date;
+            if (classe) document.getElementById("selectClasse").value = classe;
+            populateModuleSelect();
+            if (module) {
+                const selectModule = document.getElementById("selectModule");
+                const matching = Array.from(selectModule.options).find((option) => option.value === module);
+                if (matching) {
+                    selectModule.value = module;
+                } else {
+                    document.getElementById("inputModuleLibre").value = module;
+                }
+            }
+        }
+
+        function showLogin() {
+            document.getElementById("loadingScreen").classList.add("hidden");
+            document.getElementById("appShell").style.display = "none";
+            document.getElementById("loginScreen").classList.remove("hidden");
+        }
+
+        function showApp() {
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("loadingScreen").classList.add("hidden");
+            document.getElementById("appShell").style.display = "block";
+            refreshSessionContext({ forceProgressionPrefill: true });
+        }
+
+        function setLoading(isLoading) {
+            document.getElementById("loadingScreen").classList.toggle("hidden", !isLoading);
+        }
+
+        function populateClassSelect() {
+            const select = document.getElementById("selectClasse");
+            const classes = window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [];
+            classes.forEach((item) => {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = item.label;
+                select.appendChild(option);
+            });
+        }
+
+        function populateModuleSelect() {
+            const select = document.getElementById("selectModule");
+            const classeId = document.getElementById("selectClasse").value;
+            const previousValue = select.value;
+            select.innerHTML = '<option value="">-- Selectionner --</option>';
+            if (!classeId) return;
+
+            const effectiveClasses = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(effectiveClasses[0]) : [];
+            modules.forEach((module) => {
+                const option = document.createElement("option");
+                option.value = module.id;
+                option.textContent = module.id + " - " + module.titre;
+                select.appendChild(option);
+            });
+            if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
+                select.value = previousValue;
+            }
+        }
+
+        async function refreshSessionContext(options = {}) {
+            const classeId = document.getElementById("selectClasse").value;
+            if (!classeId) {
+                updateProgressionBanner(null, null, null);
+                resetStudentArea("Selectionnez une classe et un module.");
+                return;
+            }
+            setLoading(true);
+            progressionLoadVersion += 1;
+            const loadVersion = progressionLoadVersion;
+            try {
+                await loadProgressionContext(options);
+                if (loadVersion === progressionLoadVersion) {
+                    await loadStudentEntries();
+                }
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function loadProgressionContext(options = {}) {
+            const classeId = document.getElementById("selectClasse").value;
+            const date = document.getElementById("inputDate").value;
+            if (!classeId || !date) {
+                updateProgressionBanner(null, null, null);
+                return;
+            }
+
+            if (options.forceProgressionPrefill) {
+                resetSessionContextFields();
+            }
+
+            const progressionClassId = mapClassToProgression(classeId);
+            let prevueData = null;
+            let weekInfo = null;
+            let logData = null;
+
+            try {
+                const prevueSnap = await getDoc(doc(db, "progression_prevue", progressionClassId));
+                if (prevueSnap.exists()) {
+                    prevueData = { id: prevueSnap.id, ...prevueSnap.data() };
+                    weekInfo = findWeekInfo(prevueData, date);
+                }
+            } catch (error) {
+                console.warn("progression_prevue load error:", error);
+            }
+
+            try {
+                const logSnap = await getDoc(doc(db, "progression_logs", date + "_" + progressionClassId));
+                if (logSnap.exists()) {
+                    logData = logSnap.data();
+                }
+            } catch (error) {
+                console.warn("progression_logs load error:", error);
+            }
+
+            currentPrevue = prevueData;
+            currentWeekInfo = weekInfo;
+
+            updateProgressionBanner(progressionClassId, prevueData, weekInfo, logData);
+
+            if (options.forceProgressionPrefill) {
+                prefillFromProgression(weekInfo, logData);
+            }
+        }
+
+        function resetSessionContextFields() {
+            selectStatus("");
+            selectMeteo("");
+            document.getElementById("inputSeance").value = "";
+            document.getElementById("inputArret").value = "";
+            document.getElementById("inputTodo").value = "";
+            document.getElementById("inputRemarque").value = "";
+            document.getElementById("selectPhase").value = "cours";
+            document.getElementById("selectSituation").value = "Normal";
+            CHECKLIST_ITEMS.forEach((item) => {
+                setToggleState("check-" + item.key, false);
+            });
+        }
+
+        function updateProgressionBanner(progressionClassId, prevueData, weekInfo, logData = null) {
+            const banner = document.getElementById("progressionBanner");
+            if (!progressionClassId) {
+                banner.className = "progression-banner empty";
+                banner.innerHTML = "<strong>Aucune classe selectionnee</strong>Impossible de relier la seance a la progression.";
+                return;
+            }
+
+            const parts = [];
+            if (prevueData && weekInfo && weekInfo.week) {
+                const week = weekInfo.week;
+                const plannedModule = week.module || week.moduleBase || "--";
+                const plannedSeance = week.seance || "--";
+                const plannedPhase = week.phase || "--";
+                const plannedSituation = week.situation || "Normal";
+                parts.push(
+                    "<strong>Prevu dans la progression</strong>" +
+                    "Classe progression: " + progressionClassId +
+                    "<br>Module: " + escapeHtml(plannedModule) +
+                    " • Seance: " + escapeHtml(plannedSeance) +
+                    " • Phase: " + escapeHtml(plannedPhase) +
+                    " • Situation: " + escapeHtml(plannedSituation)
+                );
+            } else if (prevueData) {
+                parts.push("<strong>Aucune ligne trouvee pour cette semaine</strong>Le document de progression existe mais pas de semaine correspondante.");
+            } else {
+                parts.push("<strong>Document de progression introuvable</strong>La seance pourra etre saisie, mais sans pre-remplissage progression.");
+            }
+
+            if (logData) {
+                parts.push(
+                    "Derniere saisie du jour: " +
+                    escapeHtml(logData.statut || "--") +
+                    (logData.moduleId ? " • " + escapeHtml(logData.moduleId) : "") +
+                    (logData.seance ? " • " + escapeHtml(logData.seance) : "")
+                );
+            }
+
+            banner.className = "progression-banner";
+            banner.innerHTML = parts.join("<br><br>");
+        }
+
+        function prefillFromProgression(weekInfo, logData) {
+            if (logData) {
+                if (logData.statut) selectStatus(normalizeStatusValue(logData.statut));
+                if (logData.seance) {
+                    document.getElementById("inputSeance").value = logData.seance;
+                }
+                if (logData.arret) {
+                    document.getElementById("inputArret").value = logData.arret;
+                }
+                if (logData.remarque) {
+                    document.getElementById("inputRemarque").value = logData.remarque;
+                }
+                if (logData.todoNext && logData.todoNext.note) {
+                    document.getElementById("inputTodo").value = logData.todoNext.note;
+                }
+                if (logData.phase) document.getElementById("selectPhase").value = normalizePhaseValue(logData.phase);
+                if (logData.situation) document.getElementById("selectSituation").value = logData.situation;
+                if (logData.meteo && logData.meteo.emoji) selectMeteo(logData.meteo.emoji);
+                if (logData.checklist) {
+                    CHECKLIST_ITEMS.forEach((item) => {
+                        setToggleState("check-" + item.key, !!logData.checklist[item.key]);
+                    });
+                }
+            }
+
+            if (!weekInfo || !weekInfo.week) return;
+
+            const week = weekInfo.week;
+            if (!logData && week.statut) {
+                selectStatus(normalizeStatusValue(week.statut));
+            }
+            if (!logData && week.seance) {
+                document.getElementById("inputSeance").value = week.seance;
+            }
+            if (week.phase) {
+                document.getElementById("selectPhase").value = normalizePhaseValue(week.phase);
+            }
+            if (week.situation) {
+                document.getElementById("selectSituation").value = week.situation;
+            }
+
+            const plannedModule = week.module || week.moduleBase || "";
+            if (plannedModule && !getSelectedModuleId()) {
+                const mappedBack = mapModuleFromProgression(plannedModule);
+                const select = document.getElementById("selectModule");
+                if (mappedBack && Array.from(select.options).some((option) => option.value === mappedBack)) {
+                    select.value = mappedBack;
+                } else {
+                    document.getElementById("inputModuleLibre").value = mappedBack || plannedModule;
+                }
+            }
+        }
+
+        async function loadStudentEntries() {
+            const classeId = document.getElementById("selectClasse").value;
+            const date = document.getElementById("inputDate").value;
+            const moduleId = getSelectedModuleId();
+
+            if (!classeId || !date || !moduleId) {
+                resetStudentArea("Selectionnez la classe, la date et le module.");
+                return;
+            }
+
+            const effectiveClasses = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const students = (window.BDD_ELEVES || []).filter((student) => effectiveClasses.includes(student.classe));
+            const docId = date + "_" + moduleId;
+
+            const results = await Promise.all(
+                students.map(async (student) => {
+                    try {
+                        const snap = await getDoc(doc(db, "resultats", student.userCode, "suivi", docId));
+                        return { student, data: snap.exists() ? snap.data() : null };
+                    } catch (error) {
+                        console.warn("Suivi load error:", error);
+                        return { student, data: null };
+                    }
+                })
+            );
+
+            studentEntries = results.map(({ student, data }) => {
+                const note = data && typeof data.noteSur20 === "number" ? data.noteSur20 : null;
+                return {
+                    code: student.userCode,
+                    classe: student.classe,
+                    nom: getStudentName(student.userCode),
+                    data,
+                    note,
+                    absent: !!(data && data.absent),
+                    done: !!data && !data.absent && note !== null,
+                    objective: null
+                };
+            }).sort((a, b) => {
+                const weight = (entry) => entry.absent ? 2 : entry.done ? 1 : 0;
+                return weight(a) - weight(b) || a.code.localeCompare(b.code);
+            });
+
+            if (!studentEntries.length) {
+                resetStudentArea("Aucun eleve trouve pour cette classe.");
+                return;
+            }
+
+            if (!studentEntries.some((entry) => entry.code === currentStudentCode)) {
+                currentStudentCode = studentEntries[0].code;
+            }
+
+            renderStudentList();
+            await selectStudent(currentStudentCode);
+            updateSummaryBar();
+        }
+
+        function resetStudentArea(message) {
+            studentEntries = [];
+            currentStudentCode = null;
+            currentObjective = null;
+            currentLogExists = false;
+            currentLogCreatedAt = null;
+            studentFormState = null;
+            document.getElementById("studentList").innerHTML = "";
+            document.getElementById("studentPanel").innerHTML = '<div class="student-form-empty"><div><strong>Bloc suivi eleve</strong><br>' + escapeHtml(message) + "</div></div>";
+            document.getElementById("pillPending").textContent = "0 en attente";
+            document.getElementById("pillDone").textContent = "0 notes";
+            document.getElementById("pillAbsent").textContent = "0 absents";
+            updateSummaryBar();
+        }
+
+        function renderStudentList() {
+            const container = document.getElementById("studentList");
+            if (!studentEntries.length) {
+                container.innerHTML = "";
+                return;
+            }
+
+            container.innerHTML = studentEntries.map((entry) => {
+                const badgeClass = entry.absent ? "absent" : entry.done ? "done" : "pending";
+                const badgeLabel = entry.absent
+                    ? "ABS"
+                    : entry.done
+                        ? (entry.note !== null ? entry.note + "/20" : "Notee")
+                        : "A noter";
+                const rowClass = [
+                    "student-row",
+                    entry.code === currentStudentCode ? "current" : "",
+                    entry.absent ? "absent" : "",
+                    entry.done ? "done" : ""
+                ].join(" ");
+
+                return `
+                    <button type="button" class="${rowClass}" data-student="${entry.code}">
+                        <div class="top">
+                            <span class="code">${entry.code}</span>
+                            <span class="badge ${badgeClass}">${badgeLabel}</span>
+                        </div>
+                        <div class="name">${escapeHtml(entry.nom || "Nom non charge")} • ${escapeHtml(entry.classe)}</div>
+                    </button>
+                `;
+            }).join("");
+
+            Array.from(container.querySelectorAll(".student-row")).forEach((button) => {
+                button.addEventListener("click", async () => {
+                    await selectStudent(button.dataset.student);
+                });
+            });
+
+            const pending = studentEntries.filter((entry) => !entry.done && !entry.absent).length;
+            const done = studentEntries.filter((entry) => entry.done).length;
+            const absent = studentEntries.filter((entry) => entry.absent).length;
+            document.getElementById("pillPending").textContent = pending + " en attente";
+            document.getElementById("pillDone").textContent = done + " notes";
+            document.getElementById("pillAbsent").textContent = absent + " absents";
+        }
+
+        async function selectStudent(code) {
+            const entry = studentEntries.find((student) => student.code === code);
+            if (!entry) return;
+            currentStudentCode = code;
+            renderStudentList();
+
+            currentObjective = await loadCurrentObjective(code);
+            currentLogExists = !!entry.data;
+            currentLogCreatedAt = entry.data?.createdAt || null;
+            studentFormState = buildInitialStudentState(entry);
+            renderStudentPanel(entry);
+            updatePreview();
+            updateSummaryBar();
+        }
+
+        async function loadCurrentObjective(code) {
+            try {
+                const snap = await getDoc(doc(db, "resultats", code, "objectifs", "current"));
+                return snap.exists() ? snap.data() : null;
+            } catch (error) {
+                console.warn("Objective load error:", error);
+                return null;
+            }
+        }
+
+        function buildInitialStudentState(entry) {
+            const data = entry.data || {};
+            return {
+                travail: data.travail ?? null,
+                oral: data.oral ?? null,
+                attention: data.attention ?? null,
+                porteVue: data.porteVue ?? null,
+                coursAJour: data.coursAJour ?? null,
+                autonomie: data.autonomie ?? null,
+                initiative: data.initiative ?? null,
+                securite: data.securite ?? null,
+                planClasse: data.planClasse ?? null,
+                bavardage: data.bavardage || "aucun",
+                telephone: data.telephone || "ok",
+                commentaire: data.commentaire || "",
+                coursDistrib: normalizeCourseValues(data.coursDistrib, getDefaultCourses()),
+                ajusterNote: !!data.ajustementManuel,
+                noteManuelle: typeof data.noteSur20 === "number" ? data.noteSur20 : "",
+                justificationAjustement: data.justificationAjustement || "",
+                objectifStatut: data.objectifValide?.statut || "en_cours"
+            };
+        }
+
+        function renderStudentPanel(entry) {
+            const container = document.getElementById("studentPanel");
+            if (!entry || !studentFormState) {
+                container.innerHTML = '<div class="student-form-empty"><div><strong>Aucun eleve selectionne</strong></div></div>';
+                return;
+            }
+
+            const criteria = getActiveCriteria();
+            const objectiveHtml = currentObjective
+                ? `
+                    <div class="objective-box">
+                        <h4>Objectif actuel</h4>
+                        <div class="objective-text">${escapeHtml(currentObjective.texte || "")}</div>
+                        <div class="objective-grid">
+                            ${renderObjectiveOption("atteint", "Atteint")}
+                            ${renderObjectiveOption("non_atteint", "Non atteint")}
+                            ${renderObjectiveOption("en_cours", "En cours")}
+                        </div>
+                    </div>
+                `
+                : `
+                    <div class="objective-box">
+                        <h4>Objectif actuel</h4>
+                        <div class="section-sub">Pas d'objectif fixe pour cet eleve.</div>
+                    </div>
+                `;
+
+            container.innerHTML = `
+                <div class="student-header">
+                    <div>
+                        <h3>${entry.code}</h3>
+                        <p>${escapeHtml(entry.nom || "Nom non charge")} • ${escapeHtml(entry.classe)} • ${escapeHtml(getSelectedModuleId())}</p>
+                    </div>
+                    <div class="student-counts">
+                        <span class="pill ${entry.absent ? "absent" : entry.done ? "done" : "pending"}">
+                            ${entry.absent ? "Absent" : entry.done ? "Note enregistree" : "A noter"}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="note-preview">
+                    <div class="label">Note calculee</div>
+                    <div class="value" id="notePreviewValue">--/20</div>
+                    <div class="preview-meta" id="notePreviewMeta"></div>
+                </div>
+
+                ${objectiveHtml}
+
+                ${criteria.travail ? renderOptionSection("Travail", "travail", [
+                    ["tresbien", "✓✓", "Tres bien", "good"],
+                    ["fait", "✓", "Fait", "good"],
+                    ["partiel", "⚠️", "Partiel", "warning"],
+                    ["insuffisant", "❌", "Non fait", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.oral ? renderOptionSection("Oral", "oral", [
+                    ["0", "0", "Aucune", ""],
+                    ["1", "1", "Faible", "warning"],
+                    ["2", "2", "Correcte", ""],
+                    ["3", "3", "Bonne", "good"],
+                    ["4", "4", "Excellente", "good"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.attention ? renderOptionSection("Attention", "attention", [
+                    ["bonne", "😊", "Bonne", "good"],
+                    ["moyenne", "😐", "Moyenne", "warning"],
+                    ["insuffisante", "😕", "Insuffisante", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.porteVue ? renderOptionSection("Porte-vue", "porteVue", [
+                    ["ok", "✅", "OK", "good"],
+                    ["oubli", "❌", "Oublie", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.coursAJour ? renderOptionSection("Cours a jour", "coursAJour", [
+                    ["a_jour", "✅", "A jour", "good"],
+                    ["incomplet", "⚠️", "Incomplet", "warning"],
+                    ["pas_a_jour", "❌", "Pas a jour", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.autonomie ? renderOptionSection("Autonomie", "autonomie", [
+                    ["bonne", "😊", "Bonne", "good"],
+                    ["moyenne", "😐", "Moyenne", "warning"],
+                    ["insuffisante", "😕", "Insuffisante", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.initiative ? renderOptionSection("Initiative", "initiative", [
+                    ["oui", "💡", "Oui", "good"],
+                    ["parfois", "🟡", "Parfois", "warning"],
+                    ["non", "⛔", "Non", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.securite ? renderOptionSection("Respect du cadre", "securite", [
+                    ["oui", "✅", "Oui", "good"],
+                    ["partiel", "⚠️", "Partiel", "warning"],
+                    ["non", "❌", "Non", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${criteria.planClasse ? renderOptionSection("Plan de classe respecte", "planClasse", [
+                    ["respecte", "🪑", "Respecte", "good"],
+                    ["partiel", "⚠️", "Partiel", "warning"],
+                    ["non", "❌", "Non", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ]) : ""}
+
+                ${renderOptionSection("Bavardage", "bavardage", [
+                    ["aucun", "😊", "Aucun", "good"],
+                    ["rappel1", "1️⃣", "Rappel 1", "warning"],
+                    ["rappel2", "2️⃣", "Rappel 2", "warning"],
+                    ["rappel3", "3️⃣", "Rappel 3", "danger"],
+                    ["retenu", "🚨", "Retenu", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ])}
+
+                ${renderOptionSection("Telephone", "telephone", [
+                    ["ok", "✅", "OK", "good"],
+                    ["rappel1", "1️⃣", "Rappel 1", "warning"],
+                    ["rappel2", "2️⃣", "Rappel 2", "warning"],
+                    ["rappel3", "3️⃣", "Rappel 3", "danger"],
+                    ["confisque", "🚫", "Confisque", "danger"],
+                    ["ne", "⏸️", "NE", ""]
+                ])}
+
+                <div class="section">
+                    <h4>Cours distribues pour cet eleve</h4>
+                    <div class="course-grid">
+                        ${COURSE_OPTIONS.map((option) => {
+                            const checked = studentFormState.coursDistrib.includes(option.value) ? "active" : "";
+                            return `
+                                <button type="button" class="course-toggle ${checked}" data-course="${option.value}">
+                                    ${escapeHtml(option.label)}
+                                </button>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+
+                <div class="adjust-box">
+                    <label>
+                        <input type="checkbox" id="adjustNoteToggle" ${studentFormState.ajusterNote ? "checked" : ""}>
+                        Ajuster la note manuellement
+                    </label>
+                    <div class="adjust-fields" id="adjustFields" style="display:${studentFormState.ajusterNote ? "grid" : "none"};">
+                        <input id="inputManualNote" type="number" min="0" max="20" step="0.5" value="${escapeHtml(String(studentFormState.noteManuelle ?? ""))}">
+                        <input id="inputManualJustification" type="text" value="${escapeHtml(studentFormState.justificationAjustement || "")}" placeholder="Justification de l'ajustement">
+                    </div>
+                </div>
+
+                <div class="field full">
+                    <label for="studentComment">Commentaire</label>
+                    <textarea id="studentComment" placeholder="Observation courte sur l'eleve">${escapeHtml(studentFormState.commentaire || "")}</textarea>
+                </div>
+
+                <div class="inline-actions" style="margin-top:16px;">
+                    <button class="btn-primary" type="button" id="btnSaveStudent">Enregistrer la note</button>
+                    <button class="btn-secondary" type="button" id="btnAbsentStudent">Marquer absent</button>
+                    <button class="btn-secondary" type="button" id="btnResetStudent">Reinitialiser</button>
+                </div>
+            `;
+
+            bindStudentPanelEvents(entry);
+        }
+
+        function bindStudentPanelEvents(entry) {
+            const panel = document.getElementById("studentPanel");
+            Array.from(panel.querySelectorAll(".opt-btn")).forEach((button) => {
+                button.addEventListener("click", () => {
+                    setOption(button.dataset.critere, button.dataset.value);
+                });
+            });
+            Array.from(panel.querySelectorAll(".course-toggle")).forEach((button) => {
+                button.addEventListener("click", () => {
+                    toggleCourseForStudent(button.dataset.course);
+                });
+            });
+            Array.from(panel.querySelectorAll("input[name='objectifStatut']")).forEach((input) => {
+                input.addEventListener("change", () => {
+                    studentFormState.objectifStatut = input.value;
+                    updatePreview();
+                });
+            });
+            document.getElementById("adjustNoteToggle").addEventListener("change", (event) => {
+                studentFormState.ajusterNote = event.target.checked;
+                document.getElementById("adjustFields").style.display = event.target.checked ? "grid" : "none";
+                updatePreview();
+            });
+            document.getElementById("inputManualNote").addEventListener("input", (event) => {
+                studentFormState.noteManuelle = event.target.value;
+                updatePreview();
+            });
+            document.getElementById("inputManualJustification").addEventListener("input", (event) => {
+                studentFormState.justificationAjustement = event.target.value;
+            });
+            document.getElementById("studentComment").addEventListener("input", (event) => {
+                studentFormState.commentaire = event.target.value;
+            });
+            document.getElementById("btnSaveStudent").addEventListener("click", async () => {
+                await saveStudentNote(entry);
+            });
+            document.getElementById("btnAbsentStudent").addEventListener("click", async () => {
+                await markStudentAbsent(entry);
+            });
+            document.getElementById("btnResetStudent").addEventListener("click", () => {
+                studentFormState = buildInitialStudentState(entry);
+                renderStudentPanel(entry);
+                updatePreview();
+            });
+        }
+
+        function renderObjectiveOption(value, label) {
+            const checked = studentFormState?.objectifStatut === value ? "checked" : "";
+            return `
+                <label>
+                    <input type="radio" name="objectifStatut" value="${value}" ${checked}>
+                    ${label}
+                </label>
+            `;
+        }
+
+        function renderOptionSection(title, critere, options) {
+            return `
+                <div class="section">
+                    <h4>${escapeHtml(title)}</h4>
+                    <div class="options-grid">
+                        ${options.map(([value, emoji, label, tone]) => {
+                            const active = String(studentFormState?.[critere]) === String(value) ? "active" : "";
+                            return `
+                                <button type="button" class="opt-btn ${tone} ${active}" data-critere="${critere}" data-value="${value}">
+                                    <span class="emoji">${emoji}</span>
+                                    <span class="label">${escapeHtml(label)}</span>
+                                </button>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+            `;
+        }
+
+        function setOption(critere, value) {
+            if (!studentFormState) return;
+            studentFormState[critere] = value;
+            const entry = studentEntries.find((student) => student.code === currentStudentCode);
+            renderStudentPanel(entry);
+            updatePreview();
+        }
+
+        function toggleCourseForStudent(courseValue) {
+            if (!studentFormState) return;
+            const current = new Set(studentFormState.coursDistrib || []);
+            if (current.has(courseValue)) current.delete(courseValue);
+            else current.add(courseValue);
+            studentFormState.coursDistrib = Array.from(current);
+            const entry = studentEntries.find((student) => student.code === currentStudentCode);
+            renderStudentPanel(entry);
+            updatePreview();
+        }
+
+        function updatePreview() {
+            if (!studentFormState) return;
+            const previewValue = document.getElementById("notePreviewValue");
+            const previewMeta = document.getElementById("notePreviewMeta");
+            if (!previewValue || !previewMeta) return;
+
+            const result = calculateNote(studentFormState, getActiveCriteria());
+            let finalNote = result.noteSur20;
+            let adjusted = false;
+
+            if (studentFormState.ajusterNote) {
+                const manualValue = parseFloat(studentFormState.noteManuelle);
+                if (!Number.isNaN(manualValue) && manualValue >= 0 && manualValue <= 20) {
+                    finalNote = Math.round(manualValue * 2) / 2;
+                    adjusted = true;
+                }
+            }
+
+            const parts = [
+                "Base " + result.noteBase + "/20",
+                "Plafond " + result.plafond + "/20",
+                result.malus > 0 ? "Malus -" + result.malus : "Malus 0",
+                result.bonusObjectif > 0 ? "Bonus +0.5" : "Bonus 0"
+            ];
+            if (adjusted) parts.push("Note ajustee");
+
+            previewValue.textContent = finalNote + "/20";
+            previewValue.style.color = finalNote >= 12 ? "var(--success)" : finalNote >= 8 ? "var(--warning)" : "var(--danger)";
+            previewMeta.innerHTML = parts.map((part) => "<span>" + escapeHtml(part) + "</span>").join("");
+        }
+
+        async function saveStudentNote(entry) {
+            if (!entry || !studentFormState) return;
+            const classeId = document.getElementById("selectClasse").value;
+            const date = document.getElementById("inputDate").value;
+            const moduleId = getSelectedModuleId();
+            const moduleTitle = getSelectedModuleTitle(moduleId);
+
+            if (!classeId || !date || !moduleId) {
+                showToast("Contexte incomplet");
+                return;
+            }
+
+            const result = calculateNote(studentFormState, getActiveCriteria());
+            let noteFinale = result.noteSur20;
+            let ajustementManuel = false;
+            let justification = null;
+
+            if (studentFormState.ajusterNote) {
+                const manualValue = parseFloat(studentFormState.noteManuelle);
+                if (!Number.isNaN(manualValue) && manualValue >= 0 && manualValue <= 20) {
+                    noteFinale = Math.round(manualValue * 2) / 2;
+                    ajustementManuel = true;
+                    justification = (studentFormState.justificationAjustement || "").trim() || null;
+                }
+            }
+
+            const data = {
+                date,
+                heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+                classe: classeId,
+                module: moduleId,
+                moduleTitre: moduleTitle,
+                competences: getSessionCompetences(),
+                travail: normalizeField(studentFormState.travail),
+                oral: normalizeOralField(studentFormState.oral),
+                attention: normalizeField(studentFormState.attention),
+                porteVue: normalizeField(studentFormState.porteVue),
+                coursAJour: normalizeField(studentFormState.coursAJour),
+                autonomie: normalizeField(studentFormState.autonomie),
+                initiative: normalizeField(studentFormState.initiative),
+                securite: normalizeField(studentFormState.securite),
+                planClasse: normalizeField(studentFormState.planClasse),
+                bavardage: studentFormState.bavardage || "aucun",
+                telephone: studentFormState.telephone || "ok",
+                commentaire: (studentFormState.commentaire || "").trim() || null,
+                coursDistrib: normalizeCourseValues(studentFormState.coursDistrib, []),
+                criteresActifs: getActiveCriteria(),
+                points: result.points,
+                maxPoints: result.maxPoints,
+                noteBase: result.noteBase,
+                noteCalculee: result.noteSur20,
+                plafond: result.plafond,
+                malus: result.malus,
+                bonusObjectif: result.bonusObjectif,
+                noteSur20: noteFinale,
+                ajustementManuel,
+                justificationAjustement: justification,
+                objectifValide: currentObjective ? {
+                    texte: currentObjective.texte,
+                    statut: studentFormState.objectifStatut || "en_cours"
+                } : null,
+                absent: false,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser?.email || "anonyme"
+            };
+
+            const docId = date + "_" + moduleId;
+            const docRef = doc(db, "resultats", entry.code, "suivi", docId);
+            const existingSnap = await getDoc(docRef);
+            const oldDoc = existingSnap.exists() ? existingSnap.data() : null;
+
+            if (oldDoc && !confirm("Une note existe deja pour cet eleve a cette date. Voulez-vous la remplacer ?")) {
+                showToast("Enregistrement annule");
+                return;
+            }
+
+            await setDoc(docRef, data);
+
+            if (currentObjective && data.objectifValide) {
+                await archiveObjectiveIfNeeded(entry.code, currentObjective, data.objectifValide.statut);
+            }
+
+            await updateStats(entry.code, noteFinale, studentFormState, oldDoc);
+
+            entry.data = data;
+            entry.absent = false;
+            entry.done = true;
+            entry.note = noteFinale;
+            renderStudentList();
+            updateSummaryBar();
+            showToast(entry.code + " note " + noteFinale + "/20");
+
+            const next = studentEntries.find((student) => !student.done && !student.absent);
+            if (next) {
+                await selectStudent(next.code);
+            } else {
+                await selectStudent(entry.code);
+            }
+        }
+
+        async function markStudentAbsent(entry) {
+            if (!entry) return;
+            const classeId = document.getElementById("selectClasse").value;
+            const date = document.getElementById("inputDate").value;
+            const moduleId = getSelectedModuleId();
+            const moduleTitle = getSelectedModuleTitle(moduleId);
+            if (!classeId || !date || !moduleId) {
+                showToast("Contexte incomplet");
+                return;
+            }
+
+            const data = {
+                date,
+                heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+                classe: classeId,
+                module: moduleId,
+                moduleTitre: moduleTitle,
+                absent: true,
+                noteSur20: null,
+                competences: getSessionCompetences(),
+                coursDistrib: normalizeCourseValues(studentFormState?.coursDistrib, []),
+                coursRecu: false,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser?.email || "anonyme"
+            };
+
+            const docId = date + "_" + moduleId;
+            const docRef = doc(db, "resultats", entry.code, "suivi", docId);
+            const existingSnap = await getDoc(docRef);
+            const oldDoc = existingSnap.exists() ? existingSnap.data() : null;
+
+            if (oldDoc && !confirm("Une saisie existe deja pour cet eleve a cette date. Voulez-vous la remplacer par une absence ?")) {
+                showToast("Absence annulee");
+                return;
+            }
+
+            await setDoc(docRef, data);
+            await updateStatsAbsence(entry.code, oldDoc);
+
+            entry.data = data;
+            entry.absent = true;
+            entry.done = false;
+            entry.note = null;
+            renderStudentList();
+            updateSummaryBar();
+            showToast(entry.code + " absent");
+
+            const next = studentEntries.find((student) => !student.done && !student.absent);
+            if (next) {
+                await selectStudent(next.code);
+            } else {
+                await selectStudent(entry.code);
+            }
+        }
+
+        async function saveProgressionLog() {
+            const classeId = document.getElementById("selectClasse").value;
+            const date = document.getElementById("inputDate").value;
+            const moduleId = getSelectedModuleId();
+
+            if (!classeId || !date || !moduleId) {
+                showToast("Classe, date ou module manquant");
+                return;
+            }
+
+            if (!selectedStatus) {
+                showToast("Choisissez un statut de seance");
+                return;
+            }
+
+            const progressionClassId = mapClassToProgression(classeId);
+            const progressionModuleId = mapModuleToProgression(moduleId);
+            const checklist = {};
+            CHECKLIST_ITEMS.forEach((item) => {
+                checklist[item.key] = isToggleActive("check-" + item.key);
+            });
+
+            const absentsEleves = studentEntries.filter((entry) => entry.absent).map((entry) => entry.code);
+            const coursDefaut = getDefaultCourses();
+            const remark = document.getElementById("inputRemarque").value.trim();
+            const todoNote = document.getElementById("inputTodo").value.trim();
+            const seance = document.getElementById("inputSeance").value.trim();
+            const phase = document.getElementById("selectPhase").value;
+            const situation = document.getElementById("selectSituation").value;
+            const arret = document.getElementById("inputArret").value.trim();
+
+            const logData = {
+                timestamp: serverTimestamp(),
+                planification: null,
+                date,
+                room: null,
+                classeDocId: progressionClassId,
+                classeId: getProgressionClassLabel(progressionClassId),
+                classeSource: classeId,
+                moduleId: progressionModuleId,
+                moduleSource: moduleId,
+                phase,
+                phases: phase ? [phase] : [],
+                moduleSuivant: null,
+                seance,
+                seances: seance ? [seance] : [],
+                statut: selectedStatus,
+                situation: situation || "Normal",
+                isValide: selectedStatus === "Réalisé",
+                arret,
+                checklist,
+                evalDiag: "",
+                evalForm: "",
+                evalSomm: "",
+                cps: { cognitif: "", emotionnel: "", social: "" },
+                cpsMots: { cognitif: [], emotionnel: [], social: [] },
+                meteo: selectedMeteo,
+                qualiteDim: {},
+                todos: [],
+                absentsEleves,
+                elevesSansCopie: [],
+                absences: absentsEleves.length,
+                absencesNoms: absentsEleves.join(", "),
+                qualite: "",
+                remarque: remark || null,
+                todoNext: {
+                    action: "",
+                    label: "",
+                    note: todoNote || "",
+                    reminderPronote: false,
+                    reminderType: ""
+                },
+                userId: currentUser?.uid || ""
+            };
+
+            await setDoc(doc(db, "progression_logs", date + "_" + progressionClassId), logData);
+            await syncPrevue(progressionClassId, progressionModuleId, selectedStatus, situation, seance, phase);
+            showToast("Bilan de seance enregistre");
+            await loadProgressionContext();
+        }
+
+        async function syncPrevue(progressionClassId, moduleId, statut, situation, seance, phase) {
+            if (!currentPrevue || !currentWeekInfo || !currentWeekInfo.week || currentPrevue.id !== progressionClassId) return;
+            const prevueClone = JSON.parse(JSON.stringify(currentPrevue));
+            const targetWeek = prevueClone.semaines[currentWeekInfo.index];
+            if (!targetWeek) return;
+
+            targetWeek.statut = statut;
+            targetWeek.valide = statut === "Réalisé";
+            if (moduleId) {
+                targetWeek.module = moduleId;
+                targetWeek.moduleBase = moduleId;
+            }
+            if (seance) targetWeek.seance = seance;
+            if (phase) targetWeek.phase = phase;
+            targetWeek.situation = situation || "Normal";
+
+            await updateDoc(doc(db, "progression_prevue", progressionClassId), { semaines: prevueClone.semaines });
+            currentPrevue = prevueClone;
+            currentWeekInfo = findWeekInfo(currentPrevue, document.getElementById("inputDate").value);
+        }
+
+        function calculateNote(saisieData, criteres) {
+            let points = 0;
+            let maxPoints = 0;
+
+            if (criteres.travail !== false && saisieData.travail && saisieData.travail !== "ne") {
+                maxPoints += 4;
+                if (saisieData.travail === "tresbien") points += 4;
+                else if (saisieData.travail === "fait") points += 3;
+                else if (saisieData.travail === "partiel") points += 1.5;
+            }
+
+            if (criteres.oral !== false && saisieData.oral !== null && saisieData.oral !== undefined && saisieData.oral !== "ne") {
+                maxPoints += 4;
+                points += parseInt(saisieData.oral, 10) || 0;
+            }
+
+            if (criteres.attention !== false && saisieData.attention && saisieData.attention !== "ne") {
+                maxPoints += 3;
+                if (saisieData.attention === "bonne") points += 3;
+                else if (saisieData.attention === "moyenne") points += 1.5;
+            }
+
+            if (criteres.porteVue !== false && saisieData.porteVue && saisieData.porteVue !== "ne") {
+                maxPoints += 1;
+                if (saisieData.porteVue === "ok") points += 1;
+            }
+
+            if (criteres.coursAJour !== false && saisieData.coursAJour && saisieData.coursAJour !== "ne") {
+                maxPoints += 2;
+                if (saisieData.coursAJour === "a_jour") points += 2;
+                else if (saisieData.coursAJour === "incomplet") points += 1;
+            }
+
+            if (criteres.autonomie !== false && saisieData.autonomie && saisieData.autonomie !== "ne") {
+                maxPoints += 2;
+                if (saisieData.autonomie === "bonne") points += 2;
+                else if (saisieData.autonomie === "moyenne") points += 1;
+            }
+
+            if (criteres.initiative !== false && saisieData.initiative && saisieData.initiative !== "ne") {
+                maxPoints += 2;
+                if (saisieData.initiative === "oui") points += 2;
+                else if (saisieData.initiative === "parfois") points += 1;
+            }
+
+            if (criteres.securite !== false && saisieData.securite && saisieData.securite !== "ne") {
+                maxPoints += 2;
+                if (saisieData.securite === "oui") points += 2;
+                else if (saisieData.securite === "partiel") points += 1;
+            }
+
+            if (criteres.planClasse !== false && saisieData.planClasse && saisieData.planClasse !== "ne") {
+                maxPoints += 1;
+                if (saisieData.planClasse === "respecte") points += 1;
+                else if (saisieData.planClasse === "partiel") points += 0.5;
+            }
+
+            const noteBase = maxPoints > 0 ? Math.round((points / maxPoints) * 20 * 10) / 10 : 0;
+            const bavardage = saisieData.bavardage || "aucun";
+            const telephone = saisieData.telephone || "ok";
+            const plafond = PLAFOND_BAVARDAGE[bavardage] ?? 20;
+            const malus = MALUS_TELEPHONE[telephone] ?? 0;
+            let note = Math.min(noteBase, plafond);
+            note = Math.max(0, note - malus);
+
+            let bonusObjectif = 0;
+            const bavardageOk = bavardage === "aucun" || bavardage === "ne";
+            const telephoneOk = telephone === "ok" || telephone === "ne";
+            if (currentObjective && studentFormState?.objectifStatut === "atteint" && bavardageOk && telephoneOk) {
+                bonusObjectif = 0.5;
+                note = Math.min(20, note + bonusObjectif);
+            }
+
+            note = Math.round(note * 2) / 2;
+
+            return {
+                points,
+                maxPoints,
+                noteBase,
+                plafond,
+                malus,
+                bonusObjectif,
+                noteSur20: note
+            };
+        }
+
+        function renderStatusButtons() {
+            const grid = document.getElementById("statusGrid");
+            grid.innerHTML = STATUS_OPTIONS.map((option) => `
+                <button type="button" class="btn-status" data-status="${option.value}" data-css="${option.css}">
+                    ${option.label}
+                </button>
+            `).join("");
+
+            Array.from(grid.querySelectorAll(".btn-status")).forEach((button) => {
+                button.addEventListener("click", () => selectStatus(button.dataset.status));
+            });
+        }
+
+        function selectStatus(status) {
+            selectedStatus = status;
+            Array.from(document.querySelectorAll(".btn-status")).forEach((button) => {
+                const active = button.dataset.status === status;
+                button.classList.toggle("active", active);
+                button.classList.toggle(button.dataset.css, active);
+            });
+        }
+
+        function renderMeteoButtons() {
+            const grid = document.getElementById("meteoGrid");
+            grid.innerHTML = METEO_OPTIONS.map((option) => `
+                <button type="button" class="btn-meteo" data-emoji="${option.emoji}">
+                    <div style="font-size:1.4rem;">${option.emoji}</div>
+                    <div style="font-size:0.78rem;font-weight:700;">${option.label}</div>
+                </button>
+            `).join("");
+            Array.from(grid.querySelectorAll(".btn-meteo")).forEach((button) => {
+                button.addEventListener("click", () => selectMeteo(button.dataset.emoji));
+            });
+        }
+
+        function selectMeteo(emoji) {
+            selectedMeteo = METEO_OPTIONS.find((option) => option.emoji === emoji) || null;
+            Array.from(document.querySelectorAll(".btn-meteo")).forEach((button) => {
+                button.classList.toggle("active", button.dataset.emoji === emoji);
+            });
+        }
+
+        function renderChecklistGrid() {
+            const grid = document.getElementById("checklistGrid");
+            grid.innerHTML = CHECKLIST_ITEMS.map((item) => `
+                <button type="button" class="criterion-toggle" id="check-${item.key}" data-toggle-id="check-${item.key}">
+                    ${item.label}
+                </button>
+            `).join("");
+            bindGenericToggleGrid("#checklistGrid");
+        }
+
+        function renderCriteriaToggles() {
+            const grid = document.getElementById("criteriaToggleGrid");
+            grid.innerHTML = Object.entries(CRITERIA_LABELS).map(([key, label]) => `
+                <button type="button" class="criterion-toggle ${CRITERIA_DEFAULTS[key] ? "active" : ""}" id="crit-${key}" data-toggle-id="crit-${key}">
+                    ${label}
+                </button>
+            `).join("");
+            bindGenericToggleGrid("#criteriaToggleGrid");
+            Array.from(grid.querySelectorAll("[data-toggle-id]")).forEach((button) => {
+                button.addEventListener("click", () => {
+                    if (!currentStudentCode) return;
+                    const entry = studentEntries.find((student) => student.code === currentStudentCode);
+                    if (!entry) return;
+                    renderStudentPanel(entry);
+                    updatePreview();
+                });
+            });
+        }
+
+        function renderCourseDefaultGrid() {
+            const grid = document.getElementById("courseDefaultGrid");
+            grid.innerHTML = COURSE_OPTIONS.map((option) => `
+                <button type="button" class="course-toggle" id="course-${option.value}" data-toggle-id="course-${option.value}">
+                    ${option.label}
+                </button>
+            `).join("");
+            bindGenericToggleGrid("#courseDefaultGrid");
+        }
+
+        function bindGenericToggleGrid(selector) {
+            Array.from(document.querySelectorAll(selector + " [data-toggle-id]")).forEach((button) => {
+                button.addEventListener("click", () => {
+                    button.classList.toggle("active");
+                });
+            });
+        }
+
+        function normalizeStatusValue(status) {
+            const raw = String(status || "").trim().toLowerCase();
+            if (raw === "realise" || raw === "réalisé") return "Réalisé";
+            if (raw === "prevu" || raw === "prévu") return "Prévu";
+            if (raw === "reporte" || raw === "reporté") return "Reporté";
+            if (raw === "non realise" || raw === "non réalisé") return "Non réalisé";
+            return status || "";
+        }
+
+        function normalizePhaseValue(phase) {
+            const raw = String(phase || "").trim().toLowerCase();
+            if (raw === "cours") return "cours";
+            if (raw === "evaluation" || raw === "évaluation") return "evaluation";
+            if (raw === "correction") return "correction";
+            if (raw === "exercice" || raw === "tp") return "exercice";
+            if (raw === "revision" || raw === "révision") return "revision";
+            return "cours";
+        }
+
+        function getActiveCriteria() {
+            const criteria = {};
+            Object.keys(CRITERIA_LABELS).forEach((key) => {
+                criteria[key] = isToggleActive("crit-" + key);
+            });
+            return criteria;
+        }
+
+        function getDefaultCourses() {
+            return COURSE_OPTIONS
+                .filter((option) => isToggleActive("course-" + option.value))
+                .map((option) => option.value);
+        }
+
+        function isToggleActive(id) {
+            return document.getElementById(id)?.classList.contains("active") || false;
+        }
+
+        function setToggleState(id, active) {
+            const element = document.getElementById(id);
+            if (!element) return;
+            element.classList.toggle("active", !!active);
+        }
+
+        function getSelectedModuleId() {
+            const freeValue = document.getElementById("inputModuleLibre").value.trim();
+            return freeValue || document.getElementById("selectModule").value;
+        }
+
+        function getSelectedModuleTitle(moduleId) {
+            if (!moduleId) return "";
+            const classeId = document.getElementById("selectClasse").value;
+            const effectiveClasses = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            const modules = window.getModulesForClasse ? window.getModulesForClasse(effectiveClasses[0]) : [];
+            const module = modules.find((item) => item.id === moduleId);
+            return module ? module.titre : moduleId;
+        }
+
+        function getSessionCompetences() {
+            // Tant qu'il n'y a pas d'UI dédiée, on reste neutre pour ne pas modifier l'affichage élève.
+            return [];
+        }
+
+        function getProgressionClassLabel(progressionClassId) {
+            return currentPrevue?.classeId || progressionClassId;
+        }
+
+        function mapClassToProgression(classeId) {
+            return PROGRESSION_CLASS_MAP[classeId] || classeId;
+        }
+
+        function mapModuleToProgression(moduleId) {
+            return PROGRESSION_MODULE_MAP[moduleId] || moduleId;
+        }
+
+        function mapModuleFromProgression(moduleId) {
+            return REVERSE_PROGRESSION_MODULE_MAP[moduleId] || moduleId;
+        }
+
+        function findWeekInfo(prevueData, targetDate) {
+            if (!prevueData || !Array.isArray(prevueData.semaines)) return null;
+            const targetMonday = getMondayLocal(targetDate);
+            for (let index = 0; index < prevueData.semaines.length; index += 1) {
+                const week = prevueData.semaines[index];
+                if (!week || !week.date) continue;
+                if (sameWeekLocal(targetMonday, week.date)) {
+                    return { index, week };
+                }
+            }
+            return null;
+        }
+
+        function getMondayLocal(dateValue) {
+            const date = typeof dateValue === "string" ? new Date(dateValue + "T12:00:00") : new Date(dateValue);
+            if (Number.isNaN(date.getTime())) return null;
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(date);
+            monday.setDate(diff);
+            monday.setHours(12, 0, 0, 0);
+            return monday;
+        }
+
+        function sameWeekLocal(a, b) {
+            const mondayA = getMondayLocal(a);
+            const mondayB = getMondayLocal(b);
+            return mondayA && mondayB && mondayA.getTime() === mondayB.getTime();
+        }
+
+        function getStudentName(code) {
+            try {
+                const names = JSON.parse(localStorage.getItem(LOCAL_NAMES_KEY) || "{}");
+                return names[code.toUpperCase()] || "";
+            } catch (error) {
+                return "";
+            }
+        }
+
+        function normalizeCourseValues(rawValue, fallback = []) {
+            if (Array.isArray(rawValue)) {
+                return rawValue.filter((value) => value && value !== "aucun");
+            }
+            if (typeof rawValue === "string" && rawValue.trim()) {
+                return rawValue
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter((value) => value && value !== "aucun");
+            }
+            return Array.isArray(fallback) ? fallback.slice() : [];
+        }
+
+        function normalizeField(value) {
+            if (value === null || value === undefined || value === "" || value === "ne") return null;
+            return value;
+        }
+
+        function normalizeOralField(value) {
+            if (value === null || value === undefined || value === "" || value === "ne") return null;
+            const parsed = parseInt(value, 10);
+            return Number.isNaN(parsed) ? value : parsed;
+        }
+
+        function updateSummaryBar() {
+            const summary = document.getElementById("summaryBar");
+            const classeId = document.getElementById("selectClasse").value;
+            const moduleId = getSelectedModuleId();
+            const date = document.getElementById("inputDate").value;
+            if (!classeId || !moduleId || !date || !studentEntries.length) {
+                summary.innerHTML = "<span>Aucune classe selectionnee.</span>";
+                return;
+            }
+
+            const notes = studentEntries.filter((entry) => entry.done && typeof entry.note === "number").map((entry) => entry.note);
+            const moyenne = notes.length ? Math.round((notes.reduce((sum, value) => sum + value, 0) / notes.length) * 10) / 10 : "--";
+            const pending = studentEntries.filter((entry) => !entry.done && !entry.absent).length;
+            const absent = studentEntries.filter((entry) => entry.absent).length;
+            summary.innerHTML = [
+                "<span><strong>" + escapeHtml(classeId) + "</strong></span>",
+                "<span>" + escapeHtml(moduleId) + "</span>",
+                "<span>" + escapeHtml(date) + "</span>",
+                "<span>" + studentEntries.length + " eleves</span>",
+                "<span>" + pending + " en attente</span>",
+                "<span>" + absent + " absents</span>",
+                "<span>Moyenne seance: " + moyenne + "</span>"
+            ].join("");
+        }
+
+        async function archiveObjectiveIfNeeded(eleveCode, objective, status) {
+            if (!objective || !status || status === "en_cours") return;
+            const archiveId = new Date().toISOString() + "_" + (objective.texte || "objectif").slice(0, 20);
+            try {
+                await setDoc(doc(db, "resultats", eleveCode, "objectifs", archiveId), {
+                    texte: objective.texte,
+                    statut: status,
+                    dateValidation: serverTimestamp()
+                });
+                await deleteDoc(doc(db, "resultats", eleveCode, "objectifs", "current"));
+            } catch (error) {
+                console.warn("Objective archive error:", error);
+            }
+        }
+
+        function emptyStats() {
+            return {
+                totalNotes: 0,
+                nombreSeances: 0,
+                nbAbsences: 0,
+                moyenne: 0,
+                travail: {},
+                oral: {},
+                attention: {},
+                porteVue: {},
+                coursAJour: {},
+                autonomie: {},
+                initiative: {},
+                securite: {},
+                planClasse: {},
+                lastUpdate: null
+            };
+        }
+
+        function rollbackOldDoc(stats, oldDoc) {
+            if (!oldDoc) return;
+            if (oldDoc.absent) {
+                stats.nbAbsences = Math.max(0, (stats.nbAbsences || 0) - 1);
+                return;
+            }
+
+            const oldNote = typeof oldDoc.noteSur20 === "number" ? oldDoc.noteSur20 : 0;
+            stats.nombreSeances = Math.max(0, (stats.nombreSeances || 0) - 1);
+            stats.totalNotes = Math.max(0, (stats.totalNotes || 0) - oldNote);
+
+            const criteres = ["travail", "oral", "attention", "porteVue", "coursAJour", "autonomie", "initiative", "securite", "planClasse"];
+            criteres.forEach((critere) => {
+                const oldValue = oldDoc[critere];
+                if (oldValue === null || oldValue === undefined || oldValue === "") return;
+                if (!stats[critere]) stats[critere] = {};
+                const key = String(oldValue);
+                stats[critere][key] = Math.max(0, (stats[critere][key] || 0) - 1);
+            });
+        }
+
+        async function updateStats(eleveCode, note, saisieData, oldDoc) {
+            const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
+            const snap = await getDoc(ref);
+            const stats = snap.exists() ? snap.data() : emptyStats();
+
+            if (stats.nbSeances !== undefined && stats.nombreSeances === undefined) {
+                stats.nombreSeances = stats.nbSeances;
+            }
+            delete stats.nbSeances;
+
+            rollbackOldDoc(stats, oldDoc);
+
+            stats.nombreSeances = (stats.nombreSeances || 0) + 1;
+            stats.totalNotes = (stats.totalNotes || 0) + note;
+            stats.moyenne = stats.nombreSeances > 0
+                ? Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10
+                : 0;
+
+            const criteres = ["travail", "oral", "attention", "porteVue", "coursAJour", "autonomie", "initiative", "securite", "planClasse"];
+            criteres.forEach((critere) => {
+                const value = saisieData[critere];
+                if (value === null || value === undefined || value === "" || value === "ne") return;
+                if (!stats[critere]) stats[critere] = {};
+                const key = String(value);
+                stats[critere][key] = (stats[critere][key] || 0) + 1;
+            });
+
+            stats.lastUpdate = serverTimestamp();
+            await setDoc(ref, stats);
+        }
+
+        async function updateStatsAbsence(eleveCode, oldDoc) {
+            const ref = doc(db, "resultats", eleveCode, "stats", "suivi");
+            const snap = await getDoc(ref);
+            const stats = snap.exists() ? snap.data() : emptyStats();
+
+            if (stats.nbSeances !== undefined && stats.nombreSeances === undefined) {
+                stats.nombreSeances = stats.nbSeances;
+            }
+            delete stats.nbSeances;
+
+            rollbackOldDoc(stats, oldDoc);
+            stats.nbAbsences = (stats.nbAbsences || 0) + 1;
+            stats.moyenne = stats.nombreSeances > 0
+                ? Math.round((stats.totalNotes / stats.nombreSeances) * 10) / 10
+                : 0;
+            stats.lastUpdate = serverTimestamp();
+            await setDoc(ref, stats);
+        }
+
+        function debounce(fn, delay) {
+            let timeout = null;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => fn(...args), delay);
+            };
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.add("show");
+            window.clearTimeout(showToast.timer);
+            showToast.timer = window.setTimeout(() => {
+                toast.classList.remove("show");
+            }, 2400);
+        }
+    </script>
+</body>
+</html>
