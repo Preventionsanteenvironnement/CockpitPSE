@@ -51,8 +51,9 @@
         .wall-timer.warn { color: #f59e0b; }
         .wall-timer.danger { color: #ef4444; animation: pulse 0.5s infinite; }
         .wall-q-text {
-            font-size: clamp(1.5rem, 3vw, 2.5rem); font-weight: 800; line-height: 1.4;
-            max-width: 900px; margin-bottom: 30px;
+            font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 800; line-height: 1.4;
+            max-width: 900px; margin-bottom: 24px; background: #1e293b;
+            padding: 30px 40px; border-radius: 20px;
         }
         .wall-choices {
             display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
@@ -72,8 +73,8 @@
             font-size: 1.8rem; font-weight: 900; margin-right: 10px;
         }
         .wall-resp-counter {
-            position: fixed; top: 30px; right: 40px;
             font-size: 1.5rem; color: #94a3b8; font-weight: 700;
+            margin-top: 20px;
         }
         .wall-mot-info {
             background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15);
@@ -84,39 +85,43 @@
         /* === RESULTS === */
         #screen-results { text-align: center; overflow-y: auto; }
         .results-q-text {
-            font-size: clamp(1.2rem, 2.5vw, 2rem); font-weight: 700;
-            max-width: 800px; margin-bottom: 30px; color: #94a3b8;
+            font-size: clamp(1.4rem, 2.8vw, 2.1rem); font-weight: 800;
+            max-width: 900px; margin-bottom: 18px; color: white;
+            background: #1e293b; padding: 28px 36px; border-radius: 20px; line-height: 1.4;
         }
         .results-bars {
-            display: flex; gap: 20px; align-items: flex-end;
-            justify-content: center; height: 300px; width: 100%; max-width: 700px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+            width: 100%; max-width: 900px; margin-bottom: 24px;
         }
-        .result-bar-col {
-            flex: 1; display: flex; flex-direction: column; align-items: center;
-            height: 100%; justify-content: flex-end;
+        .results-choice {
+            padding: 24px 20px; border-radius: 20px; color: white;
+            font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 700;
+            text-align: center; position: relative; overflow: hidden;
         }
-        .result-bar-pct {
-            font-size: 1.8rem; font-weight: 900; margin-bottom: 8px;
+        .results-choice-a { background: #3b82f6; }
+        .results-choice-b { background: #f59e0b; }
+        .results-choice-c { background: #22c55e; }
+        .results-choice-d { background: #ef4444; }
+        .results-choice .letter {
+            font-size: 1.8rem; font-weight: 900; margin-right: 10px;
         }
-        .result-bar {
-            width: 100%; max-width: 120px; border-radius: 16px 16px 8px 8px;
-            transition: height 1s ease-out; height: 0;
-            position: relative;
+        .results-choice .bar-fill {
+            position: absolute; bottom: 0; left: 0; height: 6px;
+            background: rgba(255,255,255,0.45); transition: width 0.8s ease-out;
+            width: 0;
         }
-        .result-bar-a { background: #3b82f6; }
-        .result-bar-b { background: #f59e0b; }
-        .result-bar-c { background: #22c55e; }
-        .result-bar-d { background: #ef4444; }
-        .result-bar.correct { box-shadow: 0 0 30px rgba(255,255,255,0.4); border: 3px solid white; }
-        .result-bar-label {
-            margin-top: 10px; font-size: 1rem; font-weight: 600; color: #94a3b8;
-            text-align: center; max-width: 140px;
+        .results-choice .pct {
+            font-size: 2rem; font-weight: 900; display: block; margin-top: 12px;
         }
-        .result-bar-badge {
-            position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
-            font-size: 2rem; display: none;
+        .results-choice.correct-answer {
+            border: 4px solid white; box-shadow: 0 0 30px rgba(34,197,94,0.45);
         }
-        .result-bar.correct .result-bar-badge { display: block; animation: bounceIn 0.6s; }
+        .results-choice .correct-badge {
+            display: none; position: absolute; top: 8px; right: 12px; font-size: 1.5rem;
+        }
+        .results-choice.correct-answer .correct-badge {
+            display: block;
+        }
         .results-correct-text {
             font-size: 1.5rem; color: #22c55e; font-weight: 800; margin-top: 30px;
         }
@@ -329,6 +334,7 @@
 <!-- RESULTS -->
 <div id="screen-results" class="screen">
     <div class="wall-q-num" id="res-q-num"></div>
+    <div class="wall-timer" id="results-timer" style="display:none;"></div>
     <div class="q-media-container" id="res-q-media" style="display:none;"></div>
     <div class="results-q-text" id="res-q-text"></div>
     <div class="results-bars" id="res-bars"></div>
@@ -417,6 +423,69 @@
         const label = document.getElementById('wall-qr-label');
         if (!label || !url) return;
         label.textContent = '📱 ' + url.replace(/^https?:\/\//, '');
+    }
+
+    function parseWallTimestamp(value) {
+        if (!value) return 0;
+        if (typeof value === 'number') return value;
+        if (typeof value.toMillis === 'function') return value.toMillis();
+        if (typeof value.seconds === 'number') return value.seconds * 1000;
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function stopWallTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    function startSyncedWallTimer(elementId, baseSeconds, startedAtValue, prefix) {
+        stopWallTimer();
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        const totalSeconds = Number(baseSeconds || 0);
+        if (totalSeconds <= 0) {
+            el.textContent = prefix ? prefix + ' 0s' : '✋';
+            el.className = 'wall-timer';
+            return;
+        }
+
+        const startedAt = parseWallTimestamp(startedAtValue);
+        const now = Date.now();
+        const elapsedSinceStart = startedAt > 0 ? Math.max(0, (now - startedAt) / 1000) : 0;
+        const adjustedStart = (elapsedSinceStart > totalSeconds + 5 || elapsedSinceStart < 0)
+            ? now
+            : startedAt;
+        const deadline = adjustedStart + totalSeconds * 1000;
+
+        function updateTimer() {
+            const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+            el.textContent = prefix ? prefix + ' ' + remaining + 's' : remaining + 's';
+            if (remaining <= 3) el.className = 'wall-timer danger';
+            else if (remaining <= Math.max(3, Math.floor(totalSeconds * 0.3))) el.className = 'wall-timer warn';
+            else el.className = 'wall-timer';
+        }
+
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 250);
+    }
+
+    function updateWallQuestionCounter() {
+        if (lastQIndex < 0) return;
+        const current = responsesData.filter(r => r.questionIndex === lastQIndex);
+        const label = current.length + ' / ' + playerCount + ' ont repondu';
+        const counter = document.getElementById('wall-resp-counter');
+        if (counter) counter.textContent = label;
+    }
+
+    function rerenderWallResultsIfVisible() {
+        if (lastPhase !== 'results' || lastQIndex < 0) return;
+        const q = wallQuestions[lastQIndex];
+        if (!q) return;
+        displayWallResults(q, lastQIndex, wallQuestions.length);
     }
 
     async function resolveStudentQuizUrl() {
@@ -520,7 +589,9 @@
 
             // Handle pause
             if (d.paused) {
-                if (timerInterval) clearInterval(timerInterval);
+                stopWallTimer();
+                const resultsTimer = document.getElementById('results-timer');
+                if (resultsTimer) resultsTimer.style.display = 'none';
                 showWallScreen('paused');
                 lastPhase = 'paused';
                 return;
@@ -529,10 +600,11 @@
             const phase = d.phase || 'lobby';
             const qIndex = d.currentQuestionIndex ?? -1;
             const questions = wallQuestions;
-            const timer = d.timer || 15;
-            const isManual = d.mode === 'manual';
 
             if (phase === 'lobby') {
+                stopWallTimer();
+                const resultsTimer = document.getElementById('results-timer');
+                if (resultsTimer) resultsTimer.style.display = 'none';
                 showWallScreen('lobby');
                 document.getElementById('wall-code').textContent = currentSessionCode;
                 const qrUrl = wallStudentQuizUrl || fallbackStudentQuizUrl();
@@ -542,14 +614,20 @@
                 if (qIndex !== lastQIndex || lastPhase !== 'question') {
                     lastQIndex = qIndex;
                     showWallScreen('question');
-                    displayWallQuestion(questions[qIndex], qIndex, questions.length, isManual ? 0 : timer);
+                    displayWallQuestion(questions[qIndex], qIndex, questions.length, d);
+                } else {
+                    startWallTimer(d.timeRemaining ?? d.timer ?? 0, d.timerStartedAt);
                 }
             } else if (phase === 'results') {
-                if (timerInterval) clearInterval(timerInterval);
+                lastQIndex = qIndex;
+                stopWallTimer();
                 showWallScreen('results');
                 displayWallResults(questions[qIndex], qIndex, questions.length);
+                startWallResultsTimer(d, questions.length, qIndex);
             } else if (phase === 'summary') {
-                if (timerInterval) clearInterval(timerInterval);
+                stopWallTimer();
+                const resultsTimer = document.getElementById('results-timer');
+                if (resultsTimer) resultsTimer.style.display = 'none';
                 showWallScreen('summary');
                 displayWallSummary(questions);
             }
@@ -570,6 +648,10 @@
                 badge.textContent = d.data().pseudo;
                 container.appendChild(badge);
             });
+
+            if (lastPhase === 'question') {
+                updateWallQuestionCounter();
+            }
         });
 
         // Reponses
@@ -579,8 +661,9 @@
             snap.forEach(d => responsesData.push(d.data()));
 
             if (lastPhase === 'question' && lastQIndex >= 0) {
-                const current = responsesData.filter(r => r.questionIndex === lastQIndex);
-                document.getElementById('wall-resp-counter').textContent = current.length + ' / ' + playerCount + ' ont repondu';
+                updateWallQuestionCounter();
+            } else if (lastPhase === 'results') {
+                rerenderWallResultsIfVisible();
             }
         });
     }
@@ -606,8 +689,11 @@
     }
 
     // === QUESTION ===
-    function displayWallQuestion(q, index, total, timer) {
+    function displayWallQuestion(q, index, total, config) {
+        if (!q) return;
         const qType = q.type || 'qcm';
+        const resultsTimer = document.getElementById('results-timer');
+        if (resultsTimer) resultsTimer.style.display = 'none';
 
         document.getElementById('wall-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
         // Media
@@ -646,34 +732,34 @@
             }
         }
 
-        startWallTimer(timer);
+        updateWallQuestionCounter();
+        const baseSeconds = (config && config.mode === 'manual') ? 0 : (config?.timeRemaining ?? config?.timer ?? 0);
+        startWallTimer(baseSeconds, config?.timerStartedAt);
     }
 
-    function startWallTimer(seconds) {
-        if (timerInterval) clearInterval(timerInterval);
-        const el = document.getElementById('wall-timer');
+    function startWallTimer(baseSeconds, startedAtValue) {
+        startSyncedWallTimer('wall-timer', baseSeconds, startedAtValue, '');
+    }
 
-        if (seconds <= 0) {
-            el.textContent = '✋';
-            el.className = 'wall-timer';
+    function startWallResultsTimer(config, totalQuestions, qIndex) {
+        const el = document.getElementById('results-timer');
+        if (!el) return;
+
+        const baseSeconds = Number(config?.resultsTimeRemaining || 0);
+        if (baseSeconds <= 0) {
+            el.style.display = 'none';
             return;
         }
 
-        let remaining = seconds;
-        el.textContent = remaining + 's';
-        el.className = 'wall-timer';
-
-        timerInterval = setInterval(() => {
-            remaining--;
-            if (remaining < 0) { clearInterval(timerInterval); return; }
-            el.textContent = remaining + 's';
-            if (remaining <= 3) el.className = 'wall-timer danger';
-            else if (remaining <= Math.floor(seconds * 0.3)) el.className = 'wall-timer warn';
-        }, 1000);
+        el.style.display = 'block';
+        const hasMoreQ = qIndex < totalQuestions - 1;
+        const prefix = hasMoreQ ? '⏭️' : '🏁';
+        startSyncedWallTimer('results-timer', baseSeconds, config?.resultsStartedAt, prefix);
     }
 
     // === RESULTS ===
     function displayWallResults(q, index, total) {
+        if (!q) return;
         const qType = q.type || 'qcm';
 
         document.getElementById('res-q-num').textContent = 'Question ' + (index + 1) + ' / ' + total;
@@ -697,38 +783,36 @@
 
         if (qType === 'mot') {
             // Short answer: show the answer big + correct count
-            container.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:20px;">' +
+            container.innerHTML = '<div style="grid-column:1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:220px; gap:20px;">' +
                 '<div class="results-mot-answer">✅ ' + q.reponse + '</div>' +
                 '<div class="results-mot-stat">' + correctCount + ' / ' + currentResp.length + ' bonnes reponses</div>' +
                 '</div>';
             document.getElementById('res-correct-text').textContent = '';
         } else {
-            // QCM / V/F: show bars
+            // QCM / V/F: use the same card logic as the prof screen for readability
             const numChoices = q.choices.length;
             const counts = new Array(numChoices).fill(0);
             currentResp.forEach(r => { if (r.answer >= 0 && r.answer < numChoices) counts[r.answer]++; });
 
-            const maxCount = Math.max(...counts, 1);
             const letters = ['A', 'B', 'C', 'D'];
-            const barColors = ['result-bar-a', 'result-bar-b', 'result-bar-c', 'result-bar-d'];
+            const cardColors = ['results-choice-a', 'results-choice-b', 'results-choice-c', 'results-choice-d'];
 
             for (let i = 0; i < numChoices; i++) {
                 const pct = Math.round((counts[i] / totalR) * 100);
-                const barHeight = Math.max(20, (counts[i] / maxCount) * 250);
 
-                const col = document.createElement('div');
-                col.className = 'result-bar-col';
+                const card = document.createElement('div');
+                card.className = 'results-choice ' + cardColors[i] + (i === q.correct ? ' correct-answer' : '');
+                card.innerHTML = '<span class="letter">' + letters[i] + '</span> ' + q.choices[i] +
+                    '<div class="bar-fill" id="rbar-' + i + '"></div>' +
+                    '<div class="pct">' + pct + '%</div>' +
+                    '<div class="correct-badge">✅</div>';
 
-                col.innerHTML = '<div class="result-bar-pct">' + pct + '%</div>' +
-                    '<div class="result-bar ' + barColors[i] + (i === q.correct ? ' correct' : '') + '" id="rbar-' + i + '" style="height:0;">' +
-                    '<div class="result-bar-badge">✅</div></div>' +
-                    '<div class="result-bar-label"><strong>' + letters[i] + '</strong><br>' + q.choices[i] + '</div>';
-
-                container.appendChild(col);
+                container.appendChild(card);
 
                 setTimeout(() => {
-                    document.getElementById('rbar-' + i).style.height = barHeight + 'px';
-                }, 200 + i * 150);
+                    const fill = document.getElementById('rbar-' + i);
+                    if (fill) fill.style.width = pct + '%';
+                }, 120 + i * 120);
             }
 
             document.getElementById('res-correct-text').textContent = '✅ ' + correctCount + ' / ' + currentResp.length + ' bonnes reponses (' + Math.round((correctCount / totalR) * 100) + '%)';
