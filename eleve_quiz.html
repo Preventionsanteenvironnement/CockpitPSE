@@ -602,7 +602,7 @@
     <div class="brand">
         <div>
             <div class="brand-title">Quiz Live PSE</div>
-            <div class="brand-subtitle">Pseudo public pour la classe, code élève privé pour l'écran prof.</div>
+            <div class="brand-subtitle">Pseudo aléatoire pour la classe, code élève privé pour le prof.</div>
         </div>
         <div class="brand-chip" id="identity-chip">Non connecté</div>
     </div>
@@ -612,7 +612,7 @@
     <section id="join-screen" class="screen active">
         <div class="hero">
             <h1>Rejoindre le quiz</h1>
-            <p>Entre le code projeté, choisis ton pseudo public et ajoute ton code élève si tu veux que le prof voie ton nom sur son écran.</p>
+            <p>Entre le code projeté au tableau. Un pseudo t'est attribué au hasard.</p>
         </div>
 
         <div class="join-grid">
@@ -621,21 +621,24 @@
                 <input id="session-code" type="text" maxlength="12" autocomplete="off" placeholder="Ex : LION">
             </div>
             <div class="field">
-                <label for="pseudo">Pseudo public</label>
-                <input id="pseudo" type="text" maxlength="24" autocomplete="nickname" placeholder="Ex : Lynx">
-                <div class="field-help">Ce pseudo est visible sur le mur et dans le classement.</div>
+                <label for="pseudo">Ton pseudo (attribué au hasard)</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input id="pseudo" type="text" maxlength="24" readonly style="flex:1;background:rgba(99,102,241,0.12);font-weight:700;cursor:default;">
+                    <button type="button" onclick="document.getElementById('pseudo').value = generateRandomPseudo();" style="padding:10px 14px;border:2px solid rgba(99,102,241,0.3);border-radius:12px;background:rgba(99,102,241,0.1);color:#a5b4fc;font-size:1.2rem;cursor:pointer;" title="Changer de pseudo">🎲</button>
+                </div>
+                <div class="field-help">Pseudo visible sur le mur. Clique 🎲 pour en changer.</div>
             </div>
             <div class="field">
                 <label for="eleve-code">Code élève privé</label>
                 <input id="eleve-code" type="text" maxlength="16" autocomplete="off" placeholder="Ex : AB12">
-                <div class="field-help">Optionnel mais recommandé. Le mur garde ton pseudo ; seul le prof peut relier ce code à son annuaire local.</div>
+                <div class="field-help">Optionnel. Seul le prof voit ton vrai nom via ce code.</div>
             </div>
         </div>
 
         <div class="cta-row">
             <button class="btn btn-primary" id="join-btn" onclick="joinQuiz()">Entrer dans le quiz</button>
         </div>
-        <div class="muted-note">Astuce : ton pseudo et ton code sont mémorisés sur cet appareil pour la prochaine fois.</div>
+        <div class="muted-note">Ton code élève est mémorisé pour la prochaine fois. Le pseudo change à chaque session.</div>
     </section>
 
     <section id="lobby-screen" class="screen">
@@ -739,6 +742,23 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // === PSEUDOS ALÉATOIRES ===
+    const PSEUDO_ADJECTIFS = [
+        'Brave', 'Rusé', 'Rapide', 'Calme', 'Agile', 'Futé', 'Vif', 'Sage',
+        'Grand', 'Petit', 'Joyeux', 'Gentil', 'Malin', 'Fier', 'Doux', 'Fort',
+        'Cool', 'Super', 'Méga', 'Ultra', 'Turbo', 'Hyper', 'Ninja', 'Royal'
+    ];
+    const PSEUDO_ANIMAUX = [
+        'Lynx', 'Panda', 'Tigre', 'Loup', 'Aigle', 'Faucon', 'Dauphin', 'Lion',
+        'Ours', 'Renard', 'Hibou', 'Koala', 'Jaguar', 'Cobra', 'Phénix', 'Dragon',
+        'Requin', 'Castor', 'Colibri', 'Puma', 'Fennec', 'Husky', 'Panthère', 'Vipère'
+    ];
+    function generateRandomPseudo() {
+        const adj = PSEUDO_ADJECTIFS[Math.floor(Math.random() * PSEUDO_ADJECTIFS.length)];
+        const animal = PSEUDO_ANIMAUX[Math.floor(Math.random() * PSEUDO_ANIMAUX.length)];
+        return adj + ' ' + animal;
+    }
 
     let currentSessionId = null;
     let currentSessionCode = null;
@@ -970,8 +990,9 @@
             return;
         }
         if (!pseudo || pseudo.length < 2) {
-            showToast('Choisis un pseudo public de 2 caractères minimum.', 'error');
-            return;
+            // Régénérer un pseudo si vide (ne devrait pas arriver)
+            document.getElementById('pseudo').value = generateRandomPseudo();
+            return joinQuiz();
         }
 
         joinBtn.disabled = true;
@@ -991,7 +1012,7 @@
             currentPseudo = pseudo;
             currentEleveCode = eleveCode;
 
-            localStorage.setItem('quiz_live_pseudo', pseudo);
+            // Ne pas sauvegarder le pseudo (aléatoire à chaque session)
             if (eleveCode) localStorage.setItem('userCode', eleveCode);
 
             await ensurePresenceEntry();
@@ -1574,11 +1595,11 @@
     function prefillFromStorage() {
         const params = new URLSearchParams(window.location.search);
         const codeParam = normalizeCode(params.get('code'));
-        const savedPseudo = localStorage.getItem('quiz_live_pseudo') || '';
         const savedCode = normalizeCode(localStorage.getItem('userCode') || '');
 
         if (codeParam) document.getElementById('session-code').value = codeParam;
-        if (savedPseudo) document.getElementById('pseudo').value = savedPseudo;
+        // Pseudo toujours aléatoire à chaque session (pas de restauration)
+        document.getElementById('pseudo').value = generateRandomPseudo();
         if (savedCode) document.getElementById('eleve-code').value = savedCode;
     }
 
