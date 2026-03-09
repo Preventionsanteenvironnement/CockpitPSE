@@ -1206,6 +1206,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             sessionCode: currentSessionCode,
             questions: ACTIVE_QUESTIONS,
             timer: currentMode === 'manual' ? 0 : parseInt(document.getElementById('timer-input').value) || 15,
+            resultsTimeRemaining: 0,
+            resultsStartedAt: null,
             mode: currentMode,
             gameMode: gameMode,
             teams: teams,
@@ -1602,6 +1604,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
         isPaused = false;
         currentPhase = 'results';
+        const resultsDelaySeconds = currentMode === 'auto'
+            ? (parseInt(document.getElementById('results-timer-input').value) || 6)
+            : 0;
 
         await setDoc(doc(db, "quiz_live_config", "global"), buildConfig({
             phase: 'results',
@@ -1611,7 +1616,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             paused: false,
             shuffleMap: null,
             timeRemaining: 0,
-            timerStartedAt: null
+            timerStartedAt: null,
+            resultsTimeRemaining: resultsDelaySeconds,
+            resultsStartedAt: resultsDelaySeconds > 0 ? Date.now() : null
         }));
 
         const q = ACTIVE_QUESTIONS[currentQuestionIndex];
@@ -1666,8 +1673,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (currentMode === 'auto') {
             if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
             const hasMoreQ = currentQuestionIndex < ACTIVE_QUESTIONS.length - 1;
-            const delaySeconds = parseInt(document.getElementById('results-timer-input').value) || 6;
-            let countdown = delaySeconds;
+            let countdown = resultsDelaySeconds;
             document.getElementById('main-timer').textContent = hasMoreQ ? '⏭️ ' + countdown + 's' : '🏁 ' + countdown + 's';
             document.getElementById('main-timer').className = 'main-timer warn';
 
@@ -1689,7 +1695,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 } else {
                     endQuiz(); // last question done, show summary
                 }
-            }, delaySeconds * 1000);
+            }, resultsDelaySeconds * 1000);
         }
     }
 
