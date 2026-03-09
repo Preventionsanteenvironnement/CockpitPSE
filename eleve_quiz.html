@@ -753,6 +753,9 @@
     let currentTeams = [];
     let tabSwitchCount = 0;
     let questionTimerInterval = null;
+    let snapshotVersion = 0; // Token anti-race condition pour les opérations async
+    let lastSnapshotPhase = ''; // Anti-flash : évite les doubles rendus de la même phase
+    let lastSnapshotIndex = -1; // Anti-flash : évite les doubles rendus du même index
     let heartbeatInterval = null;
     let pendingFocusWarning = false;
     let lastFocusLossAt = 0;
@@ -897,15 +900,26 @@
         stopQuestionTimer();
 
         const baseSeconds = Number(config.timeRemaining ?? config.timer ?? 0);
-        const startedAt = Number(config.timerStartedAt || Date.now());
+        const startedAt = Number(config.timerStartedAt || 0);
         if (!baseSeconds || baseSeconds <= 0) {
             timerEl.textContent = '✋';
             timerEl.className = 'question-timer';
             return;
         }
 
+        // Calcul robuste : utilise l'écart entre l'heure prof et maintenant
+        // pour estimer le temps écoulé, avec une tolérance max de 2s
+        // pour absorber les dérives d'horloge entre appareils
+        const now = Date.now();
+        const elapsedSinceStart = startedAt > 0 ? Math.max(0, (now - startedAt) / 1000) : 0;
+        // Si l'écart est négatif ou trop grand (horloge décalée), on utilise baseSeconds directement
+        const adjustedStart = (elapsedSinceStart > baseSeconds + 5 || elapsedSinceStart < 0)
+            ? now  // Horloge trop décalée, on démarre le timer localement
+            : startedAt;
+        const deadline = adjustedStart + baseSeconds * 1000;
+
         function updateTimer() {
-            const remaining = Math.max(0, Math.ceil((startedAt + baseSeconds * 1000 - Date.now()) / 1000));
+            const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
             timerEl.textContent = remaining + 's';
             if (remaining <= 3) timerEl.className = 'question-timer danger';
             else if (remaining <= Math.max(3, Math.floor(baseSeconds * 0.3))) timerEl.className = 'question-timer warn';
@@ -1101,7 +1115,11 @@
                 currentQuestion = currentQuestions[nextIndex] || null;
                 currentShuffle = config.shuffleMap && config.shuffleMap[visitorId] ? config.shuffleMap[visitorId] : null;
                 if (questionChanged) {
+                    // Token anti-race condition : si un nouveau snapshot arrive
+                    // pendant hydrateCurrentResponse(), on annule le rendu obsolète
+                    const myVersion = ++snapshotVersion;
                     await hydrateCurrentResponse();
+                    if (myVersion !== snapshotVersion) return; // Un snapshot plus récent a pris le relais
                     renderQuestion();
                 }
                 hideScoreBar();
@@ -1117,8 +1135,10 @@
                 currentQuestion = currentQuestions[currentQuestionIndex] || currentQuestion;
                 stopQuestionTimer();
 
-                // Load all responses for scoring
+                // Load all responses for scoring (avec protection anti-race condition)
+                const myVersion = ++snapshotVersion;
                 await loadAllMyResponses();
+                if (myVersion !== snapshotVersion) return; // Un snapshot plus récent a pris le relais
                 currentResponse = allMyResponses[currentQuestionIndex] || null;
 
                 // Update score bar
