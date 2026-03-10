@@ -12,8 +12,19 @@
 
         /* Salle dynamique */
         #classroom {
+            position: relative;
             flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 30px 30px;
+        }
+        #scene {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            transform-origin: center center;
+            transition: transform 0.22s ease;
+            will-change: transform;
         }
 
         /* Zone avant : tableau + repere prof */
@@ -153,7 +164,7 @@
         .cell.type-4 { background: #e0f2fe; border: 4px solid #38bdf8; opacity: 0.8; } /* Fenêtre */
         .cell.type-4::after { content: "🪟"; font-size: 2rem; }
 
-        #waiting-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; color: #94a3b8; font-weight: bold; }
+        #waiting-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; color: #94a3b8; font-weight: bold; text-align: center; }
 
     </style>
 </head>
@@ -162,21 +173,23 @@
     <div id="header"><div id="class-title">...</div></div>
 
         <div id="classroom">
-        <div id="front-zone" class="front-zone">
-            <div id="teacher-marker" class="teacher-marker" aria-label="Zone professeur">
-                <div class="teacher-figure" aria-hidden="true">
-                    <span class="teacher-head"></span>
-                    <span class="teacher-body"></span>
-                    <span class="teacher-arm"></span>
-                    <span class="teacher-book"></span>
-                    <span class="teacher-legs"></span>
+        <div id="scene">
+            <div id="front-zone" class="front-zone">
+                <div id="teacher-marker" class="teacher-marker" aria-label="Zone professeur">
+                    <div class="teacher-figure" aria-hidden="true">
+                        <span class="teacher-head"></span>
+                        <span class="teacher-body"></span>
+                        <span class="teacher-arm"></span>
+                        <span class="teacher-book"></span>
+                        <span class="teacher-legs"></span>
+                    </div>
+                    <div class="teacher-label">PROF</div>
+                    <div class="teacher-floor" aria-hidden="true"></div>
                 </div>
-                <div class="teacher-label">PROF</div>
-                <div class="teacher-floor" aria-hidden="true"></div>
+                <div id="board" class="board horizontal">TABLEAU</div>
             </div>
-            <div id="board" class="board horizontal">TABLEAU</div>
+            <div id="grid"></div>
         </div>
-        <div id="grid"></div>
         <div id="waiting-msg">En attente du plan...</div>
     </div>
 
@@ -189,6 +202,7 @@
 
         const LOCAL_PLAN_KEY = "classe_plan_local";
         const LOCAL_PLAN_PING_KEY = "classe_plan_local_ping";
+        let currentPlanData = null;
 
         function renderLocalPlan() {
             try {
@@ -243,10 +257,11 @@
             const title = document.getElementById('class-title');
             const wait = document.getElementById('waiting-msg');
             const board = document.getElementById('board');
-            const container = document.getElementById('classroom');
+            const scene = document.getElementById('scene');
             const frontZone = document.getElementById('front-zone');
 
             if(!data.className) { wait.style.display = 'block'; title.innerText = "..."; grid.innerHTML = ""; return; }
+            currentPlanData = data;
             wait.style.display = 'none';
             title.innerText = data.className;
             grid.style.gridTemplateColumns = `repeat(${data.cols}, 1fr)`;
@@ -255,11 +270,12 @@
             // Position Tableau
             board.className = "board";
             frontZone.className = "front-zone";
+            scene.style.flexDirection = 'column';
             const pos = data.boardPos || 'top';
-            if(pos === 'top') { container.style.flexDirection = 'column'; board.classList.add('horizontal'); }
-            if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
-            if(pos === 'left') { container.style.flexDirection = 'row'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
-            if(pos === 'right') { container.style.flexDirection = 'row-reverse'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
+            if(pos === 'top') { scene.style.flexDirection = 'column'; board.classList.add('horizontal'); }
+            if(pos === 'bottom') { scene.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
+            if(pos === 'left') { scene.style.flexDirection = 'row'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
+            if(pos === 'right') { scene.style.flexDirection = 'row-reverse'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
 
             const total = data.rows * data.cols;
             
@@ -275,7 +291,29 @@
                 }
                 grid.appendChild(cell);
             }
+
+            requestAnimationFrame(fitSceneToViewport);
         }
+
+        function fitSceneToViewport() {
+            const classroom = document.getElementById('classroom');
+            const scene = document.getElementById('scene');
+            if (!classroom || !scene) return;
+
+            scene.style.transform = 'scale(1)';
+            const availableWidth = Math.max(0, classroom.clientWidth - 24);
+            const availableHeight = Math.max(0, classroom.clientHeight - 24);
+            const neededWidth = scene.scrollWidth;
+            const neededHeight = scene.scrollHeight;
+            if (!neededWidth || !neededHeight) return;
+
+            const scale = Math.min(availableWidth / neededWidth, availableHeight / neededHeight, 1);
+            scene.style.transform = `scale(${Math.max(scale, 0.45)})`;
+        }
+
+        window.addEventListener('resize', () => {
+            if (currentPlanData) requestAnimationFrame(fitSceneToViewport);
+        });
     </script>
 </body>
 </html>
