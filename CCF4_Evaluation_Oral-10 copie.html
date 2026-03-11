@@ -249,6 +249,26 @@ tr:nth-child(even) td{background:#f8fafc}
 .icb-cancel{background:var(--bg);color:var(--text)}
 .icb-confirm{background:var(--mm);color:white}
 
+/* RESUME SESSION CARD */
+.resume-card{margin-bottom:24px;padding:20px;background:linear-gradient(135deg,#0f2744,#1a3a5c);border-radius:16px;color:white;box-shadow:0 4px 20px rgba(15,39,68,.35)}
+.resume-badge{display:inline-block;background:var(--teal2);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px}
+.resume-title{font-size:17px;font-weight:700;margin-bottom:4px}
+.resume-meta{font-size:13px;opacity:.75;margin-bottom:14px;line-height:1.5}
+.resume-progress{background:rgba(255,255,255,.15);border-radius:4px;height:6px;margin-bottom:6px}
+.resume-progress-fill{height:100%;background:var(--teal2);border-radius:4px;transition:width .4s}
+.resume-progress-lbl{font-size:12px;opacity:.65;margin-bottom:16px}
+.resume-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-resume{padding:16px;background:var(--teal2);color:white;border:none;border-radius:12px;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:all .15s}
+.btn-resume:active{transform:scale(.98);background:var(--teal)}
+.btn-new-session{padding:16px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);border:1.5px solid rgba(255,255,255,.2);border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-new-session:active{background:rgba(255,255,255,.2)}
+.or-divider{text-align:center;font-size:12px;color:var(--muted);margin:20px 0 8px;position:relative}
+.or-divider::before,.or-divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border)}
+.or-divider::before{left:0}
+.or-divider::after{right:0}
+.new-session-section{display:none}
+.new-session-section.show{display:block}
+
 /* SAVE BANNER */
 .save-alert{position:fixed;top:0;left:0;right:0;z-index:9999;background:#c0392b;color:white;padding:14px 20px;font-size:14px;font-weight:700;text-align:center;display:none;box-shadow:0 4px 16px rgba(192,57,43,.4)}
 .save-alert.show{display:block;animation:slideDown .3s ease}
@@ -301,47 +321,67 @@ tr:nth-child(even) td{background:#f8fafc}
       <p>Évaluation orale — Biologie-Écologie</p>
       <span class="badge">Cité scolaire René Pellet</span>
     </div>
-    <div class="form-group">
-      <label class="form-label">Classe</label>
-      <div class="select-wrap">
-        <select id="sel-classe" class="form-select" onchange="checkReady()">
-          <option value="">— Choisir une classe —</option>
-          <option value="C2JP">C2JP — CAPa Jardinier-Paysagiste (10 élèves)</option>
-          <option value="C2HORT">C2HORT — CAPa Horticulteur (7 élèves)</option>
-        </select>
+
+    <!-- CARTE DE REPRISE (affichée si session en cours) -->
+    <div class="resume-card" id="resume-card" style="display:none">
+      <span class="resume-badge">Session en cours</span>
+      <div class="resume-title" id="resume-title">—</div>
+      <div class="resume-meta" id="resume-meta">—</div>
+      <div class="resume-progress"><div class="resume-progress-fill" id="resume-prog" style="width:0%"></div></div>
+      <div class="resume-progress-lbl" id="resume-prog-lbl">—</div>
+      <div class="resume-btns">
+        <button class="btn-resume" onclick="resumeSession()">▶ Reprendre</button>
+        <button class="btn-new-session" onclick="showNewSession()">+ Nouvelle session</button>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Date de l'épreuve</label>
-      <input type="date" id="sel-date" class="form-input">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Thème biologique retenu</label>
-      <div class="theme-grid">
-        <button class="theme-btn" data-theme="1" onclick="pickTheme(1)">
-          <div class="theme-num">Thème 1</div>
-          <div class="theme-name">Prévention et adaptation à l'effort</div>
-          <div class="theme-sub">FC, rythme respiratoire, signaux d'effort, récupération</div>
-        </button>
-        <button class="theme-btn" data-theme="2" onclick="pickTheme(2)">
-          <div class="theme-num">Thème 2</div>
-          <div class="theme-name">Fonctionnement musculo-squelettique</div>
-          <div class="theme-sub">Muscles, tendons, os, système cardio-respiratoire</div>
-        </button>
-        <button class="theme-btn" data-theme="3" onclick="pickTheme(3)">
-          <div class="theme-num">Thème 3</div>
-          <div class="theme-name">Énergie et alimentation</div>
-          <div class="theme-sub">Glucides, protéines, hydratation, thermorégulation</div>
-        </button>
-      </div>
-    </div>
-    <button class="btn-start" id="btn-start" onclick="startSession()" disabled>Commencer la session</button>
+
+    <!-- BANDEAU IMPORT JSON (si aucune donnée) -->
     <div class="restore-banner" id="restore-banner" style="display:none">
       <div class="rb-title">💾 Reprendre une session précédente ?</div>
       <div class="rb-sub">Importez un fichier JSON pour restaurer vos données.</div>
       <button class="rb-import" onclick="document.getElementById('import-start').click()">⬆ Importer JSON</button>
       <button class="rb-dismiss" onclick="this.parentNode.style.display='none'">Ignorer</button>
       <input type="file" id="import-start" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+
+    <!-- FORMULAIRE NOUVELLE SESSION (masqué si session en cours) -->
+    <div class="new-session-section" id="new-session-section">
+      <div class="or-divider" id="or-divider" style="display:none">ou créer une nouvelle session</div>
+      <div class="form-group">
+        <label class="form-label">Classe</label>
+        <div class="select-wrap">
+          <select id="sel-classe" class="form-select" onchange="checkReady()">
+            <option value="">— Choisir une classe —</option>
+            <option value="C2JP">C2JP — CAPa Jardinier-Paysagiste (10 élèves)</option>
+            <option value="C2HORT">C2HORT — CAPa Horticulteur (7 élèves)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date de l'épreuve</label>
+        <input type="date" id="sel-date" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Thème biologique retenu</label>
+        <div class="theme-grid">
+          <button class="theme-btn" data-theme="1" onclick="pickTheme(1)">
+            <div class="theme-num">Thème 1</div>
+            <div class="theme-name">Prévention et adaptation à l'effort</div>
+            <div class="theme-sub">FC, rythme respiratoire, signaux d'effort, récupération</div>
+          </button>
+          <button class="theme-btn" data-theme="2" onclick="pickTheme(2)">
+            <div class="theme-num">Thème 2</div>
+            <div class="theme-name">Fonctionnement musculo-squelettique</div>
+            <div class="theme-sub">Muscles, tendons, os, système cardio-respiratoire</div>
+          </button>
+          <button class="theme-btn" data-theme="3" onclick="pickTheme(3)">
+            <div class="theme-num">Thème 3</div>
+            <div class="theme-name">Énergie et alimentation</div>
+            <div class="theme-sub">Glucides, protéines, hydratation, thermorégulation</div>
+          </button>
+        </div>
+      </div>
+      <button class="btn-start" id="btn-start" onclick="startSession()" disabled>Commencer la session</button>
     </div>
   </div>
 </div>
@@ -852,6 +892,50 @@ function startSession() {
   ST.classe = document.getElementById('sel-classe').value;
   ST.date   = document.getElementById('sel-date').value;
   save(); renderList(); go('list');
+}
+
+// ── Reprise de session existante ──
+function resumeSession() {
+  renderList();
+  go('list');
+}
+
+function showNewSession() {
+  // Afficher le formulaire et le séparateur
+  document.getElementById('new-session-section').classList.add('show');
+  document.getElementById('or-divider').style.display = 'block';
+  // Scroll vers le formulaire
+  document.getElementById('new-session-section').scrollIntoView({behavior:'smooth'});
+}
+
+function buildResumeCard() {
+  // Vérifier s'il y a une session en cours avec des données
+  if(!ST.classe || !ST.theme) return false;
+  const eleves = CLASSES[ST.classe]||[];
+  if(!eleves.length) return false;
+
+  const th = THEMES[ST.theme];
+  const presents = eleves.filter(e => !ST.statuts[e] || ST.statuts[e]==='present');
+  const evalCount = Object.keys(ST.evals).length;
+  const doneCount = presents.filter(e => ST.evals[e] && ST.evals[e].valide).length;
+  const startedCount = presents.filter(e => ST.evals[e] && !ST.evals[e].valide && ST.evals[e].criteres[1].niveau).length;
+  const pct = presents.length ? Math.round(doneCount / presents.length * 100) : 0;
+
+  // Mettre à jour la carte
+  document.getElementById('resume-title').textContent = ST.classe + ' — Thème ' + ST.theme + (th ? ' — ' + th.nom : '');
+  document.getElementById('resume-meta').innerHTML =
+    '📅 ' + (ST.date||'—') + '<br>' +
+    '✅ ' + doneCount + ' validé' + (doneCount>1?'s':'') +
+    (startedCount ? ' • ✏️ ' + startedCount + ' en cours' : '') +
+    ' • ' + (presents.length - doneCount - startedCount) + ' restant' + ((presents.length - doneCount - startedCount)>1?'s':'');
+  document.getElementById('resume-prog').style.width = pct + '%';
+  document.getElementById('resume-prog-lbl').textContent = doneCount + ' / ' + presents.length + ' présents évalués (' + pct + '%)';
+
+  // Afficher la carte, masquer le formulaire
+  document.getElementById('resume-card').style.display = 'block';
+  document.getElementById('new-session-section').classList.remove('show');
+
+  return true;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1544,14 +1628,26 @@ function genWord(nom) {
 // INIT
 // ══════════════════════════════════════════════════════
 load();
+
+// Pré-remplir le formulaire (utile si on revient depuis "Modifier la session")
 if(ST.classe){ document.getElementById('sel-classe').value=ST.classe; checkReady(); }
 if(ST.theme)  pickTheme(ST.theme);
 if(ST.date)   document.getElementById('sel-date').value=ST.date;
 
-// Afficher le bandeau de restauration si pas de données en mémoire
-if(!ST.classe && !Object.keys(ST.evals).length) {
+// Logique d'affichage de l'écran de démarrage
+const hasActiveSession = buildResumeCard();
+
+if(hasActiveSession) {
+  // Session en cours → la carte de reprise est affichée, formulaire masqué
+  // L'utilisateur peut cliquer "Reprendre" ou "Nouvelle session"
+} else if(!ST.classe && !Object.keys(ST.evals).length) {
+  // Aucune donnée → afficher le bandeau d'import JSON + le formulaire
   const rb = document.getElementById('restore-banner');
   if(rb) rb.style.display = 'block';
+  document.getElementById('new-session-section').classList.add('show');
+} else {
+  // Données partielles (classe mais pas de thème, etc.) → afficher le formulaire
+  document.getElementById('new-session-section').classList.add('show');
 }
 
 // Alerte si stockage indisponible
