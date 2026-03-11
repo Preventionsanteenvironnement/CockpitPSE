@@ -471,13 +471,17 @@
                 </label>
                 <div id="competences-cibles-group" style="display:none; margin-top:8px; padding:8px 12px; background:#f0f0ff; border-radius:8px;">
                     <div style="font-size:0.8rem; font-weight:bold; color:#6366f1; margin-bottom:6px;">Competences ciblees :</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C1"> C1</label>
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C2"> C2</label>
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C3"> C3</label>
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C4"> C4</label>
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C5"> C5</label>
-                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C6"> C6</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                        <label style="cursor:pointer; background:#6366f1; color:white; padding:3px 10px; border-radius:6px; font-size:0.8rem; font-weight:700;" onclick="toggleAllCompetences(this)">
+                            <input type="checkbox" id="comp-cible-toutes" style="display:none;" onchange="onToggleToutes(this)"> 🎯 Toutes
+                        </label>
+                        <span style="color:#94a3b8; font-size:0.75rem;">|</span>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C1" onchange="syncToutesCheckbox()"> C1</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C2" onchange="syncToutesCheckbox()"> C2</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C3" onchange="syncToutesCheckbox()"> C3</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C4" onchange="syncToutesCheckbox()"> C4</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C5" onchange="syncToutesCheckbox()"> C5</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="comp-cible-cb" value="C6" onchange="syncToutesCheckbox()"> C6</label>
                     </div>
                 </div>
             </div>
@@ -1801,6 +1805,37 @@
         cbs.forEach(function(cb) { if (cb.checked) result.push(cb.value); });
         return result;
     }
+
+    // Toggle "Toutes" : coche ou décoche les 6 compétences
+    window.toggleAllCompetences = function(labelEl) {
+        var cb = document.getElementById('comp-cible-toutes');
+        cb.checked = !cb.checked;
+        onToggleToutes(cb);
+    };
+    window.onToggleToutes = function(touteCb) {
+        var cbs = document.querySelectorAll('.comp-cible-cb');
+        cbs.forEach(function(cb) { cb.checked = touteCb.checked; });
+        var label = touteCb.closest('label');
+        if (label) {
+            label.style.background = touteCb.checked ? '#4f46e5' : '#6366f1';
+            label.style.boxShadow = touteCb.checked ? 'inset 0 2px 4px rgba(0,0,0,0.2)' : 'none';
+        }
+    };
+    // Synchroniser le bouton "Toutes" quand on coche/décoche individuellement
+    window.syncToutesCheckbox = function() {
+        var cbs = document.querySelectorAll('.comp-cible-cb');
+        var allChecked = true;
+        cbs.forEach(function(cb) { if (!cb.checked) allChecked = false; });
+        var touteCb = document.getElementById('comp-cible-toutes');
+        if (touteCb) {
+            touteCb.checked = allChecked;
+            var label = touteCb.closest('label');
+            if (label) {
+                label.style.background = allChecked ? '#4f46e5' : '#6366f1';
+                label.style.boxShadow = allChecked ? 'inset 0 2px 4px rgba(0,0,0,0.2)' : 'none';
+            }
+        }
+    };
 
     window.onCategorieChange = function() {
         const type = document.getElementById('exo-type').value;
@@ -3733,6 +3768,7 @@
             document.querySelectorAll('.comp-cible-cb').forEach(function(cb) {
                 cb.checked = ex.competences_cibles.indexOf(cb.value) !== -1;
             });
+            syncToutesCheckbox();
         }
         setContenuInForm(ex.type, ex.contenu);
         // Restore sourcePrompt
