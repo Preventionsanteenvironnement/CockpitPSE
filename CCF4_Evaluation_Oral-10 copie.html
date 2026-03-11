@@ -229,6 +229,41 @@ tr:nth-child(even) td{background:#f8fafc}
 .modal-cancel{background:var(--bg);color:var(--text)}
 .modal-force{background:var(--teal);color:white}
 
+/* SAVE BANNER */
+.save-alert{position:fixed;top:0;left:0;right:0;z-index:9999;background:#c0392b;color:white;padding:14px 20px;font-size:14px;font-weight:700;text-align:center;display:none;box-shadow:0 4px 16px rgba(192,57,43,.4)}
+.save-alert.show{display:block;animation:slideDown .3s ease}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.save-alert .alert-sub{font-size:12px;font-weight:400;opacity:.9;margin-top:4px}
+
+/* TOAST NOTIFICATION */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(80px);z-index:9998;padding:12px 24px;border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;opacity:0;transition:all .35s ease;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-ok{background:#1a7a6e;color:white}
+.toast-err{background:#c0392b;color:white}
+.toast-info{background:var(--navy);color:white}
+
+/* JSON BUTTONS */
+.btn-json{background:var(--navy);color:white}
+.btn-import{background:#f0f4fa;color:var(--navy);position:relative;overflow:hidden}
+.btn-import input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.backup-section{margin:0 12px 12px;padding:16px;background:white;border-radius:var(--r);box-shadow:var(--shadow);border:2px dashed var(--teal2)}
+.backup-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);margin-bottom:10px}
+.backup-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.backup-hint{font-size:11px;color:var(--muted);margin-top:8px;text-align:center}
+.save-status{display:flex;align-items:center;gap:6px}
+.save-status .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.save-status .dot.ok{background:var(--teal2)}
+.save-status .dot.err{background:#c0392b;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* RESTORE BANNER (écran start) */
+.restore-banner{margin-top:20px;padding:14px;background:#e8f5f3;border:2px solid var(--teal2);border-radius:12px;text-align:center}
+.restore-banner .rb-title{font-size:13px;font-weight:700;color:var(--teal)}
+.restore-banner .rb-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.restore-banner button{margin-top:10px;padding:10px 20px;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.rb-import{background:var(--navy);color:white;margin-right:6px}
+.rb-dismiss{background:var(--bg);color:var(--muted)}
+
 @media(min-width:600px){
   .eval-body,.eleve-list{max-width:680px;margin:0 auto;width:100%}
   .niv-btn{min-height:66px;font-size:22px}
@@ -281,6 +316,13 @@ tr:nth-child(even) td{background:#f8fafc}
       </div>
     </div>
     <button class="btn-start" id="btn-start" onclick="startSession()" disabled>Commencer la session</button>
+    <div class="restore-banner" id="restore-banner" style="display:none">
+      <div class="rb-title">💾 Reprendre une session précédente ?</div>
+      <div class="rb-sub">Importez un fichier JSON pour restaurer vos données.</div>
+      <button class="rb-import" onclick="document.getElementById('import-start').click()">⬆ Importer JSON</button>
+      <button class="rb-dismiss" onclick="this.parentNode.style.display='none'">Ignorer</button>
+      <input type="file" id="import-start" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
   </div>
 </div>
 
@@ -291,7 +333,7 @@ tr:nth-child(even) td{background:#f8fafc}
       <div class="topbar-title" id="list-t1">—</div>
       <div class="topbar-sub" id="list-t2">—</div>
     </div>
-    <div class="save-ok"><span class="save-dot"></span><span id="save-t1">—</span></div>
+    <div class="save-ok save-status"><span id="save-t1">—</span></div>
   </div>
   <button class="btn-back" onclick="go('start')">← Modifier la session</button>
   <div class="list-header">
@@ -313,7 +355,7 @@ tr:nth-child(even) td{background:#f8fafc}
       <div class="topbar-title" id="eval-t1">—</div>
       <div class="topbar-sub" id="eval-t2">—</div>
     </div>
-    <div class="save-ok"><span class="save-dot"></span><span id="save-t2">—</span></div>
+    <div class="save-ok save-status"><span id="save-t2">—</span></div>
   </div>
   <div class="eval-topnav">
     <button class="btn-list" onclick="go('list')">☰ Liste</button>
@@ -340,11 +382,28 @@ tr:nth-child(even) td{background:#f8fafc}
   <div class="synth-body">
     <div class="synth-table-wrap"><table id="synth-table"><thead></thead><tbody></tbody></table></div>
   </div>
+  <div class="backup-section">
+    <div class="backup-title">💾 Sauvegarde sécurisée</div>
+    <div class="backup-btns">
+      <button class="btn-exp btn-json" onclick="exportJSON()">⬇ Exporter JSON</button>
+      <button class="btn-exp btn-import">⬆ Importer JSON<input type="file" accept=".json" onchange="importJSON(event)"></button>
+    </div>
+    <div class="backup-hint">Le fichier JSON contient toutes vos évaluations. Gardez-le en lieu sûr.</div>
+  </div>
   <div class="synth-actions">
     <button class="btn-exp btn-csv" onclick="exportCSV()">⬇ Exporter CSV</button>
     <button class="btn-exp btn-reset" onclick="confirmReset()">🗑 Réinitialiser</button>
   </div>
 </div>
+
+<!-- SAVE ALERT BANNER -->
+<div class="save-alert" id="save-alert">
+  ⚠️ Sauvegarde impossible !
+  <div class="alert-sub">Le stockage local est indisponible. Exportez vos données en JSON pour ne rien perdre.</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
 
 </div><!-- #app -->
 
@@ -567,15 +626,163 @@ let ST = {
   currentEleve:null
 };
 const SK = 'ccf4v2';
+const SK_BACKUP = 'ccf4v2_backup';
+let storageAvailable = true;
+let saveCount = 0;
+let lastSaveOk = true;
 
-function save() {
-  try { localStorage.setItem(SK, JSON.stringify(ST)); } catch(e){}
-  const t = new Date(); const s = t.getHours().toString().padStart(2,'0')+'h'+t.getMinutes().toString().padStart(2,'0');
-  document.querySelectorAll('[id^="save-t"]').forEach(el => el.textContent = s);
+// ── Détection localStorage ──
+function checkStorage() {
+  try {
+    const t = '__storage_test__';
+    localStorage.setItem(t, '1');
+    localStorage.removeItem(t);
+    return true;
+  } catch(e) { return false; }
 }
 
+// ── Toast notifications ──
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = 'toast toast-'+type+' show';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=> t.classList.remove('show'), 3000);
+}
+
+// ── Save sécurisé ──
+function save() {
+  const json = JSON.stringify(ST);
+  const t = new Date();
+  const s = t.getHours().toString().padStart(2,'0')+'h'+t.getMinutes().toString().padStart(2,'0')+':'+t.getSeconds().toString().padStart(2,'0');
+
+  if(storageAvailable) {
+    try {
+      localStorage.setItem(SK, json);
+      // Backup rotatif (toutes les 5 sauvegardes)
+      saveCount++;
+      if(saveCount % 5 === 0) {
+        localStorage.setItem(SK_BACKUP, json);
+      }
+      lastSaveOk = true;
+      document.getElementById('save-alert').classList.remove('show');
+    } catch(e) {
+      lastSaveOk = false;
+      document.getElementById('save-alert').classList.add('show');
+      showToast('⚠️ Sauvegarde échouée — Exportez en JSON !', 'err');
+    }
+  } else {
+    lastSaveOk = false;
+  }
+
+  // Mise à jour indicateurs visuels
+  document.querySelectorAll('[id^="save-t"]').forEach(el => {
+    el.innerHTML = (lastSaveOk ? '<span class="dot ok"></span>' : '<span class="dot err"></span>') + s;
+  });
+}
+
+// ── Load avec fallback backup ──
 function load() {
-  try { const d = localStorage.getItem(SK); if(d) ST = Object.assign(ST, JSON.parse(d)); } catch(e){}
+  storageAvailable = checkStorage();
+  if(!storageAvailable) {
+    document.getElementById('save-alert').classList.add('show');
+    showToast('⚠️ Navigation privée détectée — Importez un JSON', 'err');
+    return;
+  }
+  try {
+    let d = localStorage.getItem(SK);
+    // Fallback sur le backup si la donnée principale est corrompue
+    if(!d) d = localStorage.getItem(SK_BACKUP);
+    if(d) {
+      const parsed = JSON.parse(d);
+      ST = Object.assign(ST, parsed);
+    }
+  } catch(e) {
+    // Tentative de récupération depuis le backup
+    try {
+      const bk = localStorage.getItem(SK_BACKUP);
+      if(bk) {
+        ST = Object.assign(ST, JSON.parse(bk));
+        showToast('Données récupérées depuis le backup', 'info');
+      }
+    } catch(e2) {
+      showToast('⚠️ Données corrompues — Importez un JSON', 'err');
+    }
+  }
+}
+
+// ── Protection contre la fermeture accidentelle ──
+window.addEventListener('beforeunload', function(e) {
+  // Vérifier s'il y a des évaluations en cours
+  const hasData = Object.keys(ST.evals).length > 0;
+  if(hasData) {
+    e.preventDefault();
+    e.returnValue = 'Des évaluations sont en cours. Êtes-vous sûr de vouloir quitter ?';
+    return e.returnValue;
+  }
+});
+
+// ── Export JSON complet ──
+function exportJSON() {
+  const exportData = {
+    _format: 'CCF4_Biologie_Ecologie',
+    _version: 2,
+    _exportDate: new Date().toISOString(),
+    _device: navigator.userAgent.slice(0, 60),
+    state: ST
+  };
+  const json = JSON.stringify(exportData, null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], {type: 'application/json'}));
+  a.download = 'CCF4_Bio_' + (ST.classe||'data') + '_' + (ST.date||new Date().toISOString().slice(0,10)) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✅ Sauvegarde JSON téléchargée', 'ok');
+}
+
+// ── Import JSON ──
+function importJSON(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Valider le format
+      if(!data.state || !data._format || data._format !== 'CCF4_Biologie_Ecologie') {
+        showToast('⚠️ Format de fichier invalide', 'err');
+        return;
+      }
+      if(!confirm('Importer les données de ce fichier ?\n\n' +
+        'Classe : ' + (data.state.classe||'—') + '\n' +
+        'Date : ' + (data.state.date||'—') + '\n' +
+        'Thème : ' + (data.state.theme||'—') + '\n' +
+        'Exporté le : ' + (data._exportDate ? new Date(data._exportDate).toLocaleString('fr-FR') : '—') + '\n\n' +
+        'Cela remplacera les données actuelles.')) return;
+      ST = Object.assign(ST, data.state);
+      save();
+      showToast('✅ Données restaurées avec succès', 'ok');
+      // Rafraîchir l'interface
+      if(ST.classe) { document.getElementById('sel-classe').value = ST.classe; checkReady(); }
+      if(ST.theme) pickTheme(ST.theme);
+      if(ST.date) document.getElementById('sel-date').value = ST.date;
+      if(ST.classe && ST.theme) { renderList(); go('list'); }
+    } catch(err) {
+      showToast('⚠️ Fichier JSON invalide ou corrompu', 'err');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset pour permettre de réimporter le même fichier
+}
+
+// ── Auto-proposition de backup (toutes les 10 validations) ──
+let validationCount = 0;
+function suggestBackup() {
+  validationCount++;
+  if(validationCount % 3 === 0) {
+    showToast('💾 Pensez à exporter en JSON (synthèse)', 'info');
+  }
 }
 
 function getEval(nom) {
@@ -931,6 +1138,7 @@ function forceValider() {
 function doValider(nom) {
   getEval(nom).valide = true;
   save();
+  suggestBackup();
   const eleves = CLASSES[ST.classe]||[];
   const presents = eleves.filter(e=>!ST.statuts[e]||ST.statuts[e]==='present');
   const idx = presents.indexOf(nom);
@@ -1237,6 +1445,19 @@ load();
 if(ST.classe){ document.getElementById('sel-classe').value=ST.classe; checkReady(); }
 if(ST.theme)  pickTheme(ST.theme);
 if(ST.date)   document.getElementById('sel-date').value=ST.date;
+
+// Afficher le bandeau de restauration si pas de données en mémoire
+if(!ST.classe && !Object.keys(ST.evals).length) {
+  const rb = document.getElementById('restore-banner');
+  if(rb) rb.style.display = 'block';
+}
+
+// Alerte si stockage indisponible
+if(!storageAvailable) {
+  document.getElementById('save-alert').classList.add('show');
+  const rb = document.getElementById('restore-banner');
+  if(rb) rb.style.display = 'block';
+}
 </script>
 </body>
 </html>
