@@ -229,6 +229,26 @@ tr:nth-child(even) td{background:#f8fafc}
 .modal-cancel{background:var(--bg);color:var(--text)}
 .modal-force{background:var(--teal);color:white}
 
+/* RESET CRITERE BUTTON */
+.btn-reset-critere{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:10px;margin-top:8px;background:#fff0f0;color:var(--mm);border:1.5px dashed #f5c3bc;border-radius:10px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-reset-critere:active{background:#fdecea;transform:scale(.98)}
+
+/* RESET ELEVE DEPUIS LA LISTE */
+.eleve-actions{display:flex;align-items:center;gap:6px}
+.btn-reset-list{width:32px;height:32px;border-radius:50%;border:1.5px solid #f5c3bc;background:#fff0f0;color:var(--mm);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.btn-reset-list:active{background:#fdecea;transform:scale(.9)}
+.btn-word-list{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--cream);color:var(--navy);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.btn-word-list:active{background:var(--bg);transform:scale(.9)}
+
+/* CONFIRM INLINE */
+.inline-confirm{display:none;position:absolute;right:0;top:100%;z-index:50;background:white;border:2px solid var(--mm);border-radius:12px;padding:12px;box-shadow:var(--shadow2);min-width:220px}
+.inline-confirm.open{display:block}
+.inline-confirm-msg{font-size:13px;font-weight:600;color:var(--mm);margin-bottom:10px}
+.inline-confirm-btns{display:flex;gap:8px}
+.icb{padding:8px 14px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.icb-cancel{background:var(--bg);color:var(--text)}
+.icb-confirm{background:var(--mm);color:white}
+
 /* SAVE BANNER */
 .save-alert{position:fixed;top:0;left:0;right:0;z-index:9999;background:#c0392b;color:white;padding:14px 20px;font-size:14px;font-weight:700;text-align:center;display:none;box-shadow:0 4px 16px rgba(192,57,43,.4)}
 .save-alert.show{display:block;animation:slideDown .3s ease}
@@ -881,10 +901,21 @@ function renderList() {
     card.className = cardCls;
 
     const noteHtml = note!==null ? '<span class="eleve-note-badge">'+note+'/20</span>' : '';
+    const esc = nom.replace(/"/g,'&quot;').replace(/'/g,"\\'");
+
+    // Boutons d'action : Word (si validé) + Reset (si commencé ou validé)
+    let actionBtns = '';
+    if(!absent && (valide || started)) {
+      actionBtns += '<div class="eleve-actions">';
+      if(valide) actionBtns += '<button class="btn-word-list" title="Grille Word" onclick="event.stopPropagation();genWord(\''+esc+'\')">📄</button>';
+      actionBtns += '<button class="btn-reset-list" title="Réinitialiser" onclick="event.stopPropagation();confirmResetFromList(\''+esc+'\',this)">🗑</button>';
+      actionBtns += '</div>';
+    }
 
     card.innerHTML =
       '<div style="flex:1"><div class="eleve-nom">'+nom+'</div>'+diffInfo+'</div>'+
       noteHtml+
+      actionBtns+
       '<button class="status-badge '+badgeCls+'" data-nom="'+nom.replace(/"/g,'&quot;')+'" onclick="openPicker(event,this)">'+badgeTxt+' ▾</button>';
 
     if(!absent) {
@@ -1007,6 +1038,7 @@ function buildEvalBody(nom) {
       '<div class="chips-lbl">Observations (grille officielle)</div>'+
       '<div class="chips" id="chips'+cr.id+'">'+chips+'</div>'+
       '<textarea class="free-txt" id="ft'+cr.id+'" rows="2" placeholder="Observation libre…" oninput="updateLibre('+cr.id+',this.value)">'+cd.libre+'</textarea>'+
+      '<button class="btn-reset-critere" onclick="confirmResetCritere('+cr.id+',this)">🗑 Effacer ce critère</button>'+
       '</div>';
 
     body.appendChild(card);
@@ -1233,6 +1265,76 @@ function doResetEleve(nom) {
   delete ST.evals[nom];
   save();
   closeFiche();
+  renderList();
+}
+
+// ══════════════════════════════════════════════════════
+// RESET CRITÈRE INDIVIDUEL
+// ══════════════════════════════════════════════════════
+function confirmResetCritere(crId, btn) {
+  // Si déjà vierge, ne rien faire
+  const ev = getEval(ST.currentEleve);
+  const cd = ev.criteres[crId];
+  if(!cd.niveau && !cd.note && !cd.chips.length && !cd.libre) {
+    showToast('Critère déjà vierge', 'info');
+    return;
+  }
+  // Remplacer le bouton par une confirmation inline
+  const parent = btn.parentNode;
+  let box = parent.querySelector('.inline-confirm');
+  if(box) { box.classList.toggle('open'); return; }
+  box = document.createElement('div');
+  box.className = 'inline-confirm open';
+  box.innerHTML =
+    '<div class="inline-confirm-msg">⚠️ Effacer le critère '+crId+' ?</div>'+
+    '<div class="inline-confirm-btns">'+
+    '<button class="icb icb-cancel" onclick="this.closest(\'.inline-confirm\').classList.remove(\'open\')">Annuler</button>'+
+    '<button class="icb icb-confirm" onclick="doResetCritere('+crId+')">Effacer</button>'+
+    '</div>';
+  parent.style.position = 'relative';
+  parent.appendChild(box);
+}
+
+function doResetCritere(crId) {
+  const ev = getEval(ST.currentEleve);
+  ev.criteres[crId] = {niveau:null, note:null, chips:[], libre:''};
+  save();
+  showToast('Critère '+crId+' réinitialisé', 'ok');
+  buildEvalBody(ST.currentEleve);
+}
+
+// ══════════════════════════════════════════════════════
+// RESET ÉLÈVE DEPUIS LA LISTE
+// ══════════════════════════════════════════════════════
+function confirmResetFromList(nom, btn) {
+  const ev = ST.evals[nom];
+  if(!ev) { showToast('Aucune donnée à effacer', 'info'); return; }
+  // Fermer tout popup existant
+  document.querySelectorAll('.list-reset-popup').forEach(p=>p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'list-reset-popup';
+  popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:800;background:white;border:2px solid var(--mm);border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.3);max-width:320px;width:90%';
+  popup.innerHTML =
+    '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px">🗑 Réinitialiser</div>'+
+    '<div style="font-size:14px;color:var(--text);margin-bottom:16px">Effacer toute l\'évaluation de <strong>'+nom+'</strong> ? Cette action est irréversible.</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+    '<button style="padding:12px;border-radius:10px;border:none;background:var(--bg);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--text)" onclick="this.closest(\'.list-reset-popup\').remove()">Annuler</button>'+
+    '<button style="padding:12px;border-radius:10px;border:none;background:var(--mm);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" onclick="doResetFromList(\''+nom.replace(/'/g,"\\'")+'\')">Effacer</button>'+
+    '</div>';
+  // Overlay
+  const ov = document.createElement('div');
+  ov.className = 'list-reset-popup';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,39,68,.4);z-index:799';
+  ov.onclick = function(){ document.querySelectorAll('.list-reset-popup').forEach(p=>p.remove()); };
+  document.body.appendChild(ov);
+  document.body.appendChild(popup);
+}
+
+function doResetFromList(nom) {
+  delete ST.evals[nom];
+  save();
+  document.querySelectorAll('.list-reset-popup').forEach(p=>p.remove());
+  showToast('Évaluation de '+nom+' effacée', 'ok');
   renderList();
 }
 
