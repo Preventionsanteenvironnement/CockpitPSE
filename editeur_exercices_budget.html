@@ -1,0 +1,2617 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editeur Budget CAP - CockpitPSE</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0f172a;
+            color: #e5eefb;
+        }
+        a { color: inherit; }
+        #app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+        }
+        #sidebar {
+            background: #132238;
+            border-right: 1px solid #29405f;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .sidebar-top {
+            padding: 18px;
+            border-bottom: 1px solid #29405f;
+        }
+        .sidebar-top h1 {
+            margin: 0 0 6px 0;
+            font-size: 1.15rem;
+        }
+        .sidebar-top p {
+            margin: 0;
+            color: #8ca6c5;
+            font-size: 0.83rem;
+            line-height: 1.45;
+        }
+        .sidebar-actions,
+        .sidebar-filters {
+            padding: 14px 18px;
+            border-bottom: 1px solid #29405f;
+        }
+        .filter-label,
+        .section-label {
+            display: block;
+            margin-bottom: 7px;
+            color: #8ca6c5;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .filter-input,
+        .filter-select,
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            border: 1px solid #395579;
+            border-radius: 12px;
+            background: #102033;
+            color: #eef6ff;
+            padding: 11px 12px;
+            font: inherit;
+            outline: none;
+        }
+        .filter-input:focus,
+        .filter-select:focus,
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            border-color: #6db5ff;
+            box-shadow: 0 0 0 3px rgba(109, 181, 255, 0.15);
+        }
+        .form-textarea {
+            min-height: 96px;
+            resize: vertical;
+        }
+        .sidebar-filters {
+            display: grid;
+            gap: 10px;
+        }
+        .count-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            color: #8ca6c5;
+        }
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger,
+        .btn-ghost,
+        .btn-accent {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+        }
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .btn-danger:hover,
+        .btn-ghost:hover,
+        .btn-accent:hover {
+            transform: translateY(-1px);
+        }
+        .btn-primary { background: #27c37b; color: #062617; width: 100%; }
+        .btn-secondary { background: #3a82f6; color: white; }
+        .btn-accent { background: #8b5cf6; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-ghost {
+            background: transparent;
+            color: #c9d9eb;
+            border: 1px solid #3b5678;
+        }
+        .exo-list {
+            padding: 12px 12px 18px 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .exo-list-empty {
+            border: 1px dashed #3b5678;
+            border-radius: 14px;
+            padding: 18px 14px;
+            color: #8ca6c5;
+            text-align: center;
+            font-size: 0.86rem;
+            line-height: 1.5;
+        }
+        .exo-item {
+            background: #0f1d2f;
+            border: 1px solid #29405f;
+            border-radius: 14px;
+            padding: 12px;
+            cursor: pointer;
+        }
+        .exo-item.active {
+            border-color: #6db5ff;
+            background: #152c45;
+        }
+        .exo-item-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 0.92rem;
+        }
+        .exo-item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+        }
+        .badge-pub { background: #d9fce9; color: #0f7c44; }
+        .badge-draft { background: #fdecc8; color: #9a5a00; }
+        .badge-facile { background: #d6f8e4; color: #0d7b43; }
+        .badge-moyen { background: #fff0c6; color: #9a6200; }
+        .badge-difficile { background: #ffd9d9; color: #9b1c1c; }
+        .badge-theme { background: #dbeafe; color: #1757b8; }
+        .badge-type { background: #ece8ff; color: #5b34c4; }
+        #main {
+            min-width: 0;
+            padding: 28px;
+        }
+        #empty-state {
+            min-height: calc(100vh - 56px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #90a8c5;
+            padding: 30px;
+        }
+        #empty-state h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.6rem;
+            color: #eef6ff;
+        }
+        #editor {
+            display: none;
+            max-width: 1120px;
+            margin: 0 auto;
+            gap: 18px;
+        }
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+        .page-head h2 {
+            margin: 0 0 6px 0;
+            font-size: 1.55rem;
+        }
+        .page-head p {
+            margin: 0;
+            color: #8ca6c5;
+            line-height: 1.5;
+        }
+        .cards {
+            display: grid;
+            gap: 18px;
+        }
+        .card {
+            background: #132238;
+            border: 1px solid #29405f;
+            border-radius: 18px;
+            padding: 20px;
+        }
+        .card h3 {
+            margin: 0 0 14px 0;
+            font-size: 1rem;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .full { grid-column: 1 / -1; }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group label {
+            color: #8ca6c5;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .toggle-row {
+            display: flex;
+            gap: 8px;
+        }
+        .toggle-btn {
+            flex: 1;
+            text-align: center;
+            border: 1px solid #385273;
+            border-radius: 12px;
+            background: #0f1d2f;
+            padding: 10px 12px;
+            color: #b5cae3;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .toggle-btn.active-facile { border-color: #27c37b; color: #27c37b; background: rgba(39, 195, 123, 0.08); }
+        .toggle-btn.active-moyen { border-color: #e6aa2e; color: #ffd57a; background: rgba(230, 170, 46, 0.08); }
+        .toggle-btn.active-difficile { border-color: #ef4444; color: #ff9999; background: rgba(239, 68, 68, 0.08); }
+        .pill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .pill {
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid #3a5577;
+            background: #0f1d2f;
+            color: #c9d9eb;
+            font-size: 0.82rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .pill.active {
+            border-color: #6db5ff;
+            background: rgba(109, 181, 255, 0.12);
+            color: white;
+        }
+        .hint {
+            color: #8ca6c5;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+        .type-panel {
+            display: none;
+        }
+        .type-panel.active {
+            display: block;
+        }
+        .subcard {
+            background: #0f1d2f;
+            border: 1px solid #29405f;
+            border-radius: 14px;
+            padding: 14px;
+        }
+        .subcard h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.92rem;
+        }
+        .row-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .row-item {
+            border: 1px solid #2b4261;
+            border-radius: 14px;
+            background: #102033;
+            padding: 12px;
+        }
+        .row-inline-2,
+        .row-inline-3,
+        .row-inline-4 {
+            display: grid;
+            gap: 8px;
+            align-items: end;
+        }
+        .row-inline-2 { grid-template-columns: 1.5fr 1fr auto; }
+        .row-inline-3 { grid-template-columns: 1.2fr 0.8fr 1.1fr auto; }
+        .row-inline-4 { grid-template-columns: 1fr 0.7fr 0.7fr 0.7fr auto; }
+        .mini-btn {
+            border: none;
+            border-radius: 12px;
+            background: #223552;
+            color: #dce9f7;
+            cursor: pointer;
+            padding: 11px 12px;
+            font-weight: 700;
+        }
+        .mini-btn.danger { background: rgba(239, 68, 68, 0.16); color: #ff9999; }
+        .mini-btn.add { background: rgba(39, 195, 123, 0.12); color: #7ef0b6; }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        #prompt-box,
+        #json-export-box {
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-radius: 14px;
+            background: #0f1d2f;
+            border: 1px solid #2b4261;
+            padding: 14px;
+            color: #d9e8f7;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            max-height: 360px;
+            overflow: auto;
+        }
+        .preview-grid {
+            display: grid;
+            gap: 14px;
+        }
+        .preview-block {
+            background: #0f1d2f;
+            border: 1px solid #2b4261;
+            border-radius: 14px;
+            padding: 14px;
+        }
+        .preview-block h4 {
+            margin: 0 0 10px 0;
+        }
+        .preview-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .kpi {
+            background: #12253b;
+            border: 1px solid #2c476a;
+            border-radius: 14px;
+            padding: 12px;
+        }
+        .kpi-label {
+            color: #8ca6c5;
+            font-size: 0.75rem;
+            margin-bottom: 6px;
+        }
+        .kpi-value {
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+        .budget-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .budget-table th,
+        .budget-table td {
+            border-bottom: 1px solid #2a4363;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 0.88rem;
+        }
+        .budget-table th {
+            color: #8ca6c5;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .choice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .choice-card {
+            border: 1px solid #2c476a;
+            border-radius: 14px;
+            padding: 12px;
+            background: #12253b;
+        }
+        .choice-card.correct {
+            border-color: #27c37b;
+            box-shadow: inset 0 0 0 1px rgba(39, 195, 123, 0.35);
+        }
+        .choice-card h5 {
+            margin: 0 0 8px 0;
+            font-size: 0.95rem;
+        }
+        .choice-line {
+            font-size: 0.83rem;
+            color: #cfe0f4;
+            margin: 4px 0;
+        }
+        .choice-line strong {
+            color: white;
+        }
+        .category-preview {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .category-card {
+            border-radius: 14px;
+            border: 1px solid #2c476a;
+            background: #12253b;
+            padding: 12px;
+        }
+        .category-card h5 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+        }
+        .category-card ul {
+            margin: 0;
+            padding-left: 18px;
+            color: #d3e3f4;
+            line-height: 1.5;
+            font-size: 0.84rem;
+        }
+        .bottom-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 12, 23, 0.78);
+            padding: 22px;
+            z-index: 20;
+        }
+        .modal-backdrop.active {
+            display: block;
+        }
+        .modal {
+            max-width: 860px;
+            margin: 0 auto;
+            background: #132238;
+            border: 1px solid #29405f;
+            border-radius: 20px;
+            padding: 20px;
+            max-height: calc(100vh - 44px);
+            overflow: auto;
+        }
+        .modal-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .modal-head h3 {
+            margin: 0 0 5px 0;
+        }
+        .toast {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            background: #102033;
+            border: 1px solid #395579;
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: white;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            z-index: 30;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #calculator-shell {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 10;
+        }
+        #calculator-toggle {
+            border: none;
+            border-radius: 999px;
+            padding: 12px 16px;
+            background: #3a82f6;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 14px 30px rgba(58, 130, 246, 0.28);
+        }
+        #calculator-panel {
+            display: none;
+            width: 280px;
+            margin-top: 12px;
+            background: #132238;
+            border: 1px solid #29405f;
+            border-radius: 20px;
+            padding: 14px;
+            box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
+        }
+        #calculator-panel.active {
+            display: block;
+        }
+        #calc-display {
+            width: 100%;
+            border: 1px solid #385273;
+            border-radius: 14px;
+            background: #0f1d2f;
+            color: white;
+            padding: 14px;
+            text-align: right;
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+            min-height: 56px;
+        }
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .calc-btn {
+            border: none;
+            border-radius: 14px;
+            padding: 13px 0;
+            background: #17314d;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .calc-btn.op { background: #27486f; }
+        .calc-btn.eq { background: #27c37b; color: #062617; }
+        .calc-btn.clear { background: rgba(239, 68, 68, 0.18); color: #ffb2b2; }
+        @media (max-width: 1100px) {
+            .preview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 980px) {
+            #app { grid-template-columns: 1fr; }
+            #sidebar { min-height: auto; }
+            #main { padding: 18px; }
+            .form-grid,
+            .form-grid-3,
+            .row-inline-2,
+            .row-inline-3,
+            .row-inline-4 {
+                grid-template-columns: 1fr;
+            }
+            .page-head { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<script src="data_modules.js"></script>
+<script src="json_import_utils.js"></script>
+
+<div id="app">
+    <aside id="sidebar">
+        <div class="sidebar-top">
+            <h1>Budget CAP</h1>
+            <p>Editeur d'exercices specialise pour le module D2. Tri, calculs, epargne, credit et cas complets.</p>
+        </div>
+
+        <div class="sidebar-actions">
+            <button class="btn-primary" id="btn-new-budget">+ Nouvel exercice Budget</button>
+        </div>
+
+        <div class="sidebar-filters">
+            <div>
+                <label class="filter-label" for="filter-search">Recherche</label>
+                <input id="filter-search" class="filter-input" type="text" placeholder="Titre, type, sous-theme">
+            </div>
+            <div>
+                <label class="filter-label" for="filter-type">Type</label>
+                <select id="filter-type" class="filter-select"></select>
+            </div>
+            <div>
+                <label class="filter-label" for="filter-theme">Sous-theme</label>
+                <select id="filter-theme" class="filter-select"></select>
+            </div>
+            <div>
+                <label class="filter-label" for="filter-status">Statut</label>
+                <select id="filter-status" class="filter-select">
+                    <option value="">Tous</option>
+                    <option value="publie">Publies</option>
+                    <option value="brouillon">Brouillons</option>
+                </select>
+            </div>
+            <div>
+                <label class="filter-label" for="filter-difficulty">Difficulte</label>
+                <select id="filter-difficulty" class="filter-select">
+                    <option value="">Toutes</option>
+                    <option value="facile">Facile</option>
+                    <option value="moyen">Moyen</option>
+                    <option value="difficile">Difficile</option>
+                </select>
+            </div>
+            <div class="count-row">
+                <span>Exercices visibles</span>
+                <strong id="exo-count">0</strong>
+            </div>
+        </div>
+
+        <div class="exo-list" id="exo-list">
+            <div class="exo-list-empty">Chargement des exercices Budget...</div>
+        </div>
+    </aside>
+
+    <main id="main">
+        <section id="empty-state">
+            <div>
+                <h2>Editeur d'exercices Budget CAP</h2>
+                <p>Creer un exercice cible, un exercice combine ou un cas complet, puis l'importer en JSON, le publier et le dupliquer comme dans le Cockpit.</p>
+            </div>
+        </section>
+
+        <section id="editor">
+            <div class="page-head">
+                <div>
+                    <h2 id="editor-title">Nouvel exercice Budget</h2>
+                    <p>Le module est fixe sur <strong>CAP / MD2 - Le budget</strong>. Le formulaire s'adapte au type d'exercice choisi.</p>
+                </div>
+                <div class="toolbar">
+                    <button class="btn-ghost" id="btn-open-import">Importer JSON</button>
+                    <button class="btn-accent" id="btn-copy-prompt">Copier prompt IA</button>
+                    <button class="btn-ghost" id="btn-copy-json">Copier JSON</button>
+                </div>
+            </div>
+
+            <div class="cards">
+                <div class="card">
+                    <h3>Metadonnees</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="exo-titre">Titre</label>
+                            <input id="exo-titre" class="form-input" type="text" placeholder="Ex: Budget de Lina - cas complet">
+                        </div>
+                        <div class="form-group">
+                            <label for="exo-budget-type">Type d'exercice</label>
+                            <select id="exo-budget-type" class="form-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="exo-sous-theme">Sous-theme</label>
+                            <select id="exo-sous-theme" class="form-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Module</label>
+                            <input class="form-input" type="text" value="CAP - MD2 - Le budget" disabled>
+                        </div>
+                        <div class="form-group full">
+                            <label>Classes ciblees</label>
+                            <div class="pill-list" id="cap-classes"></div>
+                            <div class="hint">Selection optionnelle. Si rien n'est coche, l'exercice reste utilisable comme entrainement general CAP.</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Difficulte</label>
+                            <div class="toggle-row" id="difficulty-toggle">
+                                <button type="button" class="toggle-btn" data-difficulty="facile">Facile</button>
+                                <button type="button" class="toggle-btn" data-difficulty="moyen">Moyen</button>
+                                <button type="button" class="toggle-btn" data-difficulty="difficile">Difficile</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="exo-calculatrice">Calculatrice integree</label>
+                            <select id="exo-calculatrice" class="form-select">
+                                <option value="true">Oui</option>
+                                <option value="false">Non</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <label for="exo-source-prompt">Trace du prompt utilise (optionnel)</label>
+                            <textarea id="exo-source-prompt" class="form-textarea" placeholder="Collez ici le prompt ou les consignes IA utilisees si vous voulez garder une trace."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Contenu de l'exercice</h3>
+
+                    <div id="panel-sort" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="sort-consigne">Consigne</label>
+                                <input id="sort-consigne" class="form-input" type="text" placeholder="Glisse chaque element dans la bonne categorie">
+                            </div>
+                            <div class="form-group full">
+                                <label for="sort-situation">Situation (optionnel)</label>
+                                <textarea id="sort-situation" class="form-textarea" placeholder="Contexte court de l'exercice ou mini-cas."></textarea>
+                            </div>
+                        </div>
+                        <div class="subcard" style="margin-top:14px;">
+                            <h4>Items a classer</h4>
+                            <div class="hint" id="sort-categories-hint"></div>
+                            <div class="row-list" id="sort-items-list" style="margin-top:12px;"></div>
+                            <button type="button" class="mini-btn add" id="btn-add-sort-item" style="margin-top:12px;">+ Ajouter un item</button>
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label for="sort-explication">Explication pedagogique</label>
+                            <textarea id="sort-explication" class="form-textarea" placeholder="Ce que l'eleve doit retenir apres correction."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="panel-solde" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="solde-consigne">Consigne</label>
+                                <input id="solde-consigne" class="form-input" type="text" placeholder="Calcule le total des revenus, le total des depenses puis le solde.">
+                            </div>
+                            <div class="form-group full">
+                                <label for="solde-situation">Situation</label>
+                                <textarea id="solde-situation" class="form-textarea" placeholder="Décris le profil de l'eleve, le contexte ou le projet."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-grid" style="margin-top:14px;">
+                            <div class="subcard">
+                                <h4>Revenus</h4>
+                                <div class="row-list" id="solde-revenus-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-solde-revenu" style="margin-top:12px;">+ Ajouter un revenu</button>
+                            </div>
+                            <div class="subcard">
+                                <h4>Depenses</h4>
+                                <div class="row-list" id="solde-depenses-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-solde-depense" style="margin-top:12px;">+ Ajouter une depense</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label for="solde-explication">Explication pedagogique</label>
+                            <textarea id="solde-explication" class="form-textarea" placeholder="Rappelle la formule du solde et la logique du type de budget."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="panel-endettement" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="endettement-consigne">Consigne</label>
+                                <input id="endettement-consigne" class="form-input" type="text" placeholder="Calcule le taux d'endettement puis determine si l'emprunt est possible.">
+                            </div>
+                            <div class="form-group full">
+                                <label for="endettement-situation">Situation</label>
+                                <textarea id="endettement-situation" class="form-textarea" placeholder="Decris la personne, ses revenus et son projet d'achat."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-grid" style="margin-top:14px;">
+                            <div class="subcard">
+                                <h4>Revenus mensuels</h4>
+                                <div class="row-list" id="endettement-revenus-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-endettement-revenu" style="margin-top:12px;">+ Ajouter un revenu</button>
+                            </div>
+                            <div class="subcard">
+                                <h4>Charges retenues</h4>
+                                <div class="row-list" id="endettement-charges-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-endettement-charge" style="margin-top:12px;">+ Ajouter une charge</button>
+                            </div>
+                        </div>
+                        <div class="form-grid-3" style="margin-top:14px;">
+                            <div class="form-group">
+                                <label for="endettement-seuil-ok">Seuil sans risque</label>
+                                <input id="endettement-seuil-ok" class="form-input" type="number" min="0" value="33">
+                            </div>
+                            <div class="form-group">
+                                <label for="endettement-seuil-prudence">Seuil prudence</label>
+                                <input id="endettement-seuil-prudence" class="form-input" type="number" min="0" value="40">
+                            </div>
+                            <div class="form-group">
+                                <label for="endettement-explication">Explication pedagogique</label>
+                                <textarea id="endettement-explication" class="form-textarea" placeholder="Rappelle la formule et les seuils."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="panel-epargne" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="epargne-consigne">Consigne</label>
+                                <input id="epargne-consigne" class="form-input" type="text" placeholder="Choisis l'epargne la plus pertinente pour cette situation.">
+                            </div>
+                            <div class="form-group full">
+                                <label for="epargne-situation">Situation</label>
+                                <textarea id="epargne-situation" class="form-textarea" placeholder="Age, projet, delai, besoin de disponibilite, revenus..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="epargne-nom">Personnage</label>
+                                <input id="epargne-nom" class="form-input" type="text" placeholder="Ex: Lina">
+                            </div>
+                            <div class="form-group">
+                                <label for="epargne-age">Age</label>
+                                <input id="epargne-age" class="form-input" type="number" min="12" max="99" placeholder="18">
+                            </div>
+                            <div class="form-group">
+                                <label for="epargne-projet">Projet</label>
+                                <input id="epargne-projet" class="form-input" type="text" placeholder="Permis, telephone, voiture...">
+                            </div>
+                            <div class="form-group">
+                                <label for="epargne-besoin">Contrainte principale</label>
+                                <input id="epargne-besoin" class="form-input" type="text" placeholder="Argent disponible tout de suite, taux interessant...">
+                            </div>
+                        </div>
+                        <div class="subcard" style="margin-top:14px;">
+                            <h4>Options d'epargne</h4>
+                            <div class="row-list" id="epargne-options-list"></div>
+                            <button type="button" class="mini-btn add" id="btn-add-epargne-option" style="margin-top:12px;">+ Ajouter une option</button>
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label for="epargne-explication">Explication pedagogique</label>
+                            <textarea id="epargne-explication" class="form-textarea" placeholder="Explique les criteres de choix : taux, disponibilite, age, projet."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="panel-credit" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="credit-consigne">Consigne</label>
+                                <input id="credit-consigne" class="form-input" type="text" placeholder="Compare les offres et choisis le credit le plus pertinent.">
+                            </div>
+                            <div class="form-group full">
+                                <label for="credit-situation">Situation</label>
+                                <textarea id="credit-situation" class="form-textarea" placeholder="Contexte de la personne, projet a financer, budget disponible."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="credit-nom">Personnage</label>
+                                <input id="credit-nom" class="form-input" type="text" placeholder="Ex: Nolan">
+                            </div>
+                            <div class="form-group">
+                                <label for="credit-projet">Projet</label>
+                                <input id="credit-projet" class="form-input" type="text" placeholder="Scooter, telephone, ordinateur...">
+                            </div>
+                            <div class="form-group">
+                                <label for="credit-prix">Prix comptant</label>
+                                <input id="credit-prix" class="form-input" type="number" min="0" step="1" placeholder="700">
+                            </div>
+                        </div>
+                        <div class="subcard" style="margin-top:14px;">
+                            <h4>Offres de credit</h4>
+                            <div class="row-list" id="credit-offres-list"></div>
+                            <button type="button" class="mini-btn add" id="btn-add-credit-offre" style="margin-top:12px;">+ Ajouter une offre</button>
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label for="credit-explication">Explication pedagogique</label>
+                            <textarea id="credit-explication" class="form-textarea" placeholder="Explique pourquoi une offre est plus pertinente : cout total, duree, TAEG, mensualite."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="panel-complet" class="type-panel">
+                        <div class="form-grid">
+                            <div class="form-group full">
+                                <label for="complet-consigne">Consigne</label>
+                                <input id="complet-consigne" class="form-input" type="text" placeholder="Classe, calcule puis determine le type de budget.">
+                            </div>
+                            <div class="form-group full">
+                                <label for="complet-situation">Situation complete</label>
+                                <textarea id="complet-situation" class="form-textarea" placeholder="Cas complet proche de l'evaluation."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-grid" style="margin-top:14px;">
+                            <div class="subcard">
+                                <h4>Revenus a exploiter</h4>
+                                <div class="row-list" id="complet-revenus-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-complet-revenu" style="margin-top:12px;">+ Ajouter un revenu</button>
+                            </div>
+                            <div class="subcard">
+                                <h4>Depenses a exploiter</h4>
+                                <div class="row-list" id="complet-depenses-list"></div>
+                                <button type="button" class="mini-btn add" id="btn-add-complet-depense" style="margin-top:12px;">+ Ajouter une depense</button>
+                            </div>
+                        </div>
+                        <div class="form-grid-3" style="margin-top:14px;">
+                            <div class="form-group">
+                                <label for="complet-objectif">Projet ou enjeu</label>
+                                <input id="complet-objectif" class="form-input" type="text" placeholder="Telephone, permis, budget a equilibrer...">
+                            </div>
+                            <div class="form-group">
+                                <label for="complet-activer-endettement">Inclure volet endettement</label>
+                                <select id="complet-activer-endettement" class="form-select">
+                                    <option value="false">Non</option>
+                                    <option value="true">Oui</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="complet-explication">Explication pedagogique</label>
+                                <textarea id="complet-explication" class="form-textarea" placeholder="Ce que l'eleve doit retenir a la fin du cas."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Prompt IA JSON</h3>
+                    <div class="hint" style="margin-bottom:12px;">Le prompt ci-dessous est genere a partir du type selectionne. Il est pense pour produire un JSON directement re-importable dans cet editeur Budget.</div>
+                    <div id="prompt-box"></div>
+                </div>
+
+                <div class="card">
+                    <h3>JSON exportable</h3>
+                    <div class="hint" style="margin-bottom:12px;">Apercu du JSON d'import / export pour l'exercice en cours.</div>
+                    <div id="json-export-box"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Apercu enseignant</h3>
+                    <div id="preview-content" class="preview-grid"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Actions</h3>
+                    <div class="bottom-actions">
+                        <button class="btn-primary" id="btn-save">Sauvegarder</button>
+                        <button class="btn-secondary" id="btn-duplicate">Dupliquer</button>
+                        <button class="btn-secondary" id="btn-publish">Publier</button>
+                        <button class="btn-ghost" id="btn-unpublish">Depublier</button>
+                        <button class="btn-danger" id="btn-delete">Supprimer</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div class="modal-backdrop" id="import-backdrop">
+    <div class="modal">
+        <div class="modal-head">
+            <div>
+                <h3>Importer un JSON Budget</h3>
+                <p class="hint" style="margin:0;">Collez un JSON genere par une IA. L'editeur nettoie le texte, detecte le type et remplit le formulaire.</p>
+            </div>
+            <button class="btn-ghost" id="btn-close-import">Fermer</button>
+        </div>
+        <div class="form-group">
+            <label for="import-json-text">JSON brut</label>
+            <textarea id="import-json-text" class="form-textarea" style="min-height:320px;" placeholder='{"budgetType":"budget_complet", ...}'></textarea>
+        </div>
+        <div class="toolbar" style="margin-top:14px;">
+            <button class="btn-accent" id="btn-apply-import">Importer dans le formulaire</button>
+            <button class="btn-ghost" id="btn-close-import-2">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="calculator-shell">
+    <button id="calculator-toggle" type="button">Calculatrice</button>
+    <div id="calculator-panel">
+        <div id="calc-display">0</div>
+        <div class="calc-grid">
+            <button class="calc-btn clear" type="button" data-calc="C">C</button>
+            <button class="calc-btn op" type="button" data-calc="(">(</button>
+            <button class="calc-btn op" type="button" data-calc=")">)</button>
+            <button class="calc-btn op" type="button" data-calc="/">/</button>
+            <button class="calc-btn" type="button" data-calc="7">7</button>
+            <button class="calc-btn" type="button" data-calc="8">8</button>
+            <button class="calc-btn" type="button" data-calc="9">9</button>
+            <button class="calc-btn op" type="button" data-calc="*">*</button>
+            <button class="calc-btn" type="button" data-calc="4">4</button>
+            <button class="calc-btn" type="button" data-calc="5">5</button>
+            <button class="calc-btn" type="button" data-calc="6">6</button>
+            <button class="calc-btn op" type="button" data-calc="-">-</button>
+            <button class="calc-btn" type="button" data-calc="1">1</button>
+            <button class="calc-btn" type="button" data-calc="2">2</button>
+            <button class="calc-btn" type="button" data-calc="3">3</button>
+            <button class="calc-btn op" type="button" data-calc="+">+</button>
+            <button class="calc-btn" type="button" data-calc="0">0</button>
+            <button class="calc-btn" type="button" data-calc=".">.</button>
+            <button class="calc-btn" type="button" data-calc="DEL">DEL</button>
+            <button class="calc-btn eq" type="button" data-calc="=">=</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+        authDomain: "devoirs-pse.firebaseapp.com",
+        projectId: "devoirs-pse",
+        storageBucket: "devoirs-pse.firebasestorage.app",
+        messagingSenderId: "614730413904",
+        appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+    };
+
+    const BUDGET_TYPES = {
+        tri_revenus_depenses: {
+            label: "Tri revenus / depenses",
+            panel: "sort",
+            sousTheme: "revenus_depenses",
+            categories: [
+                { id: "revenu", label: "Revenus" },
+                { id: "depense", label: "Depenses" }
+            ]
+        },
+        tri_revenus_origine: {
+            label: "Tri revenus du travail / sociaux",
+            panel: "sort",
+            sousTheme: "revenus_depenses",
+            categories: [
+                { id: "travail", label: "Revenus lies au travail" },
+                { id: "social", label: "Revenus sociaux" }
+            ]
+        },
+        tri_depenses_types: {
+            label: "Tri des types de depenses",
+            panel: "sort",
+            sousTheme: "types_depenses",
+            categories: [
+                { id: "incompressible", label: "Incompressibles" },
+                { id: "courante", label: "Courantes" },
+                { id: "exceptionnelle", label: "Exceptionnelles" }
+            ]
+        },
+        calcul_solde_budget: {
+            label: "Calcul du solde",
+            panel: "solde",
+            sousTheme: "calculs_budget"
+        },
+        calcul_taux_endettement: {
+            label: "Calcul du taux d'endettement",
+            panel: "endettement",
+            sousTheme: "taux_endettement"
+        },
+        choix_epargne: {
+            label: "Choix d'une epargne",
+            panel: "epargne",
+            sousTheme: "epargne"
+        },
+        comparaison_credit: {
+            label: "Comparaison de credits",
+            panel: "credit",
+            sousTheme: "credit"
+        },
+        budget_complet: {
+            label: "Cas complet budget",
+            panel: "complet",
+            sousTheme: "cas_complets"
+        }
+    };
+
+    const SOUS_THEMES = [
+        { id: "bases_budget", label: "Bases du budget" },
+        { id: "revenus_depenses", label: "Revenus et depenses" },
+        { id: "types_depenses", label: "Types de depenses" },
+        { id: "calculs_budget", label: "Calculs du budget" },
+        { id: "epargne", label: "Epargne" },
+        { id: "credit", label: "Credit" },
+        { id: "taux_endettement", label: "Taux d'endettement" },
+        { id: "cas_complets", label: "Cas complets" }
+    ];
+
+    const BUDGET_TYPE_ORDER = Object.keys(BUDGET_TYPES);
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let allBudgetExercises = [];
+    let currentExerciseId = null;
+    let currentDifficulty = "facile";
+    let toastTimer = null;
+    let calcExpression = "";
+
+    const filterState = {
+        search: "",
+        type: "",
+        theme: "",
+        status: "",
+        difficulty: ""
+    };
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function showToast(message) {
+        const toast = $("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+
+    function escapeHtml(value) {
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function normalizeNumber(value) {
+        if (value == null || value === "") return 0;
+        const normalized = String(value).replace(",", ".").replace(/[^\d.-]/g, "");
+        const num = parseFloat(normalized);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function euro(value) {
+        return normalizeNumber(value).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " euros";
+    }
+
+    function sumRows(rows) {
+        return (rows || []).reduce((sum, row) => sum + normalizeNumber(row.montant), 0);
+    }
+
+    function sortByUpdatedDesc(items) {
+        return items.sort((a, b) => {
+            const sa = a.updatedAt && a.updatedAt.seconds ? a.updatedAt.seconds : 0;
+            const sb = b.updatedAt && b.updatedAt.seconds ? b.updatedAt.seconds : 0;
+            if (sb !== sa) return sb - sa;
+            return String(a.titre || "").localeCompare(String(b.titre || ""));
+        });
+    }
+
+    function buildTypeOptions(selectId, includeEmpty) {
+        const select = $(selectId);
+        const parts = [];
+        if (includeEmpty) {
+            parts.push('<option value="">Tous les types</option>');
+        }
+        BUDGET_TYPE_ORDER.forEach((key) => {
+            parts.push('<option value="' + key + '">' + BUDGET_TYPES[key].label + "</option>");
+        });
+        select.innerHTML = parts.join("");
+    }
+
+    function buildThemeOptions(selectId, includeEmpty) {
+        const select = $(selectId);
+        const parts = [];
+        if (includeEmpty) {
+            parts.push('<option value="">Tous les sous-themes</option>');
+        }
+        SOUS_THEMES.forEach((theme) => {
+            parts.push('<option value="' + theme.id + '">' + theme.label + "</option>");
+        });
+        select.innerHTML = parts.join("");
+    }
+
+    function renderCapClasses() {
+        const container = $("cap-classes");
+        const classes = (window.getListeClassesPourAffichage ? window.getListeClassesPourAffichage() : [])
+            .filter((item) => item.niveau === "CAP");
+
+        container.innerHTML = "";
+        classes.forEach((item) => {
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = "pill";
+            pill.dataset.classeId = item.id;
+            pill.textContent = item.label;
+            pill.addEventListener("click", () => pill.classList.toggle("active"));
+            container.appendChild(pill);
+        });
+    }
+
+    function getSelectedClassIds() {
+        return Array.from(document.querySelectorAll("#cap-classes .pill.active")).map((node) => node.dataset.classeId);
+    }
+
+    function setSelectedClassIds(classIds) {
+        const selected = new Set(classIds || []);
+        document.querySelectorAll("#cap-classes .pill").forEach((pill) => {
+            pill.classList.toggle("active", selected.has(pill.dataset.classeId));
+        });
+    }
+
+    function setDifficulty(value) {
+        currentDifficulty = value || "facile";
+        document.querySelectorAll("#difficulty-toggle .toggle-btn").forEach((btn) => {
+            btn.classList.remove("active-facile", "active-moyen", "active-difficile");
+            if (btn.dataset.difficulty === currentDifficulty) {
+                btn.classList.add("active-" + currentDifficulty);
+            }
+        });
+    }
+
+    function renderList() {
+        const list = $("exo-list");
+        const filtered = allBudgetExercises.filter((exercise) => {
+            const title = String(exercise.titre || "").toLowerCase();
+            const typeLabel = String(BUDGET_TYPES[exercise.budgetType] ? BUDGET_TYPES[exercise.budgetType].label : "").toLowerCase();
+            const themeLabel = String(exercise.sous_theme || "").toLowerCase();
+            const haystack = [title, typeLabel, themeLabel].join(" ");
+
+            if (filterState.search && !haystack.includes(filterState.search)) return false;
+            if (filterState.type && exercise.budgetType !== filterState.type) return false;
+            if (filterState.theme && exercise.sous_theme !== filterState.theme) return false;
+            if (filterState.status === "publie" && !exercise.publie) return false;
+            if (filterState.status === "brouillon" && exercise.publie) return false;
+            if (filterState.difficulty && exercise.difficulte !== filterState.difficulty) return false;
+            return true;
+        });
+
+        $("exo-count").textContent = String(filtered.length);
+
+        if (filtered.length === 0) {
+            list.innerHTML = '<div class="exo-list-empty">Aucun exercice Budget ne correspond aux filtres actifs.</div>';
+            return;
+        }
+
+        list.innerHTML = "";
+        filtered.forEach((exercise) => {
+            const node = document.createElement("div");
+            node.className = "exo-item" + (exercise.id === currentExerciseId ? " active" : "");
+            node.innerHTML =
+                '<div class="exo-item-title"><span>' + escapeHtml(exercise.titre || "Sans titre") + '</span></div>' +
+                '<div class="exo-item-meta">' +
+                '<span class="badge badge-type">' + escapeHtml(BUDGET_TYPES[exercise.budgetType] ? BUDGET_TYPES[exercise.budgetType].label : exercise.budgetType || "Budget") + "</span>" +
+                '<span class="badge badge-theme">' + escapeHtml(getThemeLabel(exercise.sous_theme)) + "</span>" +
+                '<span class="badge ' + (exercise.publie ? "badge-pub" : "badge-draft") + '">' + (exercise.publie ? "Publie" : "Brouillon") + "</span>" +
+                '<span class="badge badge-' + escapeHtml(exercise.difficulte || "facile") + '">' + escapeHtml(exercise.difficulte || "facile") + "</span>" +
+                "</div>";
+            node.addEventListener("click", () => loadExercise(exercise.id));
+            list.appendChild(node);
+        });
+    }
+
+    function getThemeLabel(themeId) {
+        const match = SOUS_THEMES.find((item) => item.id === themeId);
+        return match ? match.label : "Budget";
+    }
+
+    function renderTypePanels() {
+        const type = $("exo-budget-type").value;
+        const typeDef = BUDGET_TYPES[type];
+        document.querySelectorAll(".type-panel").forEach((panel) => panel.classList.remove("active"));
+        if (typeDef) {
+            $("panel-" + typeDef.panel).classList.add("active");
+            if (!$("exo-sous-theme").dataset.userEdited) {
+                $("exo-sous-theme").value = typeDef.sousTheme;
+            }
+        }
+        updateSortHints();
+        renderPromptBox();
+        renderJsonExport();
+        renderPreview();
+    }
+
+    function updateSortHints() {
+        const type = $("exo-budget-type").value;
+        const typeDef = BUDGET_TYPES[type];
+        if (!typeDef || typeDef.panel !== "sort") {
+            $("sort-categories-hint").textContent = "";
+            return;
+        }
+        const labels = typeDef.categories.map((category) => category.label).join(" / ");
+        $("sort-categories-hint").textContent = "Categories attendues : " + labels + ".";
+        document.querySelectorAll("#sort-items-list select").forEach((select) => {
+            rebuildSortSelect(select, typeDef.categories);
+        });
+    }
+
+    function rebuildSortSelect(select, categories) {
+        const current = select.value;
+        select.innerHTML = categories.map((category) => {
+            return '<option value="' + category.id + '">' + category.label + "</option>";
+        }).join("");
+        if (categories.some((category) => category.id === current)) {
+            select.value = current;
+        }
+    }
+
+    function addSortItemRow(data) {
+        const type = $("exo-budget-type").value;
+        const categories = (BUDGET_TYPES[type] && BUDGET_TYPES[type].categories) || [];
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-2">' +
+                '<input class="form-input sort-item-label" type="text" placeholder="Element a classer" value="' + escapeHtml(data && data.label ? data.label : "") + '">' +
+                '<select class="form-select sort-item-category"></select>' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            "</div>";
+        const select = wrapper.querySelector("select");
+        rebuildSortSelect(select, categories);
+        if (data && data.categorie) {
+            select.value = data.categorie;
+        }
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input, select").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $("sort-items-list").appendChild(wrapper);
+    }
+
+    function addMontantRow(containerId, options) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-2">' +
+                '<input class="form-input montant-label" type="text" placeholder="' + escapeHtml(options.labelPlaceholder) + '" value="' + escapeHtml(options.data && options.data.label ? options.data.label : "") + '">' +
+                '<input class="form-input montant-value" type="number" min="0" step="1" placeholder="Montant" value="' + escapeHtml(options.data && options.data.montant != null ? options.data.montant : "") + '">' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            "</div>";
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $(containerId).appendChild(wrapper);
+    }
+
+    function addCompleteRevenuRow(data) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-3">' +
+                '<input class="form-input complete-revenu-label" type="text" placeholder="Salaire, bourse..." value="' + escapeHtml(data && data.label ? data.label : "") + '">' +
+                '<input class="form-input complete-revenu-value" type="number" min="0" step="1" placeholder="Montant" value="' + escapeHtml(data && data.montant != null ? data.montant : "") + '">' +
+                '<select class="form-select complete-revenu-origin">' +
+                    '<option value="travail">Travail</option>' +
+                    '<option value="social">Social</option>' +
+                '</select>' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            "</div>";
+        if (data && data.origine) {
+            wrapper.querySelector("select").value = data.origine;
+        }
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input, select").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $("complet-revenus-list").appendChild(wrapper);
+    }
+
+    function addCompleteDepenseRow(data) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-3">' +
+                '<input class="form-input complete-depense-label" type="text" placeholder="Loyer, courses..." value="' + escapeHtml(data && data.label ? data.label : "") + '">' +
+                '<input class="form-input complete-depense-value" type="number" min="0" step="1" placeholder="Montant" value="' + escapeHtml(data && data.montant != null ? data.montant : "") + '">' +
+                '<select class="form-select complete-depense-type">' +
+                    '<option value="incompressible">Incompressible</option>' +
+                    '<option value="courante">Courante</option>' +
+                    '<option value="exceptionnelle">Exceptionnelle</option>' +
+                '</select>' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            "</div>";
+        if (data && data.type) {
+            wrapper.querySelector("select").value = data.type;
+        }
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input, select").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $("complet-depenses-list").appendChild(wrapper);
+    }
+
+    function addEpargneOptionRow(data) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-4">' +
+                '<input class="form-input epargne-option-name" type="text" placeholder="Nom du livret" value="' + escapeHtml(data && data.nom ? data.nom : "") + '">' +
+                '<input class="form-input epargne-option-rate" type="number" min="0" step="0.1" placeholder="Taux %" value="' + escapeHtml(data && data.taux != null ? data.taux : "") + '">' +
+                '<input class="form-input epargne-option-dispo" type="text" placeholder="Disponibilite" value="' + escapeHtml(data && data.disponibilite ? data.disponibilite : "") + '">' +
+                '<select class="form-select epargne-option-correct">' +
+                    '<option value="false">Distracteur</option>' +
+                    '<option value="true">Bonne option</option>' +
+                '</select>' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            '</div>' +
+            '<div class="form-grid" style="margin-top:10px;">' +
+                '<div class="form-group full">' +
+                    '<label>Conditions / profil</label>' +
+                    '<input class="form-input epargne-option-conditions" type="text" placeholder="Age, revenu, duree..." value="' + escapeHtml(data && data.conditions ? data.conditions : "") + '">' +
+                '</div>' +
+                '<div class="form-group full">' +
+                    '<label>Justification pedagogique</label>' +
+                    '<input class="form-input epargne-option-justification" type="text" placeholder="Pourquoi cette option est ou n\'est pas pertinente" value="' + escapeHtml(data && data.justification ? data.justification : "") + '">' +
+                '</div>' +
+            "</div>";
+        if (data && data.correct) {
+            wrapper.querySelector(".epargne-option-correct").value = "true";
+        }
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input, select").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $("epargne-options-list").appendChild(wrapper);
+    }
+
+    function addCreditOffreRow(data) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "row-item";
+        wrapper.innerHTML =
+            '<div class="row-inline-4">' +
+                '<input class="form-input credit-offre-name" type="text" placeholder="Offre A" value="' + escapeHtml(data && data.nom ? data.nom : "") + '">' +
+                '<input class="form-input credit-offre-mensualite" type="number" min="0" step="1" placeholder="Mensualite" value="' + escapeHtml(data && data.mensualite != null ? data.mensualite : "") + '">' +
+                '<input class="form-input credit-offre-duree" type="number" min="1" step="1" placeholder="Duree" value="' + escapeHtml(data && data.duree != null ? data.duree : "") + '">' +
+                '<input class="form-input credit-offre-total" type="number" min="0" step="1" placeholder="Cout total" value="' + escapeHtml(data && data.total != null ? data.total : "") + '">' +
+                '<button type="button" class="mini-btn danger">Supprimer</button>' +
+            '</div>' +
+            '<div class="form-grid" style="margin-top:10px;">' +
+                '<div class="form-group">' +
+                    '<label>TAEG</label>' +
+                    '<input class="form-input credit-offre-taeg" type="number" min="0" step="0.1" placeholder="4" value="' + escapeHtml(data && data.taeg != null ? data.taeg : "") + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                    '<label>Bonne offre ?</label>' +
+                    '<select class="form-select credit-offre-correct">' +
+                        '<option value="false">Non</option>' +
+                        '<option value="true">Oui</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="form-group full">' +
+                    '<label>Justification pedagogique</label>' +
+                    '<input class="form-input credit-offre-justification" type="text" placeholder="Pourquoi cette offre est la plus pertinente" value="' + escapeHtml(data && data.justification ? data.justification : "") + '">' +
+                '</div>' +
+            "</div>";
+        if (data && data.correct) {
+            wrapper.querySelector(".credit-offre-correct").value = "true";
+        }
+        wrapper.querySelector("button").addEventListener("click", () => {
+            wrapper.remove();
+            renderJsonExport();
+            renderPreview();
+        });
+        wrapper.querySelectorAll("input, select").forEach((field) => field.addEventListener("input", handleLiveUpdate));
+        $("credit-offres-list").appendChild(wrapper);
+    }
+
+    function collectRows(selector, mapper) {
+        return Array.from(document.querySelectorAll(selector))
+            .map(mapper)
+            .filter((row) => row != null);
+    }
+
+    function getActiveBudgetType() {
+        return $("exo-budget-type").value;
+    }
+
+    function calculateTypeBudget(solde) {
+        if (solde > 0) return "excedentaire";
+        if (solde < 0) return "deficitaire";
+        return "equilibre";
+    }
+
+    function calculateEndettementStatus(rate, thresholds) {
+        const ok = normalizeNumber(thresholds && thresholds.sansRisque);
+        const prudence = normalizeNumber(thresholds && thresholds.prudence);
+        if (rate < ok) return "sans risque";
+        if (rate <= prudence) return "avec prudence";
+        return "risque de surendettement";
+    }
+
+    function collectPayloadFromForm() {
+        const budgetType = getActiveBudgetType();
+        const common = {
+            budgetType,
+            titre: $("exo-titre").value.trim(),
+            sous_theme: $("exo-sous-theme").value || (BUDGET_TYPES[budgetType] ? BUDGET_TYPES[budgetType].sousTheme : "cas_complets"),
+            calculatrice: $("exo-calculatrice").value === "true",
+            difficulte: currentDifficulty,
+            classes: getSelectedClassIds()
+        };
+
+        if (budgetType === "tri_revenus_depenses" || budgetType === "tri_revenus_origine" || budgetType === "tri_depenses_types") {
+            const typeDef = BUDGET_TYPES[budgetType];
+            return Object.assign(common, {
+                consigne: $("sort-consigne").value.trim(),
+                situation: $("sort-situation").value.trim(),
+                explication: $("sort-explication").value.trim(),
+                contenu: {
+                    categories: typeDef.categories,
+                    items: collectRows("#sort-items-list .row-item", (row, index) => {
+                        const label = row.querySelector(".sort-item-label").value.trim();
+                        const categorie = row.querySelector(".sort-item-category").value;
+                        if (!label) return null;
+                        return {
+                            id: "i" + (index + 1),
+                            label,
+                            categorie
+                        };
+                    })
+                }
+            });
+        }
+
+        if (budgetType === "calcul_solde_budget") {
+            const revenus = collectRows("#solde-revenus-list .row-item", (row) => {
+                const label = row.querySelector(".montant-label").value.trim();
+                const montant = normalizeNumber(row.querySelector(".montant-value").value);
+                if (!label) return null;
+                return { label, montant };
+            });
+            const depenses = collectRows("#solde-depenses-list .row-item", (row) => {
+                const label = row.querySelector(".montant-label").value.trim();
+                const montant = normalizeNumber(row.querySelector(".montant-value").value);
+                if (!label) return null;
+                return { label, montant };
+            });
+            return Object.assign(common, {
+                consigne: $("solde-consigne").value.trim(),
+                situation: $("solde-situation").value.trim(),
+                explication: $("solde-explication").value.trim(),
+                contenu: { revenus, depenses }
+            });
+        }
+
+        if (budgetType === "calcul_taux_endettement") {
+            const revenus = collectRows("#endettement-revenus-list .row-item", (row) => {
+                const label = row.querySelector(".montant-label").value.trim();
+                const montant = normalizeNumber(row.querySelector(".montant-value").value);
+                if (!label) return null;
+                return { label, montant };
+            });
+            const charges = collectRows("#endettement-charges-list .row-item", (row) => {
+                const label = row.querySelector(".montant-label").value.trim();
+                const montant = normalizeNumber(row.querySelector(".montant-value").value);
+                if (!label) return null;
+                return { label, montant };
+            });
+            return Object.assign(common, {
+                consigne: $("endettement-consigne").value.trim(),
+                situation: $("endettement-situation").value.trim(),
+                explication: $("endettement-explication").value.trim(),
+                contenu: {
+                    revenus,
+                    charges,
+                    seuils: {
+                        sansRisque: normalizeNumber($("endettement-seuil-ok").value) || 33,
+                        prudence: normalizeNumber($("endettement-seuil-prudence").value) || 40
+                    }
+                }
+            });
+        }
+
+        if (budgetType === "choix_epargne") {
+            const options = collectRows("#epargne-options-list .row-item", (row, index) => {
+                const nom = row.querySelector(".epargne-option-name").value.trim();
+                if (!nom) return null;
+                return {
+                    id: "o" + (index + 1),
+                    nom,
+                    taux: normalizeNumber(row.querySelector(".epargne-option-rate").value),
+                    disponibilite: row.querySelector(".epargne-option-dispo").value.trim(),
+                    conditions: row.querySelector(".epargne-option-conditions").value.trim(),
+                    justification: row.querySelector(".epargne-option-justification").value.trim(),
+                    correct: row.querySelector(".epargne-option-correct").value === "true"
+                };
+            });
+            return Object.assign(common, {
+                consigne: $("epargne-consigne").value.trim(),
+                situation: $("epargne-situation").value.trim(),
+                explication: $("epargne-explication").value.trim(),
+                contenu: {
+                    profil: {
+                        nom: $("epargne-nom").value.trim(),
+                        age: normalizeNumber($("epargne-age").value),
+                        projet: $("epargne-projet").value.trim(),
+                        besoin: $("epargne-besoin").value.trim()
+                    },
+                    options
+                }
+            });
+        }
+
+        if (budgetType === "comparaison_credit") {
+            const offres = collectRows("#credit-offres-list .row-item", (row, index) => {
+                const nom = row.querySelector(".credit-offre-name").value.trim();
+                if (!nom) return null;
+                return {
+                    id: "o" + (index + 1),
+                    nom,
+                    mensualite: normalizeNumber(row.querySelector(".credit-offre-mensualite").value),
+                    duree: normalizeNumber(row.querySelector(".credit-offre-duree").value),
+                    total: normalizeNumber(row.querySelector(".credit-offre-total").value),
+                    taeg: normalizeNumber(row.querySelector(".credit-offre-taeg").value),
+                    justification: row.querySelector(".credit-offre-justification").value.trim(),
+                    correct: row.querySelector(".credit-offre-correct").value === "true"
+                };
+            });
+            return Object.assign(common, {
+                consigne: $("credit-consigne").value.trim(),
+                situation: $("credit-situation").value.trim(),
+                explication: $("credit-explication").value.trim(),
+                contenu: {
+                    profil: {
+                        nom: $("credit-nom").value.trim(),
+                        projet: $("credit-projet").value.trim(),
+                        prixComptant: normalizeNumber($("credit-prix").value)
+                    },
+                    offres
+                }
+            });
+        }
+
+        if (budgetType === "budget_complet") {
+            const revenus = collectRows("#complet-revenus-list .row-item", (row) => {
+                const label = row.querySelector(".complete-revenu-label").value.trim();
+                if (!label) return null;
+                return {
+                    label,
+                    montant: normalizeNumber(row.querySelector(".complete-revenu-value").value),
+                    origine: row.querySelector(".complete-revenu-origin").value
+                };
+            });
+            const depenses = collectRows("#complet-depenses-list .row-item", (row) => {
+                const label = row.querySelector(".complete-depense-label").value.trim();
+                if (!label) return null;
+                return {
+                    label,
+                    montant: normalizeNumber(row.querySelector(".complete-depense-value").value),
+                    type: row.querySelector(".complete-depense-type").value
+                };
+            });
+            return Object.assign(common, {
+                consigne: $("complet-consigne").value.trim(),
+                situation: $("complet-situation").value.trim(),
+                explication: $("complet-explication").value.trim(),
+                contenu: {
+                    objectif: $("complet-objectif").value.trim(),
+                    inclureEndettement: $("complet-activer-endettement").value === "true",
+                    revenus,
+                    depenses
+                }
+            });
+        }
+
+        return Object.assign(common, { consigne: "", situation: "", explication: "", contenu: {} });
+    }
+
+    function validatePayload(payload) {
+        if (!payload.titre) return "Le titre est obligatoire.";
+        if (!payload.budgetType) return "Le type d'exercice est obligatoire.";
+
+        if ((payload.budgetType === "tri_revenus_depenses" || payload.budgetType === "tri_revenus_origine" || payload.budgetType === "tri_depenses_types") && (!payload.contenu.items || payload.contenu.items.length < 2)) {
+            return "Ajoute au moins 2 items a classer.";
+        }
+
+        if (payload.budgetType === "calcul_solde_budget") {
+            if (!payload.contenu.revenus.length) return "Ajoute au moins 1 revenu.";
+            if (!payload.contenu.depenses.length) return "Ajoute au moins 1 depense.";
+        }
+
+        if (payload.budgetType === "calcul_taux_endettement") {
+            if (!payload.contenu.revenus.length) return "Ajoute au moins 1 revenu pour le calcul d'endettement.";
+            if (!payload.contenu.charges.length) return "Ajoute au moins 1 charge pour le calcul d'endettement.";
+        }
+
+        if (payload.budgetType === "choix_epargne") {
+            const nbCorrect = payload.contenu.options.filter((option) => option.correct).length;
+            if (payload.contenu.options.length < 2) return "Ajoute au moins 2 options d'epargne.";
+            if (nbCorrect !== 1) return "Il faut exactement 1 bonne option d'epargne.";
+        }
+
+        if (payload.budgetType === "comparaison_credit") {
+            const nbCorrect = payload.contenu.offres.filter((offre) => offre.correct).length;
+            if (payload.contenu.offres.length < 2) return "Ajoute au moins 2 offres de credit.";
+            if (nbCorrect !== 1) return "Il faut exactement 1 offre de credit correcte.";
+        }
+
+        if (payload.budgetType === "budget_complet") {
+            if (payload.contenu.revenus.length < 2) return "Le cas complet doit comporter au moins 2 revenus.";
+            if (payload.contenu.depenses.length < 3) return "Le cas complet doit comporter au moins 3 depenses.";
+        }
+
+        return null;
+    }
+
+    function buildFirestoreExercise(payload) {
+        const classIds = payload.classes || [];
+        const classeId = classIds.length ? classIds[0] : null;
+        const niveau = "CAP";
+        return {
+            type: "budget",
+            budgetType: payload.budgetType,
+            titre: payload.titre,
+            sous_theme: payload.sous_theme,
+            moduleId: "MD2",
+            niveau,
+            classeIds: classIds,
+            classeId,
+            difficulte: payload.difficulte,
+            calculatrice: !!payload.calculatrice,
+            sourcePrompt: $("exo-source-prompt").value.trim() || null,
+            publie: false,
+            contenu: payload
+        };
+    }
+
+    async function saveExercise(options) {
+        const payload = collectPayloadFromForm();
+        const error = validatePayload(payload);
+        if (error) {
+            showToast(error);
+            return false;
+        }
+
+        const exercise = buildFirestoreExercise(payload);
+        exercise.updatedAt = serverTimestamp();
+        exercise.publie = options && options.keepStatus ? getCurrentPublishState() : false;
+
+        try {
+            if (!currentExerciseId) {
+                currentExerciseId = "budget_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                exercise.createdAt = serverTimestamp();
+            }
+            if (options && typeof options.forcePublish === "boolean") {
+                exercise.publie = options.forcePublish;
+            }
+            await setDoc(doc(db, "exercices_banque", currentExerciseId), exercise, { merge: true });
+            showToast(exercise.publie ? "Exercice Budget publie." : "Exercice Budget sauvegarde.");
+            renderLocalButtonState(exercise.publie);
+            return true;
+        } catch (errorSave) {
+            showToast("Erreur Firestore : " + errorSave.message);
+            return false;
+        }
+    }
+
+    function getCurrentPublishState() {
+        const current = allBudgetExercises.find((exercise) => exercise.id === currentExerciseId);
+        return !!(current && current.publie);
+    }
+
+    function renderLocalButtonState(isPublished) {
+        $("btn-unpublish").style.display = isPublished ? "inline-flex" : "none";
+        $("btn-publish").style.display = isPublished ? "none" : "inline-flex";
+        $("btn-delete").style.display = currentExerciseId ? "inline-flex" : "none";
+    }
+
+    function resetTypePanels() {
+        $("sort-items-list").innerHTML = "";
+        $("solde-revenus-list").innerHTML = "";
+        $("solde-depenses-list").innerHTML = "";
+        $("endettement-revenus-list").innerHTML = "";
+        $("endettement-charges-list").innerHTML = "";
+        $("epargne-options-list").innerHTML = "";
+        $("credit-offres-list").innerHTML = "";
+        $("complet-revenus-list").innerHTML = "";
+        $("complet-depenses-list").innerHTML = "";
+    }
+
+    function resetForm() {
+        currentExerciseId = null;
+        $("editor-title").textContent = "Nouvel exercice Budget";
+        $("exo-titre").value = "";
+        $("exo-budget-type").value = "tri_revenus_depenses";
+        $("exo-sous-theme").dataset.userEdited = "";
+        $("exo-sous-theme").value = BUDGET_TYPES.tri_revenus_depenses.sousTheme;
+        $("exo-calculatrice").value = "true";
+        $("exo-source-prompt").value = "";
+        setSelectedClassIds([]);
+        setDifficulty("facile");
+        resetTypePanels();
+
+        $("sort-consigne").value = "Glisse chaque element dans la bonne categorie.";
+        $("sort-situation").value = "";
+        $("sort-explication").value = "";
+        addSortItemRow({ label: "Salaire", categorie: "revenu" });
+        addSortItemRow({ label: "Loyer", categorie: "depense" });
+
+        $("solde-consigne").value = "Calcule les totaux puis le solde du budget.";
+        $("solde-situation").value = "";
+        $("solde-explication").value = "";
+        addMontantRow("solde-revenus-list", { labelPlaceholder: "Salaire", data: { label: "Salaire", montant: 900 } });
+        addMontantRow("solde-depenses-list", { labelPlaceholder: "Loyer", data: { label: "Loyer", montant: 420 } });
+
+        $("endettement-consigne").value = "Calcule le taux d'endettement puis determine si l'emprunt est possible.";
+        $("endettement-situation").value = "";
+        $("endettement-seuil-ok").value = "33";
+        $("endettement-seuil-prudence").value = "40";
+        $("endettement-explication").value = "";
+        addMontantRow("endettement-revenus-list", { labelPlaceholder: "Salaire", data: { label: "Salaire", montant: 1300 } });
+        addMontantRow("endettement-charges-list", { labelPlaceholder: "Loyer", data: { label: "Loyer", montant: 480 } });
+
+        $("epargne-consigne").value = "Choisis l'epargne la plus adaptee a la situation.";
+        $("epargne-situation").value = "";
+        $("epargne-nom").value = "";
+        $("epargne-age").value = "";
+        $("epargne-projet").value = "";
+        $("epargne-besoin").value = "";
+        $("epargne-explication").value = "";
+        addEpargneOptionRow({ nom: "Livret jeune", taux: 3, disponibilite: "Immediate", conditions: "12 a 25 ans", correct: true, justification: "Accessible a un eleve de 18 ans avec argent disponible." });
+        addEpargneOptionRow({ nom: "PEL", taux: 2, disponibilite: "Bloque 4 ans", conditions: "Projet immobilier", correct: false, justification: "Peu adapte a un besoin rapide." });
+
+        $("credit-consigne").value = "Compare les offres et choisis le credit le plus pertinent.";
+        $("credit-situation").value = "";
+        $("credit-nom").value = "";
+        $("credit-projet").value = "";
+        $("credit-prix").value = "";
+        $("credit-explication").value = "";
+        addCreditOffreRow({ nom: "Offre A", mensualite: 120, duree: 6, total: 720, taeg: 4, correct: true, justification: "Cout total plus faible." });
+        addCreditOffreRow({ nom: "Offre B", mensualite: 95, duree: 8, total: 760, taeg: 6, correct: false, justification: "Mensualite plus basse mais credit plus cher au total." });
+
+        $("complet-consigne").value = "Classe les postes puis calcule les totaux, le solde et le type de budget.";
+        $("complet-situation").value = "";
+        $("complet-objectif").value = "";
+        $("complet-activer-endettement").value = "false";
+        $("complet-explication").value = "";
+        addCompleteRevenuRow({ label: "Salaire", montant: 980, origine: "travail" });
+        addCompleteRevenuRow({ label: "APL", montant: 180, origine: "social" });
+        addCompleteDepenseRow({ label: "Loyer", montant: 430, type: "incompressible" });
+        addCompleteDepenseRow({ label: "Courses", montant: 220, type: "courante" });
+        addCompleteDepenseRow({ label: "Sortie", montant: 45, type: "exceptionnelle" });
+
+        renderTypePanels();
+        renderLocalButtonState(false);
+        openEditor();
+    }
+
+    function openEditor() {
+        $("empty-state").style.display = "none";
+        $("editor").style.display = "grid";
+    }
+
+    function loadExercise(id) {
+        const exercise = allBudgetExercises.find((item) => item.id === id);
+        if (!exercise) return;
+        const payload = exercise.contenu || {};
+        currentExerciseId = exercise.id;
+        $("editor-title").textContent = "Edition Budget";
+        $("exo-titre").value = exercise.titre || payload.titre || "";
+        $("exo-budget-type").value = exercise.budgetType || payload.budgetType || "tri_revenus_depenses";
+        $("exo-sous-theme").dataset.userEdited = "1";
+        $("exo-sous-theme").value = exercise.sous_theme || payload.sous_theme || (BUDGET_TYPES[$("exo-budget-type").value] ? BUDGET_TYPES[$("exo-budget-type").value].sousTheme : "cas_complets");
+        $("exo-calculatrice").value = String((payload.calculatrice != null ? payload.calculatrice : exercise.calculatrice) !== false);
+        $("exo-source-prompt").value = exercise.sourcePrompt || "";
+        setSelectedClassIds(exercise.classeIds || payload.classes || []);
+        setDifficulty(exercise.difficulte || payload.difficulte || "facile");
+        resetTypePanels();
+
+        $("sort-consigne").value = payload.consigne || "";
+        $("sort-situation").value = payload.situation || "";
+        $("sort-explication").value = payload.explication || "";
+        (payload.contenu && payload.contenu.items ? payload.contenu.items : []).forEach(addSortItemRow);
+
+        $("solde-consigne").value = payload.consigne || "";
+        $("solde-situation").value = payload.situation || "";
+        $("solde-explication").value = payload.explication || "";
+        (payload.contenu && payload.contenu.revenus ? payload.contenu.revenus : []).forEach((row) => addMontantRow("solde-revenus-list", { labelPlaceholder: "Revenu", data: row }));
+        (payload.contenu && payload.contenu.depenses ? payload.contenu.depenses : []).forEach((row) => addMontantRow("solde-depenses-list", { labelPlaceholder: "Depense", data: row }));
+
+        $("endettement-consigne").value = payload.consigne || "";
+        $("endettement-situation").value = payload.situation || "";
+        $("endettement-explication").value = payload.explication || "";
+        $("endettement-seuil-ok").value = payload.contenu && payload.contenu.seuils ? payload.contenu.seuils.sansRisque : 33;
+        $("endettement-seuil-prudence").value = payload.contenu && payload.contenu.seuils ? payload.contenu.seuils.prudence : 40;
+        (payload.contenu && payload.contenu.revenus ? payload.contenu.revenus : []).forEach((row) => addMontantRow("endettement-revenus-list", { labelPlaceholder: "Revenu", data: row }));
+        (payload.contenu && payload.contenu.charges ? payload.contenu.charges : []).forEach((row) => addMontantRow("endettement-charges-list", { labelPlaceholder: "Charge", data: row }));
+
+        $("epargne-consigne").value = payload.consigne || "";
+        $("epargne-situation").value = payload.situation || "";
+        $("epargne-nom").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.nom || "" : "";
+        $("epargne-age").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.age || "" : "";
+        $("epargne-projet").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.projet || "" : "";
+        $("epargne-besoin").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.besoin || "" : "";
+        $("epargne-explication").value = payload.explication || "";
+        (payload.contenu && payload.contenu.options ? payload.contenu.options : []).forEach(addEpargneOptionRow);
+
+        $("credit-consigne").value = payload.consigne || "";
+        $("credit-situation").value = payload.situation || "";
+        $("credit-nom").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.nom || "" : "";
+        $("credit-projet").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.projet || "" : "";
+        $("credit-prix").value = payload.contenu && payload.contenu.profil ? payload.contenu.profil.prixComptant || "" : "";
+        $("credit-explication").value = payload.explication || "";
+        (payload.contenu && payload.contenu.offres ? payload.contenu.offres : []).forEach(addCreditOffreRow);
+
+        $("complet-consigne").value = payload.consigne || "";
+        $("complet-situation").value = payload.situation || "";
+        $("complet-objectif").value = payload.contenu ? payload.contenu.objectif || "" : "";
+        $("complet-activer-endettement").value = payload.contenu && payload.contenu.inclureEndettement ? "true" : "false";
+        $("complet-explication").value = payload.explication || "";
+        (payload.contenu && payload.contenu.revenus ? payload.contenu.revenus : []).forEach(addCompleteRevenuRow);
+        (payload.contenu && payload.contenu.depenses ? payload.contenu.depenses : []).forEach(addCompleteDepenseRow);
+
+        renderTypePanels();
+        renderLocalButtonState(!!exercise.publie);
+        openEditor();
+        renderList();
+    }
+
+    function buildPromptText() {
+        const type = getActiveBudgetType();
+        const typeDef = BUDGET_TYPES[type];
+        const payload = collectPayloadFromForm();
+        const base = [
+            "Tu es un concepteur d'exercices PSE pour CAP.",
+            "Genere uniquement un JSON valide, sans texte avant ni apres.",
+            'Le JSON doit commencer par {"budgetType":"'+ type + '"...}.',
+            "Niveau fixe : CAP. Module fixe : MD2 Le budget.",
+            "Le vocabulaire doit etre simple, clair et adapte a des eleves de CAP.",
+            "Ajoute toujours une consigne, une situation courte si utile, et une explication pedagogique utile apres correction.",
+            "Tous les montants doivent etre des nombres entiers en euros."
+        ];
+
+        let schema = "";
+        if (typeDef.panel === "sort") {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "' + type + '",',
+                '  "titre": "Titre de l\'exercice",',
+                '  "sous_theme": "' + typeDef.sousTheme + '",',
+                '  "calculatrice": false,',
+                '  "consigne": "Glisse chaque element dans la bonne categorie.",',
+                '  "situation": "Contexte court optionnel",',
+                '  "explication": "Rappel pedagogique",',
+                '  "contenu": {',
+                '    "items": [',
+                '      { "label": "Salaire", "categorie": "' + typeDef.categories[0].id + '" },',
+                '      { "label": "Loyer", "categorie": "' + typeDef.categories[Math.min(1, typeDef.categories.length - 1)].id + '" }',
+                '    ]',
+                '  }',
+                '}',
+                "Categories autorisees : " + typeDef.categories.map((cat) => cat.id + " = " + cat.label).join(" ; "),
+                "Prevois entre 5 et 10 items."
+            ].join("\n");
+        } else if (type === "calcul_solde_budget") {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "calcul_solde_budget",',
+                '  "titre": "Calcul du solde de ...",',
+                '  "sous_theme": "calculs_budget",',
+                '  "calculatrice": true,',
+                '  "consigne": "Calcule les totaux puis le solde.",',
+                '  "situation": "Description du personnage",',
+                '  "explication": "Solde = total revenus - total depenses.",',
+                '  "contenu": {',
+                '    "revenus": [{ "label": "Salaire", "montant": 980 }],',
+                '    "depenses": [{ "label": "Loyer", "montant": 430 }]',
+                '  }',
+                '}',
+                "Prevois entre 2 et 4 revenus et entre 4 et 7 depenses."
+            ].join("\n");
+        } else if (type === "calcul_taux_endettement") {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "calcul_taux_endettement",',
+                '  "titre": "Taux d\'endettement de ...",',
+                '  "sous_theme": "taux_endettement",',
+                '  "calculatrice": true,',
+                '  "consigne": "Calcule le taux d\'endettement puis conclus.",',
+                '  "situation": "Contexte de l\'achat et du budget",',
+                '  "explication": "Taux d\'endettement = charges / revenus x 100.",',
+                '  "contenu": {',
+                '    "revenus": [{ "label": "Salaire", "montant": 1300 }],',
+                '    "charges": [{ "label": "Loyer", "montant": 480 }, { "label": "Credit scooter", "montant": 95 }],',
+                '    "seuils": { "sansRisque": 33, "prudence": 40 }',
+                '  }',
+                '}'
+            ].join("\n");
+        } else if (type === "choix_epargne") {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "choix_epargne",',
+                '  "titre": "Choix d\'epargne de ...",',
+                '  "sous_theme": "epargne",',
+                '  "calculatrice": false,',
+                '  "consigne": "Choisis l\'epargne la plus adaptee.",',
+                '  "situation": "Age, projet, besoin de disponibilite",',
+                '  "explication": "L\'eleve doit comparer taux, disponibilite et conditions d\'ouverture.",',
+                '  "contenu": {',
+                '    "profil": { "nom": "Lina", "age": 18, "projet": "permis", "besoin": "argent disponible rapidement" },',
+                '    "options": [',
+                '      { "nom": "Livret jeune", "taux": 3, "disponibilite": "Immediate", "conditions": "12 a 25 ans", "justification": "Bonne reponse", "correct": true },',
+                '      { "nom": "PEL", "taux": 2, "disponibilite": "Bloque 4 ans", "conditions": "Projet immobilier", "justification": "Distracteur", "correct": false }',
+                '    ]',
+                '  }',
+                '}',
+                "Il doit y avoir exactement une bonne option."
+            ].join("\n");
+        } else if (type === "comparaison_credit") {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "comparaison_credit",',
+                '  "titre": "Quel credit choisir ?",',
+                '  "sous_theme": "credit",',
+                '  "calculatrice": true,',
+                '  "consigne": "Compare les offres et choisis la meilleure.",',
+                '  "situation": "Projet a financer et budget de la personne",',
+                '  "explication": "L\'eleve doit comparer cout total, mensualite, duree et TAEG.",',
+                '  "contenu": {',
+                '    "profil": { "nom": "Nolan", "projet": "telephone", "prixComptant": 700 },',
+                '    "offres": [',
+                '      { "nom": "Offre A", "mensualite": 120, "duree": 6, "total": 720, "taeg": 4, "justification": "Moins chere", "correct": true },',
+                '      { "nom": "Offre B", "mensualite": 95, "duree": 8, "total": 760, "taeg": 6, "justification": "Plus longue et plus chere", "correct": false }',
+                '    ]',
+                '  }',
+                '}'
+            ].join("\n");
+        } else {
+            schema = [
+                "Format attendu :",
+                '{',
+                '  "budgetType": "budget_complet",',
+                '  "titre": "Cas complet budget de ...",',
+                '  "sous_theme": "cas_complets",',
+                '  "calculatrice": true,',
+                '  "consigne": "Classe les postes, calcule les totaux, le solde et le type de budget.",',
+                '  "situation": "Situation complete proche de l\'evaluation",',
+                '  "explication": "Rappel des 4 objectifs du module budget.",',
+                '  "contenu": {',
+                '    "objectif": "Telephone / permis / budget a equilibrer",',
+                '    "inclureEndettement": false,',
+                '    "revenus": [',
+                '      { "label": "Salaire", "montant": 980, "origine": "travail" },',
+                '      { "label": "APL", "montant": 180, "origine": "social" }',
+                '    ],',
+                '    "depenses": [',
+                '      { "label": "Loyer", "montant": 430, "type": "incompressible" },',
+                '      { "label": "Courses", "montant": 220, "type": "courante" },',
+                '      { "label": "Concert", "montant": 45, "type": "exceptionnelle" }',
+                '    ]',
+                '  }',
+                '}',
+                "Le cas complet doit permettre de retrouver total revenus, total depenses, solde et type de budget."
+            ].join("\n");
+        }
+
+        return base.join("\n") + "\n\n" + schema + "\n\nJSON actuel en cours d'edition (a titre indicatif) :\n" + JSON.stringify(payload, null, 2);
+    }
+
+    function renderPromptBox() {
+        $("prompt-box").textContent = buildPromptText();
+    }
+
+    function renderJsonExport() {
+        $("json-export-box").textContent = JSON.stringify(collectPayloadFromForm(), null, 2);
+    }
+
+    function renderPreview() {
+        const payload = collectPayloadFromForm();
+        const preview = $("preview-content");
+        const blocks = [];
+
+        blocks.push(
+            '<div class="preview-block">' +
+            '<h4>' + escapeHtml(payload.titre || "Apercu de l'exercice Budget") + '</h4>' +
+            '<div class="choice-line"><strong>Type :</strong> ' + escapeHtml(BUDGET_TYPES[payload.budgetType] ? BUDGET_TYPES[payload.budgetType].label : payload.budgetType) + '</div>' +
+            '<div class="choice-line"><strong>Sous-theme :</strong> ' + escapeHtml(getThemeLabel(payload.sous_theme)) + '</div>' +
+            '<div class="choice-line"><strong>Difficulte :</strong> ' + escapeHtml(payload.difficulte || "facile") + '</div>' +
+            '<div class="choice-line"><strong>Calculatrice :</strong> ' + (payload.calculatrice ? "Oui" : "Non") + '</div>' +
+            (payload.situation ? '<div class="choice-line" style="margin-top:8px;"><strong>Situation :</strong> ' + escapeHtml(payload.situation) + "</div>" : "") +
+            (payload.consigne ? '<div class="choice-line" style="margin-top:8px;"><strong>Consigne :</strong> ' + escapeHtml(payload.consigne) + "</div>" : "") +
+            "</div>"
+        );
+
+        if (payload.budgetType === "tri_revenus_depenses" || payload.budgetType === "tri_revenus_origine" || payload.budgetType === "tri_depenses_types") {
+            const grouped = {};
+            (payload.contenu.categories || []).forEach((category) => { grouped[category.id] = []; });
+            (payload.contenu.items || []).forEach((item) => {
+                if (!grouped[item.categorie]) grouped[item.categorie] = [];
+                grouped[item.categorie].push(item.label);
+            });
+            blocks.push(
+                '<div class="preview-block"><h4>Repartition attendue</h4><div class="category-preview">' +
+                (payload.contenu.categories || []).map((category) => {
+                    return '<div class="category-card"><h5>' + escapeHtml(category.label) + '</h5><ul>' +
+                        (grouped[category.id] || []).map((label) => '<li>' + escapeHtml(label) + "</li>").join("") +
+                        "</ul></div>";
+                }).join("") +
+                "</div></div>"
+            );
+        }
+
+        if (payload.budgetType === "calcul_solde_budget") {
+            const totalRevenus = sumRows(payload.contenu.revenus);
+            const totalDepenses = sumRows(payload.contenu.depenses);
+            const solde = totalRevenus - totalDepenses;
+            blocks.push(
+                '<div class="preview-block">' +
+                '<h4>Calcul attendu</h4>' +
+                '<div class="preview-kpis">' +
+                    '<div class="kpi"><div class="kpi-label">Total revenus</div><div class="kpi-value">' + escapeHtml(euro(totalRevenus)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Total depenses</div><div class="kpi-value">' + escapeHtml(euro(totalDepenses)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Solde</div><div class="kpi-value">' + escapeHtml(euro(solde)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Type de budget</div><div class="kpi-value">' + escapeHtml(calculateTypeBudget(solde)) + '</div></div>' +
+                '</div>' +
+                buildBudgetTables(payload.contenu.revenus, payload.contenu.depenses) +
+                "</div>"
+            );
+        }
+
+        if (payload.budgetType === "calcul_taux_endettement") {
+            const totalRevenus = sumRows(payload.contenu.revenus);
+            const totalCharges = sumRows(payload.contenu.charges);
+            const taux = totalRevenus > 0 ? Math.round((totalCharges / totalRevenus) * 100) : 0;
+            const statut = calculateEndettementStatus(taux, payload.contenu.seuils);
+            blocks.push(
+                '<div class="preview-block">' +
+                '<h4>Resultat attendu</h4>' +
+                '<div class="preview-kpis">' +
+                    '<div class="kpi"><div class="kpi-label">Revenus</div><div class="kpi-value">' + escapeHtml(euro(totalRevenus)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Charges</div><div class="kpi-value">' + escapeHtml(euro(totalCharges)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Taux</div><div class="kpi-value">' + escapeHtml(String(taux)) + ' %</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Conclusion</div><div class="kpi-value">' + escapeHtml(statut) + '</div></div>' +
+                '</div>' +
+                '<div class="choice-line" style="margin-top:12px;"><strong>Formule :</strong> charges / revenus x 100</div>' +
+                buildMiniTable("Revenus", payload.contenu.revenus) +
+                buildMiniTable("Charges retenues", payload.contenu.charges) +
+                "</div>"
+            );
+        }
+
+        if (payload.budgetType === "choix_epargne") {
+            blocks.push(
+                '<div class="preview-block">' +
+                '<h4>Options d\'epargne</h4>' +
+                '<div class="choice-line"><strong>Profil :</strong> ' + escapeHtml([payload.contenu.profil.nom, payload.contenu.profil.age ? payload.contenu.profil.age + " ans" : "", payload.contenu.profil.projet].filter(Boolean).join(" - ")) + '</div>' +
+                '<div class="choice-line"><strong>Besoin :</strong> ' + escapeHtml(payload.contenu.profil.besoin || "") + '</div>' +
+                '<div class="choice-grid" style="margin-top:12px;">' +
+                (payload.contenu.options || []).map((option) => {
+                    return '<div class="choice-card ' + (option.correct ? "correct" : "") + '">' +
+                        '<h5>' + escapeHtml(option.nom) + '</h5>' +
+                        '<div class="choice-line"><strong>Taux :</strong> ' + escapeHtml(String(option.taux)) + ' %</div>' +
+                        '<div class="choice-line"><strong>Disponibilite :</strong> ' + escapeHtml(option.disponibilite || "") + '</div>' +
+                        '<div class="choice-line"><strong>Conditions :</strong> ' + escapeHtml(option.conditions || "") + '</div>' +
+                        '<div class="choice-line"><strong>Justification :</strong> ' + escapeHtml(option.justification || "") + '</div>' +
+                        "</div>";
+                }).join("") +
+                '</div></div>'
+            );
+        }
+
+        if (payload.budgetType === "comparaison_credit") {
+            blocks.push(
+                '<div class="preview-block">' +
+                '<h4>Offres de credit</h4>' +
+                '<div class="choice-line"><strong>Projet :</strong> ' + escapeHtml([payload.contenu.profil.nom, payload.contenu.profil.projet].filter(Boolean).join(" - ")) + '</div>' +
+                '<div class="choice-line"><strong>Prix comptant :</strong> ' + escapeHtml(euro(payload.contenu.profil.prixComptant || 0)) + '</div>' +
+                '<div class="choice-grid" style="margin-top:12px;">' +
+                (payload.contenu.offres || []).map((offre) => {
+                    return '<div class="choice-card ' + (offre.correct ? "correct" : "") + '">' +
+                        '<h5>' + escapeHtml(offre.nom) + '</h5>' +
+                        '<div class="choice-line"><strong>Mensualite :</strong> ' + escapeHtml(euro(offre.mensualite)) + '</div>' +
+                        '<div class="choice-line"><strong>Duree :</strong> ' + escapeHtml(String(offre.duree)) + ' mois</div>' +
+                        '<div class="choice-line"><strong>Cout total :</strong> ' + escapeHtml(euro(offre.total)) + '</div>' +
+                        '<div class="choice-line"><strong>TAEG :</strong> ' + escapeHtml(String(offre.taeg)) + ' %</div>' +
+                        '<div class="choice-line"><strong>Justification :</strong> ' + escapeHtml(offre.justification || "") + '</div>' +
+                        "</div>";
+                }).join("") +
+                '</div></div>'
+            );
+        }
+
+        if (payload.budgetType === "budget_complet") {
+            const totalRevenus = sumRows(payload.contenu.revenus);
+            const totalDepenses = sumRows(payload.contenu.depenses);
+            const solde = totalRevenus - totalDepenses;
+            blocks.push(
+                '<div class="preview-block">' +
+                '<h4>Cas complet</h4>' +
+                '<div class="preview-kpis">' +
+                    '<div class="kpi"><div class="kpi-label">Total revenus</div><div class="kpi-value">' + escapeHtml(euro(totalRevenus)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Total depenses</div><div class="kpi-value">' + escapeHtml(euro(totalDepenses)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Solde</div><div class="kpi-value">' + escapeHtml(euro(solde)) + '</div></div>' +
+                    '<div class="kpi"><div class="kpi-label">Type</div><div class="kpi-value">' + escapeHtml(calculateTypeBudget(solde)) + '</div></div>' +
+                '</div>' +
+                '<div class="choice-line" style="margin-top:12px;"><strong>Objectif :</strong> ' + escapeHtml(payload.contenu.objectif || "Cas complet") + '</div>' +
+                '<div class="choice-line"><strong>Volet endettement :</strong> ' + (payload.contenu.inclureEndettement ? "Oui" : "Non") + '</div>' +
+                buildBudgetTables(payload.contenu.revenus, payload.contenu.depenses, true) +
+                "</div>"
+            );
+        }
+
+        if (payload.explication) {
+            blocks.push('<div class="preview-block"><h4>A retenir</h4><div class="choice-line">' + escapeHtml(payload.explication) + "</div></div>");
+        }
+
+        preview.innerHTML = blocks.join("");
+        syncCalculatorVisibility();
+    }
+
+    function buildMiniTable(title, rows) {
+        if (!rows || !rows.length) return "";
+        return '<div class="preview-block" style="margin-top:12px;">' +
+            '<h4>' + escapeHtml(title) + '</h4>' +
+            '<table class="budget-table"><thead><tr><th>Poste</th><th>Montant</th></tr></thead><tbody>' +
+            rows.map((row) => '<tr><td>' + escapeHtml(row.label) + '</td><td>' + escapeHtml(euro(row.montant)) + '</td></tr>').join("") +
+            "</tbody></table></div>";
+    }
+
+    function buildBudgetTables(revenus, depenses, includeCategories) {
+        const revenusTable = '<div class="preview-block" style="margin-top:12px;">' +
+            '<h4>Revenus</h4>' +
+            '<table class="budget-table"><thead><tr><th>Poste</th><th>Montant</th>' + (includeCategories ? "<th>Origine</th>" : "") + '</tr></thead><tbody>' +
+            (revenus || []).map((row) => '<tr><td>' + escapeHtml(row.label) + '</td><td>' + escapeHtml(euro(row.montant)) + '</td>' + (includeCategories ? '<td>' + escapeHtml(row.origine || "") + '</td>' : "") + '</tr>').join("") +
+            "</tbody></table></div>";
+
+        const depensesTable = '<div class="preview-block" style="margin-top:12px;">' +
+            '<h4>Depenses</h4>' +
+            '<table class="budget-table"><thead><tr><th>Poste</th><th>Montant</th>' + (includeCategories ? "<th>Type</th>" : "") + '</tr></thead><tbody>' +
+            (depenses || []).map((row) => '<tr><td>' + escapeHtml(row.label) + '</td><td>' + escapeHtml(euro(row.montant)) + '</td>' + (includeCategories ? '<td>' + escapeHtml(row.type || "") + '</td>' : "") + '</tr>').join("") +
+            "</tbody></table></div>";
+
+        return revenusTable + depensesTable;
+    }
+
+    function handleLiveUpdate() {
+        renderJsonExport();
+        renderPromptBox();
+        renderPreview();
+    }
+
+    function attachLiveUpdateListeners() {
+        document.querySelectorAll("input, textarea, select").forEach((field) => {
+            if (field.id === "import-json-text") return;
+            field.addEventListener("input", handleLiveUpdate);
+            field.addEventListener("change", handleLiveUpdate);
+        });
+    }
+
+    function openImportModal() {
+        $("import-backdrop").classList.add("active");
+    }
+
+    function closeImportModal() {
+        $("import-backdrop").classList.remove("active");
+    }
+
+    function normalizeImportedPayload(rawParsed) {
+        const input = rawParsed && rawParsed.contenu && rawParsed.budgetType ? rawParsed : (rawParsed || {});
+        const budgetType = input.budgetType || input.sousType || detectBudgetType(input);
+        if (!budgetType || !BUDGET_TYPES[budgetType]) {
+            throw new Error("Type Budget non reconnu dans le JSON.");
+        }
+
+        const output = {
+            budgetType,
+            titre: input.titre || input.title || "",
+            sous_theme: input.sous_theme || input.sousTheme || (BUDGET_TYPES[budgetType] ? BUDGET_TYPES[budgetType].sousTheme : "cas_complets"),
+            calculatrice: input.calculatrice !== false,
+            consigne: input.consigne || input.question || "",
+            situation: input.situation || input.scenario || input.contexte || "",
+            explication: input.explication || input.explanation || "",
+            contenu: {}
+        };
+
+        if (input.contenu && typeof input.contenu === "object") {
+            output.contenu = JSON.parse(JSON.stringify(input.contenu));
+        }
+
+        if (budgetType === "tri_revenus_depenses" || budgetType === "tri_revenus_origine" || budgetType === "tri_depenses_types") {
+            const items = output.contenu.items || input.items || [];
+            output.contenu.items = items;
+            output.contenu.categories = BUDGET_TYPES[budgetType].categories;
+        } else if (budgetType === "calcul_solde_budget") {
+            output.contenu.revenus = output.contenu.revenus || input.revenus || [];
+            output.contenu.depenses = output.contenu.depenses || input.depenses || [];
+        } else if (budgetType === "calcul_taux_endettement") {
+            output.contenu.revenus = output.contenu.revenus || input.revenus || [];
+            output.contenu.charges = output.contenu.charges || input.charges || input.depenses || [];
+            output.contenu.seuils = output.contenu.seuils || input.seuils || { sansRisque: 33, prudence: 40 };
+        } else if (budgetType === "choix_epargne") {
+            output.contenu.profil = output.contenu.profil || input.profil || {};
+            output.contenu.options = output.contenu.options || input.options || [];
+        } else if (budgetType === "comparaison_credit") {
+            output.contenu.profil = output.contenu.profil || input.profil || {};
+            output.contenu.offres = output.contenu.offres || input.offres || input.options || [];
+        } else if (budgetType === "budget_complet") {
+            output.contenu.revenus = output.contenu.revenus || input.revenus || [];
+            output.contenu.depenses = output.contenu.depenses || input.depenses || [];
+            output.contenu.objectif = output.contenu.objectif || input.objectif || "";
+            output.contenu.inclureEndettement = !!(output.contenu.inclureEndettement || input.inclureEndettement);
+        }
+
+        return output;
+    }
+
+    function detectBudgetType(input) {
+        if (!input || typeof input !== "object") return "";
+        if (input.offres || (input.contenu && input.contenu.offres)) return "comparaison_credit";
+        if (input.options || (input.contenu && input.contenu.options)) return "choix_epargne";
+        if (input.charges || (input.contenu && input.contenu.charges)) return "calcul_taux_endettement";
+        if ((input.revenus || (input.contenu && input.contenu.revenus)) && (input.depenses || (input.contenu && input.contenu.depenses))) {
+            const revenus = input.revenus || (input.contenu ? input.contenu.revenus : []) || [];
+            const depenses = input.depenses || (input.contenu ? input.contenu.depenses : []) || [];
+            if (revenus.some((row) => row && row.origine) || depenses.some((row) => row && row.type)) {
+                return "budget_complet";
+            }
+            return "calcul_solde_budget";
+        }
+        if (input.items || (input.contenu && input.contenu.items)) {
+            return $("exo-budget-type").value || "tri_revenus_depenses";
+        }
+        return "";
+    }
+
+    function fillFormFromPayload(payload) {
+        $("exo-titre").value = payload.titre || "";
+        $("exo-budget-type").value = payload.budgetType;
+        $("exo-sous-theme").dataset.userEdited = "1";
+        $("exo-sous-theme").value = payload.sous_theme || BUDGET_TYPES[payload.budgetType].sousTheme;
+        $("exo-calculatrice").value = String(payload.calculatrice !== false);
+        resetTypePanels();
+
+        if (payload.budgetType === "tri_revenus_depenses" || payload.budgetType === "tri_revenus_origine" || payload.budgetType === "tri_depenses_types") {
+            $("sort-consigne").value = payload.consigne || "";
+            $("sort-situation").value = payload.situation || "";
+            $("sort-explication").value = payload.explication || "";
+            (payload.contenu.items || []).forEach(addSortItemRow);
+        } else if (payload.budgetType === "calcul_solde_budget") {
+            $("solde-consigne").value = payload.consigne || "";
+            $("solde-situation").value = payload.situation || "";
+            $("solde-explication").value = payload.explication || "";
+            (payload.contenu.revenus || []).forEach((row) => addMontantRow("solde-revenus-list", { labelPlaceholder: "Revenu", data: row }));
+            (payload.contenu.depenses || []).forEach((row) => addMontantRow("solde-depenses-list", { labelPlaceholder: "Depense", data: row }));
+        } else if (payload.budgetType === "calcul_taux_endettement") {
+            $("endettement-consigne").value = payload.consigne || "";
+            $("endettement-situation").value = payload.situation || "";
+            $("endettement-explication").value = payload.explication || "";
+            $("endettement-seuil-ok").value = payload.contenu.seuils ? payload.contenu.seuils.sansRisque : 33;
+            $("endettement-seuil-prudence").value = payload.contenu.seuils ? payload.contenu.seuils.prudence : 40;
+            (payload.contenu.revenus || []).forEach((row) => addMontantRow("endettement-revenus-list", { labelPlaceholder: "Revenu", data: row }));
+            (payload.contenu.charges || []).forEach((row) => addMontantRow("endettement-charges-list", { labelPlaceholder: "Charge", data: row }));
+        } else if (payload.budgetType === "choix_epargne") {
+            $("epargne-consigne").value = payload.consigne || "";
+            $("epargne-situation").value = payload.situation || "";
+            $("epargne-explication").value = payload.explication || "";
+            $("epargne-nom").value = payload.contenu.profil ? payload.contenu.profil.nom || "" : "";
+            $("epargne-age").value = payload.contenu.profil ? payload.contenu.profil.age || "" : "";
+            $("epargne-projet").value = payload.contenu.profil ? payload.contenu.profil.projet || "" : "";
+            $("epargne-besoin").value = payload.contenu.profil ? payload.contenu.profil.besoin || "" : "";
+            (payload.contenu.options || []).forEach(addEpargneOptionRow);
+        } else if (payload.budgetType === "comparaison_credit") {
+            $("credit-consigne").value = payload.consigne || "";
+            $("credit-situation").value = payload.situation || "";
+            $("credit-explication").value = payload.explication || "";
+            $("credit-nom").value = payload.contenu.profil ? payload.contenu.profil.nom || "" : "";
+            $("credit-projet").value = payload.contenu.profil ? payload.contenu.profil.projet || "" : "";
+            $("credit-prix").value = payload.contenu.profil ? payload.contenu.profil.prixComptant || "" : "";
+            (payload.contenu.offres || []).forEach(addCreditOffreRow);
+        } else if (payload.budgetType === "budget_complet") {
+            $("complet-consigne").value = payload.consigne || "";
+            $("complet-situation").value = payload.situation || "";
+            $("complet-explication").value = payload.explication || "";
+            $("complet-objectif").value = payload.contenu.objectif || "";
+            $("complet-activer-endettement").value = payload.contenu.inclureEndettement ? "true" : "false";
+            (payload.contenu.revenus || []).forEach(addCompleteRevenuRow);
+            (payload.contenu.depenses || []).forEach(addCompleteDepenseRow);
+        }
+
+        renderTypePanels();
+    }
+
+    function copyTextToClipboard(text, successMessage) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(successMessage);
+        }).catch((error) => {
+            showToast("Copie impossible : " + error.message);
+        });
+    }
+
+    function syncCalculatorVisibility() {
+        const shouldShow = $("exo-calculatrice").value === "true";
+        $("calculator-shell").style.display = shouldShow ? "block" : "none";
+    }
+
+    function setCalcDisplay(text) {
+        $("calc-display").textContent = text || "0";
+    }
+
+    function handleCalcAction(action) {
+        if (action === "C") {
+            calcExpression = "";
+            setCalcDisplay("0");
+            return;
+        }
+        if (action === "DEL") {
+            calcExpression = calcExpression.slice(0, -1);
+            setCalcDisplay(calcExpression || "0");
+            return;
+        }
+        if (action === "=") {
+            const safe = calcExpression.replace(/[^0-9+\-*/().]/g, "");
+            if (!safe) {
+                setCalcDisplay("0");
+                return;
+            }
+            try {
+                const result = Function("return (" + safe + ")")();
+                if (!Number.isFinite(result)) throw new Error("Resultat invalide");
+                calcExpression = String(result);
+                setCalcDisplay(calcExpression);
+            } catch (error) {
+                setCalcDisplay("Erreur");
+                window.setTimeout(() => setCalcDisplay(calcExpression || "0"), 900);
+            }
+            return;
+        }
+        calcExpression += action;
+        setCalcDisplay(calcExpression);
+    }
+
+    function bindEvents() {
+        buildTypeOptions("exo-budget-type");
+        buildTypeOptions("filter-type", true);
+        buildThemeOptions("exo-sous-theme");
+        buildThemeOptions("filter-theme", true);
+        renderCapClasses();
+        attachLiveUpdateListeners();
+
+        $("btn-new-budget").addEventListener("click", resetForm);
+        $("exo-budget-type").addEventListener("change", () => {
+            $("exo-sous-theme").dataset.userEdited = "";
+            renderTypePanels();
+        });
+        $("exo-sous-theme").addEventListener("change", () => {
+            $("exo-sous-theme").dataset.userEdited = "1";
+        });
+
+        document.querySelectorAll("#difficulty-toggle .toggle-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                setDifficulty(btn.dataset.difficulty);
+                handleLiveUpdate();
+            });
+        });
+
+        $("btn-add-sort-item").addEventListener("click", () => addSortItemRow());
+        $("btn-add-solde-revenu").addEventListener("click", () => addMontantRow("solde-revenus-list", { labelPlaceholder: "Revenu" }));
+        $("btn-add-solde-depense").addEventListener("click", () => addMontantRow("solde-depenses-list", { labelPlaceholder: "Depense" }));
+        $("btn-add-endettement-revenu").addEventListener("click", () => addMontantRow("endettement-revenus-list", { labelPlaceholder: "Revenu" }));
+        $("btn-add-endettement-charge").addEventListener("click", () => addMontantRow("endettement-charges-list", { labelPlaceholder: "Charge" }));
+        $("btn-add-epargne-option").addEventListener("click", () => addEpargneOptionRow());
+        $("btn-add-credit-offre").addEventListener("click", () => addCreditOffreRow());
+        $("btn-add-complet-revenu").addEventListener("click", () => addCompleteRevenuRow());
+        $("btn-add-complet-depense").addEventListener("click", () => addCompleteDepenseRow());
+
+        $("btn-save").addEventListener("click", async () => {
+            const success = await saveExercise({ keepStatus: true });
+            if (success) renderList();
+        });
+
+        $("btn-publish").addEventListener("click", async () => {
+            const success = await saveExercise({ keepStatus: true, forcePublish: true });
+            if (success) renderList();
+        });
+
+        $("btn-unpublish").addEventListener("click", async () => {
+            if (!currentExerciseId) return;
+            try {
+                await setDoc(doc(db, "exercices_banque", currentExerciseId), { publie: false, updatedAt: serverTimestamp() }, { merge: true });
+                renderLocalButtonState(false);
+                showToast("Exercice Budget depublie.");
+            } catch (error) {
+                showToast("Erreur : " + error.message);
+            }
+        });
+
+        $("btn-duplicate").addEventListener("click", async () => {
+            const payload = collectPayloadFromForm();
+            const error = validatePayload(payload);
+            if (error) {
+                showToast(error);
+                return;
+            }
+            const duplicate = buildFirestoreExercise(payload);
+            duplicate.titre = (payload.titre || "Exercice Budget") + " (copie)";
+            duplicate.publie = false;
+            duplicate.createdAt = serverTimestamp();
+            duplicate.updatedAt = serverTimestamp();
+            const newId = "budget_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            try {
+                await setDoc(doc(db, "exercices_banque", newId), duplicate);
+                currentExerciseId = newId;
+                $("exo-titre").value = duplicate.titre;
+                renderLocalButtonState(false);
+                showToast("Exercice Budget duplique.");
+            } catch (errorDup) {
+                showToast("Erreur duplication : " + errorDup.message);
+            }
+        });
+
+        $("btn-delete").addEventListener("click", async () => {
+            if (!currentExerciseId) return;
+            const confirmed = window.confirm("Supprimer cet exercice Budget ?");
+            if (!confirmed) return;
+            try {
+                await deleteDoc(doc(db, "exercices_banque", currentExerciseId));
+                showToast("Exercice Budget supprime.");
+                resetForm();
+            } catch (errorDelete) {
+                showToast("Erreur suppression : " + errorDelete.message);
+            }
+        });
+
+        $("btn-copy-prompt").addEventListener("click", () => {
+            copyTextToClipboard(buildPromptText(), "Prompt IA copie.");
+        });
+        $("btn-copy-json").addEventListener("click", () => {
+            copyTextToClipboard(JSON.stringify(collectPayloadFromForm(), null, 2), "JSON Budget copie.");
+        });
+
+        $("btn-open-import").addEventListener("click", openImportModal);
+        $("btn-close-import").addEventListener("click", closeImportModal);
+        $("btn-close-import-2").addEventListener("click", closeImportModal);
+        $("import-backdrop").addEventListener("click", (event) => {
+            if (event.target === $("import-backdrop")) closeImportModal();
+        });
+        $("btn-apply-import").addEventListener("click", () => {
+            const raw = $("import-json-text").value.trim();
+            if (!raw) {
+                showToast("Collez un JSON avant d'importer.");
+                return;
+            }
+            try {
+                const cleaned = window.JsonImportUtils && window.JsonImportUtils.cleanJsonFull ? window.JsonImportUtils.cleanJsonFull(raw).cleaned : raw;
+                const parsed = JSON.parse(cleaned);
+                const payload = normalizeImportedPayload(parsed);
+                fillFormFromPayload(payload);
+                closeImportModal();
+                showToast("JSON Budget importe dans le formulaire.");
+            } catch (errorImport) {
+                showToast("Import impossible : " + errorImport.message);
+            }
+        });
+
+        ["filter-search", "filter-type", "filter-theme", "filter-status", "filter-difficulty"].forEach((id) => {
+            $(id).addEventListener("input", () => {
+                filterState.search = $("filter-search").value.trim().toLowerCase();
+                filterState.type = $("filter-type").value;
+                filterState.theme = $("filter-theme").value;
+                filterState.status = $("filter-status").value;
+                filterState.difficulty = $("filter-difficulty").value;
+                renderList();
+            });
+            $(id).addEventListener("change", () => {
+                filterState.search = $("filter-search").value.trim().toLowerCase();
+                filterState.type = $("filter-type").value;
+                filterState.theme = $("filter-theme").value;
+                filterState.status = $("filter-status").value;
+                filterState.difficulty = $("filter-difficulty").value;
+                renderList();
+            });
+        });
+
+        $("calculator-toggle").addEventListener("click", () => {
+            $("calculator-panel").classList.toggle("active");
+        });
+        document.querySelectorAll(".calc-btn").forEach((btn) => {
+            btn.addEventListener("click", () => handleCalcAction(btn.dataset.calc));
+        });
+    }
+
+    function subscribeBudgetExercises() {
+        onSnapshot(collection(db, "exercices_banque"), (snapshot) => {
+            allBudgetExercises = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data.type === "budget") {
+                    allBudgetExercises.push(Object.assign({ id: docSnap.id }, data));
+                }
+            });
+            sortByUpdatedDesc(allBudgetExercises);
+            renderList();
+        }, (error) => {
+            showToast("Erreur chargement : " + error.message);
+        });
+    }
+
+    bindEvents();
+    subscribeBudgetExercises();
+    resetForm();
+</script>
+</body>
+</html>
