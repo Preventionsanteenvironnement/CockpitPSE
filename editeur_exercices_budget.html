@@ -142,7 +142,24 @@
             border-radius: 14px;
             padding: 12px;
             cursor: pointer;
+            position: relative;
         }
+        .ei-del {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: transparent;
+            border: none;
+            color: #8ca6c5;
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .exo-item:hover .ei-del { opacity: 1; }
+        .ei-del:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
         .exo-item.active {
             border-color: #6db5ff;
             background: #152c45;
@@ -949,11 +966,11 @@
                 <div class="card">
                     <h3>Actions</h3>
                     <div class="bottom-actions">
-                        <button class="btn-primary" id="btn-save">Sauvegarder</button>
-                        <button class="btn-secondary" id="btn-duplicate">Dupliquer</button>
-                        <button class="btn-secondary" id="btn-publish">Publier</button>
-                        <button class="btn-ghost" id="btn-unpublish">Depublier</button>
-                        <button class="btn-danger" id="btn-delete">Supprimer</button>
+                        <button class="btn-primary" id="btn-save">💾 Sauvegarder</button>
+                        <button class="btn-secondary" id="btn-duplicate">📄 Dupliquer</button>
+                        <button class="btn-secondary" id="btn-publish">🚀 Publier</button>
+                        <button class="btn-ghost" id="btn-unpublish">⏸️ Depublier</button>
+                        <button class="btn-danger" id="btn-delete">🗑️ Supprimer</button>
                     </div>
                 </div>
             </div>
@@ -1246,13 +1263,16 @@
         filtered.forEach((exercise) => {
             const node = document.createElement("div");
             node.className = "exo-item" + (exercise.id === currentExerciseId ? " active" : "");
+            var classesHtml = (exercise.classeIds && exercise.classeIds.length > 0) ? '<span class="badge" style="background:#dbeafe;color:#1757b8;">' + escapeHtml(exercise.classeIds.join(", ")) + "</span>" : "";
             node.innerHTML =
                 '<div class="exo-item-title"><span>' + escapeHtml(exercise.titre || "Sans titre") + '</span></div>' +
+                '<button class="ei-del" onclick="event.stopPropagation(); window._deleteExerciseById(\'' + exercise.id + '\')">&times;</button>' +
                 '<div class="exo-item-meta">' +
                 '<span class="badge badge-type">' + escapeHtml(BUDGET_TYPES[exercise.budgetType] ? BUDGET_TYPES[exercise.budgetType].label : exercise.budgetType || "Budget") + "</span>" +
                 '<span class="badge badge-theme">' + escapeHtml(getThemeLabel(exercise.sous_theme)) + "</span>" +
                 '<span class="badge ' + (exercise.publie ? "badge-pub" : "badge-draft") + '">' + (exercise.publie ? "Publie" : "Brouillon") + "</span>" +
                 '<span class="badge badge-' + escapeHtml(exercise.difficulte || "facile") + '">' + escapeHtml(exercise.difficulte || "facile") + "</span>" +
+                classesHtml +
                 "</div>";
             node.addEventListener("click", () => loadExercise(exercise.id));
             list.appendChild(node);
@@ -2522,17 +2542,21 @@
             }
         });
 
-        $("btn-delete").addEventListener("click", async () => {
-            if (!currentExerciseId) return;
+        window._deleteExerciseById = async function(id) {
+            if (!id) return;
             const confirmed = window.confirm("Supprimer cet exercice Budget ?");
             if (!confirmed) return;
             try {
-                await deleteDoc(doc(db, "exercices_banque", currentExerciseId));
+                await deleteDoc(doc(db, "exercices_banque", id));
                 showToast("Exercice Budget supprime.");
-                resetForm();
+                if (id === currentExerciseId) resetForm();
             } catch (errorDelete) {
                 showToast("Erreur suppression : " + errorDelete.message);
             }
+        };
+
+        $("btn-delete").addEventListener("click", () => {
+            window._deleteExerciseById(currentExerciseId);
         });
 
         $("btn-copy-prompt").addEventListener("click", () => {

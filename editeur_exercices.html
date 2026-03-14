@@ -463,6 +463,24 @@
                     <option value="">— Aucun —</option>
                 </select>
             </div>
+            <div class="form-group" id="sous-theme-group" style="display:none; margin-top:10px;">
+                <label>Sous-theme Budget (D2)</label>
+                <select class="form-select" id="exo-sous-theme">
+                    <option value="">— Aucun sous-theme —</option>
+                    <option value="bases_budget">Bases du budget</option>
+                    <option value="revenus_depenses">Revenus et depenses</option>
+                    <option value="types_depenses">Types de depenses</option>
+                    <option value="calculs_budget">Calculs du budget</option>
+                    <option value="epargne">Epargne</option>
+                    <option value="credit">Credit</option>
+                    <option value="taux_endettement">Taux d'endettement</option>
+                    <option value="cas_complets">Cas complets</option>
+                    <option value="autre">Autre</option>
+                </select>
+                <div style="font-size:0.72rem; color:#64748b; margin-top:3px;">
+                    Classifie cet exercice dans un sous-theme du module D2 Budget.
+                </div>
+            </div>
             <div class="form-group" style="margin-top:10px;" id="categorie-group">
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="exo-categorie-competences" onchange="onCategorieChange()">
@@ -1703,6 +1721,35 @@
         }
     };
 
+    // ========== SOUS-THEME BUDGET ==========
+    const BUDGET_SOUS_THEMES = [
+        { id: 'bases_budget', label: 'Bases du budget' },
+        { id: 'revenus_depenses', label: 'Revenus et depenses' },
+        { id: 'types_depenses', label: 'Types de depenses' },
+        { id: 'calculs_budget', label: 'Calculs du budget' },
+        { id: 'epargne', label: 'Epargne' },
+        { id: 'credit', label: 'Credit' },
+        { id: 'taux_endettement', label: "Taux d'endettement" },
+        { id: 'cas_complets', label: 'Cas complets' },
+        { id: 'autre', label: 'Autre' }
+    ];
+
+    function onModuleChangeForSousTheme() {
+        var modVal = document.getElementById('exo-module').value;
+        var stGroup = document.getElementById('sous-theme-group');
+        var stSel = document.getElementById('exo-sous-theme');
+        if (!stGroup || !stSel) return;
+        if (modVal === 'MD2') {
+            stGroup.style.display = '';
+        } else {
+            stGroup.style.display = 'none';
+            stSel.value = '';
+        }
+    }
+
+    // Listen for module dropdown changes
+    document.getElementById('exo-module').addEventListener('change', onModuleChangeForSousTheme);
+
     // ========== TYPE CHANGE ==========
     const TRANSVERSAL_TYPES = ['pad', 'prevention', 'estimation_risque', 'duerp_ligne', 'duerp_mini', 'duer_mission_directeur', 'pictogramme', 'itamami'];
     const AUTO_COMPETENCES_TYPES = ['analyse_copie'];
@@ -1739,6 +1786,9 @@
             if (dossierGroupAC) dossierGroupAC.style.display = 'none';
             var sdGroupAC = document.getElementById('sous-dossier-group');
             if (sdGroupAC) sdGroupAC.style.display = 'none';
+            // Hide sous-theme budget
+            var stGroupAC = document.getElementById('sous-theme-group');
+            if (stGroupAC) stGroupAC.style.display = 'none';
         } else if (TRANSVERSAL_TYPES.includes(rawType)) {
             // PAD, Prevention, etc. : checkbox masquee, module = TRANSVERSAL
             catCheckbox.checked = false;
@@ -1765,6 +1815,9 @@
                 }
                 onDossierChange();
             }
+            // Hide sous-theme budget for transversal types
+            var stGroupTR = document.getElementById('sous-theme-group');
+            if (stGroupTR) stGroupTR.style.display = 'none';
         } else {
             // Types normaux : checkbox visible et activable
             catCheckbox.disabled = false;
@@ -1787,6 +1840,8 @@
                 dossierSel2.disabled = false;
                 onDossierChange();
             }
+            // Show/hide sous-theme budget based on module
+            onModuleChangeForSousTheme();
         }
 
         // Update image path banner based on type
@@ -3674,8 +3729,9 @@
             const moduleBadge = ex.moduleId ? '<span class="ei-badge" style="background:#fef3c7; color:#92400e;">' + ex.moduleId + '</span>' : '';
             var inferredDossier = window.inferDossier ? window.inferDossier(ex) : (ex.dossier || null);
             const dossierBadge = inferredDossier ? '<span class="ei-badge" style="background:#e0f2fe; color:#0369a1;">📁 ' + inferredDossier + '</span>' : '';
+            const sousThemeBadge = ex.sous_theme ? '<span class="ei-badge" style="background:#fef3c7; color:#92400e;">' + ((BUDGET_SOUS_THEMES.find(function(s) { return s.id === ex.sous_theme; }) || {}).label || ex.sous_theme) + '</span>' : '';
             item.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + dossierBadge + '</div>' +
+                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + dossierBadge + sousThemeBadge + '</div>' +
                 '<button class="ei-del" onclick="event.stopPropagation(); deleteExerciceById(\'' + ex.id + '\')">&times;</button>';
             item.onclick = () => loadExercice(ex.id);
             list.appendChild(item);
@@ -3756,6 +3812,12 @@
                 var sdSel = document.getElementById('exo-sous-dossier');
                 if (sdSel) sdSel.value = ex.sous_dossier || '';
             }, 50);
+            // Restaurer sous-theme budget
+            onModuleChangeForSousTheme();
+            setTimeout(function() {
+                var stSel = document.getElementById('exo-sous-theme');
+                if (stSel) stSel.value = ex.sous_theme || '';
+            }, 50);
         }, 120);
         // 6f: restaurer checkbox categorie depuis Firebase
         if (ex.categorie === 'competences' && !AUTO_COMPETENCES_TYPES.includes(ex.type) && !TRANSVERSAL_TYPES.includes(ex.type)) {
@@ -3794,6 +3856,7 @@
         const moduleId = document.getElementById('exo-module').value || null;
         const dossier = document.getElementById('exo-dossier').value || null;
         const sous_dossier = document.getElementById('exo-sous-dossier').value || null;
+        const sous_theme = (moduleId === 'MD2' && document.getElementById('exo-sous-theme').value) ? document.getElementById('exo-sous-theme').value : null;
         let niveau = null;
         if (classeId) {
             const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
@@ -4129,7 +4192,7 @@
             competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
         }
         var sourcePromptVal = (document.getElementById('exo-source-prompt') || {}).value || currentSourcePrompt || null;
-        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, sourcePrompt: sourcePromptVal, updatedAt: serverTimestamp() };
+        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, sous_theme, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, sourcePrompt: sourcePromptVal, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
                 await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
@@ -4180,6 +4243,7 @@
         const moduleId = document.getElementById('exo-module').value || null;
         const dossier = document.getElementById('exo-dossier').value || null;
         const sous_dossier = document.getElementById('exo-sous-dossier').value || null;
+        const sous_theme = (moduleId === 'MD2' && document.getElementById('exo-sous-theme').value) ? document.getElementById('exo-sous-theme').value : null;
         let niveau = null;
         if (classeId) {
             const cig = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
@@ -4207,6 +4271,7 @@
             moduleId,
             dossier,
             sous_dossier,
+            sous_theme,
             niveau,
             difficulte: currentDifficulty,
             contenu,
