@@ -429,6 +429,8 @@
                         <option value="itamami">🔬 Analyse ITaMaMi</option>
                         <option value="clic_deposer">🖱️ Clic & Deposer (Budget)</option>
                         <option value="calcul_guide">🧮 Calcul guide (Budget)</option>
+                        <option value="reperage_clique">🔍 Reperage & clic (Budget)</option>
+                        <option value="comparaison">⚖️ Comparaison (Budget)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1404,6 +1406,29 @@
             <button type="button" class="btn-save" style="background:#0ea5e9; margin-top:8px;" onclick="addCalcGuideStep()">+ Ajouter une etape</button>
         </div>
 
+        <!-- ====== REPERAGE CLIQUE ====== -->
+        <div class="content-type-section" id="ct-reperage_clique">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="rc-titre" placeholder="Reperer les informations du contrat"></div>
+            <div class="form-group"><label>Consigne</label><input type="text" class="form-input" id="rc-consigne" value="Cliquez sur les elements demandes dans le document"></div>
+            <div class="form-group"><label>Texte du document</label><textarea class="form-input" id="rc-document" rows="6" placeholder="Collez ici le texte du document (contrat, facture, etc.)"></textarea></div>
+            <div class="form-group"><label>Explication (optionnel)</label><textarea class="form-input" id="rc-explication" rows="2" placeholder="Affichee apres correction"></textarea></div>
+            <div id="rc-zones-list"></div>
+            <button type="button" class="btn-save" style="background:#8b5cf6; margin-top:8px;" onclick="addReperageZone()">+ Ajouter une zone a reperer</button>
+        </div>
+
+        <!-- ====== COMPARAISON ====== -->
+        <div class="content-type-section" id="ct-comparaison">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="comp-titre" placeholder="Comparer deux offres de credit"></div>
+            <div class="form-group"><label>Consigne</label><input type="text" class="form-input" id="comp-consigne" value="Comparez les offres et repondez aux questions"></div>
+            <div class="form-group"><label>Situation / contexte (optionnel)</label><textarea class="form-input" id="comp-situation" rows="3" placeholder="Ex: Quentin souhaite acheter une voiture..."></textarea></div>
+            <div class="form-group"><label>Explication (optionnel)</label><textarea class="form-input" id="comp-explication" rows="2" placeholder="Affichee apres correction"></textarea></div>
+            <div id="comp-options-list"></div>
+            <button type="button" class="btn-save" style="background:#ec4899; margin-top:8px;" onclick="addCompOption()">+ Ajouter une offre</button>
+            <hr style="border-color:#334155; margin:12px 0;">
+            <div id="comp-questions-list"></div>
+            <button type="button" class="btn-save" style="background:#f59e0b; margin-top:8px;" onclick="addCompQuestion()">+ Ajouter une question</button>
+        </div>
+
         <!-- ====== MEMORY ====== -->
         <div class="content-type-section" id="ct-memory">
             <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="mem-titre" placeholder="Memory - Vocabulaire SST"></div>
@@ -1595,7 +1620,9 @@
         analyse_copie: '📝 Analyse copie',
         itamami: '🔬 ITaMaMi',
         clic_deposer: '🖱️ Clic & Deposer',
-        calcul_guide: '🧮 Calcul guide'
+        calcul_guide: '🧮 Calcul guide',
+        reperage_clique: '🔍 Reperage & clic',
+        comparaison: '⚖️ Comparaison'
     };
 
     // ========== CLASS PILLS ==========
@@ -2609,6 +2636,62 @@
             if (situation) result.situation = situation;
             if (explication) result.explication = explication;
             return result;
+        } else if (type === 'reperage_clique') {
+            const zones = [];
+            document.querySelectorAll('.rc-zone-row').forEach((row, i) => {
+                zones.push({
+                    id: 'z' + (i + 1),
+                    label: row.querySelector('.rc-zone-label').value.trim(),
+                    texte: row.querySelector('.rc-zone-texte').value.trim()
+                });
+            });
+            const result = {
+                titre: document.getElementById('rc-titre').value.trim(),
+                consigne: document.getElementById('rc-consigne').value.trim(),
+                document: document.getElementById('rc-document').value.trim(),
+                zones: zones
+            };
+            const expl = document.getElementById('rc-explication').value.trim();
+            if (expl) result.explication = expl;
+            return result;
+        } else if (type === 'comparaison') {
+            const options = [];
+            document.querySelectorAll('.comp-option-row').forEach((row, i) => {
+                const criteres = [];
+                row.querySelectorAll('.comp-criteres-list > div').forEach(cr => {
+                    criteres.push({
+                        label: cr.querySelector('.comp-crit-label').value.trim(),
+                        valeur: cr.querySelector('.comp-crit-valeur').value.trim()
+                    });
+                });
+                options.push({
+                    id: 'opt' + (i + 1),
+                    nom: row.querySelector('.comp-option-nom').value.trim(),
+                    criteres: criteres
+                });
+            });
+            const questions = [];
+            document.querySelectorAll('.comp-q-row').forEach((row, i) => {
+                const q = {
+                    id: 'q' + (i + 1),
+                    question: row.querySelector('.comp-q-question').value.trim(),
+                    reponse: row.querySelector('.comp-q-reponse').value.trim()
+                };
+                const opts = row.querySelector('.comp-q-options').value.trim();
+                if (opts) q.options = opts.split('|').map(s => s.trim()).filter(Boolean);
+                questions.push(q);
+            });
+            const result = {
+                titre: document.getElementById('comp-titre').value.trim(),
+                consigne: document.getElementById('comp-consigne').value.trim(),
+                options: options,
+                questions: questions
+            };
+            const sit = document.getElementById('comp-situation').value.trim();
+            const expl = document.getElementById('comp-explication').value.trim();
+            if (sit) result.situation = sit;
+            if (expl) result.explication = expl;
+            return result;
         } else if (type === 'memory') {
             const container = document.getElementById('mem-list');
             const rows = container.querySelectorAll('.mem-pair-row');
@@ -3000,6 +3083,62 @@
         document.querySelectorAll('.cg-step-row').forEach((row, i) => {
             row.querySelector('span').textContent = (i + 1) + '.';
         });
+    };
+
+    // ========== DYNAMIC HELPERS : REPERAGE CLIQUE ==========
+    window.addReperageZone = function(label, texte) {
+        const container = document.getElementById('rc-zones-list');
+        const idx = container.querySelectorAll('.rc-zone-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'rc-zone-row';
+        div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        div.innerHTML = '<span style="color:#94a3b8;font-size:0.8rem;min-width:20px;">' + idx + '.</span>' +
+            '<input type="text" class="form-input rc-zone-label" style="flex:1;" placeholder="Label (ex: Taux annuel)" value="' + (label || '') + '">' +
+            '<input type="text" class="form-input rc-zone-texte" style="flex:2;" placeholder="Texte exact a trouver dans le document" value="' + (texte || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
+    };
+
+    // ========== DYNAMIC HELPERS : COMPARAISON ==========
+    window.addCompOption = function(nom, criteres) {
+        const container = document.getElementById('comp-options-list');
+        const idx = container.querySelectorAll('.comp-option-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'comp-option-row';
+        div.style.cssText = 'border:1px solid #475569; border-radius:8px; padding:8px; margin-bottom:8px;';
+        div.innerHTML = '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+            '<span style="color:#ec4899;font-weight:700;">Offre ' + idx + '</span>' +
+            '<input type="text" class="form-input comp-option-nom" style="flex:1;" placeholder="Nom de l\'offre" value="' + (nom || '') + '">' +
+            '<button type="button" onclick="this.closest(\'.comp-option-row\').remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>' +
+            '</div>' +
+            '<div class="comp-criteres-list"></div>' +
+            '<button type="button" class="btn-save" style="background:#64748b;font-size:0.75rem;padding:4px 10px;margin-top:4px;" onclick="addCompCritere(this.closest(\'.comp-option-row\'))">+ Critere</button>';
+        container.appendChild(div);
+        if (criteres) {
+            criteres.forEach(function(c) { addCompCritere(div, c.label, c.valeur); });
+        }
+    };
+    window.addCompCritere = function(optionRow, label, valeur) {
+        const container = optionRow.querySelector('.comp-criteres-list');
+        const div = document.createElement('div');
+        div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:4px;';
+        div.innerHTML = '<input type="text" class="form-input comp-crit-label" style="flex:1;font-size:0.85rem;" placeholder="Critere (ex: Taux)" value="' + (label || '') + '">' +
+            '<input type="text" class="form-input comp-crit-valeur" style="flex:1;font-size:0.85rem;" placeholder="Valeur (ex: 4,5%)" value="' + (valeur || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
+    };
+    window.addCompQuestion = function(question, reponse, options) {
+        const container = document.getElementById('comp-questions-list');
+        const idx = container.querySelectorAll('.comp-q-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'comp-q-row';
+        div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;';
+        div.innerHTML = '<span style="color:#f59e0b;font-size:0.8rem;min-width:20px;">Q' + idx + '</span>' +
+            '<input type="text" class="form-input comp-q-question" style="flex:2;min-width:150px;" placeholder="Question" value="' + (question || '') + '">' +
+            '<input type="text" class="form-input comp-q-reponse" style="width:120px;" placeholder="Reponse" value="' + (reponse || '') + '">' +
+            '<input type="text" class="form-input comp-q-options" style="width:150px;" placeholder="Options (|) optionnel" value="' + (options || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
     };
 
     // ========== DYNAMIC HELPERS : MEMORY ==========
@@ -3440,6 +3579,22 @@
                 const opts = (st.options || []).join(' | ');
                 addCalcGuideStep(st.label, st.expected, st.unit, st.mode, opts);
             });
+        } else if (type === 'reperage_clique') {
+            document.getElementById('rc-titre').value = contenu.titre || '';
+            document.getElementById('rc-consigne').value = contenu.consigne || 'Cliquez sur les elements demandes dans le document';
+            document.getElementById('rc-document').value = contenu.document || '';
+            document.getElementById('rc-explication').value = contenu.explication || '';
+            document.getElementById('rc-zones-list').innerHTML = '';
+            (contenu.zones || []).forEach(z => addReperageZone(z.label, z.texte));
+        } else if (type === 'comparaison') {
+            document.getElementById('comp-titre').value = contenu.titre || '';
+            document.getElementById('comp-consigne').value = contenu.consigne || 'Comparez les offres et repondez aux questions';
+            document.getElementById('comp-situation').value = contenu.situation || '';
+            document.getElementById('comp-explication').value = contenu.explication || '';
+            document.getElementById('comp-options-list').innerHTML = '';
+            (contenu.options || []).forEach(opt => addCompOption(opt.nom, opt.criteres));
+            document.getElementById('comp-questions-list').innerHTML = '';
+            (contenu.questions || []).forEach(q => addCompQuestion(q.question, q.reponse, (q.options || []).join(' | ')));
         } else if (type === 'memory') {
             document.getElementById('mem-titre').value = contenu.titre || '';
             document.getElementById('mem-list').innerHTML = '';
@@ -3634,6 +3789,19 @@
         document.getElementById('cg-situation').value = '';
         document.getElementById('cg-explication').value = '';
         document.getElementById('cg-steps-list').innerHTML = '';
+        // Reperage Clique
+        document.getElementById('rc-titre').value = '';
+        document.getElementById('rc-consigne').value = 'Cliquez sur les elements demandes dans le document';
+        document.getElementById('rc-document').value = '';
+        document.getElementById('rc-explication').value = '';
+        document.getElementById('rc-zones-list').innerHTML = '';
+        // Comparaison
+        document.getElementById('comp-titre').value = '';
+        document.getElementById('comp-consigne').value = 'Comparez les offres et repondez aux questions';
+        document.getElementById('comp-situation').value = '';
+        document.getElementById('comp-explication').value = '';
+        document.getElementById('comp-options-list').innerHTML = '';
+        document.getElementById('comp-questions-list').innerHTML = '';
         // Memory
         document.getElementById('mem-titre').value = '';
         document.getElementById('mem-list').innerHTML = '';
@@ -4359,6 +4527,39 @@
             if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
         }
 
+        // Validation Reperage Clique
+        if (type === 'reperage_clique') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.document || c.document.length < 10) errors.push('Le texte du document est obligatoire');
+            if (!c.zones || c.zones.length < 1) errors.push('Il faut au moins 1 zone a reperer');
+            if (c.zones) {
+                c.zones.forEach((z, i) => {
+                    if (!z.label) errors.push('Zone ' + (i+1) + ' : label obligatoire');
+                    if (!z.texte) errors.push('Zone ' + (i+1) + ' : texte a trouver obligatoire');
+                    if (z.texte && c.document && !c.document.includes(z.texte)) errors.push('Zone ' + (i+1) + ' : "' + z.texte.substring(0,20) + '..." non trouve dans le document');
+                });
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
+        // Validation Comparaison
+        if (type === 'comparaison') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.options || c.options.length < 2) errors.push('Il faut au moins 2 offres a comparer');
+            if (!c.questions || c.questions.length < 1) errors.push('Il faut au moins 1 question');
+            if (c.questions) {
+                c.questions.forEach((q, i) => {
+                    if (!q.question) errors.push('Q' + (i+1) + ' : question obligatoire');
+                    if (!q.reponse) errors.push('Q' + (i+1) + ' : reponse obligatoire');
+                });
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
         if (type === 'memory') {
             const c = contenu;
             const errors = [];
@@ -5034,6 +5235,8 @@ Important:
         if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
         if (Array.isArray(src.steps) && src.steps[0] && src.steps[0].expected !== undefined) return 'calcul_guide';
+        if (src.document && Array.isArray(src.zones) && src.zones[0] && src.zones[0].texte !== undefined) return 'reperage_clique';
+        if (Array.isArray(src.options) && src.options[0] && src.options[0].criteres && Array.isArray(src.questions)) return 'comparaison';
         if (Array.isArray(src.items) && src.items[0] && src.mode && (src.mode === 'colonnes' || src.mode === 'ordre')) return 'clic_deposer';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
@@ -5378,6 +5581,10 @@ Important:
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'Quiz chrono attendu: questions[] + temps_par_question.';
             case 'calcul_guide':
                 return (Array.isArray(data.steps) && data.steps.length > 0) ? '' : 'Calcul guide attendu: steps[].';
+            case 'reperage_clique':
+                return (data.document && Array.isArray(data.zones)) ? '' : 'Reperage attendu: document + zones[].';
+            case 'comparaison':
+                return (Array.isArray(data.options) && Array.isArray(data.questions)) ? '' : 'Comparaison attendu: options[] + questions[].';
             case 'clic_deposer':
                 return (Array.isArray(data.items) && data.mode) ? '' : 'Clic Deposer attendu: items[] + mode.';
             case 'categoriser':
@@ -5613,6 +5820,8 @@ Important:
         else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
         else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
         else if (type === 'calcul_guide' && data.steps) detail = ' (' + data.steps.length + ' etapes)';
+        else if (type === 'reperage_clique' && data.zones) detail = ' (' + data.zones.length + ' zones)';
+        else if (type === 'comparaison' && data.options) detail = ' (' + data.options.length + ' offres, ' + (data.questions || []).length + ' questions)';
         else if (type === 'clic_deposer' && data.items) detail = ' (' + data.items.length + ' items, mode: ' + (data.mode || 'colonnes') + ')';
         else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
         else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
