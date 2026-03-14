@@ -428,6 +428,7 @@
                         <option value="analyse_copie">📝 Analyse de copie (competences)</option>
                         <option value="itamami">🔬 Analyse ITaMaMi</option>
                         <option value="clic_deposer">🖱️ Clic & Deposer (Budget)</option>
+                        <option value="calcul_guide">🧮 Calcul guide (Budget)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1393,6 +1394,16 @@
             <button type="button" class="btn-save" style="background:#f59e0b; margin-top:8px;" onclick="addClicDeposerItem()">+ Ajouter un item</button>
         </div>
 
+        <!-- ====== CALCUL GUIDE ====== -->
+        <div class="content-type-section" id="ct-calcul_guide">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="cg-titre" placeholder="Calculer le solde du budget"></div>
+            <div class="form-group"><label>Consigne</label><input type="text" class="form-input" id="cg-consigne" value="Complete les etapes du calcul"></div>
+            <div class="form-group"><label>Situation / contexte (optionnel)</label><textarea class="form-input" id="cg-situation" rows="3" placeholder="Ex: Killian gagne 1500€ par mois..."></textarea></div>
+            <div class="form-group"><label>Explication pedagogique (optionnel)</label><textarea class="form-input" id="cg-explication" rows="2" placeholder="Affichee apres correction"></textarea></div>
+            <div id="cg-steps-list"></div>
+            <button type="button" class="btn-save" style="background:#0ea5e9; margin-top:8px;" onclick="addCalcGuideStep()">+ Ajouter une etape</button>
+        </div>
+
         <!-- ====== MEMORY ====== -->
         <div class="content-type-section" id="ct-memory">
             <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="mem-titre" placeholder="Memory - Vocabulaire SST"></div>
@@ -1583,7 +1594,8 @@
         pictogramme: '⚠️ Pictogrammes',
         analyse_copie: '📝 Analyse copie',
         itamami: '🔬 ITaMaMi',
-        clic_deposer: '🖱️ Clic & Deposer'
+        clic_deposer: '🖱️ Clic & Deposer',
+        calcul_guide: '🧮 Calcul guide'
     };
 
     // ========== CLASS PILLS ==========
@@ -2570,6 +2582,33 @@
                 result.categories = document.getElementById('cd-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
             }
             return result;
+        } else if (type === 'calcul_guide') {
+            const steps = [];
+            document.querySelectorAll('.cg-step-row').forEach((row, i) => {
+                const mode = row.querySelector('.cg-step-mode').value;
+                const step = {
+                    id: 'step' + (i + 1),
+                    label: row.querySelector('.cg-step-label').value.trim(),
+                    expected: row.querySelector('.cg-step-expected').value.trim(),
+                    unit: row.querySelector('.cg-step-unit').value.trim(),
+                    mode: mode
+                };
+                if (mode === 'number') step.expected = parseFloat(step.expected) || 0;
+                if (mode === 'select') {
+                    step.options = row.querySelector('.cg-step-options').value.split('|').map(s => s.trim()).filter(Boolean);
+                }
+                steps.push(step);
+            });
+            const result = {
+                titre: document.getElementById('cg-titre').value.trim(),
+                consigne: document.getElementById('cg-consigne').value.trim(),
+                steps: steps
+            };
+            const situation = document.getElementById('cg-situation').value.trim();
+            const explication = document.getElementById('cg-explication').value.trim();
+            if (situation) result.situation = situation;
+            if (explication) result.explication = explication;
+            return result;
         } else if (type === 'memory') {
             const container = document.getElementById('mem-list');
             const rows = container.querySelectorAll('.mem-pair-row');
@@ -2930,6 +2969,37 @@
         });
         container.innerHTML = '';
         existing.forEach(it => addClicDeposerItem(it.label, '', ''));
+    };
+
+    // ========== DYNAMIC HELPERS : CALCUL GUIDE ==========
+    window.addCalcGuideStep = function(label, expected, unit, mode, options) {
+        const container = document.getElementById('cg-steps-list');
+        const idx = container.querySelectorAll('.cg-step-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'cg-step-row';
+        div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;';
+        div.innerHTML = '<span style="color:#94a3b8;font-size:0.8rem;min-width:20px;">' + idx + '.</span>' +
+            '<input type="text" class="form-input cg-step-label" style="flex:2;min-width:120px;" placeholder="Label etape" value="' + (label || '') + '">' +
+            '<input type="text" class="form-input cg-step-expected" style="width:90px;" placeholder="Reponse" value="' + (expected != null ? expected : '') + '">' +
+            '<input type="text" class="form-input cg-step-unit" style="width:50px;" placeholder="Unite" value="' + (unit || '') + '">' +
+            '<select class="form-select cg-step-mode" style="width:90px;" onchange="onCgStepModeChange(this)">' +
+                '<option value="number"' + (mode === 'number' || !mode ? ' selected' : '') + '>Nombre</option>' +
+                '<option value="text"' + (mode === 'text' ? ' selected' : '') + '>Texte</option>' +
+                '<option value="select"' + (mode === 'select' ? ' selected' : '') + '>Liste</option>' +
+            '</select>' +
+            '<input type="text" class="form-input cg-step-options" style="width:120px;display:' + (mode === 'select' ? 'block' : 'none') + ';" placeholder="Options (|)" value="' + (options || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove(); renumberCgSteps();" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        container.appendChild(div);
+    };
+    window.onCgStepModeChange = function(sel) {
+        const row = sel.closest('.cg-step-row');
+        const optInput = row.querySelector('.cg-step-options');
+        optInput.style.display = sel.value === 'select' ? 'block' : 'none';
+    };
+    window.renumberCgSteps = function() {
+        document.querySelectorAll('.cg-step-row').forEach((row, i) => {
+            row.querySelector('span').textContent = (i + 1) + '.';
+        });
     };
 
     // ========== DYNAMIC HELPERS : MEMORY ==========
@@ -3360,6 +3430,16 @@
             }
             document.getElementById('cd-items-list').innerHTML = '';
             (contenu.items || []).forEach(it => addClicDeposerItem(it.label, it.categorie, it.ordre));
+        } else if (type === 'calcul_guide') {
+            document.getElementById('cg-titre').value = contenu.titre || '';
+            document.getElementById('cg-consigne').value = contenu.consigne || 'Complete les etapes du calcul';
+            document.getElementById('cg-situation').value = contenu.situation || '';
+            document.getElementById('cg-explication').value = contenu.explication || '';
+            document.getElementById('cg-steps-list').innerHTML = '';
+            (contenu.steps || []).forEach(st => {
+                const opts = (st.options || []).join(' | ');
+                addCalcGuideStep(st.label, st.expected, st.unit, st.mode, opts);
+            });
         } else if (type === 'memory') {
             document.getElementById('mem-titre').value = contenu.titre || '';
             document.getElementById('mem-list').innerHTML = '';
@@ -3548,6 +3628,12 @@
         document.getElementById('cd-categories').value = '';
         document.getElementById('cd-categories-group').style.display = '';
         document.getElementById('cd-items-list').innerHTML = '';
+        // Calcul Guide
+        document.getElementById('cg-titre').value = '';
+        document.getElementById('cg-consigne').value = 'Complete les etapes du calcul';
+        document.getElementById('cg-situation').value = '';
+        document.getElementById('cg-explication').value = '';
+        document.getElementById('cg-steps-list').innerHTML = '';
         // Memory
         document.getElementById('mem-titre').value = '';
         document.getElementById('mem-list').innerHTML = '';
@@ -4257,6 +4343,22 @@
         }
 
         // Validation Memory
+        // Validation Calcul Guide
+        if (type === 'calcul_guide') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.steps || c.steps.length < 2) errors.push('Il faut au moins 2 etapes');
+            if (c.steps) {
+                c.steps.forEach((st, i) => {
+                    if (!st.label) errors.push('Etape ' + (i+1) + ' : label obligatoire');
+                    if (st.expected === '' || st.expected === undefined || st.expected === null) errors.push('Etape ' + (i+1) + ' : reponse attendue obligatoire');
+                    if (st.mode === 'select' && (!st.options || st.options.length < 2)) errors.push('Etape ' + (i+1) + ' : au moins 2 options pour une liste');
+                });
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
         if (type === 'memory') {
             const c = contenu;
             const errors = [];
@@ -4931,6 +5033,7 @@ Important:
         if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) return 'pictogramme';
         if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
+        if (Array.isArray(src.steps) && src.steps[0] && src.steps[0].expected !== undefined) return 'calcul_guide';
         if (Array.isArray(src.items) && src.items[0] && src.mode && (src.mode === 'colonnes' || src.mode === 'ordre')) return 'clic_deposer';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
@@ -5273,6 +5376,8 @@ Important:
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'QCM serie attendu: questions[].';
             case 'quiz_chrono':
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'Quiz chrono attendu: questions[] + temps_par_question.';
+            case 'calcul_guide':
+                return (Array.isArray(data.steps) && data.steps.length > 0) ? '' : 'Calcul guide attendu: steps[].';
             case 'clic_deposer':
                 return (Array.isArray(data.items) && data.mode) ? '' : 'Clic Deposer attendu: items[] + mode.';
             case 'categoriser':
@@ -5507,6 +5612,7 @@ Important:
         if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
         else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
         else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
+        else if (type === 'calcul_guide' && data.steps) detail = ' (' + data.steps.length + ' etapes)';
         else if (type === 'clic_deposer' && data.items) detail = ' (' + data.items.length + ' items, mode: ' + (data.mode || 'colonnes') + ')';
         else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
         else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
