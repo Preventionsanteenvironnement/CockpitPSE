@@ -427,6 +427,7 @@
                         <option value="pictogramme">⚠️ Pictogrammes de securite</option>
                         <option value="analyse_copie">📝 Analyse de copie (competences)</option>
                         <option value="itamami">🔬 Analyse ITaMaMi</option>
+                        <option value="clic_deposer">🖱️ Clic & Deposer (Budget)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1377,6 +1378,21 @@
             <button type="button" class="btn-save" style="background:#22c55e; margin-top:8px;" onclick="addCatItem()">+ Ajouter un item</button>
         </div>
 
+        <!-- ====== CLIC DEPOSER ====== -->
+        <div class="content-type-section" id="ct-clic_deposer">
+            <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="cd-titre" placeholder="Classement budget"></div>
+            <div class="form-group"><label>Consigne</label><input type="text" class="form-input" id="cd-consigne" value="Classez chaque element dans la bonne zone"></div>
+            <div class="form-group"><label>Mode</label>
+                <select class="form-input" id="cd-mode" onchange="onCdModeChange()">
+                    <option value="colonnes">Colonnes (categories)</option>
+                    <option value="ordre">Ordre (sequence)</option>
+                </select>
+            </div>
+            <div id="cd-categories-group" class="form-group"><label>Categories (separees par |)</label><input type="text" class="form-input" id="cd-categories" placeholder="Revenus | Depenses" oninput="updateCdSelects()"></div>
+            <div id="cd-items-list"></div>
+            <button type="button" class="btn-save" style="background:#f59e0b; margin-top:8px;" onclick="addClicDeposerItem()">+ Ajouter un item</button>
+        </div>
+
         <!-- ====== MEMORY ====== -->
         <div class="content-type-section" id="ct-memory">
             <div class="form-group"><label>Titre</label><input type="text" class="form-input" id="mem-titre" placeholder="Memory - Vocabulaire SST"></div>
@@ -1566,7 +1582,8 @@
         duer_mission_directeur: '📋 Mission DUERP Directeur',
         pictogramme: '⚠️ Pictogrammes',
         analyse_copie: '📝 Analyse copie',
-        itamami: '🔬 ITaMaMi'
+        itamami: '🔬 ITaMaMi',
+        clic_deposer: '🖱️ Clic & Deposer'
     };
 
     // ========== CLASS PILLS ==========
@@ -2526,6 +2543,33 @@
                 categories,
                 items
             };
+        } else if (type === 'clic_deposer') {
+            const mode = document.getElementById('cd-mode').value;
+            const container = document.getElementById('cd-items-list');
+            const rows = container.querySelectorAll('.cd-item-row');
+            const items = [];
+            rows.forEach((row, i) => {
+                const item = {
+                    id: 'cd' + (i+1),
+                    label: row.querySelector('.cd-item-label').value.trim()
+                };
+                if (mode === 'colonnes') {
+                    item.categorie = row.querySelector('.cd-item-cat').value;
+                } else {
+                    item.ordre = parseInt(row.querySelector('.cd-item-ordre').value) || (i+1);
+                }
+                items.push(item);
+            });
+            const result = {
+                titre: document.getElementById('cd-titre').value.trim(),
+                consigne: document.getElementById('cd-consigne').value.trim(),
+                mode: mode,
+                items: items
+            };
+            if (mode === 'colonnes') {
+                result.categories = document.getElementById('cd-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+            }
+            return result;
         } else if (type === 'memory') {
             const container = document.getElementById('mem-list');
             const rows = container.querySelectorAll('.mem-pair-row');
@@ -2846,6 +2890,46 @@
             const cur = sel.value;
             sel.innerHTML = cats.map(c => '<option value="' + c + '"' + (c === cur ? ' selected' : '') + '>' + c + '</option>').join('');
         });
+    };
+
+    // ========== DYNAMIC HELPERS : CLIC DEPOSER ==========
+    window.addClicDeposerItem = function(label, categorie, ordre) {
+        const container = document.getElementById('cd-items-list');
+        const mode = document.getElementById('cd-mode').value;
+        const div = document.createElement('div');
+        div.className = 'cd-item-row';
+        div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+        if (mode === 'colonnes') {
+            const cats = document.getElementById('cd-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+            let opts = cats.map(c => '<option value="' + c + '"' + (c === categorie ? ' selected' : '') + '>' + c + '</option>').join('');
+            div.innerHTML = '<input type="text" class="form-input cd-item-label" style="flex:2;" placeholder="Label item" value="' + (label || '') + '">' +
+                '<select class="form-select cd-item-cat" style="flex:1;">' + opts + '</select>' +
+                '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        } else {
+            div.innerHTML = '<input type="text" class="form-input cd-item-label" style="flex:2;" placeholder="Label item" value="' + (label || '') + '">' +
+                '<input type="number" class="form-input cd-item-ordre" style="width:60px;" placeholder="#" min="1" value="' + (ordre || '') + '">' +
+                '<button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#ef4444;font-size:1.2rem;cursor:pointer;">&times;</button>';
+        }
+        container.appendChild(div);
+    };
+    window.updateCdSelects = function() {
+        const cats = document.getElementById('cd-categories').value.split('|').map(s=>s.trim()).filter(Boolean);
+        document.querySelectorAll('.cd-item-cat').forEach(sel => {
+            const cur = sel.value;
+            sel.innerHTML = cats.map(c => '<option value="' + c + '"' + (c === cur ? ' selected' : '') + '>' + c + '</option>').join('');
+        });
+    };
+    window.onCdModeChange = function() {
+        const mode = document.getElementById('cd-mode').value;
+        const catGroup = document.getElementById('cd-categories-group');
+        catGroup.style.display = mode === 'colonnes' ? '' : 'none';
+        // Rebuild items with new mode
+        const container = document.getElementById('cd-items-list');
+        const existing = Array.from(container.querySelectorAll('.cd-item-row')).map(row => {
+            return { label: row.querySelector('.cd-item-label').value };
+        });
+        container.innerHTML = '';
+        existing.forEach(it => addClicDeposerItem(it.label, '', ''));
     };
 
     // ========== DYNAMIC HELPERS : MEMORY ==========
@@ -3264,6 +3348,18 @@
             document.getElementById('cat-categories').value = (contenu.categories || []).join(' | ');
             document.getElementById('cat-items-list').innerHTML = '';
             (contenu.items || []).forEach(it => addCatItem(it.label, it.categorie));
+        } else if (type === 'clic_deposer') {
+            document.getElementById('cd-titre').value = contenu.titre || '';
+            document.getElementById('cd-consigne').value = contenu.consigne || 'Classez chaque element dans la bonne zone';
+            document.getElementById('cd-mode').value = contenu.mode || 'colonnes';
+            if (contenu.mode === 'colonnes' || !contenu.mode) {
+                document.getElementById('cd-categories').value = (contenu.categories || []).join(' | ');
+                document.getElementById('cd-categories-group').style.display = '';
+            } else {
+                document.getElementById('cd-categories-group').style.display = 'none';
+            }
+            document.getElementById('cd-items-list').innerHTML = '';
+            (contenu.items || []).forEach(it => addClicDeposerItem(it.label, it.categorie, it.ordre));
         } else if (type === 'memory') {
             document.getElementById('mem-titre').value = contenu.titre || '';
             document.getElementById('mem-list').innerHTML = '';
@@ -3445,6 +3541,13 @@
         document.getElementById('cat-consigne').value = 'Classez chaque element dans la bonne categorie';
         document.getElementById('cat-categories').value = '';
         document.getElementById('cat-items-list').innerHTML = '';
+        // Clic Deposer
+        document.getElementById('cd-titre').value = '';
+        document.getElementById('cd-consigne').value = 'Classez chaque element dans la bonne zone';
+        document.getElementById('cd-mode').value = 'colonnes';
+        document.getElementById('cd-categories').value = '';
+        document.getElementById('cd-categories-group').style.display = '';
+        document.getElementById('cd-items-list').innerHTML = '';
         // Memory
         document.getElementById('mem-titre').value = '';
         document.getElementById('mem-list').innerHTML = '';
@@ -4125,6 +4228,34 @@
             if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
         }
 
+        // Validation Clic Deposer
+        if (type === 'clic_deposer') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.items || c.items.length < 2) errors.push('Il faut au moins 2 items');
+            if (c.mode === 'colonnes') {
+                if (!c.categories || c.categories.length < 2) errors.push('Il faut au moins 2 categories');
+                if (c.items) {
+                    c.items.forEach((it, i) => {
+                        if (!it.label) errors.push('Item ' + (i+1) + ' : label obligatoire');
+                        if (c.categories && !c.categories.includes(it.categorie)) errors.push('Item "' + it.label + '" : categorie invalide');
+                    });
+                }
+            } else if (c.mode === 'ordre') {
+                if (c.items) {
+                    const ordres = [];
+                    c.items.forEach((it, i) => {
+                        if (!it.label) errors.push('Item ' + (i+1) + ' : label obligatoire');
+                        if (!it.ordre && it.ordre !== 0) errors.push('Item "' + it.label + '" : ordre obligatoire');
+                        ordres.push(it.ordre);
+                    });
+                    if (new Set(ordres).size !== ordres.length) errors.push('Les numeros d\'ordre doivent etre uniques');
+                }
+            }
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
+
         // Validation Memory
         if (type === 'memory') {
             const c = contenu;
@@ -4800,6 +4931,7 @@ Important:
         if (src.mode && Array.isArray(src.categories) && ['quiz_image','nom_vers_image','categoriser','memory','speed','escape_game'].includes(src.mode)) return 'pictogramme';
         if (Array.isArray(src.etapes) && src.etapes[0] && typeof src.etapes[0].id === 'string') return 'scenario';
         if (Array.isArray(src.cartes) && src.cartes[0] && src.cartes[0].a !== undefined) return 'memory';
+        if (Array.isArray(src.items) && src.items[0] && src.mode && (src.mode === 'colonnes' || src.mode === 'ordre')) return 'clic_deposer';
         if (Array.isArray(src.categories) && Array.isArray(src.items) && src.items[0] && src.items[0].categorie !== undefined) return 'categoriser';
         if (Array.isArray(src.questions) && typeof src.temps_par_question === 'number') return 'quiz_chrono';
         // Priorite QCM image avant QCM serie/classique
@@ -5141,6 +5273,8 @@ Important:
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'QCM serie attendu: questions[].';
             case 'quiz_chrono':
                 return (Array.isArray(data.questions) && data.questions.length > 0) ? '' : 'Quiz chrono attendu: questions[] + temps_par_question.';
+            case 'clic_deposer':
+                return (Array.isArray(data.items) && data.mode) ? '' : 'Clic Deposer attendu: items[] + mode.';
             case 'categoriser':
                 return (Array.isArray(data.categories) && Array.isArray(data.items)) ? '' : 'Categoriser attendu: categories[] + items[].';
             case 'memory':
@@ -5373,6 +5507,7 @@ Important:
         if (type === 'qcm_classique' && data.choix) detail = ' (' + data.choix.length + ' choix)';
         else if (type === 'qcm_series_multi' && data.questions) detail = ' (' + data.questions.length + ' questions)';
         else if (type === 'quiz_chrono' && data.questions) detail = ' (' + data.questions.length + ' questions)';
+        else if (type === 'clic_deposer' && data.items) detail = ' (' + data.items.length + ' items, mode: ' + (data.mode || 'colonnes') + ')';
         else if (type === 'categoriser' && data.items) detail = ' (' + data.items.length + ' items)';
         else if (type === 'memory' && data.cartes) detail = ' (' + data.cartes.length + ' paires)';
         else if (type === 'scenario' && data.etapes) detail = ' (' + data.etapes.length + ' etapes)';
