@@ -36,12 +36,13 @@ Notions : Mensualites, TAEG, Surendettement, Cout total du credit, Taux d'endett
 - Nombre de mois d'epargne = Montant du projet / Solde mensuel
 - Cout du credit = Cout total rembourse - Prix comptant
 
-### TYPES D'EPARGNE A CONNAITRE
-- Livret A : taux 3%, plafond 22 950 euros, disponible immediatement, tout age
-- Livret jeune : taux minimum 3%, plafond 1 600 euros, disponible immediatement, 12-25 ans
-- LDDS : taux 3%, plafond 12 000 euros, disponible immediatement, majeurs
-- PEL : taux 2%, plafond 61 200 euros, bloque 4 ans, projet immobilier
-- LEP : taux 5%, plafond 10 000 euros, disponible immediatement, revenus modestes
+### TYPES D'EPARGNE A CONNAITRE (taux en vigueur a partir du 1er fevrier 2026)
+- Livret A : taux 1,5%, plafond 22 950 euros, disponible immediatement, tout age
+- Livret jeune : taux minimum 1,5% (fixe par la banque), plafond 1 600 euros, disponible immediatement, 12-25 ans domicilie en France
+- LDDS : taux 1,5%, plafond 12 000 euros, disponible immediatement, majeurs domicile fiscal en France
+- CEL : taux 1%, plafond 15 300 euros, disponibilite selon regles du compte, fiscalite specifique
+- PEL : taux 2% (si ouvert a partir du 01/01/2026), plafond 61 200 euros, bloque 4 ans, projet immobilier
+- LEP : taux 2,5%, plafond 10 000 euros, disponible immediatement, revenus modestes sous condition
 
 ---
 
@@ -68,7 +69,7 @@ ATTENTION : Ce JSON est destine a l'editeur d'exercices (type "Etude de cas"), P
 ```json
 {
   "consigne": "Lisez attentivement la situation de [Prenom] puis repondez aux questions.",
-  "scenario": "Texte complet du scenario incluant :\n- Presentation du personnage (prenom, age, metier, logement)\n- Ses revenus (salaire + aide sociale)\n- Son projet et son cout\n\nBUDGET MENSUEL :\n\nREVENUS :\n- Salaire net : XXX euros\n- [Aide sociale] : XXX euros\nTotal revenus : XXX euros\n\nDEPENSES :\n- Loyer : XXX euros\n- [Poste 2] : XXX euros\n- [Poste 3] : XXX euros\n- [...]\n- Credit [objet] (mensualite) : XXX euros\nTotal depenses : XXX euros\n\nOFFRES DE CREDIT POUR [LE PROJET] :\n- Offre A : XXX euros/mois pendant X mois (cout total : XXX euros)\n- Offre B : XXX euros/mois pendant X mois (cout total : XXX euros)\n\nTYPES D'EPARGNE DISPONIBLES :\n- Livret A : taux 3%, disponible immediatement, tout age\n- Livret jeune : taux min 3%, disponible immediatement, 12-25 ans\n- LEP : taux 5%, disponible immediatement, revenus modestes\n- PEL : taux 2%, bloque 4 ans, projet immobilier",
+  "scenario": "Texte complet du scenario incluant :\n- Presentation du personnage (prenom, age, metier, logement)\n- Ses revenus (salaire + aide sociale)\n- Son projet et son cout\n\nBUDGET MENSUEL :\n\nREVENUS :\n- Salaire net : XXX euros\n- [Aide sociale] : XXX euros\nTotal revenus : XXX euros\n\nDEPENSES :\n- Loyer : XXX euros\n- [Poste 2] : XXX euros\n- [Poste 3] : XXX euros\n- [...]\n- Credit [objet] (mensualite) : XXX euros\nTotal depenses : XXX euros\n\nOFFRES DE CREDIT POUR [LE PROJET] :\n- Offre A : XXX euros/mois pendant X mois (cout total : XXX euros)\n- Offre B : XXX euros/mois pendant X mois (cout total : XXX euros)\n\nTYPES D'EPARGNE DISPONIBLES (taux fevrier 2026) :\n- Livret A : taux 1,5%, disponible immediatement, tout age\n- Livret jeune : taux min 1,5%, disponible immediatement, 12-25 ans\n- LDDS : taux 1,5%, disponible immediatement, majeurs\n- LEP : taux 2,5%, disponible immediatement, revenus modestes\n- PEL : taux 2%, bloque 4 ans, projet immobilier",
   "questions": [
     {
       "question": "Texte de la question",
@@ -160,7 +161,7 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
 ```json
 {
   "consigne": "Lisez attentivement la situation de Yanis puis repondez aux questions.",
-  "scenario": "Yanis, 18 ans, est apprenti en carrosserie dans un garage automobile. Il vit seul dans un studio et percoit un salaire mensuel net de 760 euros. Il beneficie egalement d'une aide au logement (APL) de 180 euros par mois. Yanis souhaite passer son permis de conduire pour se rendre plus facilement a son travail. Le cout total de la formation au permis B est de 360 euros (tarif reduit par son CFA).\n\nBUDGET MENSUEL DE YANIS\n\nREVENUS :\n- Salaire net : 760 euros\n- APL : 180 euros\nTotal revenus : 940 euros\n\nDEPENSES :\n- Loyer : 420 euros\n- Forfait telephone : 25 euros\n- Transport (abonnement bus) : 55 euros\n- Assurance habitation : 30 euros\n- Alimentation : 180 euros\n- Loisirs (sorties, sport) : 60 euros\n- Vetements : 40 euros\n- Abonnement streaming : 15 euros\n- Credit scooter (mensualite) : 85 euros (reste 6 mois)\nTotal depenses : 910 euros\n\nOFFRES DE CREDIT POUR LE PERMIS :\n- Offre A : 80 euros/mois pendant 5 mois (cout total : 400 euros)\n- Offre B : 45 euros/mois pendant 9 mois (cout total : 405 euros)\n\nTYPES D'EPARGNE DISPONIBLES :\n- Livret A : taux 3%, disponible immediatement, accessible a tout age\n- Livret jeune : taux minimum 3%, disponible immediatement, reserve aux 12-25 ans\n- LEP : taux 5%, disponible immediatement, reserve aux revenus modestes\n- PEL : taux 2%, bloque 4 ans, pour un projet immobilier\n\nRAPPELS :\n- Depenses incompressibles = charges fixes obligatoires (loyer, assurance, transport travail, credit)\n- Depenses courantes = necessaires mais ajustables (alimentation, telephone, abonnements)\n- Depenses occasionnelles = non essentielles (loisirs, vetements)\n- Solde = Revenus - Depenses\n- Taux d'endettement = (mensualites credits / revenus) x 100\n- Seuil de surendettement = 33%",
+  "scenario": "Yanis, 18 ans, est apprenti en carrosserie dans un garage automobile. Il vit seul dans un studio et percoit un salaire mensuel net de 760 euros. Il beneficie egalement d'une aide au logement (APL) de 180 euros par mois. Yanis souhaite passer son permis de conduire pour se rendre plus facilement a son travail. Le cout total de la formation au permis B est de 360 euros (tarif reduit par son CFA).\n\nBUDGET MENSUEL DE YANIS\n\nREVENUS :\n- Salaire net : 760 euros\n- APL : 180 euros\nTotal revenus : 940 euros\n\nDEPENSES :\n- Loyer : 420 euros\n- Forfait telephone : 25 euros\n- Transport (abonnement bus) : 55 euros\n- Assurance habitation : 30 euros\n- Alimentation : 180 euros\n- Loisirs (sorties, sport) : 60 euros\n- Vetements : 40 euros\n- Abonnement streaming : 15 euros\n- Credit scooter (mensualite) : 85 euros (reste 6 mois)\nTotal depenses : 910 euros\n\nOFFRES DE CREDIT POUR LE PERMIS :\n- Offre A : 80 euros/mois pendant 5 mois (cout total : 400 euros)\n- Offre B : 45 euros/mois pendant 9 mois (cout total : 405 euros)\n\nTYPES D'EPARGNE DISPONIBLES (taux fevrier 2026) :\n- Livret A : taux 1,5%, disponible immediatement, accessible a tout age\n- Livret jeune : taux minimum 1,5%, disponible immediatement, reserve aux 12-25 ans\n- LDDS : taux 1,5%, disponible immediatement, reserve aux majeurs\n- LEP : taux 2,5%, disponible immediatement, reserve aux revenus modestes\n- PEL : taux 2%, bloque 4 ans, pour un projet immobilier\n\nRAPPELS :\n- Depenses incompressibles = charges fixes obligatoires (loyer, assurance, transport travail, credit)\n- Depenses courantes = necessaires mais ajustables (alimentation, telephone, abonnements)\n- Depenses occasionnelles = non essentielles (loisirs, vetements)\n- Solde = Revenus - Depenses\n- Taux d'endettement = (mensualites credits / revenus) x 100\n- Seuil de surendettement = 33%",
   "questions": [
     {
       "question": "Quel est le total des revenus mensuels de Yanis ?",
@@ -218,7 +219,7 @@ Voici un exemple complet et valide. Utilise-le comme modele pour la structure et
       "type": "qcm",
       "choix": ["Plan epargne logement (PEL)", "Livret jeune", "Aucune epargne n'est adaptee"],
       "correct": 1,
-      "explication": "Le Livret jeune est reserve aux 12-25 ans (Yanis a 18 ans), offre un taux minimum de 3%, et l'argent est disponible immediatement. Le PEL est bloque 4 ans et destine a l'immobilier."
+      "explication": "Le Livret jeune est reserve aux 12-25 ans (Yanis a 18 ans), offre un taux minimum de 1,5% (fevrier 2026), et l'argent est disponible immediatement. Le PEL est bloque 4 ans et destine a l'immobilier."
     },
     {
       "question": "A quoi sert l'epargne de precaution ?",
