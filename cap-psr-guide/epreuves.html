@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Épreuves &amp; Évaluation | Guide CAP PSR</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html" class="logo">CAP <span>PSR</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Accueil</a></li>
+      <li><a href="pole1.html" data-pole="1">Production</a></li>
+      <li><a href="pole2.html" data-pole="2">Service</a></li>
+      <li><a href="epreuves.html" class="active">Épreuves</a></li>
+      <li><a href="pfmp.html">PFMP</a></li>
+      <li><a href="glossaire.html">Glossaire</a></li>
+      <li><a href="guide-pedagogique.html">GAP</a></li>
+      <li><a href="equipement.html">Équipement</a></li>
+    </ul>
+    <div class="search-container">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" placeholder="Rechercher...">
+      <div class="search-results"></div>
+    </div>
+    <button class="theme-toggle" title="Mode sombre/clair">&#9790;</button>
+  </nav>
+
+  <div class="main">
+    <div class="breadcrumbs">
+      <a href="index.html">Accueil</a><span class="sep">/</span><strong>Épreuves</strong>
+    </div>
+
+    <div class="page-header fade-in">
+      <h1>Épreuves &amp; Évaluation</h1>
+      <p class="subtitle">Modalités d'évaluation du CAP PSR &mdash; CCF et ponctuel</p>
+    </div>
+
+    <!-- Recap coefficients -->
+    <div class="stats-bar fade-in">
+      <div class="stat-item">
+        <div class="stat-number pole1">6</div>
+        <div class="stat-label">Coefficient<br>EP1</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number pole2">6</div>
+        <div class="stat-label">Coefficient<br>EP2</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number accent">8</div>
+        <div class="stat-label">Coefficient<br>EG total</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">20</div>
+        <div class="stat-label">Coefficient<br>Total</div>
+      </div>
+    </div>
+
+    <!-- Épreuves professionnelles -->
+    <div class="section fade-in">
+      <div class="section-title">
+        <span class="dot accent"></span>
+        Épreuves professionnelles
+      </div>
+      <div id="epreuves-pro"></div>
+    </div>
+
+    <!-- Details CCF du GAP -->
+    <div class="section fade-in">
+      <div class="section-title">
+        <span class="dot pole1"></span>
+        Détails CCF &mdash; Répartition Établissement / PFMP
+      </div>
+      <div id="ccf-details"></div>
+    </div>
+
+    <!-- Épreuves générales -->
+    <div class="section fade-in">
+      <div class="section-title">
+        <span class="dot"></span>
+        Épreuves générales
+      </div>
+      <div id="epreuves-gen"></div>
+    </div>
+
+    <!-- Tableau croisé -->
+    <div class="section fade-in">
+      <div class="section-title">
+        <span class="dot accent"></span>
+        Tableau croisé Compétences / Unités
+      </div>
+      <div class="table-responsive">
+        <table class="table" id="tableau-croise">
+          <thead>
+            <tr>
+              <th>Compétence</th>
+              <th>Pole</th>
+              <th>UP1 (EP1)</th>
+              <th>UP2 (EP2)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html"><span class="icon">&#127968;</span>Accueil</a>
+    <a href="pole1.html"><span class="icon">&#127859;</span>Prod.</a>
+    <a href="pole2.html"><span class="icon">&#127860;</span>Service</a>
+    <a href="epreuves.html" class="active"><span class="icon">&#128203;</span>Épreuves</a>
+    <a href="glossaire.html"><span class="icon">&#128218;</span>Glossaire</a>
+  </nav>
+  <button class="back-to-top" title="Haut de page">&#8679;</button>
+
+  <script src="js/data.js"></script>
+  <script src="js/modules-registry.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/progression.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // ---- Épreuves professionnelles ----
+      var proContainer = document.getElementById('epreuves-pro');
+      DATA.epreuves.professionnelles.forEach(function(ep) {
+        var poleClass = ep.id === 'EP1' ? 'pole1' : 'pole2';
+        var poleNum = ep.id === 'EP1' ? 1 : 2;
+
+        // Compétences liées
+        var compLinks = ep.competences.map(function(cId) {
+          var c = DATA.competences.find(function(x) { return x.id === cId; });
+          return '<a href="competence.html?id=' + cId + '" class="tag ' + poleClass + '">' + cId + ' - ' + (c ? c.nom : '') + '</a>';
+        }).join(' ');
+
+        // Ponctuel
+        var partiesPonctuel = '';
+        ep.ponctuel.parties.forEach(function(p) {
+          partiesPonctuel +=
+            '<div style="margin-bottom:12px; padding:10px; background:var(--bg-card); border-radius:8px">' +
+              '<strong>' + p.nom + '</strong> <span class="card-badge epreuve">' + p.duree + '</span>' +
+              '<p style="margin-top:6px; font-size:0.85rem; color:var(--text-light)">' + p.description + '</p>' +
+            '</div>';
+        });
+
+        // CCF
+        var situationsCcf = '';
+        ep.ccf.situations.forEach(function(s) {
+          situationsCcf +=
+            '<div style="margin-bottom:12px; padding:10px; background:var(--bg-card); border-radius:8px">' +
+              '<strong>' + s.nom + '</strong> <span class="card-badge ' + poleClass + '">Coef. ' + s.coefficient + '</span>' +
+              '<p style="margin-top:6px; font-size:0.85rem; color:var(--text-light)">' + s.description + '</p>' +
+            '</div>';
+        });
+
+        proContainer.innerHTML +=
+          '<div class="card" id="' + ep.id + '" style="margin-bottom:16px">' +
+            '<div class="card-header">' +
+              '<div class="card-icon ' + poleClass + '">' + ep.id + '</div>' +
+              '<div>' +
+                '<div class="card-title">' + ep.nom + '</div>' +
+                '<div style="margin-top:6px">' +
+                  '<span class="card-badge ' + poleClass + '">Unite ' + ep.unite + '</span> ' +
+                  '<span class="card-badge epreuve">Coefficient ' + ep.coefficient + '</span> ' +
+                  '<span class="card-badge">Pole ' + poleNum + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="margin:12px 0 8px"><strong>Compétences évaluées :</strong></div>' +
+            '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px">' + compLinks + '</div>' +
+
+            '<div class="accordion">' +
+              '<button class="accordion-header">&#128203; Épreuve ponctuelle <span class="card-badge epreuve">' + ep.ponctuel.duree + '</span><span class="arrow">&#9654;</span></button>' +
+              '<div class="accordion-content">' +
+                '<p style="margin-bottom:12px; font-size:0.85rem"><strong>Type :</strong> ' + ep.ponctuel.type + '</p>' +
+                partiesPonctuel +
+              '</div>' +
+            '</div>' +
+
+            '<div class="accordion" style="margin-top:8px">' +
+              '<button class="accordion-header">&#9989; Controle en cours de formation (CCF)<span class="arrow">&#9654;</span></button>' +
+              '<div class="accordion-content">' +
+                situationsCcf +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      });
+
+      // ---- Épreuves générales ----
+      var genContainer = document.getElementById('epreuves-gen');
+      var genHtml = '<div class="table-responsive"><table class="table"><thead><tr>' +
+        '<th>Code</th><th>Épreuve</th><th>Unite</th><th>Coef.</th><th>Mode</th><th>Duree ponctuel</th>' +
+        '</tr></thead><tbody>';
+
+      DATA.epreuves.generales.forEach(function(eg) {
+        genHtml += '<tr>' +
+          '<td><strong>' + eg.id + '</strong></td>' +
+          '<td>' + eg.nom + '</td>' +
+          '<td>' + eg.unite + '</td>' +
+          '<td><span class="card-badge">' + eg.coefficient + '</span></td>' +
+          '<td>' + eg.mode + '</td>' +
+          '<td>' + (eg.ponctuelDuree || '-') + '</td>' +
+          '</tr>';
+        if (eg.note) {
+          genHtml += '<tr><td colspan="6" style="font-size:0.82rem; color:var(--text-light); padding-top:0"><em>' + eg.note + '</em></td></tr>';
+        }
+      });
+
+      genHtml += '</tbody></table></div>';
+      genContainer.innerHTML = genHtml;
+
+      // ---- CCF Details du GAP ----
+      var ccfEl = document.getElementById('ccf-details');
+      if (DATA.gap && DATA.gap.ccfDetails) {
+        var ccf = DATA.gap.ccfDetails;
+        var ccfHtml = '<div class="alert info" style="margin-bottom:16px"><span class="alert-icon">&#8505;</span><div>' + ccf.presentationGlobale.description + '</div></div>';
+
+        // Repartition table
+        ccfHtml += '<div class="accordion" style="margin-bottom:10px"><button class="accordion-header">&#128203; Repartition des compétences<span class="arrow">&#9654;</span></button><div class="accordion-content">';
+        ccfHtml += '<table class="table-styled"><thead><tr><th>Comp.</th><th>Intitule</th><th>Etablissement</th><th>PFMP</th></tr></thead><tbody>';
+        ccf.presentationGlobale.repartition.forEach(function(r) {
+          ccfHtml += '<tr><td><strong>' + r.competence + '</strong></td><td style="font-size:0.82rem">' + r.nom + '</td><td style="text-align:center">' + (r.etablissement ? '&#9989;' : '') + '</td><td style="text-align:center">' + (r.pfmp ? '&#9989;' : '') + '</td></tr>';
+        });
+        ccfHtml += '</tbody></table>';
+        ccfHtml += '<div class="alert info" style="margin-top:10px"><span class="alert-icon">&#128202;</span><div style="font-size:0.82rem">' + ccf.presentationGlobale.schema + '</div></div>';
+        ccfHtml += '</div></div>';
+
+        // EP1 CCF details
+        ccfHtml += '<div class="accordion" style="margin-bottom:10px"><button class="accordion-header"><span class="card-badge pole1">EP1</span> CCF Situation 1 &mdash; Etablissement (coef. 4)<span class="arrow">&#9654;</span></button><div class="accordion-content">';
+        var s1 = ccf.ep1.situation1;
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px"><strong>Secteur :</strong> ' + s1.secteur + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + s1.partieEcrite.description + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + s1.partieEcrite.precision + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px"><em>' + s1.partieEcrite.dissociation + '</em></p>';
+        ccfHtml += '<h4 style="margin:10px 0 6px">Partie pratique et orale :</h4><ul class="list-styled" style="font-size:0.82rem">';
+        s1.partiePratiqueOrale.competences.forEach(function(c) { ccfHtml += '<li>' + c + '</li>'; });
+        ccfHtml += '</ul><p style="font-size:0.82rem;margin-top:8px;color:var(--text-light)"><em>' + s1.partiePratiqueOrale.noteC4 + '</em></p>';
+        ccfHtml += '<p style="font-size:0.82rem;margin-top:6px">' + s1.organisation + '</p></div></div>';
+
+        // EP1 CCF situation 2
+        ccfHtml += '<div class="accordion" style="margin-bottom:10px"><button class="accordion-header"><span class="card-badge pole1">EP1</span> CCF Situation 2 &mdash; PFMP (coef. 2)<span class="arrow">&#9654;</span></button><div class="accordion-content">';
+        var s2 = ccf.ep1.situation2;
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px"><strong>Secteur :</strong> ' + s2.secteur + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + s2.choixSecteur + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + s2.verification + '</p>';
+        ccfHtml += '<ul class="list-styled" style="font-size:0.82rem">';
+        s2.competences.forEach(function(c) { ccfHtml += '<li>' + c + '</li>'; });
+        ccfHtml += '</ul><p style="font-size:0.82rem;margin-top:6px">' + s2.evaluation + '</p></div></div>';
+
+        // EP2 CCF situation 1
+        ccfHtml += '<div class="accordion" style="margin-bottom:10px"><button class="accordion-header"><span class="card-badge pole2">EP2</span> CCF Situation 1 &mdash; Etablissement (coef. 3)<span class="arrow">&#9654;</span></button><div class="accordion-content">';
+        var ep2s1 = ccf.ep2.situation1;
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px"><strong>Secteur :</strong> ' + ep2s1.secteur + '</p>';
+        ccfHtml += '<h4 style="margin:8px 0 6px">Partie pratique :</h4><ul class="list-styled" style="font-size:0.82rem">';
+        ep2s1.partiePratique.competences.forEach(function(c) { ccfHtml += '<li>' + c + '</li>'; });
+        ccfHtml += '</ul>';
+        ccfHtml += '<h4 style="margin:10px 0 6px">Partie orale :</h4>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:6px">' + ep2s1.partieOrale.precision + '</p>';
+        ccfHtml += '<p style="font-size:0.82rem;color:var(--text-light)"><em>' + ep2s1.partieOrale.documentsExemples + '</em></p>';
+        ccfHtml += '<p style="font-size:0.82rem;margin-top:6px">' + ep2s1.organisation + '</p></div></div>';
+
+        // EP2 CCF situation 2
+        ccfHtml += '<div class="accordion" style="margin-bottom:10px"><button class="accordion-header"><span class="card-badge pole2">EP2</span> CCF Situation 2 &mdash; PFMP (coef. 3)<span class="arrow">&#9654;</span></button><div class="accordion-content">';
+        var ep2s2 = ccf.ep2.situation2;
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px"><strong>Secteur :</strong> ' + ep2s2.secteur + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + ep2s2.choixSecteur + '</p>';
+        ccfHtml += '<p style="font-size:0.85rem;margin-bottom:8px">' + ep2s2.verification + '</p>';
+        ccfHtml += '<ul class="list-styled" style="font-size:0.82rem">';
+        ep2s2.competences.forEach(function(c) { ccfHtml += '<li>' + c + '</li>'; });
+        ccfHtml += '</ul><p style="font-size:0.82rem;margin-top:6px">' + ep2s2.evaluation + '</p></div></div>';
+
+        // Archivage + link
+        ccfHtml += '<div class="alert info"><span class="alert-icon">&#128451;</span><div><strong>Archivage :</strong> ' + ccf.archivage + '</div></div>';
+        ccfHtml += '<a href="guide-pedagogique.html#gap-ccf" class="tag accent" style="margin-top:8px">&#128279; Voir les details complets dans le GAP</a>';
+        ccfEl.innerHTML = ccfHtml;
+      }
+
+      // ---- Tableau croisé ----
+      var tbody = document.querySelector('#tableau-croise tbody');
+      DATA.tableauCroise.forEach(function(row) {
+        var comp = DATA.competences.find(function(c) { return c.id === row.competence; });
+        var poleClass = 'pole' + row.pole;
+        tbody.innerHTML +=
+          '<tr>' +
+            '<td><a href="competence.html?id=' + row.competence + '" class="tag ' + poleClass + '">' + row.competence + ' - ' + (comp ? comp.nom : '') + '</a></td>' +
+            '<td>Pole ' + row.pole + '</td>' +
+            '<td>' + (row.UP1 ? '&#9989;' : '') + '</td>' +
+            '<td>' + (row.UP2 ? '&#9989;' : '') + '</td>' +
+          '</tr>';
+      });
+
+      // Re-initialiser les accordeons
+      document.querySelectorAll('.accordion-header').forEach(function(h) {
+        h.addEventListener('click', function() { this.parentElement.classList.toggle('open'); });
+      });
+
+      // Scroll vers ancre
+      if (window.location.hash) {
+        var el = document.getElementById(window.location.hash.slice(1));
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  </script>
+</body>
+</html>

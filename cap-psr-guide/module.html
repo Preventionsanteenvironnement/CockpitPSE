@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module - Guide CAP PSR</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="top-nav">
+    <a href="index.html" class="logo">CAP <span>PSR</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Accueil</a></li>
+      <li><a href="pole1.html" data-pole="1">Production</a></li>
+      <li><a href="pole2.html" data-pole="2">Service</a></li>
+      <li><a href="epreuves.html">Épreuves</a></li>
+      <li><a href="pfmp.html">PFMP</a></li>
+      <li><a href="glossaire.html">Glossaire</a></li>
+      <li><a href="guide-pedagogique.html">GAP</a></li>
+      <li><a href="equipement.html">Équipement</a></li>
+    </ul>
+    <div class="search-container">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" placeholder="Rechercher...">
+      <div class="search-results"></div>
+    </div>
+    <button class="theme-toggle" title="Mode sombre/clair">&#9790;</button>
+  </nav>
+
+  <div class="main">
+    <div class="breadcrumbs" id="breadcrumbs">
+      <a href="index.html">Accueil</a><span class="sep">/</span><strong>Module</strong>
+    </div>
+
+    <div class="page-header fade-in module-header" id="module-header">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+        <div id="module-icon" style="font-size:2.5rem"></div>
+        <div>
+          <h1 id="module-title">Chargement...</h1>
+          <p class="subtitle" id="module-subtitle"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation sections -->
+    <div class="module-section-nav fade-in" id="section-nav"></div>
+
+    <!-- Contenu du module -->
+    <div id="module-content"></div>
+
+    <!-- Liens vers le referentiel -->
+    <div class="section fade-in" id="crossrefs-section" style="display:none">
+      <div class="section-title">
+        <span class="dot accent"></span>
+        Liens avec le référentiel
+      </div>
+      <div id="crossrefs-container"></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html"><span class="icon">&#127968;</span>Accueil</a>
+    <a href="pole1.html"><span class="icon">&#127859;</span>Prod.</a>
+    <a href="pole2.html"><span class="icon">&#127860;</span>Service</a>
+    <a href="epreuves.html"><span class="icon">&#128203;</span>Épreuves</a>
+    <a href="glossaire.html"><span class="icon">&#128218;</span>Glossaire</a>
+  </nav>
+  <button class="back-to-top" title="Haut de page">&#8679;</button>
+
+  <script src="js/data.js"></script>
+  <script src="js/modules-registry.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/progression.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var params = new URLSearchParams(window.location.search);
+      var moduleId = params.get('id');
+      if (!moduleId) { window.location.href = 'index.html'; return; }
+
+      PSR_MODULES.load(moduleId).then(function(mod) {
+        // Titre
+        document.title = mod.nom + ' | Guide CAP PSR';
+        document.getElementById('module-title').textContent = mod.nomComplet || mod.nom;
+        document.getElementById('module-subtitle').textContent = mod.description || '';
+        document.getElementById('module-icon').innerHTML = mod.icone || '';
+
+        // Couleur du header
+        var header = document.getElementById('module-header');
+        if (mod.couleur) header.style.borderTopColor = mod.couleur;
+
+        // Breadcrumbs
+        document.getElementById('breadcrumbs').innerHTML =
+          '<a href="index.html">Accueil</a><span class="sep">/</span><strong>' + mod.nom + '</strong>';
+
+        // Navigation des sections
+        if (mod.sections && mod.sections.length > 1) {
+          var navHtml = '';
+          mod.sections.forEach(function(section) {
+            navHtml += '<a href="#' + section.id + '">' + section.titre + '</a>';
+          });
+          document.getElementById('section-nav').innerHTML = navHtml;
+        }
+
+        // Contenu
+        var contentEl = document.getElementById('module-content');
+        var contentHtml = '';
+
+        if (mod.sections) {
+          mod.sections.forEach(function(section) {
+            contentHtml += '<div class="section fade-in" id="' + section.id + '">';
+            contentHtml += '<div class="section-title">';
+            contentHtml += '<span class="dot" style="background:' + (mod.couleur || 'var(--accent)') + '"></span>';
+            contentHtml += section.titre;
+            contentHtml += '</div>';
+
+            if (section.contenu) {
+              section.contenu.forEach(function(item) {
+                contentHtml += renderContentItem(item, mod);
+              });
+            }
+
+            contentHtml += '</div>';
+          });
+        }
+
+        contentEl.innerHTML = contentHtml;
+
+        // Liens vers le referentiel (cross-refs directes)
+        renderModuleCrossRefs(mod);
+
+        // Initialiser accordeons
+        document.querySelectorAll('.accordion-header').forEach(function(h) {
+          h.addEventListener('click', function() { this.parentElement.classList.toggle('open'); });
+        });
+
+        // Initialiser progression
+        if (typeof initProgressCheckboxes === 'function') {
+          initProgressCheckboxes();
+          updateProgressDisplay();
+        }
+
+        // Scroll vers ancre si present
+        if (window.location.hash) {
+          var target = document.getElementById(window.location.hash.substring(1));
+          if (target) {
+            setTimeout(function() { target.scrollIntoView({ behavior: 'smooth' }); }, 300);
+          }
+        }
+
+      }).catch(function(err) {
+        document.getElementById('module-title').textContent = 'Module non trouve';
+        document.getElementById('module-subtitle').textContent = err.message || 'Erreur de chargement';
+      });
+
+      /**
+       * Rend un element de contenu (chapitre, activite, fiche, etc.)
+       */
+      function renderContentItem(item, mod) {
+        var html = '';
+        var couleur = mod.couleur || 'var(--accent)';
+        var poleClass = '';
+
+        // Type badge
+        var typeBadge = '';
+        if (item.type) {
+          var typeLabels = { chapitre: 'Chapitre', activite: 'Activite', evaluation: 'Évaluation', fiche: 'Fiche', cours: 'Cours' };
+          typeBadge = '<span class="card-badge" style="background:' + couleur + '20;color:' + couleur + '">' +
+            (typeLabels[item.type] || item.type) + '</span>';
+        }
+
+        html += '<div class="accordion" id="' + item.id + '">';
+        html += '<button class="accordion-header">';
+        if (typeBadge) html += typeBadge + ' ';
+        html += item.titre;
+        html += '<span class="arrow">&#9654;</span>';
+        html += '</button>';
+        html += '<div class="accordion-content">';
+
+        // Objectifs
+        if (item.objectifs && item.objectifs.length > 0) {
+          html += '<div style="margin-bottom:12px"><strong>Objectifs :</strong>';
+          html += '<ul class="list-styled">';
+          item.objectifs.forEach(function(obj) { html += '<li>' + obj + '</li>'; });
+          html += '</ul></div>';
+        }
+
+        // Texte
+        if (item.texte) {
+          html += '<div style="font-size:0.88rem;line-height:1.7;margin-bottom:12px">' + item.texte + '</div>';
+        }
+
+        // Items (sous-elements avec progression)
+        if (item.items && item.items.length > 0) {
+          item.items.forEach(function(subItem) {
+            html += '<div class="progress-check" id="check-' + subItem.id + '">';
+            html += '<input type="checkbox" data-id="' + subItem.id + '">';
+            html += '<label>';
+            html += '<strong>' + subItem.nom + '</strong>';
+            if (subItem.detail) {
+              html += '<div style="margin-top:4px;font-size:0.82rem;color:var(--text-light)">' + subItem.detail + '</div>';
+            }
+            if (subItem.notions && subItem.notions.length > 0) {
+              html += '<div style="margin-top:6px;font-size:0.78rem;line-height:1.5">';
+              html += '<strong style="color:var(--text)">Notions cl\u00e9s : </strong>';
+              html += '<span style="color:var(--text-light)">' + subItem.notions.join(' \u00b7 ') + '</span>';
+              html += '</div>';
+            }
+            if (subItem.contenus && subItem.contenus.length > 0) {
+              html += '<div style="margin-top:4px;font-size:0.76rem;line-height:1.5;color:var(--text-light)">';
+              html += '<strong style="color:var(--text)">Contenus : </strong>';
+              html += '<ul style="margin:2px 0 0 16px;padding:0">';
+              subItem.contenus.forEach(function(c) { html += '<li style="margin:1px 0">' + c + '</li>'; });
+              html += '</ul></div>';
+            }
+            html += '</label></div>';
+          });
+        }
+
+        // Sous-sections
+        if (item.sousSections) {
+          item.sousSections.forEach(function(ss) {
+            html += '<h4 style="margin:12px 0 6px;color:' + couleur + '">' + ss.titre + '</h4>';
+            if (ss.texte) html += '<p style="font-size:0.85rem;line-height:1.6">' + ss.texte + '</p>';
+            if (ss.items) {
+              html += '<ul class="list-styled">';
+              ss.items.forEach(function(i) { html += '<li>' + (typeof i === 'string' ? i : i.nom) + '</li>'; });
+              html += '</ul>';
+            }
+          });
+        }
+
+        html += '</div></div>';
+        return html;
+      }
+
+      /**
+       * Affiche les liens cross-refs du module vers le referentiel
+       */
+      function renderModuleCrossRefs(mod) {
+        if (!mod.crossRefs) return;
+        var container = document.getElementById('crossrefs-container');
+        var section = document.getElementById('crossrefs-section');
+        var html = '';
+        var hasRefs = false;
+
+        // Liens vers compétences
+        if (mod.crossRefs.competences) {
+          Object.keys(mod.crossRefs.competences).forEach(function(compId) {
+            var comp = window.getCompetence ? window.getCompetence(compId) : null;
+            if (!comp) return;
+            hasRefs = true;
+            var poleClass = 'pole' + comp.pole;
+            html += '<a href="competence.html?id=' + compId + '" class="card card-link" style="margin-bottom:8px">' +
+              '<div class="card-header">' +
+              '<div class="card-icon ' + poleClass + '">' + compId + '</div>' +
+              '<div><div class="card-title">' + comp.nom + '</div></div></div></a>';
+          });
+        }
+
+        // Liens vers savoirs
+        if (mod.crossRefs.savoirs) {
+          var savoirLinks = '';
+          Object.keys(mod.crossRefs.savoirs).forEach(function(savoirId) {
+            hasRefs = true;
+            savoirLinks += '<a href="competence.html?id=' + savoirId.split('.')[0].replace('S', 'C') +
+              '#' + savoirId + '" class="tag accent" style="margin:3px">' + savoirId + '</a>';
+          });
+          if (savoirLinks) {
+            html += '<div class="card" style="margin-top:8px"><div class="card-title" style="margin-bottom:8px">Savoirs associés</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:4px">' + savoirLinks + '</div></div>';
+          }
+        }
+
+        if (hasRefs) {
+          container.innerHTML = html;
+          section.style.display = '';
+        }
+      }
+    });
+  </script>
+</body>
+</html>

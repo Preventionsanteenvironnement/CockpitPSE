@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compétence - Guide CAP PSR</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="top-nav">
+    <a href="index.html" class="logo">CAP <span>PSR</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Accueil</a></li>
+      <li><a href="pole1.html" data-pole="1">Production</a></li>
+      <li><a href="pole2.html" data-pole="2">Service</a></li>
+      <li><a href="epreuves.html">Épreuves</a></li>
+      <li><a href="pfmp.html">PFMP</a></li>
+      <li><a href="glossaire.html">Glossaire</a></li>
+      <li><a href="guide-pedagogique.html">GAP</a></li>
+      <li><a href="equipement.html">Équipement</a></li>
+    </ul>
+    <div class="search-container">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" placeholder="Rechercher...">
+      <div class="search-results"></div>
+    </div>
+    <button class="theme-toggle" title="Mode sombre/clair">&#9790;</button>
+  </nav>
+
+  <div class="main">
+    <div class="breadcrumbs" id="breadcrumbs"></div>
+    <div class="page-header" id="comp-header"></div>
+
+    <!-- Liens rapides vers activite et épreuve -->
+    <div id="quick-links" class="quick-links" style="margin-bottom:20px"></div>
+
+    <!-- Conditions de réalisation -->
+    <div class="section" id="section-conditions">
+      <div class="accordion">
+        <button class="accordion-header">
+          &#128736; Conditions de réalisation - Ressources
+          <span class="arrow">&#9654;</span>
+        </button>
+        <div class="accordion-content">
+          <ul class="list-styled" id="conditions-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compétences détaillées + indicateurs -->
+    <div class="section" id="section-details">
+      <div class="section-title">
+        <span class="dot" id="dot-details"></span>
+        Compétences détaillées &amp; Indicateurs de performance
+      </div>
+      <div id="details-container"></div>
+    </div>
+
+    <!-- Savoirs associés -->
+    <div class="section" id="section-savoirs">
+      <div class="section-title">
+        <span class="dot accent"></span>
+        Savoirs associés
+      </div>
+      <div class="card">
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-text">Progression des savoirs</div>
+      </div>
+      <div id="savoirs-container"></div>
+    </div>
+
+    <!-- Savoirs communs du pole -->
+    <div class="section" id="section-savoirs-communs">
+      <div class="section-title">
+        <span class="dot" id="dot-sc"></span>
+        Savoirs communs du pole
+      </div>
+      <div id="savoirs-communs-container"></div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html"><span class="icon">&#127968;</span>Accueil</a>
+    <a href="pole1.html"><span class="icon">&#127859;</span>Prod.</a>
+    <a href="pole2.html"><span class="icon">&#127860;</span>Service</a>
+    <a href="epreuves.html"><span class="icon">&#128203;</span>Épreuves</a>
+    <a href="glossaire.html"><span class="icon">&#128218;</span>Glossaire</a>
+  </nav>
+
+  <button class="back-to-top" title="Haut de page">&#8679;</button>
+
+  <script src="js/data.js"></script>
+  <script src="js/modules-registry.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/progression.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Recuperer l'id de la compétence depuis l'URL
+      var params = new URLSearchParams(window.location.search);
+      var compId = params.get('id');
+      if (!compId) { window.location.href = 'index.html'; return; }
+
+      var comp = DATA.competences.find(function(c) { return c.id === compId; });
+      if (!comp) { window.location.href = 'index.html'; return; }
+
+      var pole = comp.pole;
+      var poleClass = 'pole' + pole;
+      var poleName = pole === 1 ? 'Production alimentaire' : 'Service en restauration';
+      var epreuveId = comp.epreuve;
+      var epreuve = DATA.epreuves.professionnelles.find(function(e) { return e.id === epreuveId; });
+
+      // Titre de la page
+      document.title = comp.id + ' - ' + comp.nom + ' | Guide CAP PSR';
+
+      // Breadcrumbs
+      document.getElementById('breadcrumbs').innerHTML =
+        '<a href="index.html">Accueil</a><span class="sep">/</span>' +
+        '<a href="pole' + pole + '.html">Pole ' + pole + '</a><span class="sep">/</span>' +
+        '<strong>' + comp.id + '</strong>';
+
+      // Header
+      document.getElementById('comp-header').innerHTML =
+        '<h1>' + comp.id + ' - ' + comp.nom + '</h1>' +
+        '<p class="subtitle">Pole ' + pole + ' &mdash; ' + poleName + '</p>';
+
+      // Quick links
+      var activiteId = comp.activites[0];
+      var activite = DATA.activites.find(function(a) { return a.id === activiteId; });
+      document.getElementById('quick-links').innerHTML =
+        '<a href="pole' + pole + '.html#' + activiteId + '" class="tag ' + poleClass + '">' +
+          '&#128279; Activité ' + activiteId + ' - ' + (activite ? activite.nom.substring(0, 40) + '...' : '') +
+        '</a>' +
+        '<a href="epreuves.html#' + epreuveId + '" class="tag epreuve">' +
+          '&#128203; ' + epreuveId + ' - ' + epreuve.nom + ' (Coef. ' + epreuve.coefficient + ')' +
+        '</a>';
+
+      // Conditions de réalisation
+      var condList = document.getElementById('conditions-list');
+      comp.conditions.forEach(function(cond) {
+        condList.innerHTML += '<li>' + cond + '</li>';
+      });
+
+      // Dots couleur
+      document.getElementById('dot-details').classList.add(poleClass);
+      document.getElementById('dot-sc').classList.add(poleClass);
+
+      // Compétences détaillées
+      var detailsContainer = document.getElementById('details-container');
+      comp.details.forEach(function(detail) {
+        var indicComm = '';
+        if (detail.indicateursCommuns && detail.indicateursCommuns.length > 0) {
+          indicComm = '<div class="indicateur-group"><h4>Indicateurs communs</h4>';
+          detail.indicateursCommuns.forEach(function(ind) {
+            indicComm += '<div class="indicateur-item commun">' + ind + '</div>';
+          });
+          indicComm += '</div>';
+        }
+
+        var indicSpec = '';
+        if (detail.indicateursSpecifiques && detail.indicateursSpecifiques.length > 0) {
+          indicSpec = '<div class="indicateur-group"><h4>Indicateurs spécifiques</h4>';
+          detail.indicateursSpecifiques.forEach(function(ind) {
+            indicSpec += '<div class="indicateur-item specifique">' + ind + '</div>';
+          });
+          indicSpec += '</div>';
+        }
+
+        detailsContainer.innerHTML +=
+          '<div class="accordion">' +
+            '<button class="accordion-header">' +
+              '<span class="card-badge ' + poleClass + '">' + detail.id + '</span> ' +
+              detail.nom +
+              '<span class="arrow">&#9654;</span>' +
+            '</button>' +
+            '<div class="accordion-content">' +
+              indicComm + indicSpec +
+            '</div>' +
+          '</div>';
+      });
+
+      // Savoirs associés
+      var savoirsContainer = document.getElementById('savoirs-container');
+      comp.savoirs.forEach(function(categorie) {
+        var html = '<div class="accordion">' +
+          '<button class="accordion-header">' +
+            '&#128218; ' + categorie.categorie +
+            ' <span class="card-badge epreuve">' + categorie.items.length + ' savoir(s)</span>' +
+            '<span class="arrow">&#9654;</span>' +
+          '</button>' +
+          '<div class="accordion-content">';
+
+        categorie.items.forEach(function(savoir) {
+          html += '<div class="progress-check" id="check-' + savoir.id + '">' +
+            '<input type="checkbox" data-id="' + savoir.id + '">' +
+            '<label>' +
+              '<strong>' + savoir.id + ' - ' + savoir.nom + '</strong>' +
+              '<div style="margin-top:6px; font-size:0.82rem; color:var(--text-light)">' +
+                '<em>Limites d\'exigence :</em> ' + savoir.limites +
+              '</div>' +
+            '</label>' +
+          '</div>';
+        });
+
+        html += '</div></div>';
+        savoirsContainer.innerHTML += html;
+      });
+
+      // Savoirs communs du pole
+      var scKey = pole === 1 ? 'SC1' : 'SC2';
+      var sc = DATA.savoirsCommuns[scKey];
+      var scContainer = document.getElementById('savoirs-communs-container');
+
+      scContainer.innerHTML = '<div class="alert info"><span class="alert-icon">&#8505;</span>' +
+        '<div>' + sc.titre + '<br><small>Ces savoirs sont partagés par toutes les compétences du pole ' + pole + '.</small></div>' +
+        '</div>';
+
+      sc.items.forEach(function(categorie) {
+        var html = '<div class="accordion">' +
+          '<button class="accordion-header">' +
+            '&#128218; ' + categorie.categorie +
+            ' <span class="card-badge ' + poleClass + '">' + categorie.savoirs.length + '</span>' +
+            '<span class="arrow">&#9654;</span>' +
+          '</button>' +
+          '<div class="accordion-content">';
+
+        categorie.savoirs.forEach(function(savoir) {
+          html += '<div class="progress-check" id="check-' + savoir.id + '">' +
+            '<input type="checkbox" data-id="' + savoir.id + '">' +
+            '<label>' +
+              '<strong>' + savoir.id + ' - ' + savoir.nom + '</strong>' +
+              '<div style="margin-top:6px; font-size:0.82rem; color:var(--text-light)">' +
+                '<em>Limites d\'exigence :</em> ' + savoir.limites +
+              '</div>' +
+            '</label>' +
+          '</div>';
+        });
+
+        html += '</div></div>';
+        scContainer.innerHTML += html;
+      });
+
+      // Re-initialiser les accordeons apres generation dynamique
+      document.querySelectorAll('.accordion-header').forEach(function(header) {
+        header.addEventListener('click', function() {
+          this.parentElement.classList.toggle('open');
+        });
+      });
+
+      // Re-initialiser les checkboxes de progression
+      if (typeof initProgressCheckboxes === 'function') {
+        initProgressCheckboxes();
+        updateProgressDisplay();
+      }
+
+      // Afficher les enseignements associés (modules)
+      if (window.PSR_CORE && typeof PSR_CORE.renderLinkedModules === 'function') {
+        PSR_CORE.renderLinkedModules(compId);
+      }
+    });
+  </script>
+</body>
+</html>

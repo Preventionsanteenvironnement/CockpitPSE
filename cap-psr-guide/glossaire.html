@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glossaire | Guide CAP PSR</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html" class="logo">CAP <span>PSR</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Accueil</a></li>
+      <li><a href="pole1.html" data-pole="1">Production</a></li>
+      <li><a href="pole2.html" data-pole="2">Service</a></li>
+      <li><a href="epreuves.html">Épreuves</a></li>
+      <li><a href="pfmp.html">PFMP</a></li>
+      <li><a href="glossaire.html" class="active">Glossaire</a></li>
+      <li><a href="guide-pedagogique.html">GAP</a></li>
+      <li><a href="equipement.html">Équipement</a></li>
+    </ul>
+    <div class="search-container">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" placeholder="Rechercher...">
+      <div class="search-results"></div>
+    </div>
+    <button class="theme-toggle" title="Mode sombre/clair">&#9790;</button>
+  </nav>
+
+  <div class="main">
+    <div class="breadcrumbs">
+      <a href="index.html">Accueil</a><span class="sep">/</span><strong>Glossaire</strong>
+    </div>
+
+    <div class="page-header fade-in">
+      <h1>Glossaire</h1>
+      <p class="subtitle">Termes techniques et acronymes du référentiel CAP PSR</p>
+    </div>
+
+    <!-- Filtre rapide -->
+    <div class="section fade-in">
+      <div style="margin-bottom:16px">
+        <input type="text" id="glossaire-filter" class="search-input" placeholder="Filtrer les termes..." style="width:100%; max-width:400px; padding:10px 14px; border:1px solid var(--border); border-radius:8px; font-size:0.95rem; background:var(--bg-card); color:var(--text)">
+      </div>
+      <div class="alert info" style="margin-bottom:16px">
+        <span class="alert-icon">&#8505;</span>
+        <div><span id="glossaire-count"></span> termes &mdash; Chaque terme est relié aux compétences où il intervient.</div>
+      </div>
+      <div id="glossaire-container"></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html"><span class="icon">&#127968;</span>Accueil</a>
+    <a href="pole1.html"><span class="icon">&#127859;</span>Prod.</a>
+    <a href="pole2.html"><span class="icon">&#127860;</span>Service</a>
+    <a href="epreuves.html"><span class="icon">&#128203;</span>Épreuves</a>
+    <a href="glossaire.html" class="active"><span class="icon">&#128218;</span>Glossaire</a>
+  </nav>
+  <button class="back-to-top" title="Haut de page">&#8679;</button>
+
+  <script src="js/data.js"></script>
+  <script src="js/modules-registry.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/progression.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var container = document.getElementById('glossaire-container');
+      var countEl = document.getElementById('glossaire-count');
+      var filterInput = document.getElementById('glossaire-filter');
+
+      // Fusionner avec les termes des modules si disponibles
+      var glossaireBase = DATA.glossaire.slice();
+      if (window.PSR_CORE && typeof PSR_CORE.getMergedGlossaire === 'function') {
+        // Charger tous les modules en arriere-plan puis fusionner
+        PSR_MODULES.loadAll().then(function() {
+          glossaire = PSR_CORE.getMergedGlossaire();
+          countEl.textContent = glossaire.length;
+          renderGlossaire(glossaire);
+        }).catch(function() {});
+      }
+
+      // Trier par ordre alphabetique
+      var glossaire = glossaireBase.sort(function(a, b) {
+        return a.terme.localeCompare(b.terme, 'fr');
+      });
+
+      countEl.textContent = glossaire.length;
+
+      function renderGlossaire(termes) {
+        container.innerHTML = '';
+        termes.forEach(function(item) {
+          var compLinks = '';
+          if (item.competences && item.competences.length > 0) {
+            compLinks = '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px">';
+            item.competences.forEach(function(cId) {
+              var comp = DATA.competences.find(function(c) { return c.id === cId; });
+              var poleClass = comp && comp.pole === 1 ? 'pole1' : 'pole2';
+              compLinks += '<a href="competence.html?id=' + cId + '" class="tag ' + poleClass + '" style="font-size:0.78rem">' + cId + '</a>';
+            });
+            compLinks += '</div>';
+          }
+
+          // Badges sources modules
+          var modBadges = '';
+          if (item.moduleSources && item.moduleSources.length > 0) {
+            modBadges = '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">';
+            item.moduleSources.forEach(function(ms) {
+              modBadges += '<a href="module.html?id=' + ms.moduleId + '" class="tag" style="font-size:0.72rem;background:#8e44ad20;color:#8e44ad">' +
+                (ms.moduleIcone || '') + ' ' + ms.moduleNom + '</a>';
+            });
+            modBadges += '</div>';
+          }
+
+          container.innerHTML +=
+            '<div class="card" style="margin-bottom:10px" id="glossaire-' + item.terme.toLowerCase().replace(/[^a-z0-9]/g, '') + '">' +
+              '<div class="card-header">' +
+                '<div class="card-icon" style="background:var(--accent-light); font-size:0.75rem; font-weight:700">' + item.terme.substring(0, 3) + '</div>' +
+                '<div style="flex:1">' +
+                  '<div class="card-title">' + item.terme + '</div>' +
+                  '<p style="margin-top:6px; font-size:0.85rem; color:var(--text-light); line-height:1.5">' + item.definition + '</p>' +
+                  compLinks + modBadges +
+                '</div>' +
+              '</div>' +
+            '</div>';
+        });
+      }
+
+      renderGlossaire(glossaire);
+
+      // Filtre en temps reel
+      filterInput.addEventListener('input', function() {
+        var query = this.value.toLowerCase().trim();
+        if (!query) {
+          renderGlossaire(glossaire);
+          countEl.textContent = glossaire.length;
+          return;
+        }
+        var filtered = glossaire.filter(function(item) {
+          return item.terme.toLowerCase().indexOf(query) !== -1 ||
+                 item.definition.toLowerCase().indexOf(query) !== -1;
+        });
+        renderGlossaire(filtered);
+        countEl.textContent = filtered.length;
+      });
+
+      // Scroll vers ancre
+      if (window.location.hash) {
+        var el = document.getElementById(window.location.hash.slice(1));
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  </script>
+</body>
+</html>
