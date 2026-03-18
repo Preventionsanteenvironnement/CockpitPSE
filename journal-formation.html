@@ -2150,7 +2150,8 @@ function openPromptIA(){
 }
 
 function generateIAPrompt(){
-  // Construire la liste complète des compétences et attendus
+  // Construire la liste des IDs autorisés
+  let idList = [];
   let refList = '';
   for(const[fk,fv] of Object.entries(REF)){
     refList += `\n## ${fk} — ${fv.label}\n`;
@@ -2158,59 +2159,105 @@ function generateIAPrompt(){
       refList += `### ${ck} : ${cv.name}\n`;
       for(const at of cv.attendus){
         refList += `- ${at.id} : "${at.txt}"\n`;
+        idList.push(at.id);
       }
     }
   }
 
-  return `Tu es un assistant expert en formation des enseignants. Tu vas m'aider à remplir mon journal de formation professionnelle.
+  // Extraire le JSON actuel (nettoyé)
+  saveAll();
+  const currentJSON = JSON.stringify(D, null, 2);
+  const today = new Date().toISOString().slice(0,10);
 
-CONTEXTE : Je suis enseignant stagiaire/contractuel. Mon journal de formation est structuré selon le référentiel des compétences professionnelles des métiers du professorat. Chaque compétence a des "attendus" concrets. Pour chaque attendu, je dois indiquer un niveau de maîtrise et un commentaire.
+  return `Tu vas mettre à jour mon journal de formation professionnelle enseignant à partir d'un JSON déjà existant.
+
+IMPORTANT :
+Tu ne dois surtout pas générer un nouveau journal depuis zéro.
+Tu dois travailler uniquement en logique de FUSION et de MISE À JOUR, afin d'éviter les répétitions, les écrasements inutiles et les incohérences.
+
+CONTEXTE :
+Mon journal est structuré selon le référentiel des compétences professionnelles des métiers du professorat (BO du 25 juillet 2013).
+Je suis enseignant en lycée professionnel, second degré, PLP Biotechnologies Santé-Environnement.
+Chaque attendu est identifié par un ID officiel.
+Chaque attendu peut avoir un niveau de maîtrise dans "evals" et un commentaire dans "coms".
 
 NIVEAUX DE MAÎTRISE :
 - TBM = Très Bien Maîtrisé
 - MS = Maîtrisé Satisfaisant
-- MC = Maîtrisé en Cours (je progresse mais c'est pas encore parfait)
+- MC = Maîtrisé en Cours
 - MI = Insuffisant / En construction
 
-VOICI LE RÉFÉRENTIEL COMPLET avec les ID des attendus :
+RÉFÉRENTIEL COMPLET :
 ${refList}
 
-CE QUE TU DOIS FAIRE :
-1. Écoute/lis attentivement tout ce que je vais te raconter sur ma pratique professionnelle des derniers mois.
-2. Pour chaque élément que je mentionne, identifie à quel(s) attendu(s) il correspond (utilise les ID comme CC1_AT1, P3_AT1, etc.).
-3. Évalue le niveau de maîtrise (TBM, MS, MC ou MI) en fonction de ce que je décris.
-4. Rédige un commentaire professionnel en "je" pour chaque attendu identifié.
+LISTE DES IDs AUTORISÉS (aucun autre ID ne doit apparaître) :
+${idList.join('\n')}
 
-FORMAT DE SORTIE : Tu dois générer un fichier JSON avec cette structure exacte :
+RÈGLES DE FUSION OBLIGATOIRES :
 
-\`\`\`json
+1. Tu pars TOUJOURS du JSON existant. Ne repars jamais de zéro. Conserve les attendus déjà présents sauf raison valable de les modifier.
+
+2. Pour chaque attendu DÉJÀ PRÉSENT dans le JSON :
+   - Si le nouvel élément dit la même chose → ne crée rien de nouveau
+   - Si le nouvel élément apporte une précision utile → enrichis le commentaire existant
+   - Si le nouvel élément montre une progression réelle → ajuste le niveau
+   - Si le commentaire actuel est meilleur que la nouvelle formulation → conserve l'ancien
+   - Ne remplace JAMAIS un commentaire précis par un commentaire plus vague
+
+3. Pour les NOUVEAUX attendus :
+   - Ajoute un attendu seulement si les éléments permettent réellement de l'évaluer
+   - N'ajoute pas plusieurs attendus pour un même exemple si non justifié
+   - Utilise uniquement les IDs officiels autorisés
+
+4. COHÉRENCE INTERNE :
+   - Chaque ID dans "evals" doit être dans "coms" et vice-versa
+   - Niveaux autorisés : TBM, MS, MC, MI uniquement
+   - Commentaires en français, première personne ("Je..."), professionnels et concrets
+   - Chaque commentaire doit correspondre à l'attendu visé
+
+5. GESTION DES RÉPÉTITIONS :
+   - Si une même compétence réapparaît plusieurs fois → fusionne dans une seule entrée
+   - Garde la meilleure formulation, enrichis sans alourdir
+   - Pas de doublon logique
+
+6. HIÉRARCHIE DE DÉCISION (quand tu hésites) :
+   - Priorité 1 : fidélité au référentiel
+   - Priorité 2 : précision professionnelle
+   - Priorité 3 : cohérence avec ce qui existe déjà
+   - Priorité 4 : éviter les répétitions
+
+SORTIE ATTENDUE :
+Tu dois produire UNIQUEMENT le JSON final fusionné. Pas d'explication, pas de commentaire, pas de markdown autour. Juste le JSON valide.
+
+Structure obligatoire :
 {
   "ta": {
     "1": {
-      "date": "2026-03-18",
-      "evals": {
-        "CC1_AT1": "MS",
-        "P3_AT1": "TBM"
-      },
-      "coms": {
-        "CC1_AT1": "Je veille à ce que chaque élève puisse s'exprimer...",
-        "P3_AT1": "Je conçois des séances structurées autour de la démarche de résolution de problème..."
-      },
-      "notes": "Période : septembre-mars 2026"
+      "date": "YYYY-MM-DD",
+      "evals": { "ID": "NIVEAU" },
+      "coms": { "ID": "Je ..." },
+      "notes": "texte"
     }
-  }
+  },
+  "bilan": "",
+  "bilanNote": ""
 }
-\`\`\`
 
-RÈGLES IMPORTANTES :
-- Utilise UNIQUEMENT les ID d'attendus listés ci-dessus (CC1_AT1, CC2_AT1, P1_AT1, etc.)
-- Le numéro dans "ta" correspond au temps d'accompagnement (utilise "1" par défaut, ou un numéro de 1 à 10)
-- Les commentaires doivent être rédigés à la première personne ("Je...")
-- Sois précis et professionnel dans les commentaires
-- Si je mentionne quelque chose qui ne correspond à aucun attendu, ignore-le
-- Ne mets un niveau que si ce que je raconte permet vraiment de l'évaluer
+══════════════════════════════════════
+MON JSON ACTUEL (à fusionner avec les nouveaux éléments) :
+══════════════════════════════════════
 
-Maintenant, raconte-moi ce que tu as fait ces derniers mois dans ton enseignement. Parle librement, je m'occupe du tri !`;
+${currentJSON}
+
+══════════════════════════════════════
+DATE À UTILISER POUR LA MISE À JOUR : ${today}
+══════════════════════════════════════
+
+NOUVEAUX ÉLÉMENTS DE PRATIQUE :
+[RACONTEZ ICI CE QUE VOUS AVEZ FAIT DEPUIS LA DERNIÈRE MISE À JOUR]
+
+NOTES DE PÉRIODE :
+[AJOUTEZ ICI UNE NOTE DE PÉRIODE SI NÉCESSAIRE, OU LAISSEZ VIDE]`;
 }
 
 function copyPrompt(){
