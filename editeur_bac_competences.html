@@ -1,0 +1,4068 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correcteur Bac PSE par compétences</title>
+<script src="./data_appreciation.js"></script>
+<script src="./data_commentaires_competences.js"></script>
+<script src="./data_commentaires_auto.js"></script>
+<script src="./data_classes_eleves.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root{
+    --bg:#eef1f7;
+    --surface:#ffffff;
+    --surface-soft:#f8fafc;
+    --surface-muted:#f1f5f9;
+    --line:#dbe2ea;
+    --line-strong:#c7d2fe;
+    --text:#162033;
+    --muted:#63718a;
+    --nav:#131b2c;
+    --accent:#2457eb;
+    --accent-soft:#dbe8ff;
+    --ok:#0f9f6e;
+    --ok-soft:#dff7ed;
+    --warn:#b7791f;
+    --warn-soft:#fff3d6;
+    --bad:#c24141;
+    --bad-soft:#ffe3e3;
+    --shadow:0 18px 42px rgba(15, 23, 42, 0.12);
+    --c2:#2957c8;
+    --c2-soft:#dce6ff;
+    --c3:#7c3aed;
+    --c3-soft:#efe3ff;
+    --c4:#13805d;
+    --c4-soft:#daf5ea;
+    --c5:#b24a1b;
+    --c5-soft:#ffe7d9;
+    --c6:#374151;
+    --c6-soft:#e5e7eb;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'IBM Plex Sans',sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(36,87,235,.08), transparent 32%),
+      radial-gradient(circle at top right, rgba(124,58,237,.08), transparent 28%),
+      linear-gradient(180deg,#f7f9fc 0%,#edf1f7 100%);
+  }
+
+  .app-shell{min-height:100vh;display:flex;flex-direction:column}
+
+  header{
+    background:var(--nav);
+    color:#fff;
+    padding:16px 20px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-right:auto;
+    min-width:240px;
+  }
+
+  .brand-mark{
+    width:42px;height:42px;border-radius:14px;
+    background:linear-gradient(135deg,#2a4fd7,#8b5cf6);
+    display:grid;place-items:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;font-weight:700;letter-spacing:.08em;
+    box-shadow:0 10px 24px rgba(74, 85, 235, .28);
+  }
+
+  .brand-copy small{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-size:10px;
+    color:rgba(255,255,255,.55);
+    margin-bottom:3px;
+  }
+  .brand-copy strong{font-size:20px;font-weight:700}
+
+  .toolbar{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .btn{
+    appearance:none;border:1px solid rgba(255,255,255,.16);cursor:pointer;
+    background:rgba(255,255,255,.08);color:#fff;border-radius:12px;
+    padding:11px 14px;font-size:12px;font-weight:600;
+    font-family:'IBM Plex Mono',monospace;
+    transition:transform .14s ease, background .14s ease, border-color .14s ease;
+  }
+  .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.14)}
+  .btn.primary{background:#2556ea;border-color:#7ea2ff}
+  .btn.success{background:#0d8d62;border-color:#5fe0b4}
+  .btn.ghost{background:#fff;color:var(--text);border-color:var(--line)}
+  .btn.warn{background:#b24a1b;border-color:#f5b08b}
+
+  .page{
+    width:min(1500px, calc(100vw - 32px));
+    margin:20px auto 34px;
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:18px;
+    align-items:start;
+  }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid rgba(15,23,42,.06);
+    border-radius:24px;
+    box-shadow:var(--shadow);
+  }
+
+  .sidebar{
+    position:sticky;
+    top:92px;
+    overflow:hidden;
+  }
+
+  .panel-body{padding:18px}
+  .section + .section{margin-top:18px}
+  .section-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+
+  .meta-stack{display:grid;gap:10px}
+  .meta-card{
+    border:1px solid var(--line);
+    background:linear-gradient(180deg,#fff, #f9fbff);
+    border-radius:18px;
+    padding:14px;
+  }
+  .meta-card strong{display:block;font-size:15px;margin-bottom:4px}
+  .meta-card small{color:var(--muted);display:block;line-height:1.55}
+
+  .student-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .roster-list{
+    display:grid;
+    gap:8px;
+    max-height:360px;
+    overflow:auto;
+    padding-right:4px;
+  }
+  .roster-item{
+    width:100%;
+    text-align:left;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    padding:12px 13px;
+    cursor:pointer;
+    transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease;
+  }
+  .roster-item:hover{transform:translateY(-1px);border-color:#9db7ff}
+  .roster-item.active{
+    border-color:#7ea2ff;
+    box-shadow:0 8px 22px rgba(36,87,235,.14);
+    background:linear-gradient(180deg,#f8fbff,#eef4ff);
+  }
+  .roster-name{font-weight:700;font-size:14px}
+  .roster-sub{
+    margin-top:3px;
+    color:var(--muted);
+    font-size:12px;
+  }
+  .roster-meta{
+    margin-top:8px;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    align-items:center;
+    font-size:11px;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  label.field-label{
+    display:block;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+
+  input[type="text"], textarea, select{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:11px 12px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+  }
+  input[type="number"]{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:8px 10px;
+    background:#fff;
+    color:var(--text);
+    font:inherit;
+  }
+  textarea{resize:vertical;min-height:112px}
+  input:focus, textarea:focus, select:focus{outline:3px solid rgba(37,86,234,.18);border-color:#8aa7ff}
+
+  .badge-row{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 10px;border-radius:999px;font-size:11px;
+    font-family:'IBM Plex Mono',monospace;font-weight:600;
+    background:var(--surface-muted);color:var(--muted);
+  }
+  .badge.c2{background:var(--c2-soft);color:var(--c2)}
+  .badge.c3{background:var(--c3-soft);color:var(--c3)}
+  .badge.c4{background:var(--c4-soft);color:var(--c4)}
+  .badge.c5{background:var(--c5-soft);color:var(--c5)}
+  .badge.c6{background:var(--c6-soft);color:var(--c6)}
+  .badge.warn{background:var(--warn-soft);color:var(--warn)}
+  .badge.ok{background:var(--ok-soft);color:var(--ok)}
+  .badge.bad{background:var(--bad-soft);color:var(--bad)}
+
+  .main-stack{display:grid;gap:18px}
+
+  .summary-top{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .summary-card{
+    flex:1 1 180px;
+    min-width:160px;
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:16px;
+    background:linear-gradient(180deg,#fff,#f9fbff);
+  }
+  .summary-card .value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:28px;font-weight:700;color:var(--accent);
+  }
+  .summary-card .label{
+    font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin-top:5px;
+  }
+
+  .panel-head{
+    padding:18px 18px 0;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    justify-content:space-between;
+    flex-wrap:wrap;
+  }
+  .panel-head h2{
+    margin:0;
+    font-size:20px;
+  }
+  .panel-head p{margin:6px 0 0;color:var(--muted);font-size:14px;line-height:1.55}
+  .panel-actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  .mode-switch{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .mode-switch .btn{
+    padding:9px 12px;
+    font-size:11px;
+  }
+  .panel-select{
+    min-width:170px;
+    border-radius:12px;
+    padding:9px 12px;
+    font-size:12px;
+    background:#fff;
+  }
+
+  .table-wrap{
+    overflow:auto;
+    padding:18px;
+  }
+  table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+  .grid-table{
+    min-width:1220px;
+    border:1px solid var(--line);
+    border-radius:22px;
+    overflow:hidden;
+    background:#fff;
+  }
+  .grid-table thead th{
+    position:sticky;top:0;z-index:2;
+    background:#eef3fb;
+    border-bottom:1px solid var(--line);
+    border-right:1px solid #d7deeb;
+    padding:10px 8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#52607a;
+    white-space:nowrap;
+  }
+  .grid-table thead th.comp-head{
+    text-align:center;
+    color:#fff;
+    border-left:2px solid rgba(255,255,255,.4);
+    border-right:2px solid rgba(255,255,255,.4);
+  }
+  .grid-table thead th.comp-head.c2{background:var(--c2)}
+  .grid-table thead th.comp-head.c3{background:var(--c3)}
+  .grid-table thead th.comp-head.c4{background:var(--c4)}
+  .grid-table thead th.comp-head.c5{background:var(--c5)}
+  .grid-table thead th.comp-head.c6{background:var(--c6)}
+  .grid-table thead th.comp-sub{
+    text-align:center;
+    border-right:1px solid #d7deeb;
+  }
+  .grid-table thead th.comp-sub.active-start{border-left-width:2px}
+  .grid-table thead th.comp-sub.active-end{border-right-width:2px}
+  .grid-table thead th.comp-sub.c2{background:var(--c2-soft);color:var(--c2);border-left-color:var(--c2);border-right-color:var(--c2)}
+  .grid-table thead th.comp-sub.c3{background:var(--c3-soft);color:var(--c3);border-left-color:var(--c3);border-right-color:var(--c3)}
+  .grid-table thead th.comp-sub.c4{background:var(--c4-soft);color:var(--c4);border-left-color:var(--c4);border-right-color:var(--c4)}
+  .grid-table thead th.comp-sub.c5{background:var(--c5-soft);color:var(--c5);border-left-color:var(--c5);border-right-color:var(--c5)}
+  .grid-table thead th.comp-sub.c6{background:var(--c6-soft);color:var(--c6);border-left-color:var(--c6);border-right-color:var(--c6)}
+
+  .grid-table td{
+    border-bottom:1px solid #edf1f7;
+    border-right:1px solid #edf1f7;
+    padding:10px 8px;
+    vertical-align:top;
+    font-size:13px;
+    background:#fff;
+  }
+  .grid-table th:last-child,
+  .grid-table td:last-child{border-right:0}
+
+  .grid-row:hover td{background:#fafcff}
+  .grid-row.selected td{background:#f5f9ff}
+  .grid-row.neutralized td{background:#fcfcfc;color:#7b8597}
+  .grid-detail-row td{
+    padding:0;
+    background:#fff;
+    border-right:0;
+  }
+  .inline-review{
+    padding:14px 16px 16px;
+    background:linear-gradient(180deg,#fcfdff,#f8fbff);
+    border-top:1px dashed #dbe2ea;
+  }
+  .inline-review-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .inline-review-head h4{
+    margin:0;
+    font-size:15px;
+  }
+  .inline-review-head p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.45;
+  }
+  .inline-review-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+  }
+  .review-panel{
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:14px;
+    background:#fff;
+    min-height:100%;
+  }
+  .review-panel h5{
+    margin:0 0 10px;
+    font-size:13px;
+    font-family:'IBM Plex Mono',monospace;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+  .review-panel.attendus{background:#f2f7ff}
+  .review-panel.reponses{background:#f9f6ff}
+  .review-panel.ia{background:#eefaf4}
+  .review-panel .meta-line{
+    margin-bottom:8px;
+  }
+  .review-text{
+    border:1px solid rgba(22,32,51,.08);
+    border-radius:14px;
+    padding:10px 12px;
+    background:rgba(255,255,255,.74);
+    line-height:1.55;
+    white-space:pre-wrap;
+    font-size:13px;
+  }
+  .review-text + .review-text{margin-top:8px}
+  .review-text.empty{
+    color:var(--muted);
+    font-style:italic;
+    background:rgba(255,255,255,.42);
+  }
+  .criteria-inline-list{
+    display:grid;
+    gap:8px;
+  }
+  .criteria-inline-item{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:10px 11px;
+    background:#fff;
+  }
+  .criteria-inline-item strong{
+    display:block;
+    margin-bottom:4px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+  }
+  .criteria-inline-item.m{
+    border-color:#66c6a1;
+    background:#effcf6;
+    box-shadow:inset 0 0 0 1px rgba(102,198,161,.24);
+  }
+  .criteria-inline-item.a{background:#fff8eb}
+  .criteria-inline-item.i{background:#fff1f1}
+  .criteria-inline-item.nt{background:#f8fafc}
+  .inline-neutralized{
+    border:1px dashed #cbd5e1;
+    border-radius:14px;
+    padding:12px;
+    background:#f8fafc;
+    color:#64748b;
+    font-size:13px;
+    line-height:1.5;
+  }
+  .detail-toggle-btn{
+    appearance:none;
+    border:1px solid #cfe0ff;
+    background:#f8fbff;
+    color:var(--accent);
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:10px;
+    font-family:'IBM Plex Mono',monospace;
+    cursor:pointer;
+  }
+  .detail-toggle-btn:hover{background:#eef4ff}
+
+  .col-num{
+    width:90px;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:13px;
+    white-space:nowrap;
+  }
+  .col-libelle{min-width:300px}
+  .q-title{font-weight:600;font-size:14px;line-height:1.45;margin-bottom:6px}
+  .q-sub{
+    display:flex;gap:6px;flex-wrap:wrap;
+    font-size:11px;color:var(--muted);
+  }
+
+  .cell-zone{
+    min-width:46px;
+    text-align:center;
+    padding:6px 4px!important;
+  }
+  .cell-zone.inactive-zone{background:#fafbfe}
+  .cell-zone.active-scope{
+    --active-line:#8aa7ff;
+    background:#fbfdff;
+    border-top:2px solid var(--active-line)!important;
+    border-bottom:2px solid var(--active-line)!important;
+  }
+  .cell-zone.active-scope.comp-c2{--active-line:var(--c2);background:rgba(41,87,200,.05)}
+  .cell-zone.active-scope.comp-c3{--active-line:var(--c3);background:rgba(124,58,237,.05)}
+  .cell-zone.active-scope.comp-c4{--active-line:var(--c4);background:rgba(19,128,93,.05)}
+  .cell-zone.active-scope.comp-c5{--active-line:var(--c5);background:rgba(178,74,27,.06)}
+  .cell-zone.active-scope.comp-c6{--active-line:var(--c6);background:rgba(55,65,81,.06)}
+  .cell-zone.active-start{border-left:2px solid var(--active-line)!important}
+  .cell-zone.active-end{border-right:2px solid var(--active-line)!important}
+  .grid-row.selected .cell-zone.active-scope{box-shadow:inset 0 0 0 1px rgba(255,255,255,.65)}
+  .grid-row.neutralized .cell-zone.active-scope{
+    --active-line:#94a3b8;
+    background:#f3f6fa;
+  }
+  .level-btn{
+    width:34px;height:34px;border-radius:11px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:#718198;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;font-weight:700;
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .level-btn:hover{border-color:#93a9d6;color:var(--text)}
+  .level-btn.disabled{
+    background:#eef2f7;
+    color:#b0bac9;
+    border-style:dashed;
+    cursor:not-allowed;
+  }
+  .level-btn.selected.nt{background:#f1f5f9;border-color:#94a3b8;color:#334155}
+  .level-btn.selected.i{background:#ffe4e4;border-color:#f08b8b;color:#b42318}
+  .level-btn.selected.a{background:#fff0d6;border-color:#efb96a;color:#a86408}
+  .level-btn.selected.m{background:#def7ea;border-color:#5ed0a2;color:#057a55}
+  .cell-zone.active-scope .level-btn.selected{border-width:2px}
+
+  .inactive-slot{
+    width:34px;height:34px;border-radius:11px;
+    background:#f7f8fb;
+    border:1px dashed #e3e8f0;
+    display:inline-grid;
+    place-items:center;
+    color:#d2d9e3;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+  }
+
+  .response-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 8px;border-radius:999px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;font-weight:600;
+    background:var(--accent-soft);color:var(--accent);
+  }
+
+  .detail-grid{
+    display:grid;
+    grid-template-columns:1.1fr .9fr;
+    gap:14px;
+    padding:18px;
+  }
+  .detail-card{
+    border:1px solid var(--line);
+    border-radius:20px;
+    background:linear-gradient(180deg,#fff,#fafcff);
+    padding:16px;
+  }
+  .detail-card h3{
+    margin:0 0 10px;
+    font-size:15px;
+  }
+  .detail-card p{
+    margin:0 0 10px;
+    color:var(--muted);
+    line-height:1.55;
+    font-size:13px;
+  }
+
+  .criteria-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;
+    margin-top:12px;
+  }
+  .criteria-card{
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:12px;
+    min-height:120px;
+    background:#fff;
+  }
+  .criteria-card .code{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;font-weight:700;
+    margin-bottom:8px;
+  }
+  .criteria-card.nt{background:#f8fafc}
+  .criteria-card.i{background:#fff3f3}
+  .criteria-card.a{background:#fff7ea}
+  .criteria-card.m{background:#effcf6}
+
+  .suggestion-box{
+    border:1px solid #bfdbfe;
+    background:#eef6ff;
+    border-radius:18px;
+    padding:14px;
+  }
+  .suggestion-box strong{display:block;margin-bottom:8px}
+  .suggestion-meta{
+    display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;
+  }
+  .mini-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mini-btn{
+    border:1px solid var(--line);
+    background:#fff;color:var(--text);
+    border-radius:12px;padding:8px 10px;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;
+  }
+
+  .competence-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;
+    padding:18px;
+  }
+  .competence-card{
+    border:1px solid var(--line);
+    border-radius:22px;
+    padding:16px;
+    background:linear-gradient(180deg,#fff,#fbfcff);
+  }
+  .competence-card h3{
+    margin:0 0 10px;
+    font-size:16px;
+    display:flex;justify-content:space-between;gap:10px;align-items:center;
+  }
+  .comp-stats{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:8px;
+    margin:12px 0;
+  }
+  .stat-pill{
+    border-radius:14px;padding:8px 6px;text-align:center;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;
+    border:1px solid var(--line);
+  }
+  .stat-pill strong{display:block;font-size:16px;margin-bottom:2px}
+  .stat-pill.nt{background:#f8fafc}
+  .stat-pill.i{background:#fff0f0}
+  .stat-pill.a{background:#fff6e7}
+  .stat-pill.m{background:#edfdf5}
+  .note-line{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    margin-top:10px;font-size:13px;
+  }
+  .note-line strong{font-family:'IBM Plex Mono',monospace;font-size:20px;color:var(--accent)}
+  .note-line input{max-width:90px;text-align:right}
+
+  .comment-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .comment-box{padding:18px}
+
+  .soft-list{
+    list-style:none;padding:0;margin:0;display:grid;gap:8px;
+  }
+  .soft-list button{
+    width:100%;text-align:left;padding:10px 12px;border-radius:14px;
+    border:1px solid var(--line);background:#fff;cursor:pointer;
+    font:inherit;color:var(--text);
+  }
+  .soft-list button:hover{background:#f8fbff;border-color:#9db7ff}
+
+  .status-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:0 18px 18px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .hidden{display:none!important}
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(15,23,42,.52);
+    display:none;align-items:center;justify-content:center;z-index:60;
+    padding:22px;
+  }
+  .modal-backdrop.show{display:flex}
+  .modal{
+    width:min(860px,100%);
+    max-height:min(88vh,900px);
+    overflow:auto;
+    background:#fff;
+    border-radius:26px;
+    box-shadow:0 26px 80px rgba(15,23,42,.32);
+    border:1px solid rgba(255,255,255,.38);
+  }
+  .modal-head{
+    padding:18px 20px 0;
+    display:flex;justify-content:space-between;gap:12px;align-items:flex-start;
+  }
+  .modal-head h3{margin:0;font-size:18px}
+  .modal-head p{margin:5px 0 0;color:var(--muted);line-height:1.55}
+  .modal-body{padding:18px 20px}
+  .modal-actions{
+    display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;
+    padding:0 20px 20px;
+  }
+
+  .import-layout{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+
+  .print-link{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:12px;color:var(--accent);text-decoration:none;font-weight:600;
+  }
+
+  .toast{
+    position:fixed;right:20px;bottom:20px;
+    background:#111827;color:#fff;padding:10px 14px;border-radius:14px;
+    box-shadow:0 16px 40px rgba(15,23,42,.28);
+    font-size:13px;transform:translateY(14px);opacity:0;pointer-events:none;
+    transition:all .18s ease;z-index:80;
+  }
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.error{background:#b42318}
+  .toast.success{background:#0b7d59}
+
+  .empty{
+    padding:36px 20px;
+    text-align:center;
+    color:var(--muted);
+  }
+
+  @page{margin:0.8cm}
+  @media print{
+    body{background:#fff}
+    header,.sidebar,.comment-actions,.toolbar,.status-row,.mini-actions,.panel-head .btn,.btn{display:none!important}
+    .page{display:block;width:auto;margin:0}
+    .panel{box-shadow:none;border:0;border-radius:0}
+    .panel-body,.table-wrap,.competence-cards,.comment-box{padding:0}
+    .panel-head{padding:0 0 10px}
+    .grid-table{border-radius:0;box-shadow:none;border:1px solid #cbd5e1}
+    .grid-table thead th,.grid-table td{font-size:8pt;padding:4px}
+    .summary-top{margin-bottom:10px}
+    .summary-card{border-radius:12px;padding:10px;box-shadow:none}
+    .summary-card .value{font-size:18pt}
+    .detail-grid{grid-template-columns:1fr;gap:10px;padding:10px 0 0}
+    .detail-card{border-radius:12px;padding:10px;page-break-inside:avoid}
+    .criteria-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    textarea,input,select{border:0;padding:0;background:transparent}
+  }
+
+  @media (max-width:1180px){
+    .page{grid-template-columns:1fr}
+    .sidebar{position:static}
+  }
+  @media (max-width:820px){
+    .import-layout,.detail-grid,.student-grid,.criteria-grid,.inline-review-grid{grid-template-columns:1fr}
+    .page{width:min(100vw - 16px, 100%)}
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">BAC</div>
+      <div class="brand-copy">
+        <small>PSE · Correcteur par compétences</small>
+        <strong id="headerTitle">Prototype Bac blanc</strong>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" id="btnLoadExample">Charger l’exemple</button>
+      <button class="btn ghost" id="btnPromptMaster">Prompt IA devoir</button>
+      <button class="btn ghost" id="btnPromptStudent">Prompt IA élève</button>
+      <button class="btn" id="btnImportMaster">Devoir JSON</button>
+      <button class="btn" id="btnImportStudent">Correction élève JSON</button>
+      <button class="btn" id="btnExportStudentJson">Élève JSON</button>
+      <button class="btn" id="btnExportClassJson">Classe JSON</button>
+      <button class="btn" id="btnImportClassJson">Charger classe</button>
+      <button class="btn" id="btnExportSessionJson">Session JSON</button>
+      <button class="btn" id="btnImportSessionJson">Charger session</button>
+      <button class="btn ghost" id="btnNotesClass">Notes classe</button>
+      <button class="btn success" id="btnPrint">Imprimer / PDF</button>
+      <button class="btn ghost" id="btnExportWord">Word</button>
+      <button class="btn warn" id="btnReset">Réinitialiser</button>
+      <input type="file" id="fileMaster" class="hidden" accept=".json,application/json">
+      <input type="file" id="fileStudent" class="hidden" accept=".json,application/json">
+      <input type="file" id="fileClass" class="hidden" accept=".json,application/json">
+      <input type="file" id="fileSession" class="hidden" accept=".json,application/json">
+    </div>
+  </header>
+
+  <div class="page">
+    <aside class="panel sidebar">
+      <div class="panel-body">
+        <section class="section">
+          <div class="section-title">Session</div>
+          <div class="meta-stack">
+            <div class="meta-card">
+              <strong id="metaTitle">Aucun devoir chargé</strong>
+              <small id="metaInfo">Charge un JSON maître ou l’exemple Bac blanc pour construire la grille.</small>
+            </div>
+            <div class="meta-card">
+              <strong>Barème global</strong>
+              <div class="badge-row" id="competenceBadges"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Classe</div>
+          <div style="display:grid;gap:10px">
+            <div>
+              <label class="field-label" for="classSelect">Classe active</label>
+              <select id="classSelect"></select>
+            </div>
+            <div class="meta-card">
+              <strong id="classTitle">Aucune classe sélectionnée</strong>
+              <small id="classNote">La base élèves de l’éditeur principal sera reprise ici pour corriger toute une classe.</small>
+            </div>
+            <div id="rosterList" class="roster-list"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Élève</div>
+          <div class="student-grid">
+            <div>
+              <label class="field-label" for="studentNom">Nom</label>
+              <input type="text" id="studentNom" placeholder="DUPONT">
+            </div>
+            <div>
+              <label class="field-label" for="studentPrenom">Prénom</label>
+              <input type="text" id="studentPrenom" placeholder="Lina">
+            </div>
+            <div>
+              <label class="field-label" for="studentClasse">Classe</label>
+              <input type="text" id="studentClasse" placeholder="TMELEC">
+            </div>
+            <div>
+              <label class="field-label" for="studentCode">Code candidat</label>
+              <input type="text" id="studentCode" placeholder="AB12">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Réglages</div>
+          <div style="display:grid;gap:10px">
+            <div>
+              <label class="field-label" for="roundingMode">Arrondi</label>
+              <select id="roundingMode">
+                <option value="dixieme">Au dixième</option>
+                <option value="quart">Au quart de point</option>
+                <option value="entier">À l’entier</option>
+              </select>
+            </div>
+            <div class="meta-card">
+              <strong>Révision détaillée</strong>
+              <small>Les notions faibles seront regroupées dans l’appréciation finale via le bouton <em>Révisions</em>.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Lien de correction</div>
+          <div class="meta-card">
+            <strong id="qrTitle">Aucun lien renseigné</strong>
+            <small id="qrNote">Si le devoir ou une question contient un lien détaillé vers la correction, il apparaîtra ici pour l’impression.</small>
+            <a id="correctionLink" class="print-link hidden" target="_blank" rel="noopener noreferrer">Ouvrir la correction détaillée</a>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <main class="main-stack">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Vue d’ensemble</h2>
+            <p>Le tableau est entièrement piloté par le JSON maître. Les questions neutralisées restent visibles mais ne comptent jamais dans le calcul.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="summary-top">
+            <div class="summary-card">
+              <div class="value" id="summaryTotal">—</div>
+              <div class="label">Note finale / 20</div>
+            </div>
+            <div class="summary-card">
+              <div class="value" id="summaryProgress">0 / 0</div>
+              <div class="label">Indicateurs corrigés</div>
+            </div>
+            <div class="summary-card">
+              <div class="value" id="summaryNeutralized">0</div>
+              <div class="label">Questions neutralisées</div>
+            </div>
+            <div class="summary-card">
+              <div class="value" id="summaryStudent">—</div>
+              <div class="label">Élève actif</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Grille de correction</h2>
+            <p>Une seule compétence est active par ligne. Les niveaux non autorisés sont grisés et ne sont jamais comptabilisés.</p>
+          </div>
+          <div class="panel-actions">
+            <div class="badge-row">
+              <span class="badge ok" id="importStatus">Aucun JSON élève chargé</span>
+            </div>
+            <div class="mode-switch">
+              <button class="btn ghost" id="btnCompactView">Mode compact</button>
+              <button class="btn ghost" id="btnDetailedView">Mode détaillé</button>
+              <button class="btn ghost" id="btnExpandAllDetails">Tout ouvrir</button>
+              <button class="btn ghost" id="btnCollapseAllDetails">Tout fermer</button>
+              <select id="printModeSelect" class="panel-select">
+                <option value="compact">Impression compacte</option>
+                <option value="detaillee">Impression détaillée</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap" id="gridWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Détail de la question</h2>
+            <p>Tu peux relire la réponse importée, ajuster la proposition et garder la main sur le niveau final.</p>
+          </div>
+        </div>
+        <div id="detailWrap" class="empty">Charge un devoir puis sélectionne une ligne pour afficher le détail.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Résultats par compétence</h2>
+            <p>Les notes sont calculées par moyenne des niveaux puis converties sur le barème de chaque compétence. Tu peux ajuster manuellement une compétence si besoin.</p>
+          </div>
+        </div>
+        <div class="competence-cards" id="competenceWrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Appréciation finale</h2>
+            <p>Banque de commentaires, commentaires par compétences et synthèse des révisions faibles.</p>
+          </div>
+        </div>
+        <div class="comment-box">
+          <div class="comment-actions">
+            <button class="btn ghost" id="btnBankAppreciation">Modèles d’appréciation</button>
+            <button class="btn ghost" id="btnBankCompetenceComments">Commentaires C2-C6</button>
+            <button class="btn ghost" id="btnBankCompetenceRemediation">Remédiations C2-C6</button>
+            <button class="btn ghost" id="btnInsertRevision">Révisions</button>
+            <button class="btn ghost" id="btnSaveAppreciationText">Enregistrer ce texte</button>
+          </div>
+          <textarea id="finalComment" placeholder="Commentaire final, synthèse des compétences, révisions à prévoir…"></textarea>
+        </div>
+      </section>
+
+      <section class="status-row">
+        <span id="statusText">Prototype prêt. Charge un devoir JSON ou l’exemple pour commencer.</span>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="modalTitle">Action</h3>
+        <p id="modalNote"></p>
+      </div>
+      <button class="btn ghost" id="btnCloseModal">Fermer</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LEVELS = ['NT','I','A','M'];
+const LEVEL_VALUES = { NT:0, I:1, A:2, M:3 };
+const LEVEL_LABELS = { NT:'Non traité', I:'Insuffisant', A:'Acceptable', M:'Maîtrisé' };
+const COMP_ORDER = ['C2','C3','C4','C5','C6'];
+const DEFAULT_CORRECTION_URL = 'https://mapse.fr/bac_blanc_pse_correction_2025.html';
+const DEFAULT_COMPETENCES = {
+  C2: { bareme:5, label:"Appliquer une démarche d'analyse" },
+  C3: { bareme:4, label:"Expliquer" },
+  C4: { bareme:4, label:"Proposer une solution" },
+  C5: { bareme:4, label:"Argumenter un choix" },
+  C6: { bareme:3, label:"Communiquer à l'écrit et à l'oral" }
+};
+const DEFAULT_BANKS = {
+  appreciation: [
+    "Excellent travail : copie très soignée, réponses précises et bien justifiées.",
+    "Très bon travail : ensemble solide, bonne compréhension du cours et des documents.",
+    "Bon travail : résultats satisfaisants, quelques points restent à consolider.",
+    "Travail correct : l’essentiel est compris, mais il faut gagner en précision et en méthode.",
+    "Travail sérieux : tu t’investis, continue en améliorant la rigueur et la justification.",
+    "Bonne progression : des progrès visibles, il faut poursuivre les efforts pour stabiliser les acquis.",
+    "Travail inégal : certaines réponses sont réussies, d’autres sont à reprendre plus sérieusement.",
+    "Copie soignée mais fragile : présentation correcte, mais des notions du cours sont à retravailler.",
+    "Manque de rigueur : attention aux consignes et à la qualité des réponses, relis-toi.",
+    "Copie incomplète : plusieurs questions non traitées, il faut terminer et revoir la méthode.",
+    "Travail insuffisant : plusieurs notions ne sont pas acquises, un temps de révision est nécessaire.",
+    "Manque d’implication : réponses trop courtes ou incomplètes, il faut davantage développer.",
+    "Très bon investissement : tu as travaillé avec sérieux et efficacité, continue sur cette lancée.",
+    "Travail solide : les réponses sont globalement justes et bien structurées.",
+    "Très bonne méthode : tu appliques une démarche claire et tu sais t’appuyer sur les documents.",
+    "Bonne compréhension : tu identifies l’essentiel, il faut maintenant gagner en précision.",
+    "Travail appliqué : tu as pris le temps de répondre, attention à mieux justifier certaines idées.",
+    "Copie claire : présentation lisible, effort d’organisation visible, quelques notions à revoir.",
+    "Progrès encourageants : tu es sur la bonne voie, continue à t’entraîner régulièrement.",
+    "Résultats satisfaisants : des acquis présents, il faut encore renforcer la rigueur.",
+    "Ensemble correct : réponses pertinentes, mais certaines imprécisions restent à corriger.",
+    "Travail trop superficiel : des réponses existent, mais elles manquent de détails et d’arguments.",
+    "Attention aux consignes : certaines réponses ne correspondent pas exactement à ce qui est demandé.",
+    "Manque de relecture : plusieurs erreurs évitables, pense à te relire avant de rendre.",
+    "Effort à poursuivre : implication présente, mais il faut être plus régulier et plus précis.",
+    "Travail à consolider : l’essentiel est là, mais la méthode doit être mieux maîtrisée.",
+    "Résultats fragiles : tu as des idées, mais elles sont parfois mal organisées ou incomplètes.",
+    "Copie trop courte : tu as répondu, mais il faut davantage développer pour montrer ta compréhension.",
+    "Travail à reprendre : trop d’oublis et d’approximations, une révision du cours est nécessaire.",
+    "Insuffisant : manque de réponses et de méthode, il faut retravailler sérieusement pour progresser.",
+    "Très insuffisant : copie incomplète, notions non acquises, reprise impérative avec entraînement guidé."
+  ],
+  remediations: {
+    C1:[
+      "Relire la consigne et repérer exactement ce qui est demandé",
+      "Relever les informations utiles dans les documents",
+      "Surligner les mots-clés et les données chiffrées",
+      "Vérifier unités, dates, pourcentages, sources",
+      "Classer les infos par thèmes (danger, cause, conséquence, prévention)",
+      "Reformuler l’information avec ses propres mots",
+      "Compléter un tableau / schéma à partir des documents",
+      "Éliminer les informations hors sujet"
+    ],
+    C2:[
+      "Faire le QQOQCCP (qui, quoi, où, quand, comment, combien, pourquoi)",
+      "Utiliser ITAMaMi (Individu, Tâche, Activité, Matériel, Milieu)",
+      "Réaliser un PAD (processus d’apparition d’un dommage)",
+      "Utiliser Ishikawa / 5M (Main-d’œuvre, Matériel, Méthode, Milieu, Matière)",
+      "Identifier danger, événement déclencheur, dommage",
+      "Repérer causes et conséquences (cause → effet)",
+      "Lister facteurs aggravants et facteurs protecteurs",
+      "Prioriser les risques (plus grave / plus probable)"
+    ],
+    C3:[
+      "Définir les notions avec un vocabulaire scientifique et précis",
+      "Expliquer le lien cause → conséquence",
+      "Citer la règle ou la consigne de sécurité attendue",
+      "Relier la règle à un risque concret (ce que ça évite)",
+      "Donner un exemple concret lié à la situation",
+      "Expliquer le rôle de la prévention (avant / pendant / après)",
+      "Distinguer danger, risque, dommage"
+    ],
+    C4:[
+      "Proposer au moins 2 mesures de prévention",
+      "Classer les mesures (collectives avant individuelles)",
+      "Adapter la solution à la situation (réaliste, applicable)",
+      "Préciser qui fait quoi et avec quel matériel",
+      "Vérifier l’efficacité attendue (ce que ça réduit)",
+      "Prévoir une action de contrôle (vérifier, entretenir, former)",
+      "Utiliser la logique éviter → réduire → protéger"
+    ],
+    C5:[
+      "Justifier le choix avec 2 critères minimum (sécurité, coût, efficacité, faisabilité)",
+      "Comparer avantages / limites de plusieurs solutions",
+      "Appuyer l’argumentation sur la situation et les documents",
+      "Utiliser des connecteurs logiques (car, donc, cependant, ainsi)",
+      "Conclure clairement (je choisis… parce que…)",
+      "Vérifier la cohérence entre solution proposée et risque identifié"
+    ],
+    C6:[
+      "Répondre à toutes les questions (ne rien laisser vide)",
+      "Si une question n’est pas comprise, reformuler ce qui est demandé puis répondre",
+      "Répondre dans l’ordre des questions",
+      "Écrire des phrases complètes (sujet + verbe + complément)",
+      "Aérer la réponse (lignes, tirets, mots-clés)",
+      "Utiliser un vocabulaire professionnel adapté",
+      "Soigner l’orthographe des mots-clés PSE",
+      "Éviter les réponses trop vagues (être précis)",
+      "Se relire et corriger avant de rendre"
+    ]
+  },
+  competenceComments:{
+    C1:{
+      "Général":{
+        NT:[
+          "Aucune information attendue identifiée.",
+          "Information relevée fausse ou erronée."
+        ],
+        I:["Information attendue partiellement identifiée."],
+        A:["Information attendue clairement identifiée."],
+        M:["Information attendue clairement identifiée et reformulée/synthétisée."]
+      }
+    },
+    C2:{
+      "Général":{
+        NT:[
+          "Problème non identifié.",
+          "Aucune composante / une composante de la situation identifiée."
+        ],
+        I:[
+          "Problème identifié partiellement / mal formulé.",
+          "Quelques composantes de la situation identifiées."
+        ],
+        A:[
+          "Problème clairement identifié et mal formulé.",
+          "La majorité des composantes de la situation identifiée (et mise en relation suivant l’outil utilisé)."
+        ],
+        M:[
+          "Problème identifié précisément et correctement formulé.",
+          "Toutes les composantes de la situation identifiées (et mises en relation suivant l’outil utilisé)."
+        ]
+      },
+      "Diagramme causes-effets":{
+        NT:["Une cause ou une conséquence placée."],
+        I:["Une cause et une conséquence placée."],
+        A:["Plusieurs causes et au moins une conséquence placée."],
+        M:["Diagramme complet."]
+      },
+      "ItaMaMi":{
+        NT:["Aucun élément de réponse ou réponse incohérente dans chaque partie ou une seule partie complétée/renseignée correctement."],
+        I:["2 parties correctement complétées/renseignées."],
+        A:["3 parties correctement complétées/renseignées."],
+        M:["Les 4 parties correctement complétées/renseignées."]
+      },
+      "Méthode des 5M":{
+        NT:["Aucun élément de réponse ou réponse incohérente dans chaque partie ou 1 à 2 parties renseignées ou la conséquence uniquement."],
+        I:["3 parties correctement renseignées et la conséquence."],
+        A:["4 parties correctement renseignées et la conséquence."],
+        M:["5 parties correctement renseignées et la conséquence."]
+      },
+      "Méthode QQOQCP":{
+        NT:["Aucun élément de réponse ou réponse incohérente dans chaque partie ou 1 à 2 parties renseignées."],
+        I:["3 parties correctement renseignées."],
+        A:["4 parties correctement renseignées."],
+        M:["5 parties correctement renseignées."]
+      },
+      "Démarche d’approche par les risques":{
+        NT:["Aucun élément de réponse ou réponse incohérente ou 1 élément de réponse."],
+        I:["2 éléments de réponse avec une mise en relation ou 3 éléments sans mise en relation."],
+        A:["3 éléments de réponse avec une mise en relation ou 4 éléments sans mise en relation."],
+        M:["Tous les éléments attendus avec une mise en relation."]
+      },
+      "Démarche d’approche par le travail":{
+        NT:["Aucun élément de réponse ou réponse incohérente ou 1 à 2 éléments de réponse."],
+        I:["Au moins un déterminant opérateur/entreprise et au moins un effet sur l’opérateur/entreprise et le travail prescrit ou les tâches réelles ou les activités réelles."],
+        A:["Déterminants opérateur/entreprise et effets sur l’opérateur/entreprise et le travail prescrit et les tâches réelles ou les activités réelles."],
+        M:["Tous les éléments de réponse attendus et le lien de causalité."]
+      }
+    },
+    C3:{
+      "Général":{
+        NT:["Pas d’explication d’un phénomène physiologique, d’un enjeu environnemental, d’une disposition réglementaire."],
+        I:["Explication partielle d’un phénomène physiologique, d’un enjeu environnemental, d’une disposition réglementaire."],
+        A:["Explication d’un phénomène physiologique, d’un enjeu environnemental, d’une disposition réglementaire."],
+        M:["Explication d’un phénomène physiologique, d’un enjeu environnemental, d’une disposition réglementaire en utilisant un vocabulaire adapté, en lien avec une mesure de prévention."]
+      }
+    },
+    C4:{
+      "Général":{
+        NT:["Pas de solution / solution inadaptée ou sans lien avec le thème/problème."],
+        I:["Solution en lien avec le thème mais pas adaptée à la situation problème."],
+        A:["Solution adaptée à la situation problème et en lien avec le thème."],
+        M:["Solution adaptée à la situation problème, associée au niveau adéquat (individuel, collectif, niveaux de prévention) en lien avec le thème."]
+      }
+    },
+    C5:{
+      "Général":{
+        NT:[
+          "Pas d’argument.",
+          "Argument sans lien avec un choix."
+        ],
+        I:["Argument non pertinent en lien avec un choix."],
+        A:["Argument pertinent en lien avec un choix."],
+        M:["Argument(s) introduit(s) avec des éléments de preuve en lien avec un choix qui arrive en conclusion."]
+      }
+    },
+    C6:{
+      "Général":{
+        NT:["Absence de phrase : pas de syntaxe et vocabulaire limité/inadapté à l’écrit et à l’oral."],
+        I:["Phrases avec une syntaxe et/ou un vocabulaire succinct."],
+        A:["Enchaînement de phrases avec une syntaxe et un vocabulaire adaptés."],
+        M:["Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation."]
+      }
+    }
+  },
+  autoComments:{
+    C1:{
+      I:"Aucune information attendue identifiée. Information relevée fausse ou erronée.",
+      M:"Information attendue partiellement identifiée."
+    },
+    C2:{
+      I:"Problème non identifié / partiellement identifié / mal formulé.",
+      M:"Problème identifié précisément."
+    },
+    C3:{
+      I:"Pas d'explication / explication partielle d'un phénomène physiologique, d'un enjeu environnemental, d'une disposition réglementaire.",
+      M:"Explication d'un phénomène physiologique, d'un enjeu environnemental, d'une disposition réglementaire identifiée."
+    },
+    C4:{
+      I:"Pas de solution / solution inadaptée ou sans lien avec le thème / problème.",
+      M:"Solution adaptée à la situation problème."
+    },
+    C5:{
+      I:"Pas d'argument / argument non pertinent — argument sans lien avec un choix.",
+      M:"Argument(s) avec des « éléments de preuve » en lien avec un choix."
+    },
+    C6:{
+      I:"Absence de phrase : pas de syntaxe, ou vocabulaire limité ou succinct / inadapté à l'écrit.",
+      M:"Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation."
+    }
+  }
+};
+
+const EXAMPLE_MASTER = {
+  meta:{
+    titre:"Bac blanc PSE — JO 2024 et prévention",
+    type:"Bac Blanc",
+    niveau:"Terminale Bac Pro",
+    date:"2026-03-15",
+    note_sur:20,
+    correction_url:DEFAULT_CORRECTION_URL
+  },
+  competences:{
+    C2:{ bareme:5, label:"Appliquer une démarche d'analyse" },
+    C3:{ bareme:4, label:"Expliquer" },
+    C4:{ bareme:4, label:"Proposer une solution" },
+    C5:{ bareme:4, label:"Argumenter un choix" },
+    C6:{ bareme:3, label:"Communiquer à l'écrit et à l'oral" }
+  },
+  questions:[
+    {
+      num:"Q1.1",
+      libelle:"Identifier quatre impacts environnementaux liés à l’organisation des JO 2024.",
+      module:"B5",
+      competence:"C2",
+      niveaux_autorises:["NT","A","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Aucun impact pertinent identifié ou réponse hors sujet.",
+        I:null,
+        A:"Au moins 3 impacts pertinents identifiés.",
+        M:"4 impacts pertinents identifiés parmi les attendus."
+      },
+      remediation:{
+        notion:"Empreinte carbone",
+        module:"B5",
+        conseil:"Relève les conséquences environnementales directes puis formule-les avec le vocabulaire du cours.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q1.2",
+      libelle:"Compléter le tableau d’analyse des facteurs aggravants et protecteurs.",
+      module:"B5",
+      competence:"C2",
+      niveaux_autorises:["NT","I","A","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Tableau vide ou incohérent.",
+        I:"Quelques facteurs correctement relevés sans organisation complète.",
+        A:"La majorité des facteurs attendus sont repérés.",
+        M:"Tous les facteurs attendus sont relevés et classés correctement."
+      },
+      remediation:{
+        notion:"Facteurs aggravants et protecteurs",
+        module:"B5",
+        conseil:"Classe d’abord les éléments qui augmentent le risque, puis ceux qui le réduisent.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q1.3",
+      libelle:"Compléter un outil d’analyse du type QQOQCCP à partir de la situation proposée.",
+      module:"B5",
+      competence:"C2",
+      niveaux_autorises:["NT","I","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Outil vide ou hors sujet.",
+        I:"Plusieurs rubriques sont remplies mais l’ensemble reste incomplet.",
+        A:null,
+        M:"Toutes les rubriques attendues sont renseignées correctement."
+      },
+      remediation:{
+        notion:"QQOQCCP",
+        module:"B5",
+        conseil:"Renseigne d’abord qui, quoi, où et quand, puis complète comment et pourquoi.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q1.4",
+      libelle:"Expliquer en quoi l’augmentation du trafic et des constructions a un impact sur l’environnement.",
+      module:"B5",
+      competence:"C3",
+      niveaux_autorises:["NT","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Aucune explication ou réponse hors sujet.",
+        I:null,
+        A:null,
+        M:"Le lien cause → conséquence environnementale est expliqué avec un vocabulaire adapté."
+      },
+      remediation:{
+        notion:"Impacts environnementaux",
+        module:"B5",
+        conseil:"Mets en relation le fait observé, la pollution engendrée et la conséquence sur l’environnement.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q1.5",
+      libelle:"Expliquer pourquoi la prévention des déchets doit être anticipée avant un grand évènement.",
+      module:"B5",
+      competence:"C3",
+      niveaux_autorises:["NT","I","A","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Pas d’explication pertinente.",
+        I:"Explication très partielle.",
+        A:"Idée correcte mais peu développée.",
+        M:"Explication complète avec lien clair vers la prévention."
+      },
+      remediation:{
+        notion:"Prévention des déchets",
+        module:"B5",
+        conseil:"Explique toujours ce que permet d’éviter une mesure avant l’évènement.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q2.1",
+      libelle:"Proposer deux mesures de prévention réalistes pour limiter les impacts environnementaux.",
+      module:"B5",
+      competence:"C4",
+      niveaux_autorises:["NT","A","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Pas de solution ou solution hors sujet.",
+        I:null,
+        A:"Deux mesures réalistes sont proposées.",
+        M:"Deux mesures réalistes sont proposées et correctement justifiées."
+      },
+      remediation:{
+        notion:"Mesures de prévention environnementales",
+        module:"B5",
+        conseil:"Pense à une mesure collective puis à une mesure concrète facile à mettre en œuvre.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q2.2",
+      libelle:"Justifier le choix de la mesure la plus pertinente pour l’organisateur.",
+      module:"B5",
+      competence:"C5",
+      niveaux_autorises:["NT","I","A","M"],
+      neutralisee:false,
+      compte_dans_note:true,
+      criteres:{
+        NT:"Aucun argument en lien avec le choix.",
+        I:"Choix sans argument solide.",
+        A:"Choix argumenté sans preuve suffisamment précise.",
+        M:"Choix argumenté avec éléments de preuve et cohérence globale."
+      },
+      remediation:{
+        notion:"Argumentation",
+        module:"B5",
+        conseil:"Justifie toujours ton choix avec au moins un avantage concret et un critère précis.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    {
+      num:"Q2.5",
+      libelle:"Question neutralisée — visible sur la copie mais exclue du calcul.",
+      module:"B5",
+      competence:"C2",
+      niveaux_autorises:["NT"],
+      neutralisee:true,
+      compte_dans_note:false,
+      criteres:{
+        NT:"Question neutralisée — visible sur la copie mais exclue du calcul.",
+        I:null,
+        A:null,
+        M:null
+      },
+      remediation:{
+        notion:"Question neutralisée",
+        module:"B5",
+        conseil:"Aucune remédiation car cette question ne compte pas dans la note.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    }
+  ],
+  c6:{
+    active:true,
+    num:"C6",
+    libelle:"Communiquer à l'écrit et à l'oral avec une syntaxe claire et un vocabulaire adapté.",
+    niveaux_autorises:["NT","I","A","M"],
+    competence:"C6",
+    compte_dans_note:true,
+    neutralisee:false,
+    criteres:{
+      NT:"Absence de phrase : pas de syntaxe et vocabulaire limité/inadapté à l’écrit et à l’oral.",
+      I:"Phrases avec une syntaxe et/ou un vocabulaire succinct.",
+      A:"Enchaînement de phrases avec une syntaxe et un vocabulaire adaptés.",
+      M:"Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation."
+    },
+    remediation:{
+      notion:"Communication écrite",
+      module:"B5",
+      conseil:"Rédige des phrases complètes avec un vocabulaire précis et des transitions simples.",
+      lien:DEFAULT_CORRECTION_URL
+    }
+  },
+  banque_commentaires:[
+    "Ensemble sérieux.",
+    "Réponses à préciser.",
+    "Bonne maîtrise des notions.",
+    "Des efforts de rédaction sont attendus."
+  ]
+};
+
+const EXAMPLE_STUDENT = {
+  devoirRef:{ titre:"Bac blanc PSE — JO 2024 et prévention", module:"B5" },
+  eleve:{ nom:"BENIDIR", prenom:"Farah", classe:"B1AGO1", code:"KA47" },
+  questions:[
+    {
+      question:"Q1.1",
+      reponseExtraite:"Pollution de l'air, déchets, transports et énergie.",
+      reponseVerifieeProposee:"L’élève repère la pollution de l’air, les déchets, les transports supplémentaires et la consommation d’énergie.",
+      aVerifier:false,
+      confiance:0.94,
+      niveauPropose:"M",
+      commentairePropose:"Quatre impacts attendus sont relevés.",
+      remediationProposee:"Relève les conséquences environnementales directes puis formule-les avec le vocabulaire du cours.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q1.2",
+      reponseExtraite:"Facteurs aggravants : trafic, déchets. Protecteurs : tri, transports propres.",
+      reponseVerifieeProposee:"L’élève distingue plusieurs facteurs aggravants et protecteurs, mais le tableau reste partiellement incomplet.",
+      aVerifier:false,
+      confiance:0.87,
+      niveauPropose:"A",
+      commentairePropose:"La majorité des éléments utiles est repérée.",
+      remediationProposee:"Classe d’abord les éléments qui augmentent le risque, puis ceux qui le réduisent.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q1.3",
+      reponseExtraite:"Qui : organisateurs, Quoi : pollution, Où : Paris, Quand : JO, Comment : transports.",
+      reponseVerifieeProposee:"Le QQOQCCP est partiellement complété mais toutes les rubriques ne sont pas finalisées.",
+      aVerifier:false,
+      confiance:0.82,
+      niveauPropose:"I",
+      commentairePropose:"L’outil est engagé mais incomplet.",
+      remediationProposee:"Renseigne d’abord qui, quoi, où et quand, puis complète comment et pourquoi.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q1.4",
+      reponseExtraite:"Plus de trafic = plus de pollution.",
+      reponseVerifieeProposee:"L’élève établit bien le lien entre l’augmentation du trafic et la pollution générée.",
+      aVerifier:false,
+      confiance:0.92,
+      niveauPropose:"M",
+      commentairePropose:"Le lien cause → conséquence est clairement formulé.",
+      remediationProposee:"Mets en relation le fait observé, la pollution engendrée et la conséquence sur l’environnement.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q1.5",
+      reponseExtraite:"Il faut prévoir avant pour éviter trop de déchets.",
+      reponseVerifieeProposee:"L’idée est juste mais la justification reste courte et peu développée.",
+      aVerifier:false,
+      confiance:0.79,
+      niveauPropose:"A",
+      commentairePropose:"L’idée de prévention est comprise.",
+      remediationProposee:"Explique toujours ce que permet d’éviter une mesure avant l’évènement.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q2.1",
+      reponseExtraite:"Mettre des poubelles de tri et faire plus de transports en commun.",
+      reponseVerifieeProposee:"Deux mesures réalistes sont proposées.",
+      aVerifier:false,
+      confiance:0.93,
+      niveauPropose:"A",
+      commentairePropose:"Deux solutions adaptées sont bien présentes.",
+      remediationProposee:"Pense à une mesure collective puis à une mesure concrète facile à mettre en œuvre.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q2.2",
+      reponseExtraite:"Le tri est mieux car ça réduit les déchets.",
+      reponseVerifieeProposee:"Le choix est identifié mais l’argumentation reste trop courte pour être complètement convaincante.",
+      aVerifier:false,
+      confiance:0.76,
+      niveauPropose:"I",
+      commentairePropose:"L’argumentation est présente mais encore trop légère.",
+      remediationProposee:"Justifie toujours ton choix avec au moins un avantage concret et un critère précis.",
+      remarqueExtraction:""
+    },
+    {
+      question:"Q2.5",
+      reponseExtraite:"Réponse conservée mais question neutralisée.",
+      reponseVerifieeProposee:"Réponse conservée mais question neutralisée.",
+      aVerifier:false,
+      confiance:0.91,
+      niveauPropose:"",
+      commentairePropose:"Question neutralisée.",
+      remediationProposee:"",
+      remarqueExtraction:"Réponse visible mais exclue du calcul."
+    },
+    {
+      question:"C6",
+      reponseExtraite:"Réponses globalement compréhensibles mais parfois très courtes.",
+      reponseVerifieeProposee:"L’ensemble est compréhensible, mais la rédaction reste encore simple et peu articulée.",
+      aVerifier:false,
+      confiance:0.88,
+      niveauPropose:"A",
+      commentairePropose:"Communication écrite globalement correcte mais peu développée.",
+      remediationProposee:"Rédige des phrases complètes avec un vocabulaire précis et des transitions simples.",
+      remarqueExtraction:""
+    }
+  ],
+  commentaireGlobalPropose:"Ensemble sérieux et compréhensible, mais plusieurs réponses gagneraient à être davantage justifiées."
+};
+
+const appState = {
+  master:null,
+  rows:[],
+  rowStates:{},
+  selectedRowKey:'',
+  displayMode:'compact',
+  printMode:'compact',
+  detailVisibility:{},
+  roundingMode:'dixieme',
+  competenceOverrides:{},
+  studentMeta:{ nom:'', prenom:'', classe:'', code:'' },
+  finalComment:'',
+  importSource:'Aucun JSON élève chargé',
+  rosterAll:[],
+  currentClass:'',
+  currentStudentKey:'',
+  studentCorrections:{},
+  customBanks:{
+    appreciation:[]
+  }
+};
+
+const SESSION_STORAGE_KEY = 'cockpit-pse-bac-session-v1';
+let persistTimer = null;
+let isRestoringSession = false;
+
+const toastEl = document.getElementById('toast');
+const modalState = { onClose:null };
+
+function normalizeRosterEntry(item){
+  return {
+    code:String(item && item.code || '').trim(),
+    classe:String(item && item.classe || '').trim(),
+    prenom:String(item && item.prenom || '').trim(),
+    nom:String(item && item.nom || '').trim()
+  };
+}
+
+function buildStudentKey(item){
+  const data = normalizeRosterEntry(item);
+  return [data.classe, data.code || 'nocode', data.nom, data.prenom].join('::').toUpperCase();
+}
+
+function getInitialRoster(){
+  const source = Array.isArray(window.DATA_CLASSES_ELEVES) ? window.DATA_CLASSES_ELEVES : [];
+  return source.map(normalizeRosterEntry).filter(function(item){
+    return item.classe && (item.nom || item.prenom || item.code);
+  }).sort(function(a, b){
+    return (a.classe + '|' + a.nom + '|' + a.prenom).localeCompare(b.classe + '|' + b.nom + '|' + b.prenom, undefined, { sensitivity:'base' });
+  });
+}
+
+function getClassList(){
+  return Array.from(new Set((appState.rosterAll || []).map(function(item){ return item.classe; }).filter(Boolean))).sort(function(a,b){
+    return a.localeCompare(b, undefined, { numeric:true, sensitivity:'base' });
+  });
+}
+
+function getStudentsForClass(classe){
+  return (appState.rosterAll || []).filter(function(item){ return item.classe === classe; });
+}
+
+function getStudentByKey(key){
+  return (appState.rosterAll || []).find(function(item){ return buildStudentKey(item) === key; }) || null;
+}
+
+function mergeRosterClass(classe, students){
+  const normalizedClass = String(classe || '').trim();
+  const incoming = (Array.isArray(students) ? students : []).map(function(item){
+    const base = normalizeRosterEntry(item);
+    if(!base.classe) base.classe = normalizedClass;
+    return base;
+  }).filter(function(item){ return item.classe && (item.nom || item.prenom || item.code); });
+  const remaining = (appState.rosterAll || []).filter(function(item){ return item.classe !== normalizedClass; });
+  appState.rosterAll = remaining.concat(incoming).sort(function(a, b){
+    return (a.classe + '|' + a.nom + '|' + a.prenom).localeCompare(b.classe + '|' + b.nom + '|' + b.prenom, undefined, { sensitivity:'base' });
+  });
+}
+
+function clone(value){
+  return JSON.parse(JSON.stringify(value));
+}
+
+function slugify(value){
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-zA-Z0-9]+/g,'-')
+    .replace(/^-+|-+$/g,'')
+    .toLowerCase() || 'document';
+}
+
+function esc(text){
+  return String(text == null ? '' : text)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function toast(message, type){
+  toastEl.textContent = message;
+  toastEl.className = 'toast show' + (type === 'error' ? ' error' : type === 'success' ? ' success' : '');
+  window.clearTimeout(toast._timer);
+  toast._timer = window.setTimeout(function(){ toastEl.className = 'toast'; }, 2400);
+}
+
+function openModal(title, note, html, actions){
+  document.getElementById('modalTitle').textContent = title || 'Action';
+  document.getElementById('modalNote').textContent = note || '';
+  document.getElementById('modalBody').innerHTML = html || '';
+  const actionsWrap = document.getElementById('modalActions');
+  actionsWrap.innerHTML = '';
+  (actions || []).forEach(function(action){
+    const button = document.createElement('button');
+    button.className = 'btn ghost';
+    button.textContent = action.label;
+    button.addEventListener('click', function(){
+      const result = action.onClick ? action.onClick() : undefined;
+      if(result === false) return;
+      if(result && typeof result.then === 'function'){
+        result.then(function(shouldClose){
+          if(shouldClose !== false) closeModal();
+        }).catch(function(){});
+        return;
+      }
+      closeModal();
+    });
+    actionsWrap.appendChild(button);
+  });
+  if(!(actions || []).length){
+    const button = document.createElement('button');
+    button.className = 'btn ghost';
+    button.textContent = 'Fermer';
+    button.addEventListener('click', closeModal);
+    actionsWrap.appendChild(button);
+  }
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('show');
+  document.getElementById('modalBody').innerHTML = '';
+}
+
+function sanitizeJsonLikeInput(raw){
+  let s = String(raw == null ? '' : raw)
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const fence = String.fromCharCode(96,96,96);
+  s = s.trim();
+  if(s.toLowerCase().startsWith(fence + 'json')) s = s.slice(7).trim();
+  else if(s.startsWith(fence)) s = s.slice(3).trim();
+  if(s.endsWith(fence)) s = s.slice(0,-3).trim();
+  s = s.replace(/,(\s*[}\]])/g, '$1');
+  return s;
+}
+
+function parseJsonInput(raw){
+  return JSON.parse(sanitizeJsonLikeInput(raw));
+}
+
+function copyText(text){
+  const value = String(text == null ? '' : text);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(value);
+  }
+  return new Promise(function(resolve, reject){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly','readonly');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      ta.style.pointerEvents = 'none';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      resolve();
+    } catch (error){
+      reject(error);
+    }
+  });
+}
+
+function safeUrl(value){
+  const raw = String(value || '').trim();
+  if(!raw) return '';
+  if(/^https?:\/\//i.test(raw)) return raw;
+  return 'https://' + raw.replace(/^\/+/,'');
+}
+
+function roundScore(value, mode){
+  if(value == null || !Number.isFinite(value)) return null;
+  if(mode === 'quart') return Math.round(value * 4) / 4;
+  if(mode === 'entier') return Math.round(value);
+  return Math.round(value * 10) / 10;
+}
+
+function formatScore(value){
+  if(value == null || !Number.isFinite(value)) return '—';
+  return String(value).replace('.', ',');
+}
+
+function uniqueByText(items){
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(items) ? items : []).forEach(function(item){
+    const label = String(item && item.label != null ? item.label : '').trim();
+    const text = String(item && item.text != null ? item.text : '').trim();
+    if(!text) return;
+    const key = text.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({ label: label || text, text:text });
+  });
+  return out;
+}
+
+function normalizeCustomBanks(raw){
+  const source = raw && typeof raw === 'object' ? raw : {};
+  return {
+    appreciation: uniqueByText((Array.isArray(source.appreciation) ? source.appreciation : []).map(function(text){
+      return { label:'Personnel', text:String(text || '') };
+    })).map(function(item){ return item.text; })
+  };
+}
+
+function getAppreciationBank(){
+  const globalSource = window.DATA_APPRECIATION && Array.isArray(window.DATA_APPRECIATION.Global)
+    ? window.DATA_APPRECIATION.Global
+    : DEFAULT_BANKS.appreciation;
+  const masterSource = appState.master && Array.isArray(appState.master.banque_commentaires)
+    ? appState.master.banque_commentaires
+    : [];
+  const customSource = appState.customBanks && Array.isArray(appState.customBanks.appreciation)
+    ? appState.customBanks.appreciation
+    : [];
+  return uniqueByText(globalSource.concat(masterSource, customSource).map(function(text){
+    return { label:'Appréciation', text:text };
+  }));
+}
+
+function getRemediationBank(){
+  return window.DATA_APPRECIATION && window.DATA_APPRECIATION.Remédiations
+    ? window.DATA_APPRECIATION.Remédiations
+    : DEFAULT_BANKS.remediations;
+}
+
+function getCompetenceCommentBank(){
+  return window.DATA_COMMENTAIRES_COMPETENCES || DEFAULT_BANKS.competenceComments;
+}
+
+function buildFullCompetenceCommentEntries(){
+  const bank = getCompetenceCommentBank();
+  const auto = window.COMMENTAIRES_AUTO || DEFAULT_BANKS.autoComments || {};
+  const items = [];
+  Object.keys(bank || {}).forEach(function(code){
+    const groups = bank[code] || {};
+    Object.keys(groups).forEach(function(group){
+      const byLevel = groups[group] || {};
+      LEVELS.forEach(function(level){
+        const list = Array.isArray(byLevel[level]) ? byLevel[level] : [];
+        list.forEach(function(text, index){
+          items.push({
+            label: code + ' — ' + group + ' — ' + level + (list.length > 1 ? ' #' + (index + 1) : ''),
+            text: String(text || '')
+          });
+        });
+      });
+    });
+  });
+  Object.keys(auto || {}).forEach(function(code){
+    const byLevel = auto[code] || {};
+    Object.keys(byLevel).forEach(function(level){
+      const text = String(byLevel[level] || '').trim();
+      if(!text) return;
+      items.push({
+        label: code + ' — Auto — ' + level,
+        text:text
+      });
+    });
+  });
+  return uniqueByText(items);
+}
+
+function buildFullRemediationEntries(){
+  const bank = getRemediationBank();
+  const items = [];
+  Object.keys(bank || {}).forEach(function(code){
+    const list = Array.isArray(bank[code]) ? bank[code] : [];
+    list.forEach(function(text){
+      items.push({
+        label: code + ' — Remédiation',
+        text: '(' + code + ') ' + String(text || '').trim()
+      });
+    });
+  });
+  return uniqueByText(items);
+}
+
+function buildMasterPromptSchemaExample(){
+  return {
+    meta:{
+      titre:"Bac Blanc PSE",
+      type:"Bac Blanc",
+      niveau:"Terminale Bac Pro",
+      date:"2026-03-15",
+      note_sur:20,
+      correction_url:DEFAULT_CORRECTION_URL
+    },
+    competences:{
+      C2:{ bareme:5, label:"Appliquer une démarche d'analyse" },
+      C3:{ bareme:4, label:"Expliquer" },
+      C4:{ bareme:4, label:"Proposer une solution" },
+      C5:{ bareme:4, label:"Argumenter un choix" },
+      C6:{ bareme:3, label:"Communiquer à l'écrit et à l'oral" }
+    },
+    questions:[
+      {
+        num:"Q1.1",
+        libelle:"Identifier quatre impacts environnementaux liés à l’organisation des JO 2024.",
+        module:"B5",
+        competence:"C2",
+        niveaux_autorises:["NT","A","M"],
+        neutralisee:false,
+        compte_dans_note:true,
+        criteres:{
+          NT:"Aucun impact pertinent identifié ou réponse hors sujet.",
+          I:null,
+          A:"Au moins 3 impacts pertinents identifiés.",
+          M:"4 impacts pertinents identifiés parmi les attendus."
+        },
+        remediation:{
+          notion:"Empreinte carbone",
+          module:"B5",
+          conseil:"Relève les conséquences environnementales directes puis formule-les avec le vocabulaire du cours.",
+          lien:DEFAULT_CORRECTION_URL
+        }
+      }
+    ],
+    c6:{
+      active:true,
+      num:"C6",
+      libelle:"Communiquer à l'écrit et à l'oral avec une syntaxe claire et un vocabulaire adapté.",
+      niveaux_autorises:["NT","I","A","M"],
+      competence:"C6",
+      compte_dans_note:true,
+      neutralisee:false,
+      criteres:{
+        NT:"Absence de phrase : pas de syntaxe et vocabulaire limité/inadapté à l’écrit et à l’oral.",
+        I:"Phrases avec une syntaxe et/ou un vocabulaire succinct.",
+        A:"Enchaînement de phrases avec une syntaxe et un vocabulaire adaptés.",
+        M:"Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation."
+      },
+      remediation:{
+        notion:"Communication écrite",
+        module:"B5",
+        conseil:"Rédige des phrases complètes avec un vocabulaire précis et des transitions simples.",
+        lien:DEFAULT_CORRECTION_URL
+      }
+    },
+    banque_commentaires:[
+      "Ensemble sérieux.",
+      "Réponses à préciser."
+    ]
+  };
+}
+
+function buildMasterPrompt(){
+  return [
+    "Tu es un expert de l'évaluation PSE en lycée professionnel français.",
+    "",
+    "Ta mission : à partir d'un sujet d'évaluation PSE et, si disponible, de la grille officielle, du corrigé ou des indicateurs, produire un JSON maître strictement compatible avec mon éditeur de correction par compétences.",
+    "",
+    "Ce JSON maître doit être réutilisable pour tous les futurs devoirs, y compris si :",
+    "- le nombre de questions change",
+    "- les compétences actives changent",
+    "- certaines questions sont neutralisées",
+    "- certaines questions n'autorisent que certains niveaux",
+    "- le sujet n'est pas un bac blanc mais un autre devoir par compétences",
+    "",
+    "Le JSON doit donc être générique, robuste, stable et exploitable par un éditeur dynamique.",
+    "",
+    "Important :",
+    "- ce JSON ne sert pas seulement à afficher des questions",
+    "- il sert à construire automatiquement une grille de correction par compétences",
+    "- cette grille doit afficher des cases grisées selon les niveaux autorisés",
+    "- cette grille doit calculer automatiquement les résultats par compétence",
+    "- cette grille doit permettre ensuite d'importer un JSON élève pour pré-cocher les cases",
+    "",
+    "Règles impératives :",
+    "- Tu rends uniquement du JSON valide.",
+    "- Aucun texte avant ou après le JSON.",
+    "- Aucun markdown.",
+    "- Le devoir est évalué par compétences.",
+    "- Les compétences possibles dans l'éditeur sont C2, C3, C4, C5, C6.",
+    "- Chaque question doit être rattachée à une seule compétence principale parmi C2, C3, C4 ou C5.",
+    "- C6 est toujours présente en fin de devoir comme bloc transversal séparé sur 3 points.",
+    "- Les niveaux possibles sont NT, I, A, M.",
+    "- Pour chaque question, tu ne gardes dans niveaux_autorises que les niveaux réellement autorisés par la grille officielle ou les indicateurs.",
+    "- Si un niveau n'est pas utilisé pour une question, il ne doit pas apparaître dans niveaux_autorises.",
+    "- Si une question est neutralisée, mets neutralisee=true et compte_dans_note=false.",
+    "- Si une question est visible dans le sujet mais neutralisée, elle doit quand même apparaître dans questions.",
+    "- Les critères NT, I, A, M doivent être rédigés à partir du corrigé officiel, de la grille ou des indicateurs fournis.",
+    "- Les remédiations doivent rester courtes, pédagogiques, concrètes et reliées à la notion ou au module.",
+    "- Les identifiants de question doivent rester strictement stables pour permettre ensuite l'import du JSON élève.",
+    "- Garde l'ordre réel des questions du devoir.",
+    "- Si une information manque, fais une hypothèse raisonnable et cohérente avec le sujet et le corrigé.",
+    "",
+    "Logique pédagogique à respecter absolument :",
+    "- Le devoir n'est pas noté par points question par question dans la logique pédagogique.",
+    "- Les questions servent d'indicateurs de maîtrise pour une compétence.",
+    "- La note finale se calcule ensuite par compétence.",
+    "- Chaque question possède une seule compétence active.",
+    "- Pour chaque question, seuls certains niveaux peuvent être autorisés.",
+    "- Les niveaux absents de niveaux_autorises seront grisés dans l'éditeur et non utilisables.",
+    "- Le JSON produit doit être compatible avec un mode compact et un mode détaillé de relecture enseignant.",
+    "- Les champs num, libelle, module, competence, niveaux_autorises, criteres et remediation doivent donc être propres, complets et directement lisibles humainement.",
+    "- Le bloc criteres doit être pensé pour être relu facilement dans un bloc Attendus de correction.",
+    "",
+    "Barème global attendu par défaut pour un bac blanc :",
+    "- C2 sur 5",
+    "- C3 sur 4",
+    "- C4 sur 4",
+    "- C5 sur 4",
+    "- C6 sur 3",
+    "- Total 20",
+    "- Si le devoir n'est pas un bac blanc, adapte les métadonnées, mais conserve la structure du JSON.",
+    "- Si aucun autre barème n'est donné, conserve cette structure par compétences pour compatibilité avec l'éditeur.",
+    "",
+    "Pour C6, utilise toujours exactement ces critères :",
+    "- NT : Absence de phrase : pas de syntaxe et vocabulaire limité/inadapté à l’écrit et à l’oral.",
+    "- I : Phrases avec une syntaxe et/ou un vocabulaire succinct.",
+    "- A : Enchaînement de phrases avec une syntaxe et un vocabulaire adaptés.",
+    "- M : Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation.",
+    "",
+    "Format JSON cible :",
+    JSON.stringify(buildMasterPromptSchemaExample(), null, 2),
+    "",
+    "Important :",
+    "- Chaque question doit avoir un libellé exact ou quasi exact du sujet.",
+    "- Chaque question doit être rattachée à son module réel si identifiable.",
+    "- Si plusieurs modules apparaissent dans le devoir, ils peuvent coexister question par question.",
+    "- Si une question n'autorise que deux niveaux, n'inclus que ces deux niveaux dans niveaux_autorises.",
+    "- Si une question n'autorise que trois niveaux, n'inclus que ces trois niveaux dans niveaux_autorises.",
+    "- Si une question est neutralisée, conserve-la avec neutralisee=true, compte_dans_note=false et un bloc criteres cohérent avec une question neutralisée.",
+    "- Le champ criteres doit toujours exister.",
+    "- Si un niveau n'est pas autorisé, sa valeur dans criteres doit être null.",
+    "- Le JSON doit être directement exploitable dans un éditeur HTML/JS qui affiche les lignes de questions, grise les cases non autorisées, calcule ensuite les notes par compétence, ajoute C6 en fin de correction et permet une relecture détaillée enseignant à partir des attendus.",
+    "- Respecte les identifiants de question exactement tels qu'ils apparaissent sur le sujet si possible, par exemple Q1.1, Q1.2, Q2.5.",
+    "- Ajoute une entrée C6 finale même si le sujet ne l'explicite pas clairement.",
+    "",
+    "Ce que tu dois faire maintenant :",
+    "- analyser le sujet et, si disponible, le corrigé ou la grille officielle",
+    "- reconstruire la liste complète des questions dans l'ordre",
+    "- attribuer à chaque question sa compétence principale",
+    "- déterminer précisément les niveaux autorisés",
+    "- rédiger les critères d'évaluation question par question",
+    "- signaler les éventuelles questions neutralisées",
+    "- générer l'entrée C6 finale",
+    "- produire le JSON maître complet et valide",
+    "",
+    "Rends maintenant le JSON maître complet."
+  ].join('\n');
+}
+
+function buildStudentPromptMasterSnapshot(){
+  if(!appState.master) return null;
+  return {
+    meta:appState.master.meta,
+    competences:appState.master.competences,
+    questions:appState.rows.map(function(row){
+      return {
+        num:row.num,
+        libelle:row.libelle,
+        module:row.module,
+        competence:row.competence,
+        niveaux_autorises:row.niveaux_autorises.slice(),
+        neutralisee:row.neutralisee,
+        compte_dans_note:row.compte_dans_note,
+        criteres:clone(row.criteres),
+        remediation:clone(row.remediation)
+      };
+    })
+  };
+}
+
+function buildStudentPromptExample(){
+  return {
+    devoirRef:{
+      titre:"Bac Blanc PSE",
+      module:"B5"
+    },
+    eleve:{
+      nom:"DUPONT",
+      prenom:"Lina",
+      classe:"TMELEC",
+      code:"AB12"
+    },
+    questions:[
+      {
+        question:"Q1.1",
+        reponseExtraite:"pollution de l'air et de l'eau",
+        reponseVerifieeProposee:"Pollution de l'air et de l'eau.",
+        aVerifier:false,
+        confiance:0.92,
+        niveauPropose:"A",
+        commentairePropose:"Plusieurs impacts sont repérés.",
+        remediationProposee:"Relève les conséquences environnementales directes puis formule-les avec le vocabulaire du cours.",
+        remarqueExtraction:""
+      },
+      {
+        question:"Q2.5",
+        reponseExtraite:"réponse élève visible",
+        reponseVerifieeProposee:"réponse élève visible",
+        aVerifier:false,
+        confiance:0.9,
+        niveauPropose:"",
+        commentairePropose:"Question neutralisée.",
+        remediationProposee:"",
+        remarqueExtraction:"Réponse conservée mais question exclue du calcul."
+      },
+      {
+        question:"C6",
+        reponseExtraite:"Réponses globalement compréhensibles.",
+        reponseVerifieeProposee:"Communication écrite globale correcte mais simple.",
+        aVerifier:false,
+        confiance:0.85,
+        niveauPropose:"A",
+        commentairePropose:"Ensemble compréhensible.",
+        remediationProposee:"Rédige des réponses complètes en utilisant un vocabulaire précis et des phrases claires.",
+        remarqueExtraction:""
+      }
+    ],
+    commentaireGlobalPropose:"Ensemble sérieux, mais certaines réponses restent à développer."
+  };
+}
+
+function buildStudentPrompt(){
+  if(!appState.master) return '';
+  const snapshot = buildStudentPromptMasterSnapshot();
+  const targetStudent = [
+    appState.studentMeta.nom,
+    appState.studentMeta.prenom,
+    appState.studentMeta.classe,
+    appState.studentMeta.code
+  ].filter(Boolean).join(' · ');
+  return [
+    "Tu es un assistant de pré-correction Bac PSE.",
+    "",
+    "Ta mission : à partir de la copie d'un élève et du JSON maître du devoir ci-dessous, produire un JSON de correction élève strictement compatible avec mon éditeur Bac par compétences.",
+    "",
+    "Règles impératives :",
+    "- Tu rends uniquement du JSON valide.",
+    "- Aucun texte avant ou après le JSON.",
+    "- Aucun markdown.",
+    "- Tu n'inventes pas de réponses si la copie est illisible : dans ce cas garde reponseExtraite vide ou très prudente et mets aVerifier=true.",
+    "- Tu proposes un niveau uniquement parmi les niveaux autorisés de la question.",
+    "- Si la question est neutralisée, laisse niveauPropose vide.",
+    "- Tu respectes exactement les identifiants de question du devoir chargé.",
+    "- Tu produis aussi une entrée C6 pour l'évaluation globale de la communication écrite.",
+    "- Tu peux proposer un commentaire et une remédiation, mais l'enseignant garde toujours la validation finale.",
+    "",
+    (targetStudent ? ("Élève en cours de correction dans la grille : " + targetStudent) : "L'identité de l'élève peut être déduite de la copie si elle est lisible."),
+    "",
+    "JSON maître du devoir à respecter :",
+    JSON.stringify(snapshot, null, 2),
+    "",
+    "Format JSON élève attendu :",
+    JSON.stringify(buildStudentPromptExample(), null, 2),
+    "",
+    "Consignes supplémentaires :",
+    "- reponseExtraite = texte lu sur la copie",
+    "- reponseVerifieeProposee = version relue/reformulée si la lecture est suffisamment claire",
+    "- niveauPropose = NT, I, A ou M uniquement si ce niveau est autorisé pour la question",
+    "- confiance = nombre entre 0 et 1",
+    "- commentairePropose = remarque courte de correction",
+    "- remediationProposee = appui pédagogique court, de préférence cohérent avec la remédiation du devoir",
+    "- remarqueExtraction = précision utile sur lisibilité, rature, ambiguïté",
+    "",
+    "Rends maintenant le JSON élève complet."
+  ].join('\n');
+}
+
+function openPromptModal(title, note, promptText){
+  const html = '<div>'
+    + '<label class="field-label">Prompt prêt à copier</label>'
+    + '<textarea id="promptOutput" readonly style="min-height:420px">' + esc(promptText) + '</textarea>'
+    + '</div>';
+  openModal(
+    title,
+    note,
+    html,
+    [
+      {
+        label:'Copier le prompt',
+        onClick:function(){
+          const ta = document.getElementById('promptOutput');
+          return copyText(ta ? ta.value : promptText).then(function(){
+            toast('Prompt copié', 'success');
+          }).catch(function(error){
+            toast('Copie impossible : ' + error.message, 'error');
+            return false;
+          });
+        }
+      }
+    ]
+  );
+}
+
+function normalizeMaster(raw){
+  const base = clone(raw || {});
+  base.meta = base.meta || {};
+  base.meta = {
+    titre:String(base.meta.titre || 'Devoir Bac PSE'),
+    type:String(base.meta.type || 'Bac Blanc'),
+    niveau:String(base.meta.niveau || 'Terminale Bac Pro'),
+    date:String(base.meta.date || ''),
+    note_sur:Number(base.meta.note_sur || 20),
+    correction_url:safeUrl(base.meta.correction_url || DEFAULT_CORRECTION_URL)
+  };
+
+  const competences = clone(DEFAULT_COMPETENCES);
+  Object.entries(base.competences || {}).forEach(function(entry){
+    const code = entry[0];
+    const item = entry[1] || {};
+    competences[code] = {
+      bareme:Number.isFinite(Number(item.bareme)) ? Number(item.bareme) : (competences[code] ? competences[code].bareme : 0),
+      label:String(item.label || (competences[code] ? competences[code].label : code))
+    };
+  });
+  base.competences = competences;
+
+  base.questions = Array.isArray(base.questions) ? base.questions.map(function(question, index){
+    const q = question || {};
+    const allowed = Array.isArray(q.niveaux_autorises) ? q.niveaux_autorises.filter(function(level){ return LEVELS.includes(level); }) : LEVELS.slice();
+    return {
+      id:String(q.num || ('Q' + (index + 1))),
+      num:String(q.num || ('Q' + (index + 1))),
+      libelle:String(q.libelle || ''),
+      module:String(q.module || ''),
+      competence:COMP_ORDER.includes(q.competence) ? q.competence : 'C2',
+      niveaux_autorises:allowed.length ? allowed : LEVELS.slice(),
+      neutralisee:Boolean(q.neutralisee),
+      compte_dans_note:q.compte_dans_note !== false && !q.neutralisee,
+      criteres:{
+        NT:q.criteres && q.criteres.NT != null ? String(q.criteres.NT) : '',
+        I:q.criteres && q.criteres.I != null ? String(q.criteres.I) : '',
+        A:q.criteres && q.criteres.A != null ? String(q.criteres.A) : '',
+        M:q.criteres && q.criteres.M != null ? String(q.criteres.M) : ''
+      },
+      remediation:{
+        notion:String(q.remediation && q.remediation.notion || ''),
+        module:String(q.remediation && q.remediation.module || q.module || ''),
+        conseil:String(q.remediation && q.remediation.conseil || ''),
+        lien:safeUrl(q.remediation && q.remediation.lien || base.meta.correction_url || DEFAULT_CORRECTION_URL)
+      }
+    };
+  }) : [];
+
+  const existingC6 = base.questions.find(function(q){ return q.competence === 'C6' || q.num === 'C6'; });
+  if(base.c6 && base.c6.active !== false && !existingC6){
+    const c6 = base.c6;
+    base.questions.push({
+      id:String(c6.num || 'C6'),
+      num:String(c6.num || 'C6'),
+      libelle:String(c6.libelle || "Communiquer à l'écrit et à l'oral avec une syntaxe claire et un vocabulaire adapté."),
+      module:String(c6.module || ''),
+      competence:'C6',
+      niveaux_autorises:Array.isArray(c6.niveaux_autorises) ? c6.niveaux_autorises.filter(function(level){ return LEVELS.includes(level); }) : LEVELS.slice(),
+      neutralisee:Boolean(c6.neutralisee),
+      compte_dans_note:c6.compte_dans_note !== false && !c6.neutralisee,
+      criteres:{
+        NT:c6.criteres && c6.criteres.NT != null ? String(c6.criteres.NT) : "Absence de phrase : pas de syntaxe et vocabulaire limité/inadapté à l’écrit et à l’oral.",
+        I:c6.criteres && c6.criteres.I != null ? String(c6.criteres.I) : "Phrases avec une syntaxe et/ou un vocabulaire succinct.",
+        A:c6.criteres && c6.criteres.A != null ? String(c6.criteres.A) : "Enchaînement de phrases avec une syntaxe et un vocabulaire adaptés.",
+        M:c6.criteres && c6.criteres.M != null ? String(c6.criteres.M) : "Enchaînement de phrases avec des transitions, une syntaxe et un vocabulaire adaptés à la situation."
+      },
+      remediation:{
+        notion:String(c6.remediation && c6.remediation.notion || 'Communication écrite'),
+        module:String(c6.remediation && c6.remediation.module || ''),
+        conseil:String(c6.remediation && c6.remediation.conseil || "Rédige des phrases complètes avec un vocabulaire précis et des transitions simples."),
+        lien:safeUrl(c6.remediation && c6.remediation.lien || base.meta.correction_url || DEFAULT_CORRECTION_URL)
+      }
+    });
+  }
+
+  base.questions = base.questions.sort(function(a,b){
+    if(a.competence === 'C6' && b.competence !== 'C6') return 1;
+    if(b.competence === 'C6' && a.competence !== 'C6') return -1;
+    return a.num.localeCompare(b.num, undefined, { numeric:true, sensitivity:'base' });
+  });
+
+  base.banque_commentaires = Array.isArray(base.banque_commentaires) ? base.banque_commentaires.slice() : [];
+  return base;
+}
+
+function buildInitialRowState(row){
+  return {
+    selectedLevel:'',
+    importedText:'',
+    verifiedText:'',
+    suggestedLevel:'',
+    confidence:null,
+    aVerifier:false,
+    commentairePropose:'',
+    remediationProposee:'',
+    teacherComment:'',
+    teacherRemediation:'',
+    extractionRemark:'',
+    sourceLabel:'',
+    updatedAt:''
+  };
+}
+
+function buildBlankRowStates(){
+  const out = {};
+  appState.rows.forEach(function(row){
+    out[row.id] = buildInitialRowState(row);
+  });
+  return out;
+}
+
+function buildDefaultDetailVisibility(visible){
+  const out = {};
+  const defaultVisible = Boolean(visible);
+  appState.rows.forEach(function(row){
+    out[row.id] = defaultVisible;
+  });
+  return out;
+}
+
+function normalizeStudentSnapshot(raw, fallbackMeta){
+  const snapshot = raw && typeof raw === 'object' ? raw : {};
+  const normalizedMeta = normalizeRosterEntry(snapshot.studentMeta || fallbackMeta || {});
+  const rowStates = buildBlankRowStates();
+  const sourceStates = snapshot.rowStates && typeof snapshot.rowStates === 'object' ? snapshot.rowStates : {};
+  appState.rows.forEach(function(row){
+    if(!sourceStates[row.id] || typeof sourceStates[row.id] !== 'object') return;
+    rowStates[row.id] = Object.assign(buildInitialRowState(row), clone(sourceStates[row.id]));
+  });
+  return {
+    studentMeta: normalizedMeta,
+    rowStates: rowStates,
+    competenceOverrides: snapshot.competenceOverrides && typeof snapshot.competenceOverrides === 'object' ? clone(snapshot.competenceOverrides) : {},
+    finalComment: String(snapshot.finalComment || ''),
+    importSource: String(snapshot.importSource || 'Aucun JSON élève chargé'),
+    updatedAt: String(snapshot.updatedAt || '')
+  };
+}
+
+function createStudentSnapshot(meta){
+  return normalizeStudentSnapshot({}, meta);
+}
+
+function saveCurrentStudentState(){
+  if(!appState.currentStudentKey || !appState.master) return;
+  appState.studentCorrections[appState.currentStudentKey] = {
+    studentMeta: clone(appState.studentMeta),
+    rowStates: clone(appState.rowStates),
+    competenceOverrides: clone(appState.competenceOverrides),
+    finalComment: appState.finalComment || '',
+    importSource: appState.importSource || 'Aucun JSON élève chargé',
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function ensureStudentSnapshotByKey(key){
+  if(!key) return null;
+  const rosterStudent = getStudentByKey(key) || {};
+  if(!appState.studentCorrections[key]){
+    appState.studentCorrections[key] = createStudentSnapshot(rosterStudent);
+  } else {
+    appState.studentCorrections[key] = normalizeStudentSnapshot(appState.studentCorrections[key], rosterStudent);
+  }
+  return appState.studentCorrections[key];
+}
+
+function setCurrentStudentByKey(key, options){
+  const opts = options || {};
+  if(!key){
+    appState.currentStudentKey = '';
+    appState.rowStates = buildBlankRowStates();
+    appState.detailVisibility = buildDefaultDetailVisibility(appState.displayMode === 'detaillee');
+    appState.competenceOverrides = {};
+    appState.finalComment = '';
+    appState.importSource = 'Aucun JSON élève chargé';
+    setStudentMeta({});
+    if(!opts.silent) renderAll();
+    return;
+  }
+  if(!opts.skipSave) saveCurrentStudentState();
+  const rosterStudent = getStudentByKey(key);
+  if(rosterStudent && rosterStudent.classe) appState.currentClass = rosterStudent.classe;
+  const snapshot = ensureStudentSnapshotByKey(key);
+  appState.currentStudentKey = key;
+  appState.rowStates = clone(snapshot.rowStates);
+  appState.detailVisibility = buildDefaultDetailVisibility(appState.displayMode === 'detaillee');
+  appState.competenceOverrides = clone(snapshot.competenceOverrides || {});
+  appState.finalComment = snapshot.finalComment || '';
+  appState.importSource = snapshot.importSource || 'Aucun JSON élève chargé';
+  setStudentMeta(snapshot.studentMeta || rosterStudent || {});
+  if(!opts.silent) renderAll();
+}
+
+function setCurrentClass(classe, options){
+  const opts = options || {};
+  const list = getStudentsForClass(classe);
+  appState.currentClass = classe || '';
+  const candidate = list.find(function(item){ return buildStudentKey(item) === appState.currentStudentKey; });
+  const nextKey = candidate ? buildStudentKey(candidate) : (list[0] ? buildStudentKey(list[0]) : '');
+  setCurrentStudentByKey(nextKey, { skipSave:opts.skipSave, silent:true });
+  if(!opts.silent) renderAll();
+}
+
+function findMatchingStudentKey(info){
+  const needle = normalizeRosterEntry(info || {});
+  if(needle.code){
+    const byCode = (appState.rosterAll || []).find(function(item){
+      return String(item.code || '').toUpperCase() === needle.code.toUpperCase();
+    });
+    if(byCode) return buildStudentKey(byCode);
+  }
+  if(needle.nom && needle.prenom){
+    const byName = (appState.rosterAll || []).find(function(item){
+      return String(item.nom || '').trim().toUpperCase() === needle.nom.toUpperCase()
+        && String(item.prenom || '').trim().toUpperCase() === needle.prenom.toUpperCase();
+    });
+    if(byName) return buildStudentKey(byName);
+  }
+  return '';
+}
+
+function setMaster(master){
+  const previousClass = appState.currentClass || '';
+  const previousStudentKey = appState.currentStudentKey || '';
+  appState.master = normalizeMaster(master);
+  appState.rows = appState.master.questions.map(function(question){ return clone(question); });
+  appState.rowStates = buildBlankRowStates();
+  appState.detailVisibility = buildDefaultDetailVisibility(appState.displayMode === 'detaillee');
+  appState.selectedRowKey = appState.rows[0] ? appState.rows[0].id : '';
+  appState.competenceOverrides = {};
+  appState.finalComment = '';
+  appState.importSource = 'Aucun JSON élève chargé';
+  appState.studentCorrections = {};
+  if(!appState.rosterAll.length) appState.rosterAll = getInitialRoster();
+  const classes = getClassList();
+  appState.currentClass = classes.indexOf(previousClass) >= 0 ? previousClass : (classes[0] || '');
+  const classStudents = appState.currentClass ? getStudentsForClass(appState.currentClass) : [];
+  const preservedStudent = classStudents.find(function(student){
+    return buildStudentKey(student) === previousStudentKey;
+  });
+  const firstStudent = preservedStudent || classStudents[0] || null;
+  setCurrentStudentByKey(firstStudent ? buildStudentKey(firstStudent) : '', { skipSave:true, silent:true });
+  renderAll();
+}
+
+function setStudentMeta(info){
+  appState.studentMeta = {
+    nom:String(info && info.nom || ''),
+    prenom:String(info && info.prenom || ''),
+    classe:String(info && info.classe || ''),
+    code:String(info && info.code || '')
+  };
+  document.getElementById('studentNom').value = appState.studentMeta.nom;
+  document.getElementById('studentPrenom').value = appState.studentMeta.prenom;
+  document.getElementById('studentClasse').value = appState.studentMeta.classe;
+  document.getElementById('studentCode').value = appState.studentMeta.code;
+}
+
+function syncStudentMetaFromInputs(){
+  appState.studentMeta.nom = document.getElementById('studentNom').value.trim();
+  appState.studentMeta.prenom = document.getElementById('studentPrenom').value.trim();
+  appState.studentMeta.classe = document.getElementById('studentClasse').value.trim();
+  appState.studentMeta.code = document.getElementById('studentCode').value.trim();
+  if(appState.currentStudentKey){
+    appState.studentCorrections[appState.currentStudentKey] = appState.studentCorrections[appState.currentStudentKey] || createStudentSnapshot(appState.studentMeta);
+    appState.studentCorrections[appState.currentStudentKey].studentMeta = clone(appState.studentMeta);
+  }
+  renderSummary();
+  persistSessionState();
+}
+
+function importStudentPayload(payload, sourceLabel){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return;
+  }
+  const data = clone(payload || {});
+  const matchedKey = findMatchingStudentKey(data.eleve || {});
+  const targetKey = appState.currentStudentKey || matchedKey || '';
+  if(targetKey && targetKey !== appState.currentStudentKey){
+    setCurrentStudentByKey(targetKey, { skipSave:false, silent:true });
+  }
+  const questionMap = new Map(appState.rows.map(function(row){ return [row.id, row]; }));
+  const importedQuestions = Array.isArray(data.questions) ? data.questions : [];
+  importedQuestions.forEach(function(entry){
+    const key = String(entry && (entry.question || entry.num || '') || '').trim();
+    if(!questionMap.has(key)) return;
+    const row = questionMap.get(key);
+    const state = appState.rowStates[row.id] || buildInitialRowState(row);
+    state.importedText = String(entry.reponseExtraite || '');
+    state.verifiedText = String(entry.reponseVerifieeProposee || '');
+    state.suggestedLevel = LEVELS.includes(entry.niveauPropose) ? entry.niveauPropose : '';
+    state.confidence = Number.isFinite(Number(entry.confiance)) ? Number(entry.confiance) : null;
+    state.aVerifier = Boolean(entry.aVerifier);
+    state.commentairePropose = String(entry.commentairePropose || '');
+    state.remediationProposee = String(entry.remediationProposee || '');
+    state.extractionRemark = String(entry.remarqueExtraction || '');
+    state.sourceLabel = sourceLabel || 'JSON élève';
+    state.updatedAt = new Date().toISOString();
+    if(state.suggestedLevel && row.niveaux_autorises.includes(state.suggestedLevel) && !row.neutralisee && row.compte_dans_note !== false){
+      state.selectedLevel = state.suggestedLevel;
+    }
+    appState.rowStates[row.id] = state;
+  });
+  if(appState.currentStudentKey){
+    const lockedMeta = getStudentByKey(appState.currentStudentKey) || appState.studentMeta || {};
+    setStudentMeta(lockedMeta);
+  } else if(data.eleve && Object.keys(data.eleve).length){
+    const fallbackMeta = matchedKey ? (getStudentByKey(matchedKey) || {}) : {};
+    setStudentMeta(Object.assign({}, fallbackMeta, data.eleve || {}));
+  }
+  if(data.commentaireGlobalPropose) appState.finalComment = String(data.commentaireGlobalPropose);
+  appState.importSource = sourceLabel || 'JSON élève importé';
+  saveCurrentStudentState();
+  renderAll();
+  toast('Correction élève importée', 'success');
+}
+
+function getCompetenceRows(code){
+  return appState.rows.filter(function(row){
+    return row.competence === code && row.compte_dans_note !== false && !row.neutralisee;
+  });
+}
+
+function computeCompetenceMetrics(code){
+  const compDef = (appState.master && appState.master.competences && appState.master.competences[code]) || DEFAULT_COMPETENCES[code] || { bareme:0, label:code };
+  const rows = getCompetenceRows(code);
+  const counts = { NT:0, I:0, A:0, M:0 };
+  let totalValue = 0;
+  let answered = 0;
+  rows.forEach(function(row){
+    const selected = (appState.rowStates[row.id] && appState.rowStates[row.id].selectedLevel) || '';
+    if(LEVELS.includes(selected)){
+      counts[selected]++;
+      totalValue += LEVEL_VALUES[selected];
+      answered++;
+    }
+  });
+  const mean = answered ? totalValue / answered : null;
+  const autoScore = mean == null ? null : roundScore((mean / 3) * Number(compDef.bareme || 0), appState.roundingMode);
+  const override = appState.competenceOverrides[code];
+  return {
+    code:code,
+    label:compDef.label,
+    bareme:Number(compDef.bareme || 0),
+    counts:counts,
+    totalRows:rows.length,
+    answered:answered,
+    mean:mean,
+    autoScore:autoScore,
+    score:Number.isFinite(override) ? override : autoScore,
+    override:Number.isFinite(override) ? override : null
+  };
+}
+
+function computeTotalNote(){
+  if(!appState.master) return null;
+  return COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).reduce(function(sum, code){
+    const score = computeCompetenceMetrics(code).score;
+    return sum + (Number.isFinite(score) ? score : 0);
+  }, 0);
+}
+
+function countCorrectedRows(){
+  const total = appState.rows.filter(function(row){ return row.compte_dans_note !== false && !row.neutralisee; }).length;
+  const answered = appState.rows.filter(function(row){
+    return row.compte_dans_note !== false && !row.neutralisee && LEVELS.includes(appState.rowStates[row.id] && appState.rowStates[row.id].selectedLevel);
+  }).length;
+  return { answered:answered, total:total };
+}
+
+function isWeakLevel(level){
+  return level === 'NT' || level === 'I';
+}
+
+function getRevisionNotions(){
+  const notions = [];
+  appState.rows.forEach(function(row){
+    if(row.neutralisee || row.compte_dans_note === false) return;
+    const selected = appState.rowStates[row.id] && appState.rowStates[row.id].selectedLevel;
+    if(isWeakLevel(selected) && row.remediation && row.remediation.notion){
+      notions.push(row.remediation.notion);
+    }
+  });
+  return Array.from(new Set(notions));
+}
+
+function getWeakCompetenceEntries(kind){
+  const banksComments = getCompetenceCommentBank();
+  const banksRemediations = getRemediationBank();
+  const items = [];
+  COMP_ORDER.forEach(function(code){
+    if(!appState.master || !appState.master.competences[code]) return;
+    const metrics = computeCompetenceMetrics(code);
+    if(!metrics.totalRows) return;
+    const mean = metrics.mean;
+    const derivedLevel = mean == null ? null : (mean < 0.75 ? 'NT' : mean < 1.5 ? 'I' : mean < 2.4 ? 'A' : 'M');
+    if(kind === 'comment'){
+      const bank = banksComments[code];
+      const general = bank && (bank['Général'] || bank['General']);
+      const levelItems = general && derivedLevel ? general[derivedLevel] : null;
+      (Array.isArray(levelItems) ? levelItems : []).forEach(function(text){
+        items.push({ label:code + ' — ' + metrics.label + ' — ' + derivedLevel, text:text });
+      });
+    } else {
+      const list = banksRemediations[code];
+      (Array.isArray(list) ? list : []).forEach(function(text){
+        items.push({ label:code + ' — Remédiation', text:'(' + code + ') ' + text });
+      });
+    }
+  });
+  return items;
+}
+
+function syncViewControls(){
+  const compactBtn = document.getElementById('btnCompactView');
+  const detailedBtn = document.getElementById('btnDetailedView');
+  const expandBtn = document.getElementById('btnExpandAllDetails');
+  const collapseBtn = document.getElementById('btnCollapseAllDetails');
+  const printSelect = document.getElementById('printModeSelect');
+  if(compactBtn){
+    compactBtn.classList.toggle('primary', appState.displayMode === 'compact');
+    compactBtn.classList.toggle('ghost', appState.displayMode !== 'compact');
+  }
+  if(detailedBtn){
+    detailedBtn.classList.toggle('primary', appState.displayMode === 'detaillee');
+    detailedBtn.classList.toggle('ghost', appState.displayMode !== 'detaillee');
+  }
+  if(expandBtn){
+    expandBtn.classList.toggle('primary', appState.displayMode === 'detaillee');
+    expandBtn.classList.toggle('ghost', appState.displayMode !== 'detaillee');
+  }
+  if(collapseBtn){
+    collapseBtn.classList.toggle('primary', appState.displayMode === 'compact');
+    collapseBtn.classList.toggle('ghost', appState.displayMode !== 'compact');
+  }
+  if(printSelect) printSelect.value = appState.printMode || 'compact';
+}
+
+function setDisplayMode(mode){
+  appState.displayMode = mode === 'detaillee' ? 'detaillee' : 'compact';
+  appState.detailVisibility = buildDefaultDetailVisibility(appState.displayMode === 'detaillee');
+  renderAll();
+}
+
+function isRowDetailVisible(rowId){
+  return appState.detailVisibility[rowId] === true;
+}
+
+function toggleRowDetail(rowId){
+  appState.detailVisibility[rowId] = !isRowDetailVisible(rowId);
+  renderGrid();
+  syncViewControls();
+}
+
+function expandAllDetails(){
+  appState.displayMode = 'detaillee';
+  appState.detailVisibility = buildDefaultDetailVisibility(true);
+  renderAll();
+}
+
+function collapseAllDetails(){
+  appState.displayMode = 'compact';
+  appState.detailVisibility = buildDefaultDetailVisibility(false);
+  renderAll();
+}
+
+function buildVisibleCriteriaEntries(row){
+  const ordered = ['M','A','I','NT'];
+  return ordered.map(function(level){
+    return { level:level, text:String(row.criteres && row.criteres[level] || '').trim() };
+  }).filter(function(item){
+    return item.text && (row.niveaux_autorises.includes(item.level) || item.level === 'NT' || row.neutralisee);
+  });
+}
+
+function buildInlineReviewMarkup(row, state, colspan){
+  const criteriaEntries = buildVisibleCriteriaEntries(row);
+  const allowedLevels = row.niveaux_autorises.filter(function(level){ return LEVELS.includes(level); });
+  const confidenceBadge = Number.isFinite(state.confidence) ? '<span class="badge">' + esc('Confiance ' + Math.round(state.confidence * 100) + '%') + '</span>' : '';
+  const expectedMarkup = row.neutralisee
+    ? '<div class="inline-neutralized">Question neutralisée : elle reste visible dans la grille, mais elle ne compte jamais dans le calcul de la note.</div>'
+    : (criteriaEntries.length
+      ? '<div class="criteria-inline-list">' + criteriaEntries.map(function(item){
+          return '<div class="criteria-inline-item ' + item.level.toLowerCase() + '"><strong>' + esc(item.level + ' — ' + LEVEL_LABELS[item.level]) + '</strong><div>' + esc(item.text) + '</div></div>';
+        }).join('') + '</div>'
+      : '<div class="review-text empty">Aucun critère détaillé renseigné pour cette question.</div>');
+  const importedText = String(state.importedText || '').trim();
+  const verifiedText = String(state.verifiedText || '').trim();
+  const extractionRemark = String(state.extractionRemark || '').trim();
+  const teacherComment = String(state.teacherComment || '').trim();
+  const teacherRemediation = String(state.teacherRemediation || '').trim();
+  return '<tr class="grid-detail-row"><td colspan="' + esc(String(colspan)) + '">'
+    + '<div class="inline-review">'
+    + '<div class="inline-review-head">'
+    + '<div><h4>' + esc(row.num + ' — ' + row.libelle) + '</h4><p>' + esc('Compétence ' + row.competence + ' · Niveaux autorisés : ' + (allowedLevels.join(' · ') || '—')) + '</p></div>'
+    + '<div class="badge-row">'
+    + '<span class="badge ' + row.competence.toLowerCase() + '">' + esc(row.competence + ' — ' + appState.master.competences[row.competence].label) + '</span>'
+    + (state.selectedLevel ? '<span class="badge ok">' + esc('Niveau retenu : ' + state.selectedLevel) + '</span>' : '<span class="badge warn">Niveau final non renseigné</span>')
+    + (state.aVerifier ? '<span class="badge bad">À vérifier</span>' : '')
+    + confidenceBadge
+    + '</div></div>'
+    + '<div class="inline-review-grid">'
+    + '<section class="review-panel attendus"><h5>Attendus</h5>'
+    + expectedMarkup
+    + '</section>'
+    + '<section class="review-panel reponses"><h5>Réponse de l’élève</h5>'
+    + '<div class="review-text' + (importedText ? '' : ' empty') + '"><strong>Réponse brute extraite</strong><br>' + esc(importedText || 'Aucune réponse importée pour cette question.') + '</div>'
+    + '<div class="review-text' + (verifiedText ? '' : ' empty') + '"><strong>Réponse reformulée proposée</strong><br>' + esc(verifiedText || 'Aucune reformulation proposée.') + '</div>'
+    + (extractionRemark ? '<div class="review-text"><strong>Remarque d’extraction</strong><br>' + esc(extractionRemark) + '</div>' : '')
+    + '</section>'
+    + '<section class="review-panel ia"><h5>Analyse IA</h5>'
+    + '<div class="meta-line badge-row">'
+    + (state.suggestedLevel ? '<span class="badge ' + state.suggestedLevel.toLowerCase() + '">' + esc('Niveau proposé : ' + state.suggestedLevel) + '</span>' : '<span class="badge">Aucun niveau proposé</span>')
+    + confidenceBadge
+    + '</div>'
+    + '<div class="review-text' + (state.commentairePropose ? '' : ' empty') + '"><strong>Commentaire proposé</strong><br>' + esc(state.commentairePropose || 'Aucun commentaire proposé.') + '</div>'
+    + '<div class="review-text' + ((state.remediationProposee || row.remediation.conseil) ? '' : ' empty') + '"><strong>Remédiation proposée</strong><br>' + esc(state.remediationProposee || row.remediation.conseil || 'Aucune remédiation proposée.') + '</div>'
+    + '<div class="review-text' + ((teacherComment || teacherRemediation) ? '' : ' empty') + '"><strong>Zone enseignant</strong><br>' + esc((teacherComment ? ('Commentaire : ' + teacherComment + '\n') : '') + (teacherRemediation ? ('Remédiation : ' + teacherRemediation) : '') || 'Tu peux utiliser la zone de détail ci-dessous pour affiner ou compléter la correction.') + '</div>'
+    + '</section>'
+    + '</div></div></td></tr>';
+}
+
+function setSelectedRow(rowId){
+  appState.selectedRowKey = rowId;
+  renderGrid();
+  renderDetail();
+}
+
+function setRowLevel(rowId, level){
+  const row = appState.rows.find(function(item){ return item.id === rowId; });
+  if(!row || row.neutralisee || row.compte_dans_note === false) return;
+  if(!row.niveaux_autorises.includes(level)) return;
+  const state = appState.rowStates[rowId];
+  state.selectedLevel = state.selectedLevel === level ? '' : level;
+  state.updatedAt = new Date().toISOString();
+  renderAll();
+}
+
+function renderMeta(){
+  if(!appState.master){
+    document.getElementById('headerTitle').textContent = 'Prototype Bac blanc';
+    document.getElementById('metaTitle').textContent = 'Aucun devoir chargé';
+    document.getElementById('metaInfo').textContent = 'Charge un JSON maître ou l’exemple Bac blanc pour construire la grille.';
+    document.getElementById('competenceBadges').innerHTML = '';
+    document.getElementById('qrTitle').textContent = 'Aucun lien renseigné';
+    document.getElementById('qrNote').textContent = 'Si le devoir ou une question contient un lien détaillé vers la correction, il apparaîtra ici pour l’impression.';
+    document.getElementById('correctionLink').classList.add('hidden');
+    return;
+  }
+  const meta = appState.master.meta;
+  document.getElementById('headerTitle').textContent = meta.titre;
+  document.getElementById('metaTitle').textContent = meta.titre;
+  document.getElementById('metaInfo').textContent = [meta.type, meta.niveau, meta.date].filter(Boolean).join(' · ');
+  document.getElementById('competenceBadges').innerHTML = COMP_ORDER
+    .filter(function(code){ return appState.master.competences[code]; })
+    .map(function(code){
+      const item = appState.master.competences[code];
+      return '<span class="badge ' + code.toLowerCase() + '">' + esc(code + ' · /' + item.bareme) + '</span>';
+    }).join('');
+  const correctionUrl = safeUrl(meta.correction_url || firstAvailableCorrectionLink());
+  const linkEl = document.getElementById('correctionLink');
+  if(correctionUrl){
+    document.getElementById('qrTitle').textContent = 'Lien de correction disponible';
+    document.getElementById('qrNote').textContent = correctionUrl;
+    linkEl.href = correctionUrl;
+    linkEl.textContent = 'Ouvrir la correction détaillée';
+    linkEl.classList.remove('hidden');
+  } else {
+    document.getElementById('qrTitle').textContent = 'Aucun lien renseigné';
+    document.getElementById('qrNote').textContent = 'Ajoute meta.correction_url ou un lien de remédiation question par question pour l’impression.';
+    linkEl.classList.add('hidden');
+  }
+}
+
+function firstAvailableCorrectionLink(){
+  const row = appState.rows.find(function(item){ return item.remediation && item.remediation.lien; });
+  return row && row.remediation ? row.remediation.lien : '';
+}
+
+function computeProgressForSnapshot(snapshot){
+  const source = snapshot && snapshot.rowStates ? snapshot.rowStates : {};
+  const total = appState.rows.filter(function(row){ return row.compte_dans_note !== false && !row.neutralisee; }).length;
+  const answered = appState.rows.filter(function(row){
+    return row.compte_dans_note !== false && !row.neutralisee && LEVELS.includes(source[row.id] && source[row.id].selectedLevel);
+  }).length;
+  return { answered:answered, total:total };
+}
+
+function computeCompetenceMetricsForSnapshot(code, snapshot){
+  const sourceStates = snapshot && snapshot.rowStates ? snapshot.rowStates : {};
+  const overrides = snapshot && snapshot.competenceOverrides ? snapshot.competenceOverrides : {};
+  const compDef = (appState.master && appState.master.competences && appState.master.competences[code]) || DEFAULT_COMPETENCES[code] || { bareme:0, label:code };
+  const rows = getCompetenceRows(code);
+  const counts = { NT:0, I:0, A:0, M:0 };
+  let totalValue = 0;
+  let answered = 0;
+  rows.forEach(function(row){
+    const selected = (sourceStates[row.id] && sourceStates[row.id].selectedLevel) || '';
+    if(LEVELS.includes(selected)){
+      counts[selected]++;
+      totalValue += LEVEL_VALUES[selected];
+      answered++;
+    }
+  });
+  const mean = answered ? totalValue / answered : null;
+  const autoScore = mean == null ? null : roundScore((mean / 3) * Number(compDef.bareme || 0), appState.roundingMode);
+  const override = overrides[code];
+  return {
+    score:Number.isFinite(override) ? override : autoScore
+  };
+}
+
+function computeTotalForSnapshot(snapshot){
+  if(!appState.master) return null;
+  return COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).reduce(function(sum, code){
+    const score = computeCompetenceMetricsForSnapshot(code, snapshot).score;
+    return sum + (Number.isFinite(score) ? score : 0);
+  }, 0);
+}
+
+function renderClassSection(){
+  const select = document.getElementById('classSelect');
+  const title = document.getElementById('classTitle');
+  const note = document.getElementById('classNote');
+  const listWrap = document.getElementById('rosterList');
+  const classes = getClassList();
+  if(!classes.length){
+    select.innerHTML = '<option value="">Aucune classe</option>';
+    title.textContent = 'Aucune classe disponible';
+    note.textContent = 'La base élèves est vide.';
+    listWrap.innerHTML = '<div class="empty">Aucun élève chargé.</div>';
+    return;
+  }
+  if(classes.indexOf(appState.currentClass) < 0) appState.currentClass = classes[0];
+  select.innerHTML = classes.map(function(cls){
+    return '<option value="' + esc(cls) + '"' + (cls === appState.currentClass ? ' selected' : '') + '>' + esc(cls) + '</option>';
+  }).join('');
+  const students = getStudentsForClass(appState.currentClass || classes[0]);
+  title.textContent = appState.currentClass || classes[0];
+  note.textContent = students.length + ' élève(s) disponibles dans cette classe.';
+  listWrap.innerHTML = students.map(function(student){
+    const key = buildStudentKey(student);
+    const snapshot = ensureStudentSnapshotByKey(key);
+    const progress = computeProgressForSnapshot(snapshot);
+    const total = computeTotalForSnapshot(snapshot);
+    return '<button class="roster-item' + (key === appState.currentStudentKey ? ' active' : '') + '" data-student-key="' + esc(key) + '">'
+      + '<div class="roster-name">' + esc((student.nom || '') + ' ' + (student.prenom || '')) + '</div>'
+      + '<div class="roster-sub">' + esc([student.code, student.classe].filter(Boolean).join(' · ')) + '</div>'
+      + '<div class="roster-meta"><span>' + esc(progress.answered + '/' + progress.total) + ' indicateurs</span><strong>' + esc(total == null ? '— / 20' : (formatScore(roundScore(total, appState.roundingMode)) + ' / 20')) + '</strong></div>'
+      + '</button>';
+  }).join('') || '<div class="empty">Aucun élève dans cette classe.</div>';
+  listWrap.querySelectorAll('[data-student-key]').forEach(function(button){
+    button.addEventListener('click', function(){
+      setCurrentStudentByKey(this.getAttribute('data-student-key'));
+    });
+  });
+}
+
+function renderSummary(){
+  const total = computeTotalNote();
+  const progress = countCorrectedRows();
+  document.getElementById('summaryTotal').textContent = total == null ? '—' : formatScore(roundScore(total, appState.roundingMode));
+  document.getElementById('summaryProgress').textContent = progress.answered + ' / ' + progress.total;
+  document.getElementById('summaryNeutralized').textContent = String(appState.rows.filter(function(row){ return row.neutralisee || row.compte_dans_note === false; }).length);
+  const name = [appState.studentMeta.nom, appState.studentMeta.prenom].filter(Boolean).join(' ').trim();
+  document.getElementById('summaryStudent').textContent = name || '—';
+  document.getElementById('importStatus').textContent = appState.importSource;
+  document.getElementById('statusText').textContent = appState.master
+    ? ('Grille prête · ' + progress.answered + ' indicateur(s) corrigé(s) sur ' + progress.total + '.')
+    : 'Prototype prêt. Charge un devoir JSON ou l’exemple pour commencer.';
+}
+
+function renderGrid(){
+  const wrap = document.getElementById('gridWrap');
+  if(!appState.master){
+    wrap.innerHTML = '<div class="empty">Charge un devoir JSON pour construire la grille par compétences.</div>';
+    syncViewControls();
+    return;
+  }
+  const activeCompCodes = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; });
+  const totalColumns = 2 + activeCompCodes.length * LEVELS.length;
+  const compHeaders = activeCompCodes.map(function(code){
+    return '<th class="comp-head ' + code.toLowerCase() + '" colspan="4">' + esc(code + ' — ' + appState.master.competences[code].label) + '</th>';
+  }).join('');
+  const subHeaders = activeCompCodes.map(function(code){
+    return LEVELS.map(function(level){
+      const idx = LEVELS.indexOf(level);
+      const subClasses = ['comp-sub', code.toLowerCase()];
+      if(idx === 0) subClasses.push('active-start');
+      if(idx === LEVELS.length - 1) subClasses.push('active-end');
+      return '<th class="' + subClasses.join(' ') + '">' + esc(level) + '</th>';
+    }).join('');
+  }).join('');
+
+  const body = appState.rows.map(function(row){
+    const state = appState.rowStates[row.id];
+    const rowClasses = ['grid-row'];
+    if(appState.selectedRowKey === row.id) rowClasses.push('selected');
+    if(row.neutralisee || row.compte_dans_note === false) rowClasses.push('neutralized');
+    const compCells = activeCompCodes.map(function(code){
+      return LEVELS.map(function(level){
+        const activeComp = row.competence === code;
+        const levelIndex = LEVELS.indexOf(level);
+        const allowed = row.niveaux_autorises.includes(level);
+        if(!activeComp){
+          return '<td class="cell-zone inactive-zone"><span class="inactive-slot">—</span></td>';
+        }
+        const disabled = !allowed || row.neutralisee || row.compte_dans_note === false;
+        const selected = state.selectedLevel === level;
+        const title = row.neutralisee ? 'Question neutralisée' : (allowed ? LEVEL_LABELS[level] : 'Niveau non utilisé pour cette question');
+        const zoneClasses = ['cell-zone', 'active-scope', 'comp-' + code.toLowerCase()];
+        if(levelIndex === 0) zoneClasses.push('active-start');
+        if(levelIndex === LEVELS.length - 1) zoneClasses.push('active-end');
+        return '<td class="' + zoneClasses.join(' ') + '">'
+          + '<button class="level-btn' + (disabled ? ' disabled' : '') + (selected ? ' selected ' + level.toLowerCase() : '') + '"'
+          + ' data-row-level="' + esc(row.id + '::' + level) + '"'
+          + ' title="' + esc(title) + '"'
+          + (disabled ? ' disabled' : '')
+          + '>'
+          + esc(level)
+          + '</button></td>';
+      }).join('');
+    }).join('');
+
+    const sub = [];
+    sub.push('<span class="badge ' + row.competence.toLowerCase() + '">' + esc(row.competence) + '</span>');
+    if(row.module) sub.push('<span class="badge">' + esc(row.module) + '</span>');
+    if(state.importedText) sub.push('<span class="response-chip">Réponse élève importée</span>');
+    if(row.neutralisee || row.compte_dans_note === false) sub.push('<span class="badge warn">Neutralisée</span>');
+    sub.push('<button class="detail-toggle-btn" data-toggle-row-detail="' + esc(row.id) + '">' + esc(isRowDetailVisible(row.id) ? 'Masquer le détail' : 'Afficher le détail') + '</button>');
+
+    const mainRow = '<tr class="' + rowClasses.join(' ') + '" data-select-row="' + esc(row.id) + '">'
+      + '<td class="col-num">' + esc(row.num) + '</td>'
+      + '<td class="col-libelle">'
+      + '<div class="q-title">' + esc(row.libelle) + '</div>'
+      + '<div class="q-sub">' + sub.join(' ') + '</div>'
+      + '</td>'
+      + compCells
+      + '</tr>';
+    if(!isRowDetailVisible(row.id)) return mainRow;
+    return mainRow + buildInlineReviewMarkup(row, state, totalColumns);
+  }).join('');
+
+  wrap.innerHTML = '<table class="grid-table"><thead><tr><th rowspan="2">Question</th><th rowspan="2">Énoncé</th>' + compHeaders + '</tr><tr>' + subHeaders + '</tr></thead><tbody>' + body + '</tbody></table>';
+
+  wrap.querySelectorAll('[data-row-level]').forEach(function(button){
+    button.addEventListener('click', function(event){
+      event.stopPropagation();
+      const parts = this.getAttribute('data-row-level').split('::');
+      setRowLevel(parts[0], parts[1]);
+    });
+  });
+  wrap.querySelectorAll('[data-toggle-row-detail]').forEach(function(button){
+    button.addEventListener('click', function(event){
+      event.stopPropagation();
+      toggleRowDetail(this.getAttribute('data-toggle-row-detail'));
+    });
+  });
+  wrap.querySelectorAll('[data-select-row]').forEach(function(rowEl){
+    rowEl.addEventListener('click', function(){
+      setSelectedRow(this.getAttribute('data-select-row'));
+    });
+  });
+  syncViewControls();
+}
+
+function buildConfidenceBadge(value){
+  if(!Number.isFinite(value)) return '<span class="badge">Confiance —</span>';
+  const ratio = Math.round(value * 100);
+  const cls = value >= 0.8 ? 'ok' : value >= 0.55 ? 'warn' : 'bad';
+  return '<span class="badge ' + cls + '">Confiance ' + esc(String(ratio)) + '%</span>';
+}
+
+function renderDetail(){
+  const wrap = document.getElementById('detailWrap');
+  if(!appState.master){
+    wrap.innerHTML = '<div class="empty">Charge d’abord un devoir JSON pour afficher le détail.</div>';
+    return;
+  }
+  const row = appState.rows.find(function(item){ return item.id === appState.selectedRowKey; }) || appState.rows[0];
+  if(!row){
+    wrap.innerHTML = '<div class="empty">Aucune question à afficher.</div>';
+    return;
+  }
+  appState.selectedRowKey = row.id;
+  const state = appState.rowStates[row.id];
+  wrap.innerHTML = '<div class="detail-grid">'
+    + '<div class="detail-card">'
+    + '<h3>' + esc(row.num + ' — ' + row.libelle) + '</h3>'
+    + '<div class="badge-row" style="margin-bottom:10px">'
+    + '<span class="badge ' + row.competence.toLowerCase() + '">' + esc(row.competence + ' — ' + appState.master.competences[row.competence].label) + '</span>'
+    + (row.neutralisee ? '<span class="badge warn">Question neutralisée</span>' : '')
+    + buildConfidenceBadge(state.confidence)
+    + (state.aVerifier ? '<span class="badge bad">À vérifier</span>' : '')
+    + '</div>'
+    + '<p>' + (row.remediation && row.remediation.notion ? ('Notion ciblée : <strong>' + esc(row.remediation.notion) + '</strong>. ') : '')
+    + (row.remediation && row.remediation.conseil ? esc(row.remediation.conseil) : '') + '</p>'
+    + '<label class="field-label">Réponse élève importée</label>'
+    + '<textarea id="detailImported" placeholder="Réponse extraite de la copie…">' + esc(state.importedText || '') + '</textarea>'
+    + '<label class="field-label" style="margin-top:12px">Réponse vérifiée / retravaillée</label>'
+    + '<textarea id="detailVerified" placeholder="Version relue et reformulée si besoin…">' + esc(state.verifiedText || '') + '</textarea>'
+    + '<div class="mini-actions">'
+    + '<button class="mini-btn" id="btnUseSuggestedLevel">Appliquer le niveau proposé</button>'
+    + '<button class="mini-btn" id="btnUseSuggestedComment">Reprendre le commentaire proposé</button>'
+    + '<button class="mini-btn" id="btnUseSuggestedRemediation">Reprendre la remédiation proposée</button>'
+    + '</div>'
+    + '</div>'
+    + '<div class="detail-card">'
+    + '<h3>Guidage pédagogique</h3>'
+    + '<div class="suggestion-box">'
+    + '<strong>Suggestion IA</strong>'
+    + '<div class="suggestion-meta">'
+    + (state.suggestedLevel ? '<span class="badge ' + state.suggestedLevel.toLowerCase() + '">' + esc('Niveau proposé : ' + state.suggestedLevel) + '</span>' : '<span class="badge">Aucun niveau proposé</span>')
+    + buildConfidenceBadge(state.confidence)
+    + '</div>'
+    + '<p><strong>Commentaire proposé :</strong><br>' + esc(state.commentairePropose || '—') + '</p>'
+    + '<p><strong>Remédiation proposée :</strong><br>' + esc(state.remediationProposee || row.remediation.conseil || '—') + '</p>'
+    + '<p><strong>Remarque d’extraction :</strong><br>' + esc(state.extractionRemark || '—') + '</p>'
+    + '</div>'
+    + '<div class="criteria-grid">'
+    + LEVELS.map(function(level){
+      const txt = row.criteres[level];
+      return '<div class="criteria-card ' + level.toLowerCase() + '"><div class="code">' + esc(level + ' — ' + LEVEL_LABELS[level]) + '</div><div>' + esc(txt || 'Niveau non utilisé pour cette question.') + '</div></div>';
+    }).join('')
+    + '</div>'
+    + '<label class="field-label" style="margin-top:12px">Commentaire enseignant pour cette question</label>'
+    + '<textarea id="detailTeacherComment" placeholder="Observation ciblée…">' + esc(state.teacherComment || '') + '</textarea>'
+    + '<label class="field-label" style="margin-top:12px">Remédiation enseignant pour cette question</label>'
+    + '<textarea id="detailTeacherRemediation" placeholder="Piste de reprise…">' + esc(state.teacherRemediation || '') + '</textarea>'
+    + '</div>'
+    + '</div>';
+
+  document.getElementById('detailImported').addEventListener('input', function(){
+    state.importedText = this.value;
+    persistSessionState();
+  });
+  document.getElementById('detailVerified').addEventListener('input', function(){
+    state.verifiedText = this.value;
+    persistSessionState();
+  });
+  document.getElementById('detailTeacherComment').addEventListener('input', function(){
+    state.teacherComment = this.value;
+    persistSessionState();
+  });
+  document.getElementById('detailTeacherRemediation').addEventListener('input', function(){
+    state.teacherRemediation = this.value;
+    persistSessionState();
+  });
+  document.getElementById('btnUseSuggestedLevel').addEventListener('click', function(){
+    if(state.suggestedLevel && row.niveaux_autorises.includes(state.suggestedLevel) && !row.neutralisee){
+      state.selectedLevel = state.suggestedLevel;
+      renderAll();
+    }
+  });
+  document.getElementById('btnUseSuggestedComment').addEventListener('click', function(){
+    state.teacherComment = state.commentairePropose || state.teacherComment;
+    renderDetail();
+    persistSessionState();
+  });
+  document.getElementById('btnUseSuggestedRemediation').addEventListener('click', function(){
+    state.teacherRemediation = state.remediationProposee || row.remediation.conseil || state.teacherRemediation;
+    renderDetail();
+    persistSessionState();
+  });
+}
+
+function renderCompetenceCards(){
+  const wrap = document.getElementById('competenceWrap');
+  if(!appState.master){
+    wrap.innerHTML = '<div class="empty">Les résultats par compétence apparaîtront après chargement du devoir.</div>';
+    return;
+  }
+  wrap.innerHTML = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
+    const metrics = computeCompetenceMetrics(code);
+    return '<div class="competence-card">'
+      + '<h3><span class="badge ' + code.toLowerCase() + '">' + esc(code) + '</span><span>' + esc(metrics.label) + '</span></h3>'
+      + '<div class="comp-stats">'
+      + LEVELS.map(function(level){
+        return '<div class="stat-pill ' + level.toLowerCase() + '"><strong>' + esc(String(metrics.counts[level])) + '</strong>' + esc(level) + '</div>';
+      }).join('')
+      + '</div>'
+      + '<div class="note-line"><span>Progression</span><span>' + esc(metrics.answered + ' / ' + metrics.totalRows) + '</span></div>'
+      + '<div class="note-line"><span>Calcul auto</span><strong>' + esc(formatScore(metrics.autoScore)) + ' / ' + esc(String(metrics.bareme)) + '</strong></div>'
+      + '<div class="note-line"><span>Ajustement manuel</span><input type="number" step="0.25" min="0" max="' + esc(String(metrics.bareme)) + '" data-override-competence="' + esc(code) + '" value="' + esc(metrics.override == null ? '' : String(metrics.override)) + '" placeholder="Auto"></div>'
+      + '</div>';
+  }).join('');
+
+  wrap.querySelectorAll('[data-override-competence]').forEach(function(input){
+    input.addEventListener('input', function(){
+      const code = this.getAttribute('data-override-competence');
+      const raw = this.value.trim();
+      if(raw === ''){
+        delete appState.competenceOverrides[code];
+      } else {
+        const parsed = Number(raw.replace(',', '.'));
+        if(Number.isFinite(parsed)){
+          appState.competenceOverrides[code] = roundScore(parsed, appState.roundingMode);
+        }
+      }
+      renderSummary();
+      persistSessionState();
+    });
+  });
+}
+
+function renderFinalComment(){
+  document.getElementById('finalComment').value = appState.finalComment || '';
+}
+
+function renderAll(){
+  renderClassSection();
+  renderMeta();
+  renderSummary();
+  renderGrid();
+  renderDetail();
+  renderCompetenceCards();
+  renderFinalComment();
+  syncViewControls();
+  persistSessionState();
+}
+
+function openJsonImportModal(kind){
+  const label = kind === 'master'
+    ? 'devoir'
+    : kind === 'student'
+      ? 'correction élève'
+      : kind === 'session'
+        ? 'session'
+        : 'classe';
+  openModal(
+    'Importer un JSON ' + label,
+    kind === 'student'
+      ? 'Tu peux coller un JSON de correction IA ou une sauvegarde JSON d’un élève.'
+      : kind === 'session'
+        ? 'Tu peux coller une sauvegarde JSON complète de session.'
+      : 'Tu peux coller le JSON directement ou choisir un fichier local.',
+    '<div class="import-layout">'
+      + '<div><label class="field-label">Coller le JSON</label><textarea id="modalJsonInput" placeholder="Colle ici le JSON…"></textarea></div>'
+      + '<div><label class="field-label">Choisir un fichier</label><div class="meta-card"><strong>Import local</strong><small>Utilise le bouton ci-dessous si tu préfères charger un fichier `.json`.</small><div style="margin-top:10px"><button class="btn ghost" id="modalFilePicker">' + (kind === 'master' ? 'Choisir le devoir JSON' : kind === 'student' ? 'Choisir le JSON élève' : kind === 'session' ? 'Choisir le JSON de session' : 'Choisir le JSON de classe') + '</button></div></div></div>'
+      + '</div>',
+    [
+      {
+        label:'Importer le collage',
+        onClick:function(){
+          const ta = document.getElementById('modalJsonInput');
+          if(!ta || !ta.value.trim()){
+            toast('Aucun JSON collé', 'error');
+            return false;
+          }
+          try {
+            const parsed = parseJsonInput(ta.value);
+            if(kind === 'master'){
+              if(!confirmSessionReplacement('Charger un nouveau devoir JSON')) return false;
+              setMaster(parsed);
+            }
+            else if(kind === 'student'){
+              if(parsed && parsed.kind === 'pse-bac-student-snapshot') applyStudentSnapshot(parsed, 'Collage sauvegarde élève');
+              else importStudentPayload(parsed, 'Collage JSON élève');
+            }
+            else if(kind === 'session'){
+              if(!confirmSessionReplacement('Charger une session')) return false;
+              applySessionSnapshot(parsed, 'Collage JSON session');
+            }
+            else {
+              if(!confirmSessionReplacement('Charger une classe')) return false;
+              applyClassSnapshot(parsed, 'Collage JSON classe');
+            }
+            toast('JSON importé', 'success');
+          } catch (error) {
+            toast('JSON invalide : ' + error.message, 'error');
+            return false;
+          }
+        }
+      }
+    ]
+  );
+  document.getElementById('modalFilePicker').addEventListener('click', function(){
+    if(kind === 'master') document.getElementById('fileMaster').click();
+    else if(kind === 'student') document.getElementById('fileStudent').click();
+    else if(kind === 'session') document.getElementById('fileSession').click();
+    else document.getElementById('fileClass').click();
+  });
+}
+
+function readFileAsText(file, cb){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){ cb(String(reader.result || ''), file.name); };
+  reader.readAsText(file);
+}
+
+function buildRevisionText(){
+  const notions = getRevisionNotions();
+  if(!notions.length) return '';
+  return 'Révisions : ' + notions.join(', ');
+}
+
+function openBankModal(kind){
+  let items = [];
+  let title = 'Banque';
+  if(kind === 'appreciation'){
+    title = 'Modèles d’appréciation';
+    items = getAppreciationBank();
+  } else if(kind === 'comment'){
+    title = 'Commentaires par compétences';
+    items = uniqueByText(getWeakCompetenceEntries('comment').concat(buildFullCompetenceCommentEntries()));
+  } else if(kind === 'remediation'){
+    title = 'Remédiations par compétences';
+    items = uniqueByText(getWeakCompetenceEntries('remediation').concat(buildFullRemediationEntries()));
+  }
+  if(!items.length){
+    toast('Aucune entrée disponible dans cette banque', 'error');
+    return;
+  }
+  openModal(
+    title,
+    'Clique sur un élément pour l’insérer dans l’appréciation finale.',
+    '<ul class="soft-list">' + items.map(function(item, index){
+      return '<li><button data-bank-item="' + index + '"><strong>' + esc(item.label) + '</strong><br><span style="color:#63718a">' + esc(item.text) + '</span></button></li>';
+    }).join('') + '</ul>',
+    []
+  );
+  document.querySelectorAll('[data-bank-item]').forEach(function(button){
+    button.addEventListener('click', function(){
+      const item = items[Number(this.getAttribute('data-bank-item'))];
+      const textarea = document.getElementById('finalComment');
+      const current = textarea.value.trim();
+      textarea.value = current ? (current + '\n' + item.text) : item.text;
+      appState.finalComment = textarea.value;
+      persistSessionState();
+      closeModal();
+    });
+  });
+}
+
+function saveCurrentAppreciationText(){
+  const text = String(document.getElementById('finalComment').value || '').trim();
+  if(!text){
+    toast('Aucun texte à enregistrer', 'error');
+    return;
+  }
+  const existing = normalizeCustomBanks(appState.customBanks);
+  if(existing.appreciation.some(function(item){ return item.trim().toLowerCase() === text.toLowerCase(); })){
+    toast('Ce modèle est déjà enregistré', 'error');
+    return;
+  }
+  existing.appreciation.unshift(text);
+  appState.customBanks = existing;
+  persistSessionState(true);
+  toast('Modèle enregistré dans la banque', 'success');
+}
+
+function buildClassNotesRows(){
+  saveCurrentStudentState();
+  const students = getStudentsForClass(appState.currentClass || '');
+  return students.map(function(student){
+    const key = buildStudentKey(student);
+    const snapshot = ensureStudentSnapshotByKey(key);
+    const total = computeTotalForSnapshot(snapshot);
+    return {
+      nom:student.nom || '',
+      prenom:student.prenom || '',
+      code:student.code || '',
+      note:total
+    };
+  });
+}
+
+function openClassNotesModal(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return;
+  }
+  const rows = buildClassNotesRows();
+  const cls = appState.currentClass || 'Classe';
+  const tsv = rows.map(function(row){
+    return [row.nom, row.prenom, row.code, row.note == null ? '' : formatScore(roundScore(row.note, appState.roundingMode))].join('\t');
+  }).join('\n');
+  openModal(
+    'Notes de la classe',
+    'Résumé rapide pour report dans Pronote.',
+    '<div class="meta-card" style="margin-bottom:12px"><strong>' + esc(cls) + '</strong><small>' + esc(rows.length + ' élève(s) · colonne Note prête à copier') + '</small></div>'
+      + '<table><thead><tr><th>Nom</th><th>Prénom</th><th>Code</th><th>Note / 20</th></tr></thead><tbody>'
+      + rows.map(function(row){
+          return '<tr><td>' + esc(row.nom) + '</td><td>' + esc(row.prenom) + '</td><td>' + esc(row.code) + '</td><td style="font-family:IBM Plex Mono,Consolas,monospace">' + esc(row.note == null ? '—' : formatScore(roundScore(row.note, appState.roundingMode))) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>',
+    [
+      {
+        label:'Copier le tableau',
+        onClick:function(){
+          return copyText(tsv).then(function(){
+            toast('Tableau des notes copié', 'success');
+          }).catch(function(error){
+            toast('Copie impossible : ' + error.message, 'error');
+            return false;
+          });
+        }
+      }
+    ]
+  );
+}
+
+function downloadJson(filename, payload){
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildCurrentStudentSnapshotPayload(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return null;
+  }
+  const savedAt = new Date().toISOString();
+  const meta = normalizeRosterEntry(appState.studentMeta || {});
+  return {
+    kind:'pse-bac-student-snapshot',
+    schemaVersion:1,
+    savedAt:savedAt,
+    master:clone(appState.master),
+    masterRef:{
+      titre:appState.master && appState.master.meta ? appState.master.meta.titre : '',
+      date:appState.master && appState.master.meta ? appState.master.meta.date : '',
+      niveau:appState.master && appState.master.meta ? appState.master.meta.niveau : ''
+    },
+    currentClass:appState.currentClass || meta.classe || '',
+    studentKey:appState.currentStudentKey || '',
+    studentMeta:clone(meta),
+    rowStates:clone(appState.rowStates),
+    competenceOverrides:clone(appState.competenceOverrides),
+    finalComment:appState.finalComment || '',
+    importSource:appState.importSource || 'Aucun JSON élève chargé',
+    updatedAt:savedAt
+  };
+}
+
+function exportStudentJson(){
+  const snapshot = buildCurrentStudentSnapshotPayload();
+  if(!snapshot) return;
+  const meta = snapshot.studentMeta || {};
+  const title = appState.master && appState.master.meta ? appState.master.meta.titre : 'correction_bac';
+  downloadJson(
+    slugify('eleve_' + [meta.classe, meta.nom, meta.prenom, title].filter(Boolean).join('_')) + '.json',
+    snapshot
+  );
+  toast('JSON élève exporté', 'success');
+}
+
+function applyStudentSnapshot(payload, sourceLabel){
+  if(!appState.master){
+    if(payload && payload.master){
+      setMaster(payload.master);
+    } else {
+      throw new Error('Charge d’abord un devoir JSON avant de recharger une sauvegarde élève');
+    }
+  }
+  const meta = normalizeRosterEntry(payload && payload.studentMeta || {});
+  const payloadKey = String(payload && payload.studentKey || '').trim();
+  const matchedKey = findMatchingStudentKey(meta);
+  const preferredKey = appState.currentStudentKey || payloadKey || matchedKey || '';
+  const targetKey = getStudentByKey(preferredKey) ? preferredKey : (matchedKey || appState.currentStudentKey || '');
+  if(targetKey && targetKey !== appState.currentStudentKey){
+    setCurrentStudentByKey(targetKey, { skipSave:false, silent:true });
+  }
+  const snapshot = normalizeStudentSnapshot(payload, meta);
+  if(appState.currentStudentKey){
+    appState.studentCorrections[appState.currentStudentKey] = snapshot;
+    appState.rowStates = clone(snapshot.rowStates);
+    appState.competenceOverrides = clone(snapshot.competenceOverrides || {});
+    appState.finalComment = snapshot.finalComment || '';
+    appState.importSource = sourceLabel || snapshot.importSource || 'Sauvegarde élève chargée';
+    const lockedMeta = getStudentByKey(appState.currentStudentKey) || snapshot.studentMeta || {};
+    setStudentMeta(lockedMeta);
+  } else {
+    appState.rowStates = clone(snapshot.rowStates);
+    appState.competenceOverrides = clone(snapshot.competenceOverrides || {});
+    appState.finalComment = snapshot.finalComment || '';
+    appState.importSource = sourceLabel || snapshot.importSource || 'Sauvegarde élève chargée';
+    setStudentMeta(snapshot.studentMeta || meta);
+  }
+  renderAll();
+  toast(sourceLabel || 'Sauvegarde élève chargée', 'success');
+}
+
+function buildClassSnapshot(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return null;
+  }
+  saveCurrentStudentState();
+  const currentClass = appState.currentClass || '';
+  const classStudents = getStudentsForClass(currentClass);
+  return {
+    kind:'pse-bac-class-snapshot',
+    schemaVersion:1,
+    savedAt:new Date().toISOString(),
+    master:clone(appState.master),
+    customBanks:clone(appState.customBanks),
+    currentClass:currentClass,
+    currentStudentKey:appState.currentStudentKey || '',
+    classStudents:classStudents.map(function(student){ return clone(student); }),
+    students:classStudents.map(function(student){
+      const key = buildStudentKey(student);
+      const snapshot = ensureStudentSnapshotByKey(key);
+      return {
+        key:key,
+        studentMeta:clone(snapshot.studentMeta),
+        rowStates:clone(snapshot.rowStates),
+        competenceOverrides:clone(snapshot.competenceOverrides),
+        finalComment:snapshot.finalComment || '',
+        importSource:snapshot.importSource || 'Aucun JSON élève chargé',
+        updatedAt:snapshot.updatedAt || ''
+      };
+    })
+  };
+}
+
+function buildSessionSnapshot(){
+  const now = new Date().toISOString();
+  const corrections = clone(appState.studentCorrections || {});
+  if(appState.master && appState.currentStudentKey){
+    corrections[appState.currentStudentKey] = {
+      studentMeta:clone(appState.studentMeta),
+      rowStates:clone(appState.rowStates),
+      competenceOverrides:clone(appState.competenceOverrides),
+      finalComment:appState.finalComment || '',
+      importSource:appState.importSource || 'Aucun JSON élève chargé',
+      updatedAt:now
+    };
+  }
+  return {
+    kind:'pse-bac-session',
+    schemaVersion:1,
+    savedAt:now,
+    master:appState.master ? clone(appState.master) : null,
+    customBanks:clone(appState.customBanks),
+    rosterAll:clone(appState.rosterAll || []),
+    currentClass:appState.currentClass || '',
+    currentStudentKey:appState.currentStudentKey || '',
+    selectedRowKey:appState.selectedRowKey || '',
+    displayMode:appState.displayMode === 'detaillee' ? 'detaillee' : 'compact',
+    printMode:appState.printMode === 'detaillee' ? 'detaillee' : 'compact',
+    roundingMode:['dixieme','quart','entier'].includes(appState.roundingMode) ? appState.roundingMode : 'dixieme',
+    studentCorrections:corrections
+  };
+}
+
+function persistSessionState(immediate){
+  if(isRestoringSession) return;
+  const write = function(){
+    try{
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(buildSessionSnapshot()));
+    } catch (error) {
+      console.warn('Impossible de sauvegarder la session Bac', error);
+    }
+  };
+  window.clearTimeout(persistTimer);
+  if(immediate){
+    write();
+    return;
+  }
+  persistTimer = window.setTimeout(write, 120);
+}
+
+function restoreSessionState(){
+  let raw = '';
+  try{
+    raw = localStorage.getItem(SESSION_STORAGE_KEY) || '';
+  } catch (error) {
+    return false;
+  }
+  if(!raw) return false;
+  try{
+    const payload = JSON.parse(raw);
+    if(!payload || payload.kind !== 'pse-bac-session') return false;
+    isRestoringSession = true;
+    appState.rosterAll = (Array.isArray(payload.rosterAll) ? payload.rosterAll : getInitialRoster()).map(normalizeRosterEntry).filter(function(item){
+      return item.classe && (item.nom || item.prenom || item.code);
+    });
+    appState.customBanks = normalizeCustomBanks(payload.customBanks);
+    appState.displayMode = payload.displayMode === 'detaillee' ? 'detaillee' : 'compact';
+    appState.printMode = payload.printMode === 'detaillee' ? 'detaillee' : 'compact';
+    appState.roundingMode = ['dixieme','quart','entier'].includes(payload.roundingMode) ? payload.roundingMode : 'dixieme';
+    appState.studentCorrections = {};
+    if(payload.master){
+      appState.master = normalizeMaster(payload.master);
+      appState.rows = appState.master.questions.map(function(question){ return clone(question); });
+      appState.rowStates = buildBlankRowStates();
+      appState.detailVisibility = buildDefaultDetailVisibility(appState.displayMode === 'detaillee');
+      appState.selectedRowKey = appState.rows[0] ? appState.rows[0].id : '';
+      appState.competenceOverrides = {};
+      appState.finalComment = '';
+      appState.importSource = 'Aucun JSON élève chargé';
+      const sourceCorrections = payload.studentCorrections && typeof payload.studentCorrections === 'object' ? payload.studentCorrections : {};
+      Object.keys(sourceCorrections).forEach(function(key){
+        appState.studentCorrections[key] = normalizeStudentSnapshot(sourceCorrections[key], sourceCorrections[key] && sourceCorrections[key].studentMeta);
+      });
+      const classes = getClassList();
+      appState.currentClass = classes.indexOf(payload.currentClass) >= 0 ? payload.currentClass : (classes[0] || '');
+      const classStudents = appState.currentClass ? getStudentsForClass(appState.currentClass) : [];
+      const preferredKey = String(payload.currentStudentKey || '').trim();
+      const validKey = classStudents.some(function(student){ return buildStudentKey(student) === preferredKey; }) ? preferredKey : '';
+      setCurrentStudentByKey(validKey || (classStudents[0] ? buildStudentKey(classStudents[0]) : ''), { skipSave:true, silent:true });
+      if(appState.rows.some(function(row){ return row.id === payload.selectedRowKey; })){
+        appState.selectedRowKey = payload.selectedRowKey;
+      }
+    } else {
+      appState.master = null;
+      appState.rows = [];
+      appState.rowStates = {};
+      appState.detailVisibility = {};
+      appState.selectedRowKey = '';
+      appState.competenceOverrides = {};
+      appState.finalComment = '';
+      appState.importSource = 'Aucun JSON élève chargé';
+      appState.currentStudentKey = '';
+      appState.currentClass = getClassList()[0] || '';
+      appState.customBanks = normalizeCustomBanks(payload.customBanks);
+      setStudentMeta({});
+    }
+    isRestoringSession = false;
+    renderAll();
+    return true;
+  } catch (error) {
+    isRestoringSession = false;
+    console.warn('Impossible de restaurer la session Bac', error);
+    return false;
+  }
+}
+
+function clearSessionState(){
+  try{
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (error) {}
+}
+
+function exportSessionJson(){
+  downloadJson(
+    slugify('session_bac_' + ((appState.master && appState.master.meta && appState.master.meta.titre) || 'correction')) + '.json',
+    buildSessionSnapshot()
+  );
+  toast('Session JSON exportée', 'success');
+}
+
+function applySessionSnapshot(payload, sourceLabel){
+  if(!payload || payload.kind !== 'pse-bac-session'){
+    throw new Error('Format de session non reconnu');
+  }
+  if(payload.master){
+    appState.rosterAll = (Array.isArray(payload.rosterAll) ? payload.rosterAll : getInitialRoster()).map(normalizeRosterEntry).filter(function(item){
+      return item.classe && (item.nom || item.prenom || item.code);
+    });
+    appState.customBanks = normalizeCustomBanks(payload.customBanks);
+    appState.displayMode = payload.displayMode === 'detaillee' ? 'detaillee' : 'compact';
+    appState.printMode = payload.printMode === 'detaillee' ? 'detaillee' : 'compact';
+    appState.roundingMode = ['dixieme','quart','entier'].includes(payload.roundingMode) ? payload.roundingMode : 'dixieme';
+    appState.studentCorrections = {};
+    setMaster(payload.master);
+    appState.customBanks = normalizeCustomBanks(payload.customBanks);
+    const sourceCorrections = payload.studentCorrections && typeof payload.studentCorrections === 'object' ? payload.studentCorrections : {};
+    Object.keys(sourceCorrections).forEach(function(key){
+      appState.studentCorrections[key] = normalizeStudentSnapshot(sourceCorrections[key], sourceCorrections[key] && sourceCorrections[key].studentMeta);
+    });
+    const classes = getClassList();
+    appState.currentClass = classes.indexOf(payload.currentClass) >= 0 ? payload.currentClass : (classes[0] || '');
+    const classStudents = appState.currentClass ? getStudentsForClass(appState.currentClass) : [];
+    const preferredKey = String(payload.currentStudentKey || '').trim();
+    const validKey = classStudents.some(function(student){ return buildStudentKey(student) === preferredKey; }) ? preferredKey : '';
+    setCurrentStudentByKey(validKey || (classStudents[0] ? buildStudentKey(classStudents[0]) : ''), { skipSave:true, silent:true });
+    if(appState.rows.some(function(row){ return row.id === payload.selectedRowKey; })){
+      appState.selectedRowKey = payload.selectedRowKey;
+    }
+    renderAll();
+    toast(sourceLabel || 'Session chargée', 'success');
+    return;
+  }
+  throw new Error('Session incomplète : aucun devoir maître');
+}
+
+function hasUnsavedWork(){
+  if(!appState.master) return false;
+  if(String(appState.finalComment || '').trim()) return true;
+  if(Object.keys(appState.studentCorrections || {}).length) return true;
+  return appState.rows.some(function(row){
+    const state = appState.rowStates[row.id] || {};
+    return Boolean(
+      String(state.selectedLevel || '').trim()
+      || String(state.importedText || '').trim()
+      || String(state.verifiedText || '').trim()
+      || String(state.commentairePropose || '').trim()
+      || String(state.remediationProposee || '').trim()
+      || String(state.teacherComment || '').trim()
+      || String(state.teacherRemediation || '').trim()
+    );
+  });
+}
+
+function confirmSessionReplacement(actionLabel){
+  if(!hasUnsavedWork()) return true;
+  return window.confirm(
+    actionLabel + ' va remplacer la session Bac en cours. '
+    + 'Si tu veux garder une trace externe, exporte d’abord "Élève JSON" ou "Classe JSON". '
+    + 'Continuer ?'
+  );
+}
+
+function exportClassJson(){
+  const snapshot = buildClassSnapshot();
+  if(!snapshot) return;
+  const cls = snapshot.currentClass || 'classe';
+  const title = appState.master && appState.master.meta ? appState.master.meta.titre : 'correction_bac';
+  downloadJson(slugify('classe_' + cls + '_' + title) + '.json', snapshot);
+  toast('JSON de classe exporté', 'success');
+}
+
+function applyClassSnapshot(payload, sourceLabel){
+  if(!payload || payload.kind !== 'pse-bac-class-snapshot'){
+    throw new Error('Format de classe non reconnu');
+  }
+  const classStudents = (Array.isArray(payload.classStudents) ? payload.classStudents : []).map(normalizeRosterEntry).filter(function(item){
+    return item.classe && (item.nom || item.prenom || item.code);
+  });
+  setMaster(payload.master || {});
+  appState.customBanks = normalizeCustomBanks(payload.customBanks);
+  if(classStudents.length){
+    mergeRosterClass(payload.currentClass || classStudents[0].classe, classStudents);
+  }
+  appState.studentCorrections = {};
+  (Array.isArray(payload.students) ? payload.students : []).forEach(function(item){
+    const meta = normalizeRosterEntry(item && item.studentMeta || {});
+    const key = String(item && item.key || buildStudentKey(meta)).trim();
+    if(!key) return;
+    appState.studentCorrections[key] = normalizeStudentSnapshot(item, meta);
+  });
+  const targetClass = String(payload.currentClass || (classStudents[0] && classStudents[0].classe) || getClassList()[0] || '').trim();
+  appState.currentClass = targetClass;
+  const targetKey = String(payload.currentStudentKey || '').trim();
+  const fallbackStudent = getStudentsForClass(targetClass)[0];
+  setCurrentStudentByKey(targetKey || (fallbackStudent ? buildStudentKey(fallbackStudent) : ''), { skipSave:true, silent:true });
+  renderAll();
+  toast(sourceLabel || 'JSON de classe chargé', 'success');
+}
+
+function buildPrintMarkup(mode){
+  saveCurrentStudentState();
+  const printMode = mode === 'detaillee' ? 'detaillee' : 'compact';
+  const total = computeTotalNote();
+  const comment = document.getElementById('finalComment').value.trim();
+  const revisionText = buildRevisionText().trim();
+  const combinedComment = revisionText && !/révisions\s*:/i.test(comment)
+    ? [comment, revisionText].filter(Boolean).join('\n')
+    : (comment || revisionText);
+  const correctionUrl = safeUrl((appState.master && appState.master.meta && appState.master.meta.correction_url) || firstAvailableCorrectionLink());
+  const qrImage = correctionUrl
+    ? '<img alt="QR code correction" style="width:54px;height:54px;border-radius:10px;border:1px solid #dbe2ea" src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(correctionUrl) + '">'
+    : '';
+  const rawTitle = String(appState.master.meta.titre || 'Bac Blanc PSE').trim();
+  const printTitle = /^corrig[ée]/i.test(rawTitle) ? rawTitle : ('Corrigé ' + rawTitle);
+  const studentIdentity = [appState.studentMeta.prenom, appState.studentMeta.nom].filter(Boolean).join(' ').trim() || 'Élève non renseigné';
+  const studentMetaLine = [appState.studentMeta.classe, appState.studentMeta.code].filter(Boolean).join(' · ');
+  const printColors = {
+    C2:{ line:'#2957c8', bg:'#eef4ff', text:'#2957c8' },
+    C3:{ line:'#7c3aed', bg:'#f2eaff', text:'#7c3aed' },
+    C4:{ line:'#13805d', bg:'#e9f8f1', text:'#13805d' },
+    C5:{ line:'#b24a1b', bg:'#fff0e6', text:'#b24a1b' },
+    C6:{ line:'#374151', bg:'#eef1f5', text:'#374151' }
+  };
+
+  const compHeaders = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
+    const palette = printColors[code] || printColors.C2;
+    return '<th colspan="4" style="background:' + palette.line + ';color:#fff;border-left:2px solid rgba(255,255,255,.55);border-right:2px solid rgba(255,255,255,.55);font-family:IBM Plex Mono,monospace;font-size:7px;text-transform:uppercase;letter-spacing:.06em">' + esc(code) + '</th>';
+  }).join('');
+  const subHeaders = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
+    const palette = printColors[code] || printColors.C2;
+    return LEVELS.map(function(level, levelIndex){
+      const start = levelIndex === 0 ? ';border-left:2px solid ' + palette.line : '';
+      const end = levelIndex === LEVELS.length - 1 ? ';border-right:2px solid ' + palette.line : '';
+      return '<th style="background:' + palette.bg + ';color:' + palette.text + ';font-family:IBM Plex Mono,monospace;font-size:7px;text-transform:uppercase' + start + end + '">' + esc(level) + '</th>';
+    }).join('');
+  }).join('');
+  const bodyRows = appState.rows.map(function(row){
+    const state = appState.rowStates[row.id];
+    const cells = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
+      const palette = printColors[code] || printColors.C2;
+      return LEVELS.map(function(level){
+        if(code !== row.competence){
+          return '<td style="background:#f8fafc;color:#d0d7e2;text-align:center">—</td>';
+        }
+        const mark = state.selectedLevel === level ? '✕' : '';
+        const levelIndex = LEVELS.indexOf(level);
+        const start = levelIndex === 0 ? ';border-left:2px solid ' + palette.line : '';
+        const end = levelIndex === LEVELS.length - 1 ? ';border-right:2px solid ' + palette.line : '';
+        if(row.neutralisee || !row.niveaux_autorises.includes(level)){
+          return '<td style="background:#edf1f7;color:#b2bfce;text-align:center;border-top:2px solid ' + palette.line + ';border-bottom:2px solid ' + palette.line + start + end + '">·</td>';
+        }
+        return '<td style="background:' + palette.bg + ';text-align:center;font-weight:700;border-top:2px solid ' + palette.line + ';border-bottom:2px solid ' + palette.line + start + end + '">' + mark + '</td>';
+      }).join('');
+    }).join('');
+    return '<tr>'
+      + '<td style="font-family:IBM Plex Mono,monospace;font-weight:700;white-space:nowrap">' + esc(row.num) + (row.neutralisee ? '<div style="font-weight:400;color:#7b8597;font-size:6.6pt;margin-top:2px">neutralisée</div>' : '') + '</td>'
+      + cells
+      + '</tr>';
+  }).join('');
+
+  const compSummary = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
+    const metrics = computeCompetenceMetrics(code);
+    return '<tr>'
+      + '<td style="font-family:IBM Plex Mono,monospace;font-weight:700">' + esc(code) + '</td>'
+      + '<td>' + esc(metrics.label) + '</td>'
+      + '<td style="text-align:center">' + esc(String(metrics.counts.NT)) + '</td>'
+      + '<td style="text-align:center">' + esc(String(metrics.counts.I)) + '</td>'
+      + '<td style="text-align:center">' + esc(String(metrics.counts.A)) + '</td>'
+      + '<td style="text-align:center">' + esc(String(metrics.counts.M)) + '</td>'
+      + '<td style="text-align:right;font-family:IBM Plex Mono,monospace">' + esc(formatScore(metrics.score)) + ' / ' + esc(String(metrics.bareme)) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const compactDetailRows = appState.rows.map(function(row){
+    const state = appState.rowStates[row.id];
+    const parts = [];
+    const teacherComment = String(state.teacherComment || '').trim();
+    const teacherRemediation = String(state.teacherRemediation || '').trim();
+    const fallbackComment = String(state.commentairePropose || '').trim();
+    const fallbackRemediation = String(state.remediationProposee || row.remediation.conseil || '').trim();
+    if(teacherComment) parts.push(teacherComment);
+    else if(fallbackComment && state.selectedLevel) parts.push(fallbackComment);
+    if(teacherRemediation) parts.push('Remédiation : ' + teacherRemediation);
+    else if(fallbackRemediation && state.selectedLevel && !teacherComment) parts.push('Remédiation : ' + fallbackRemediation);
+    if(!parts.length) return '';
+    return '<tr>'
+      + '<td style="width:11%;font-family:IBM Plex Mono,monospace;font-weight:700;white-space:nowrap">' + esc(row.num) + '</td>'
+      + '<td style="width:9%;text-align:center;font-family:IBM Plex Mono,monospace">' + esc(state.selectedLevel || '—') + '</td>'
+      + '<td class="comment">' + esc(parts.join(' \n')) + '</td>'
+      + '</tr>';
+  }).filter(Boolean).join('');
+
+  const detailedSections = appState.rows.map(function(row){
+    const state = appState.rowStates[row.id];
+    const criteriaEntries = buildVisibleCriteriaEntries(row);
+    const criteriaHtml = row.neutralisee
+      ? '<div class="p-empty">Question neutralisée : visible dans la grille, mais exclue du calcul.</div>'
+      : (criteriaEntries.length
+        ? criteriaEntries.map(function(item){
+            return '<div class="p-criterion ' + item.level.toLowerCase() + '"><strong>' + esc(item.level + ' — ' + LEVEL_LABELS[item.level]) + '</strong><div>' + esc(item.text) + '</div></div>';
+          }).join('')
+        : '<div class="p-empty">Aucun critère détaillé disponible.</div>');
+    const imported = String(state.importedText || '').trim();
+    const verified = String(state.verifiedText || '').trim();
+    const remark = String(state.extractionRemark || '').trim();
+    const teacherComment = String(state.teacherComment || '').trim();
+    const teacherRemediation = String(state.teacherRemediation || '').trim();
+    return '<section class="box question-sheet">'
+      + '<div class="question-sheet-head"><div><strong>' + esc(row.num) + '</strong> — ' + esc(row.libelle) + '</div><div class="question-meta">'
+      + '<span class="p-tag">' + esc(row.competence + ' — ' + appState.master.competences[row.competence].label) + '</span>'
+      + '<span class="p-tag">' + esc('Niveaux : ' + row.niveaux_autorises.join(' · ')) + '</span>'
+      + '<span class="p-tag strong">' + esc('Niveau retenu : ' + (state.selectedLevel || '—')) + '</span>'
+      + (state.aVerifier ? '<span class="p-tag warn">À vérifier</span>' : '')
+      + '</div></div>'
+      + '<div class="detail-print-grid">'
+      + '<div class="print-panel attendus"><h3>Attendus</h3>' + criteriaHtml + '</div>'
+      + '<div class="print-panel reponse"><h3>Réponse de l’élève</h3>'
+      + '<div class="p-block' + (imported ? '' : ' empty') + '"><strong>Réponse brute</strong><br>' + esc(imported || 'Aucune réponse importée.') + '</div>'
+      + '<div class="p-block' + (verified ? '' : ' empty') + '"><strong>Réponse reformulée</strong><br>' + esc(verified || 'Aucune reformulation proposée.') + '</div>'
+      + (remark ? '<div class="p-block"><strong>Remarque d’extraction</strong><br>' + esc(remark) + '</div>' : '')
+      + '</div>'
+      + '<div class="print-panel analyse"><h3>Analyse IA / Enseignant</h3>'
+      + '<div class="p-block' + (state.commentairePropose ? '' : ' empty') + '"><strong>Commentaire proposé</strong><br>' + esc(state.commentairePropose || 'Aucun commentaire proposé.') + '</div>'
+      + '<div class="p-block' + ((state.remediationProposee || row.remediation.conseil) ? '' : ' empty') + '"><strong>Remédiation proposée</strong><br>' + esc(state.remediationProposee || row.remediation.conseil || 'Aucune remédiation proposée.') + '</div>'
+      + '<div class="p-block' + ((teacherComment || teacherRemediation) ? '' : ' empty') + '"><strong>Ajout enseignant</strong><br>' + esc((teacherComment ? ('Commentaire : ' + teacherComment + '\n') : '') + (teacherRemediation ? ('Remédiation : ' + teacherRemediation) : '') || 'Aucun ajout enseignant.') + '</div>'
+      + '</div></div>'
+      + '</section>';
+  }).join('');
+
+  const baseStyle = '@page{margin:0.8cm}'
+    + 'body{font-family:IBM Plex Sans,Arial,sans-serif;color:#162033;font-size:' + (printMode === 'detaillee' ? '8.2pt' : '8pt') + ';line-height:1.25}'
+    + 'h1,h2,h3{margin:0}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:1px solid #dbe2ea;padding:3px 4px;vertical-align:top}'
+    + 'th{background:#f8fafc}'
+    + 'small{color:#64748b}'
+    + '.sheet{display:grid;gap:0}'
+    + '.print-page,.detail-page{display:grid;gap:8px}'
+    + '.print-page{page-break-after:always;break-after:page}'
+    + '.print-hero{display:grid;grid-template-columns:1.05fr .95fr;gap:8px;align-items:start}'
+    + '.head-main{min-width:0}'
+    + '.head-main h1{font-size:13pt;line-height:1.1;margin-bottom:3px}'
+    + '.hero-meta{color:#64748b;font-size:7.7pt;margin-bottom:6px}'
+    + '.student-line{border:1px solid #dbe2ea;border-radius:10px;padding:6px 8px;background:#fff}'
+    + '.student-line strong{display:block;font-size:7.1pt;text-transform:uppercase;letter-spacing:.08em;color:#63718a;margin-bottom:2px}'
+    + '.head-side{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:stretch}'
+    + '.note-card,.comment-card,.box{border:1px solid #dbe2ea;border-radius:10px;padding:6px;page-break-inside:avoid;background:#fff}'
+    + '.note-card{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:linear-gradient(180deg,#f8fbff,#eef4ff)}'
+    + '.note-card .label{font-family:IBM Plex Mono,Consolas,monospace;font-size:7.1pt;text-transform:uppercase;color:#63718a;letter-spacing:.08em}'
+    + '.note-card .value{font-size:16pt;font-weight:700;color:#2457eb;line-height:1.05;margin-top:4px}'
+    + '.comment-card strong{display:block;font-size:7.1pt;text-transform:uppercase;letter-spacing:.08em;color:#63718a;margin-bottom:4px}'
+    + '.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+    + '.muted{color:#64748b}'
+    + '.mono{font-family:IBM Plex Mono,Consolas,monospace}'
+    + '.tot{font-size:15pt;font-weight:700;color:#2457eb}'
+    + '.comment{line-height:1.3;white-space:pre-wrap}'
+    + '.qr{display:flex;gap:8px;align-items:center}'
+    + '.bottom{display:grid;grid-template-columns:1.15fr .85fr;gap:8px}'
+    + '.print-grid th,.print-grid td{padding:2px 2px}'
+    + '.print-grid th{font-size:6.8px}'
+    + '.print-grid .qcol{width:9%}'
+    + '.detail-print-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}'
+    + '.print-panel{border:1px solid #dbe2ea;border-radius:10px;padding:6px;background:#fff}'
+    + '.print-panel h3{font-size:8.4pt;margin-bottom:6px}'
+    + '.print-panel.attendus{background:#f2f7ff}'
+    + '.print-panel.reponse{background:#faf7ff}'
+    + '.print-panel.analyse{background:#effaf5}'
+    + '.p-block,.p-criterion,.p-empty{border:1px solid rgba(22,32,51,.08);border-radius:8px;padding:6px;background:rgba(255,255,255,.78);line-height:1.35;white-space:pre-wrap}'
+    + '.p-block + .p-block,.p-criterion + .p-criterion{margin-top:6px}'
+    + '.p-empty{color:#64748b;font-style:italic}'
+    + '.p-criterion strong,.p-block strong{display:block;margin-bottom:3px;font-family:IBM Plex Mono,Consolas,monospace;font-size:7pt}'
+    + '.p-criterion.m{background:#edfdf5;border-color:#75c9a5}'
+    + '.p-criterion.a{background:#fff8eb}'
+    + '.p-criterion.i{background:#fff1f1}'
+    + '.p-criterion.nt{background:#f8fafc}'
+    + '.question-sheet{page-break-inside:avoid}'
+    + '.question-sheet-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:6px}'
+    + '.question-meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}'
+    + '.p-tag{display:inline-block;padding:4px 7px;border-radius:999px;background:#eef2f7;color:#52607a;font-family:IBM Plex Mono,Consolas,monospace;font-size:7pt}'
+    + '.p-tag.strong{background:#dbe8ff;color:#2457eb}'
+    + '.p-tag.warn{background:#ffe3e3;color:#b42318}'
+    + '.resource-box{display:grid;gap:6px}'
+    + '.resource-box strong{display:block;font-size:7.1pt;text-transform:uppercase;letter-spacing:.08em;color:#63718a;margin-bottom:2px}';
+
+  const sharedTop = '<div class="print-hero">'
+    + '<div class="head-main">'
+    + '<h1>' + esc(printTitle) + '</h1>'
+    + '<div class="hero-meta">' + esc([appState.master.meta.niveau, appState.master.meta.date].filter(Boolean).join(' · ')) + '</div>'
+    + '<div class="student-line"><strong>Élève</strong><div>' + esc(studentIdentity) + '</div>' + (studentMetaLine ? '<small>' + esc(studentMetaLine) + '</small>' : '') + '</div>'
+    + '</div>'
+    + '<div class="head-side">'
+    + '<div class="note-card"><div class="label">Note / 20</div><div class="value">' + esc(formatScore(roundScore(total, appState.roundingMode))) + '</div></div>'
+    + '<div class="comment-card"><strong>Commentaires / révisions</strong><div class="comment">' + esc(combinedComment || 'Aucun commentaire saisi.') + '</div></div>'
+    + '</div>'
+    + '</div>';
+
+  const resourceBox = correctionUrl
+    ? '<div class="box resource-box"><strong>Correction détaillée</strong><div class="qr"><div>' + qrImage + '</div><div><div class="comment">' + esc(correctionUrl) + '</div></div></div></div>'
+    : '';
+
+  const compactFirstPage = '<div class="box"><table class="print-grid"><thead><tr><th rowspan="2" class="qcol">Question</th>' + compHeaders + '</tr><tr>' + subHeaders + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>'
+    + '<div class="bottom">'
+    + '<div class="box"><strong>Résultats par compétence</strong><table><thead><tr><th style="width:9%">Comp.</th><th>Libellé</th><th style="width:6%">NT</th><th style="width:6%">I</th><th style="width:6%">A</th><th style="width:6%">M</th><th style="width:18%">Note</th></tr></thead><tbody>' + compSummary + '</tbody></table></div>'
+    + resourceBox
+    + '</div>';
+
+  const compactSecondPage = '<section class="detail-page"><div class="box"><strong>Correction détaillée</strong>'
+    + (compactDetailRows
+      ? '<table><thead><tr><th style="width:11%">Question</th><th style="width:9%">Niveau</th><th>Détail</th></tr></thead><tbody>' + compactDetailRows + '</tbody></table>'
+      : '<div class="comment">Aucune correction détaillée saisie pour le moment.</div>')
+    + '</div></section>';
+
+  const detailedFirstPage = '<div class="box"><strong>Synthèse des compétences</strong><table><thead><tr><th style="width:9%">Comp.</th><th>Libellé</th><th style="width:6%">NT</th><th style="width:6%">I</th><th style="width:6%">A</th><th style="width:6%">M</th><th style="width:18%">Note</th></tr></thead><tbody>' + compSummary + '</tbody></table></div>'
+    + resourceBox;
+
+  const detailedSecondPage = '<section class="detail-page">' + detailedSections + '</section>';
+
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>' + esc(printTitle) + '</title>'
+    + '<style>' + baseStyle + '</style></head><body>'
+    + '<div class="sheet">'
+    + '<section class="print-page">'
+    + sharedTop
+    + (printMode === 'detaillee' ? detailedFirstPage : compactFirstPage)
+    + '</section>'
+    + (printMode === 'detaillee' ? detailedSecondPage : compactSecondPage)
+    + '</div></body></html>';
+}
+
+function printSheet(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return;
+  }
+  const popup = window.open('', '_blank');
+  if(!popup){
+    toast('Autorise l’ouverture de fenêtre pour imprimer', 'error');
+    return;
+  }
+  popup.document.open();
+  popup.document.write(buildPrintMarkup(appState.printMode));
+  popup.document.close();
+  popup.focus();
+  popup.print();
+}
+
+function exportWord(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON', 'error');
+    return;
+  }
+  const content = buildPrintMarkup(appState.printMode);
+  const blob = new Blob([content], { type:'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = slugify((appState.master.meta.titre || 'correction_bac') + '_' + [appState.studentMeta.nom, appState.studentMeta.prenom].filter(Boolean).join('_')) + '.doc';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+document.getElementById('modal').addEventListener('click', function(event){
+  if(event.target === this) closeModal();
+});
+
+document.getElementById('btnLoadExample').addEventListener('click', function(){
+  if(!confirmSessionReplacement('Charger l’exemple')) return;
+  setMaster(EXAMPLE_MASTER);
+  importStudentPayload(EXAMPLE_STUDENT, 'Exemple JSON élève');
+});
+document.getElementById('btnPromptMaster').addEventListener('click', function(){
+  openPromptModal(
+    'Prompt IA devoir Bac',
+    'Donne ce prompt à l’IA avec le sujet et, si possible, la grille officielle/corrigé pour obtenir le JSON maître du devoir.',
+    buildMasterPrompt()
+  );
+});
+document.getElementById('btnPromptStudent').addEventListener('click', function(){
+  if(!appState.master){
+    toast('Charge d’abord un devoir JSON pour construire le prompt élève', 'error');
+    return;
+  }
+  openPromptModal(
+    'Prompt IA copie élève Bac',
+    'Ce prompt est construit à partir du devoir actuellement chargé. Donne-le à l’IA avec la copie de l’élève.',
+    buildStudentPrompt()
+  );
+});
+document.getElementById('btnImportMaster').addEventListener('click', function(){ openJsonImportModal('master'); });
+document.getElementById('btnImportStudent').addEventListener('click', function(){ openJsonImportModal('student'); });
+document.getElementById('btnExportStudentJson').addEventListener('click', exportStudentJson);
+document.getElementById('btnExportClassJson').addEventListener('click', exportClassJson);
+document.getElementById('btnImportClassJson').addEventListener('click', function(){ openJsonImportModal('class'); });
+document.getElementById('btnExportSessionJson').addEventListener('click', exportSessionJson);
+document.getElementById('btnImportSessionJson').addEventListener('click', function(){ openJsonImportModal('session'); });
+document.getElementById('btnNotesClass').addEventListener('click', openClassNotesModal);
+document.getElementById('btnCompactView').addEventListener('click', function(){ setDisplayMode('compact'); });
+document.getElementById('btnDetailedView').addEventListener('click', function(){ setDisplayMode('detaillee'); });
+document.getElementById('btnExpandAllDetails').addEventListener('click', expandAllDetails);
+document.getElementById('btnCollapseAllDetails').addEventListener('click', collapseAllDetails);
+document.getElementById('printModeSelect').addEventListener('change', function(){
+  appState.printMode = this.value === 'detaillee' ? 'detaillee' : 'compact';
+});
+document.getElementById('btnPrint').addEventListener('click', printSheet);
+document.getElementById('btnExportWord').addEventListener('click', exportWord);
+document.getElementById('btnReset').addEventListener('click', function(){
+  if(!confirmSessionReplacement('Réinitialiser')) return;
+  saveCurrentStudentState();
+  appState.master = null;
+  appState.rows = [];
+  appState.rowStates = {};
+  appState.detailVisibility = {};
+  appState.selectedRowKey = '';
+  appState.competenceOverrides = {};
+  appState.finalComment = '';
+  appState.importSource = 'Aucun JSON élève chargé';
+  appState.currentStudentKey = '';
+  appState.currentClass = getClassList()[0] || '';
+  appState.studentCorrections = {};
+  clearSessionState();
+  setStudentMeta({});
+  renderAll();
+});
+
+document.getElementById('fileMaster').addEventListener('change', function(){
+  const file = this.files && this.files[0];
+  readFileAsText(file, function(text){
+    try {
+      if(!confirmSessionReplacement('Charger un nouveau devoir JSON')) return;
+      setMaster(parseJsonInput(text));
+      toast('Devoir JSON chargé', 'success');
+    } catch (error) {
+      toast('JSON maître invalide : ' + error.message, 'error');
+    }
+  });
+  this.value = '';
+});
+document.getElementById('fileStudent').addEventListener('change', function(){
+  const file = this.files && this.files[0];
+  readFileAsText(file, function(text, name){
+    try {
+      const parsed = parseJsonInput(text);
+      if(parsed && parsed.kind === 'pse-bac-student-snapshot') applyStudentSnapshot(parsed, name || 'Sauvegarde élève');
+      else importStudentPayload(parsed, name || 'JSON élève');
+    } catch (error) {
+      toast('JSON élève invalide : ' + error.message, 'error');
+    }
+  });
+  this.value = '';
+});
+document.getElementById('fileClass').addEventListener('change', function(){
+  const file = this.files && this.files[0];
+  readFileAsText(file, function(text, name){
+    try {
+      if(!confirmSessionReplacement('Charger une classe')) return;
+      applyClassSnapshot(parseJsonInput(text), name || 'JSON classe');
+    } catch (error) {
+      toast('JSON classe invalide : ' + error.message, 'error');
+    }
+  });
+  this.value = '';
+});
+document.getElementById('fileSession').addEventListener('change', function(){
+  const file = this.files && this.files[0];
+  readFileAsText(file, function(text, name){
+    try {
+      if(!confirmSessionReplacement('Charger une session')) return;
+      applySessionSnapshot(parseJsonInput(text), name || 'JSON session');
+    } catch (error) {
+      toast('JSON session invalide : ' + error.message, 'error');
+    }
+  });
+  this.value = '';
+});
+
+document.getElementById('roundingMode').addEventListener('change', function(){
+  appState.roundingMode = this.value;
+  renderAll();
+});
+document.getElementById('classSelect').addEventListener('change', function(){
+  setCurrentClass(this.value);
+});
+
+document.getElementById('studentNom').addEventListener('input', syncStudentMetaFromInputs);
+document.getElementById('studentPrenom').addEventListener('input', syncStudentMetaFromInputs);
+document.getElementById('studentClasse').addEventListener('input', syncStudentMetaFromInputs);
+document.getElementById('studentCode').addEventListener('input', syncStudentMetaFromInputs);
+document.getElementById('finalComment').addEventListener('input', function(){
+  appState.finalComment = this.value;
+  persistSessionState();
+});
+
+document.getElementById('btnBankAppreciation').addEventListener('click', function(){ openBankModal('appreciation'); });
+document.getElementById('btnBankCompetenceComments').addEventListener('click', function(){ openBankModal('comment'); });
+document.getElementById('btnBankCompetenceRemediation').addEventListener('click', function(){ openBankModal('remediation'); });
+document.getElementById('btnInsertRevision').addEventListener('click', function(){
+  const text = buildRevisionText();
+  if(!text){
+    toast('Aucune notion faible à reprendre pour le moment', 'error');
+    return;
+  }
+  const textarea = document.getElementById('finalComment');
+  textarea.value = textarea.value.trim() ? (textarea.value.trim() + '\n' + text) : text;
+  appState.finalComment = textarea.value;
+  persistSessionState();
+});
+document.getElementById('btnSaveAppreciationText').addEventListener('click', saveCurrentAppreciationText);
+window.addEventListener('beforeunload', function(){ persistSessionState(true); });
+window.addEventListener('pagehide', function(){ persistSessionState(true); });
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) persistSessionState(true);
+});
+
+appState.rosterAll = getInitialRoster();
+if(!restoreSessionState()){
+  appState.currentClass = getClassList()[0] || '';
+  renderAll();
+}
+</script>
+</body>
+</html>
