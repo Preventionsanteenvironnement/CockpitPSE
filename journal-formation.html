@@ -1167,13 +1167,17 @@ function buildTAHTML(n){
   `;
 
   for(const[fk,fv] of Object.entries(REF)){
+    const totalAt = Object.values(fv.comps).reduce((s,cv)=>s+cv.attendus.length,0);
+    const compList = Object.keys(fv.comps).join(' · ');
     h+=`<div class="focale-block" id="fb-${n}-${fk}">
       <div class="focale-head" style="background:${fv.hex}18;color:${fv.hex}" onclick="toggleFocale('fb-${n}-${fk}')">
         <div class="focale-pip" style="background:${fv.hex}"></div>
         <span class="focale-key">${fk}</span>
         <span class="focale-name">${fv.label}</span>
+        <span class="focale-counter" id="fc-${n}-${fk}" style="margin-left:auto;font-size:10px;font-weight:700;opacity:.7;">0/${totalAt}</span>
         <span class="focale-chevron">▾</span>
       </div>
+      <div class="focale-comps-bar" style="padding:4px 14px 6px;font-size:10px;color:${fv.hex};opacity:.6;letter-spacing:.3px;">${compList} — ${totalAt} attendus</div>
       <div class="focale-body">`;
 
     for(const[ck,cv] of Object.entries(fv.comps)){
@@ -1181,11 +1185,12 @@ function buildTAHTML(n){
         <div class="comp-head">
           <span class="comp-tag" style="background:${fv.hex}16;color:${fv.hex}">${ck}</span>
           <span class="comp-name">${cv.name}</span>
+          <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${cv.attendus.length} attendu${cv.attendus.length>1?'s':''}</span>
         </div>`;
 
       for(const at of cv.attendus){
         h+=`<div class="attendu">
-          <div class="attendu-text">${at.txt}</div>
+          <div class="attendu-text"><span id="at-badge-${n}-${at.id}" class="at-mini-badge" style="display:none;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;"></span>${at.txt} <span style="font-size:9px;color:var(--text-muted);opacity:.5;">(${at.id})</span></div>
           <div class="level-row" id="lr-${n}-${at.id}">
             ${LEVELS.map(l=>`<button class="lpill ${l.cls}" title="${l.title}"
               data-lv="${l.id}" onclick="setLv(${n},'${at.id}','${l.id}',this)">
@@ -1452,6 +1457,37 @@ function updateTACompletion(n){
     });
   }
   if(pctEl)pctEl.textContent=pct+'%';
+
+  // Mise à jour compteurs par focale + mini-badges
+  const levelColors={TBM:'#d1fae5',MS:'#dcfce7',MC:'#fef3c7',MI:'#fee2e2'};
+  const levelTextColors={TBM:'#065f46',MS:'#166534',MC:'#92400e',MI:'#991b1b'};
+  for(const[fk,fv] of Object.entries(REF)){
+    let focFilled=0, focTotal=0;
+    for(const cv of Object.values(fv.comps)){
+      for(const at of cv.attendus){
+        focTotal++;
+        const lv=evals[at.id];
+        if(lv&&lv!=='NE') focFilled++;
+        // Mini-badge
+        const badge=document.getElementById(`at-badge-${n}-${at.id}`);
+        if(badge){
+          if(lv&&lv!=='NE'){
+            badge.style.display='inline';
+            badge.textContent=lv;
+            badge.style.background=levelColors[lv]||'#eee';
+            badge.style.color=levelTextColors[lv]||'#333';
+          } else {
+            badge.style.display='none';
+          }
+        }
+      }
+    }
+    const fcEl=document.getElementById(`fc-${n}-${fk}`);
+    if(fcEl){
+      fcEl.textContent=`${focFilled}/${focTotal}`;
+      fcEl.style.opacity=focFilled>0?'1':'.5';
+    }
+  }
 }
 
 // ============================================================
