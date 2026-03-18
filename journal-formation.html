@@ -2160,9 +2160,18 @@ function pasteIAJSON(){
   }
 }
 
+function cleanJSON(txt){
+  return txt
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    .replace(/\u2026/g, '...')
+    .replace(/[\u00A0]/g, ' ');
+}
+
 function importPastedJSON(){
-  const txt=document.getElementById('ia-paste-area').value.trim();
+  let txt=document.getElementById('ia-paste-area').value.trim();
   if(!txt){alert('Collez le JSON avant de cliquer sur Importer.');return;}
+  txt=cleanJSON(txt);
   try{
     const iaData=JSON.parse(txt);
     processIAData(iaData);
@@ -2209,7 +2218,7 @@ function importIAJSON(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    try{ processIAData(JSON.parse(ev.target.result)); }
+    try{ processIAData(JSON.parse(cleanJSON(ev.target.result))); }
     catch(err){ alert('Fichier JSON invalide : ' + err.message); }
   };
   r.readAsText(f);
