@@ -923,8 +923,13 @@ textarea::placeholder{color:var(--text-muted);opacity:.7;}
 
       <div style="background:#fef9e7;border:1px solid #f5e6a3;border-radius:12px;padding:16px;margin-bottom:16px;">
         <h3 style="font-size:.9rem;font-weight:700;color:#c07830;margin-bottom:8px;">📥 Importer le JSON généré par l'IA</h3>
-        <p style="font-size:.8rem;color:#7a6a4e;margin-bottom:10px;">Une fois que l'IA a généré le fichier JSON, importez-le ici. Les données seront placées automatiquement dans les bonnes compétences.</p>
-        <button onclick="document.getElementById('ia-json-in').click()" style="background:#c07830;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;">📂 Importer le JSON de l'IA</button>
+        <p style="font-size:.8rem;color:#7a6a4e;margin-bottom:10px;">Deux options : charger un fichier JSON ou coller directement le texte.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button onclick="document.getElementById('ia-json-in').click()" style="flex:1;background:#c07830;color:white;border:none;padding:10px 16px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;">📂 Charger un fichier</button>
+          <button onclick="pasteIAJSON()" id="ia-paste-btn" style="flex:1;background:#1a1f3a;color:white;border:none;padding:10px 16px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;">📋 Coller le JSON</button>
+        </div>
+        <textarea id="ia-paste-area" placeholder="Collez ici le JSON généré par l'IA puis cliquez sur 'Importer le texte collé'..." style="width:100%;height:120px;background:#fff;color:#1a1f3a;border:1px solid #f5e6a3;border-radius:10px;padding:12px;font-family:monospace;font-size:.75rem;line-height:1.5;resize:vertical;display:none;"></textarea>
+        <button id="ia-paste-import" onclick="importPastedJSON()" style="display:none;width:100%;margin-top:8px;background:#2a7d50;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;">✅ Importer le texte collé</button>
       </div>
 
       <button onclick="document.getElementById('modal-ia').style.display='none'" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;">Fermer</button>
@@ -2142,50 +2147,70 @@ function copyPrompt(){
   });
 }
 
+function pasteIAJSON(){
+  const area=document.getElementById('ia-paste-area');
+  const btn=document.getElementById('ia-paste-import');
+  if(area.style.display==='none'){
+    area.style.display='block';
+    btn.style.display='block';
+    area.focus();
+  } else {
+    area.style.display='none';
+    btn.style.display='none';
+  }
+}
+
+function importPastedJSON(){
+  const txt=document.getElementById('ia-paste-area').value.trim();
+  if(!txt){alert('Collez le JSON avant de cliquer sur Importer.');return;}
+  try{
+    const iaData=JSON.parse(txt);
+    processIAData(iaData);
+  }catch(err){
+    alert('JSON invalide : ' + err.message + '\n\nVérifiez que vous avez bien collé tout le texte JSON.');
+  }
+}
+
+function processIAData(iaData){
+  if(!iaData.ta){alert('Format invalide : pas de clé "ta" trouvée.');return;}
+  let count=0;
+  for(const[taKey,taVal] of Object.entries(iaData.ta)){
+    if(!D.ta[taKey]) D.ta[taKey]={date:'',evals:{},coms:{},notes:''};
+    if(taVal.date) D.ta[taKey].date=taVal.date;
+    if(taVal.notes) D.ta[taKey].notes=taVal.notes;
+    if(taVal.evals){
+      for(const[atId,level] of Object.entries(taVal.evals)){
+        let found=false;
+        for(const fv of Object.values(REF)){
+          for(const cv of Object.values(fv.comps)){
+            if(cv.attendus.find(a=>a.id===atId)){found=true;break;}
+          }
+          if(found)break;
+        }
+        if(found && ['TBM','MS','MC','MI','NE'].includes(level)){
+          D.ta[taKey].evals[atId]=level;
+          count++;
+        }
+      }
+    }
+    if(taVal.coms){
+      for(const[atId,com] of Object.entries(taVal.coms)){
+        D.ta[taKey].coms[atId]=com;
+      }
+    }
+  }
+  localStorage.setItem('jf-mecheri-2122',JSON.stringify(D));
+  loadForms();updateDashboard();buildSynthese();updateNavStatus();
+  document.getElementById('modal-ia').style.display='none';
+  alert('Import IA réussi ! ' + count + ' évaluations placées dans le journal.');
+}
+
 function importIAJSON(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    try{
-      const iaData=JSON.parse(ev.target.result);
-      if(!iaData.ta){alert('❌ Format invalide : pas de clé "ta" trouvée.');return;}
-
-      // Fusionner avec les données existantes
-      let count=0;
-      for(const[taKey,taVal] of Object.entries(iaData.ta)){
-        if(!D.ta[taKey]) D.ta[taKey]={date:'',evals:{},coms:{},notes:''};
-        if(taVal.date) D.ta[taKey].date=taVal.date;
-        if(taVal.notes) D.ta[taKey].notes=taVal.notes;
-        if(taVal.evals){
-          for(const[atId,level] of Object.entries(taVal.evals)){
-            // Vérifier que l'attendu existe dans le référentiel
-            let found=false;
-            for(const fv of Object.values(REF)){
-              for(const cv of Object.values(fv.comps)){
-                if(cv.attendus.find(a=>a.id===atId)){found=true;break;}
-              }
-              if(found)break;
-            }
-            if(found && ['TBM','MS','MC','MI','NE'].includes(level)){
-              D.ta[taKey].evals[atId]=level;
-              count++;
-            }
-          }
-        }
-        if(taVal.coms){
-          for(const[atId,com] of Object.entries(taVal.coms)){
-            D.ta[taKey].coms[atId]=com;
-          }
-        }
-      }
-
-      localStorage.setItem('jf-mecheri-2122',JSON.stringify(D));
-      loadForms();updateDashboard();buildSynthese();updateNavStatus();
-      document.getElementById('modal-ia').style.display='none';
-      alert('✅ Import IA réussi ! ' + count + ' évaluations placées dans le journal.');
-    }catch(err){
-      alert('❌ Fichier JSON invalide : ' + err.message);
-    }
+    try{ processIAData(JSON.parse(ev.target.result)); }
+    catch(err){ alert('Fichier JSON invalide : ' + err.message); }
   };
   r.readAsText(f);
   e.target.value='';
