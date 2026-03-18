@@ -724,6 +724,12 @@ textarea::placeholder{color:var(--text-muted);opacity:.7;}
               <p style="font-size:12.5px;color:var(--text-muted);font-style:italic">Remplissez vos auto-positionnements pour voir l'analyse apparaître ici.</p>
             </div>
           </div>
+          <div class="card" id="recent-card">
+            <div class="card-label">🕐 Dernières modifications</div>
+            <div id="recent-container">
+              <p style="font-size:12.5px;color:var(--text-muted);font-style:italic">Aucune modification enregistrée pour le moment.</p>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -1327,13 +1333,15 @@ function setLv(n,aid,lv,btn){
   row.querySelectorAll('.lpill').forEach(p=>p.classList.remove('on'));
   if(!D.ta[n])D.ta[n]={evals:{},coms:{}};
   if(!D.ta[n].evals)D.ta[n].evals={};
-  if(D.ta[n].evals[aid]===lv){delete D.ta[n].evals[aid];}
-  else{btn.classList.add('on');D.ta[n].evals[aid]=lv;}
-  saveAll();updateDashboard();buildSynthese();updateNavStatus();updateTACompletion(n);updateAxes();
+  if(!D.ta[n].timestamps)D.ta[n].timestamps={};
+  if(D.ta[n].evals[aid]===lv){delete D.ta[n].evals[aid];delete D.ta[n].timestamps[aid];}
+  else{btn.classList.add('on');D.ta[n].evals[aid]=lv;D.ta[n].timestamps[aid]=new Date().toISOString();}
+  saveAll();updateDashboard();buildSynthese();updateNavStatus();updateTACompletion(n);updateAxes();updateRecent();
 }
 
 function saveTA(n){
   if(!D.ta[n])D.ta[n]={};
+  if(!D.ta[n].timestamps)D.ta[n].timestamps={};
   const de=document.getElementById(`d${n}-date`);
   if(de)D.ta[n].date=de.value;
   const ne=document.getElementById(`d${n}-notes`);
@@ -1343,7 +1351,11 @@ function saveTA(n){
     for(const cv of Object.values(fv.comps))
       for(const at of cv.attendus){
         const el=document.getElementById(`cm-${n}-${at.id}`);
-        if(el)D.ta[n].coms[at.id]=el.value;
+        if(el){
+          const oldVal=D.ta[n].coms[at.id]||'';
+          D.ta[n].coms[at.id]=el.value;
+          if(el.value && el.value!==oldVal) D.ta[n].timestamps[at.id]=new Date().toISOString();
+        }
       }
   saveAll();updateNavStatus();updateTACompletion(n);updateAxes();updateCompletionBar(n);
 }
@@ -1530,6 +1542,64 @@ function updateAxes(){
 }
 
 // ============================================================
+// DERNIÈRES MODIFICATIONS
+// ============================================================
+function updateRecent(){
+  const container=document.getElementById('recent-container');
+  if(!container)return;
+
+  // Collecter tous les attendus avec timestamp
+  const items=[];
+  for(let i=1;i<=10;i++){
+    const t=D.ta[i];
+    if(!t||!t.timestamps)continue;
+    for(const[atId,ts] of Object.entries(t.timestamps)){
+      const lv=t.evals?.[atId];
+      if(!lv||lv==='NE')continue;
+      // Trouver le nom de l'attendu et la compétence
+      let atTxt='',compName='',fHex='#666';
+      for(const fv of Object.values(REF)){
+        for(const[ck,cv] of Object.entries(fv.comps)){
+          const found=cv.attendus.find(a=>a.id===atId);
+          if(found){atTxt=found.txt;compName=ck+' : '+cv.name;fHex=fv.hex;break;}
+        }
+      }
+      items.push({atId,ta:i,lv,ts,atTxt,compName,fHex});
+    }
+  }
+
+  if(!items.length){
+    container.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Aucune modification enregistrée pour le moment.</div>';
+    return;
+  }
+
+  // Trier par date décroissante, garder les 8 dernières
+  items.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const recent=items.slice(0,8);
+
+  const levelColors={TBM:'#d1fae5',MS:'#dcfce7',MC:'#fef3c7',MI:'#fee2e2'};
+  const levelTC={TBM:'#065f46',MS:'#166534',MC:'#92400e',MI:'#991b1b'};
+
+  container.innerHTML=recent.map(r=>{
+    const d=new Date(r.ts);
+    const dateStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    const timeStr=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <div style="min-width:65px;text-align:right;color:var(--text-muted);font-size:10px;line-height:1.4;">${dateStr}<br>${timeStr}</div>
+      <div style="width:6px;height:6px;border-radius:50%;background:${r.fHex};margin-top:5px;flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:var(--text);">${r.atId}</span>
+          <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:${levelColors[r.lv]||'#eee'};color:${levelTC[r.lv]||'#333'};">${r.lv}</span>
+          <span style="font-size:10px;color:var(--text-muted);">TA${r.ta}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.compName}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
 // STATS & SCORES
 // ============================================================
 function getStats(){
@@ -1578,6 +1648,7 @@ function updateDashboard(){
   if(window._radar){window._radar.data.datasets[0].data=Object.values(sc);window._radar.update();}
   updateLine();
   updateAxes();
+  updateRecent();
   for(let i=1;i<=10;i++) applyValidationUI(i);
 }
 
@@ -2185,8 +2256,10 @@ function processIAData(iaData){
   let count=0;
   for(const[taKey,taVal] of Object.entries(iaData.ta)){
     if(!D.ta[taKey]) D.ta[taKey]={date:'',evals:{},coms:{},notes:''};
+    if(!D.ta[taKey].timestamps) D.ta[taKey].timestamps={};
     if(taVal.date) D.ta[taKey].date=taVal.date;
     if(taVal.notes) D.ta[taKey].notes=taVal.notes;
+    const now=new Date().toISOString();
     if(taVal.evals){
       for(const[atId,level] of Object.entries(taVal.evals)){
         let found=false;
@@ -2198,6 +2271,7 @@ function processIAData(iaData){
         }
         if(found && ['TBM','MS','MC','MI','NE'].includes(level)){
           D.ta[taKey].evals[atId]=level;
+          D.ta[taKey].timestamps[atId]=now;
           count++;
         }
       }
