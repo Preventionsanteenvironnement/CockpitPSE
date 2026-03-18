@@ -657,6 +657,7 @@ textarea::placeholder{color:var(--text-muted);opacity:.7;}
       <button class="btn btn-outline" onclick="exportJSON()" title="Exporter les données">⬇ Exporter</button>
       <button class="btn btn-outline" onclick="document.getElementById('file-in').click()" title="Importer des données">⬆ Importer</button>
       <button class="btn btn-outline" onclick="openPromptIA()" title="Générer un prompt IA pour remplir automatiquement" style="border-color:#8b5cf6;color:#8b5cf6;">🤖 Prompt IA</button>
+      <button class="btn btn-outline" onclick="openAuditIA()" title="Audit et correction du JSON par l'IA" style="border-color:#ef4444;color:#ef4444;">🔍 Audit</button>
       <button class="btn btn-outline" onclick="printSynthese()" title="Synthèse 2-3 pages">📄 Synthèse</button><button class="btn btn-gold keep" onclick="window.print()">🖨 Imprimer</button>
     </div>
   </div>
@@ -939,6 +940,38 @@ textarea::placeholder{color:var(--text-muted);opacity:.7;}
       </div>
 
       <button onclick="document.getElementById('modal-ia').style.display='none'" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL AUDIT IA ===== -->
+<div id="modal-audit" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);overflow-y:auto;padding:20px;">
+  <div style="max-width:720px;margin:40px auto;background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#dc2626,#ef4444);color:white;padding:20px 24px;">
+      <h2 style="font-size:1.2rem;font-weight:700;">🔍 Audit JSON — Expert correcteur</h2>
+      <p style="font-size:.82rem;opacity:.8;margin-top:4px;">L'IA analyse, détecte les erreurs et corrige votre journal</p>
+    </div>
+    <div style="padding:24px;">
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <h3 style="font-size:.9rem;font-weight:700;color:#dc2626;margin-bottom:8px;">Mode d'emploi en 3 étapes</h3>
+        <ol style="font-size:.82rem;color:#7f1d1d;line-height:1.8;padding-left:20px;">
+          <li><strong>Copiez le prompt</strong> ci-dessous (votre JSON est déjà inclus dedans)</li>
+          <li><strong>Collez dans ChatGPT ou Claude</strong> — l'IA audite et corrige</li>
+          <li><strong>Récupérez le JSON corrigé</strong> et réimportez-le ici</li>
+        </ol>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <label style="font-size:.85rem;font-weight:600;color:var(--text);">Le prompt d'audit :</label>
+          <button onclick="copyAudit()" style="background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;">📋 Copier le prompt</button>
+        </div>
+        <textarea id="audit-prompt" readonly style="width:100%;height:300px;background:#1a1f3a;color:#e4e6f0;border:none;border-radius:12px;padding:16px;font-family:monospace;font-size:.75rem;line-height:1.6;resize:vertical;"></textarea>
+      </div>
+      <div style="background:#fef9e7;border:1px solid #f5e6a3;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <h3 style="font-size:.9rem;font-weight:700;color:#c07830;margin-bottom:8px;">📥 Réimporter le JSON corrigé</h3>
+        <p style="font-size:.8rem;color:#7a6a4e;margin-bottom:10px;">Après l'audit, importez le JSON corrigé via le bouton Importer en haut, ou collez-le via le Prompt IA.</p>
+      </div>
+      <button onclick="document.getElementById('modal-audit').style.display='none'" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;">Fermer</button>
     </div>
   </div>
 </div>
@@ -2147,6 +2180,102 @@ function openPromptIA(){
   const prompt = generateIAPrompt();
   document.getElementById('ia-prompt').value = prompt;
   document.getElementById('modal-ia').style.display = 'block';
+}
+
+function openAuditIA(){
+  const prompt = generateAuditPrompt();
+  document.getElementById('audit-prompt').value = prompt;
+  document.getElementById('modal-audit').style.display = 'block';
+}
+
+function generateAuditPrompt(){
+  saveAll();
+  const currentJSON = JSON.stringify(D, null, 2);
+
+  // Liste des IDs autorisés
+  let idList = [];
+  for(const fv of Object.values(REF))
+    for(const cv of Object.values(fv.comps))
+      for(const at of cv.attendus)
+        idList.push(at.id);
+
+  // Référentiel pour vérification des commentaires
+  let refMap = '';
+  for(const[fk,fv] of Object.entries(REF)){
+    refMap += `\n## ${fk} — ${fv.label}\n`;
+    for(const[ck,cv] of Object.entries(fv.comps)){
+      refMap += `### ${ck} : ${cv.name}\n`;
+      for(const at of cv.attendus)
+        refMap += `- ${at.id} : "${at.txt}"\n`;
+    }
+  }
+
+  return `Tu vas effectuer un audit complet d'un fichier JSON de journal de formation professionnelle enseignant.
+
+Contexte :
+Ce fichier a été exporté, importé puis modifié plusieurs fois. Je soupçonne des erreurs de structure, de cohérence et d'alignement avec le référentiel des compétences professionnelles. Je veux un contrôle rigoureux, précis et sans approximation.
+
+Référentiel de structure attendu :
+{
+  "ta": {
+    "1": {
+      "date": "YYYY-MM-DD",
+      "evals": { "ID_ATTENDU": "TBM|MS|MC|MI" },
+      "coms": { "ID_ATTENDU": "Commentaire rédigé à la première personne" },
+      "notes": "texte"
+    }
+  },
+  "bilan": "",
+  "bilanNote": ""
+}
+
+Contrôles à effectuer :
+
+1. VALIDITÉ JSON — syntaxe stricte, types de données
+
+2. CONFORMITÉ DE STRUCTURE — présence de ta, date, evals, coms, notes dans chaque TA. Signaler toute clé manquante, vide, inattendue ou mal typée.
+
+3. CONTRÔLE DES IDs — vérifier que les IDs utilisés appartiennent exclusivement à cette liste :
+${idList.join('\n')}
+Signaler tout ID inconnu, mal orthographié ou mal utilisé.
+
+4. COHÉRENCE evals ↔ coms — chaque ID dans evals doit exister dans coms et vice-versa. Aucun orphelin.
+
+5. NIVEAUX — seules valeurs autorisées : TBM, MS, MC, MI. Signaler toute autre valeur.
+
+6. QUALITÉ RÉDACTIONNELLE — chaque commentaire doit être en français correct, à la première personne, professionnel, concret, et correspondre à l'attendu visé. Pas trop vague ni hors sujet.
+
+7. COHÉRENCE DE FOND — dates incohérentes, champs vides, décalages entre évaluation et commentaire, attendus mal associés, commentaires relevant d'un autre attendu, formulations trop générales.
+
+RÉFÉRENTIEL COMPLET (pour vérifier l'alignement des commentaires) :
+${refMap}
+
+SORTIE ATTENDUE en 3 sections exactement :
+1. Problèmes repérés (liste précise et détaillée)
+2. Corrections proposées (ce que tu modifies et pourquoi)
+3. JSON corrigé (strictement valide, sans commentaire, prêt à réimporter)
+
+Règles :
+- Ne supprime rien sans justification
+- Si une information est ambiguë, explique avant de corriger
+- Le JSON corrigé doit être importable directement
+
+══════════════════════════════════════
+JSON À AUDITER :
+══════════════════════════════════════
+
+${currentJSON}`;
+}
+
+function copyAudit(){
+  const txt = document.getElementById('audit-prompt').value;
+  navigator.clipboard.writeText(txt).then(()=>{
+    alert('Prompt d\'audit copié ! Collez-le dans ChatGPT ou Claude.');
+  }).catch(()=>{
+    document.getElementById('audit-prompt').select();
+    document.execCommand('copy');
+    alert('Prompt d\'audit copié !');
+  });
 }
 
 function generateIAPrompt(){
