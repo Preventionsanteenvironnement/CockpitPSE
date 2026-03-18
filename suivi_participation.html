@@ -465,6 +465,11 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
       <input type="file" id="csvF" accept=".csv,.txt" style="display:none" onchange="loadCSV(this)">
     </div>
     <div class="csv-prev" id="csvPrev"></div>
+    <div style="margin:10px 0;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:var(--rs)">
+      <div style="font-size:.72rem;font-weight:700;color:var(--wn);margin-bottom:6px">⚡ Chargement rapide</div>
+      <button class="mbtn pro" onclick="loadFromCockpit()" style="width:100%;padding:8px;font-size:.82rem">📋 Charger mes classes du Cockpit</button>
+      <div style="font-size:.62rem;color:var(--mu);margin-top:4px">Charge automatiquement tous les élèves depuis data_classes_eleves.js<br>AGO1+AGO2 regroupées, GATL1+GATL2 regroupées</div>
+    </div>
     <div class="mact">
       <button class="mbtn g" onclick="closeM('mCSV')">Annuler</button>
       <button class="mbtn s" onclick="dlCSVTpl()">⬇️ Modèle</button>
@@ -502,6 +507,7 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
   </div>
 </div>
 
+<script src="data_classes_eleves.js"></script>
 <script>
 // ════════════════════════════════
 // CONFIG
@@ -1273,6 +1279,48 @@ function doImport(){
 }
 function dlCSVTpl(){
   dlFile('eleves_modele.csv','# classe,prenom,nom\nCAP1,Aya,Benali\nCAP1,Kevin,Faure\nMELEC1,Sofia,Estève\n','text/csv');
+}
+
+// ════════════════════════════════
+// CHARGEMENT COCKPIT (data_classes_eleves.js)
+// ════════════════════════════════
+function loadFromCockpit(){
+  const data = window.DATA_CLASSES_ELEVES;
+  if(!data || !data.length){
+    alert('Données non trouvées. Vérifiez que data_classes_eleves.js est chargé.');
+    return;
+  }
+  // Groupements : AGO1+AGO2 ensemble, GATL1+GATL2 ensemble
+  const groupes = {
+    'B1AGO1':'Seconde AGO','B1AGO2':'Seconde AGO',
+    'B2GATL1':'Première AGO','B2GATL2':'Première AGO',
+    'BTAGO1':'Terminale AGO','BTAGO2':'Terminale AGO',
+    'B1MELEC':'Seconde MELEC','B2MELEC':'Première MELEC','BTMELEC':'Terminale MELEC',
+    'C1CAN':'C1 CAN','C2CAN':'C2 CAN',
+    'C1HORT':'C1 HORT','C2HORT':'C2 HORT',
+    'C1JP':'C1 JP','C2JP':'C2 JP',
+    'C1PSR':'C1 PSR','C2PSR':'C2 PSR',
+    'C1VAN':'C1 VAN','C2VAN':'C2 VAN'
+  };
+  const parsed = data.map(e => ({
+    classe: groupes[e.classe] || e.classe,
+    name: e.prenom + ' ' + e.nom.charAt(0) + '.'
+  }));
+  const newCls = [...new Set(parsed.map(p=>p.classe))].sort();
+  // Demander si on remplace ou ajoute
+  const repl = confirm('Remplacer les élèves existants ?\n\nOK = Remplacer tout\nAnnuler = Ajouter aux existants');
+  if(repl) students = [];
+  parsed.forEach(p => {
+    if(!students.find(s => s.name===p.name && s.classe===p.classe))
+      students.push(mkStu(p.name, p.classe, Date.now()+Math.random()));
+  });
+  newCls.forEach(c => { if(!classes.includes(c)) classes.push(c); });
+  // Supprimer la classe Exemple si elle existe
+  classes = classes.filter(c => c !== 'Exemple');
+  students = students.filter(s => s.classe !== 'Exemple');
+  save(); renderClassBar(); renderList();
+  closeM('mCSV');
+  alert('✅ ' + parsed.length + ' élèves chargés dans ' + newCls.length + ' classes !\n\n' + newCls.join('\n'));
 }
 
 // ════════════════════════════════
