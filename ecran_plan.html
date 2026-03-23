@@ -10,6 +10,29 @@
         #header { height: 80px; background: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
         #class-title { font-size: 2.5rem; font-weight: 900; color: #2c3e50; text-transform: uppercase; letter-spacing: 2px; }
 
+        body.compact-mode #header { height: 52px; }
+        body.compact-mode #class-title { font-size: 1.6rem; letter-spacing: 1px; }
+        body.compact-mode #classroom { padding: 10px; }
+        body.compact-mode #scene { gap: 8px; }
+        body.compact-mode .front-zone { gap: 6px; }
+        body.compact-mode .teacher-marker { display: none; }
+        body.compact-mode .board.horizontal { width: min(78vw, 980px); height: 30px; font-size: 0.88rem; margin: 6px; }
+        body.compact-mode .board.vertical { width: 30px; height: min(68vh, 620px); font-size: 0.82rem; margin: 6px; }
+        body.compact-mode #grid { gap: 10px; padding: 8px; }
+        body.compact-mode .cell { width: 126px; height: 80px; }
+        body.compact-mode .student-name { font-size: 1.3rem; }
+
+        body.ultra-compact #header { display: none; }
+        body.ultra-compact #classroom { padding: 8px; }
+        body.ultra-compact #scene { gap: 6px; }
+        body.ultra-compact .front-zone { gap: 4px; }
+        body.ultra-compact .teacher-marker { display: none; }
+        body.ultra-compact .board.horizontal { width: min(82vw, 940px); height: 26px; font-size: 0.8rem; margin: 0; }
+        body.ultra-compact .board.vertical { width: 26px; height: min(72vh, 560px); font-size: 0.76rem; margin: 0 4px; }
+        body.ultra-compact #grid { gap: 8px; padding: 4px; }
+        body.ultra-compact .cell { width: 116px; height: 72px; border-radius: 10px; }
+        body.ultra-compact .student-name { font-size: 1.15rem; }
+
         /* Salle dynamique */
         #classroom {
             position: relative;
@@ -351,15 +374,31 @@
             const scene = document.getElementById('scene');
             if (!classroom || !scene) return;
 
+            document.body.classList.remove('compact-mode', 'ultra-compact');
             scene.style.transform = 'scale(1)';
+
+            let scale = getSceneScale(classroom, scene);
+            if (scale < 0.92) {
+                document.body.classList.add('compact-mode');
+                scene.style.transform = 'scale(1)';
+                scale = getSceneScale(classroom, scene);
+            }
+            if (scale < 0.92) {
+                document.body.classList.add('ultra-compact');
+                scene.style.transform = 'scale(1)';
+                scale = getSceneScale(classroom, scene);
+            }
+
+            scene.style.transform = `scale(${Math.min(scale, 1)})`;
+        }
+
+        function getSceneScale(classroom, scene) {
             const availableWidth = Math.max(0, classroom.clientWidth - 24);
             const availableHeight = Math.max(0, classroom.clientHeight - 24);
             const neededWidth = scene.scrollWidth;
             const neededHeight = scene.scrollHeight;
-            if (!neededWidth || !neededHeight) return;
-
-            const scale = Math.min(availableWidth / neededWidth, availableHeight / neededHeight, 1);
-            scene.style.transform = `scale(${Math.max(scale, 0.55)})`;
+            if (!neededWidth || !neededHeight) return 1;
+            return Math.min(availableWidth / neededWidth, availableHeight / neededHeight, 1);
         }
 
         window.addEventListener('resize', () => {

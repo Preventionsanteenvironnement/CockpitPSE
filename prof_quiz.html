@@ -553,7 +553,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     function getPresenceEntryForVisitor(visitorId) {
-        return presenceSnapshotData.find(function(entry) {
+        return rawPresenceSnapshotData.find(function(entry) {
             return entry.visitorId === visitorId;
         }) || null;
     }
@@ -578,6 +578,95 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             parts.push(code);
         }
         return parts.join(' · ');
+    }
+
+    function parsePresenceTimestamp(value) {
+        if (!value) return 0;
+        if (typeof value === 'number') return value;
+        if (typeof value.toMillis === 'function') return value.toMillis();
+        if (typeof value.seconds === 'number') return value.seconds * 1000;
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function getActivePresenceEntries() {
+        const now = Date.now();
+        return rawPresenceSnapshotData
+            .filter(function(entry) {
+                const lastSeen = parsePresenceTimestamp(entry.lastSeen || entry.joinedAt);
+                return !lastSeen || (now - lastSeen) <= PRESENCE_STALE_MS;
+            })
+            .sort(function(a, b) {
+                const numeroA = Number(a.numero || 0);
+                const numeroB = Number(b.numero || 0);
+                if (numeroA !== numeroB) return numeroA - numeroB;
+                return parsePresenceTimestamp(a.joinedAt) - parsePresenceTimestamp(b.joinedAt);
+            });
+    }
+
+    function renderPresenceSnapshot() {
+        playerCount = 0;
+        presenceSnapshotData = getActivePresenceEntries();
+        playerCount = presenceSnapshotData.length;
+        document.getElementById('presence-count').textContent = playerCount;
+        document.getElementById('main-counter').textContent = playerCount + ' eleve(s) actif(s)';
+
+        const list = document.getElementById('presence-list');
+        list.innerHTML = '';
+        presenceSnapshotData.forEach(function(data) {
+            const item = document.createElement('div');
+            item.className = 'presence-item';
+            const left = document.createElement('div');
+            left.className = 'presence-left';
+
+            const main = document.createElement('div');
+            main.className = 'presence-pseudo';
+            main.textContent = getProfDisplayLabel(data);
+
+            const team = getTeamForVisitor(data.visitorId);
+            if (team) {
+                const teamBadge = document.createElement('span');
+                teamBadge.style.fontSize = '0.6rem';
+                teamBadge.style.padding = '1px 4px';
+                teamBadge.style.borderRadius = '3px';
+                teamBadge.style.background = team.teamColor;
+                teamBadge.style.color = 'white';
+                teamBadge.style.marginLeft = '4px';
+                teamBadge.textContent = team.teamEmoji;
+                main.appendChild(teamBadge);
+            }
+
+            const switches = data.tabSwitches || 0;
+            if (switches > 0) {
+                const alertBadge = document.createElement('span');
+                alertBadge.style.color = '#ef4444';
+                alertBadge.style.fontSize = '0.7rem';
+                alertBadge.style.marginLeft = '4px';
+                alertBadge.title = switches + ' sortie(s) de page';
+                alertBadge.textContent = '⚠️' + switches;
+                main.appendChild(alertBadge);
+            }
+
+            left.appendChild(main);
+            const meta = getProfDisplayMeta(data);
+            if (meta) {
+                const metaEl = document.createElement('div');
+                metaEl.className = 'presence-meta';
+                metaEl.textContent = meta;
+                left.appendChild(metaEl);
+            }
+
+            const num = document.createElement('span');
+            num.className = 'presence-num';
+            num.textContent = 'n°' + (data.numero || '?');
+
+            item.appendChild(left);
+            item.appendChild(num);
+            list.appendChild(item);
+        });
+
+        if (gameMode !== 'solo') updateTeamOptions();
+        if (currentPhase === 'question') updateResponseDisplay();
     }
 
     function updateStudentNameStatus() {
@@ -720,11 +809,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let isPaused = false;
     let pausedTimeRemaining = 0;
     let presenceSnapshotData = [];
+    let rawPresenceSnapshotData = [];
+    let presenceRefreshTimer = null;
     let currentPhase = 'lobby';
     let shuffleEnabled = false;
     let autoAdvanceTimer = null; // timer for auto-advance after results
     let inCorrectionMode = false;
     let correctionIndex = -1;
+    const PRESENCE_STALE_MS = 45000;
 
     // === GAME MODE (Solo / Equipe / Battle / Duo) ===
     let gameMode = 'solo';
@@ -1318,72 +1410,17 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (!currentSessionId) return;
         if (unsubPresence) unsubPresence();
         if (unsubReponses) unsubReponses();
+        if (presenceRefreshTimer) clearInterval(presenceRefreshTimer);
 
         const qPres = query(collection(db, "quiz_live_presence"), where("sessionId", "==", currentSessionId));
         unsubPresence = onSnapshot(qPres, (snap) => {
-            playerCount = snap.size;
-            document.getElementById('presence-count').textContent = playerCount;
-            document.getElementById('main-counter').textContent = playerCount + ' eleve(s) connecte(s)';
-
-            presenceSnapshotData = [];
-            const list = document.getElementById('presence-list');
-            list.innerHTML = '';
+            rawPresenceSnapshotData = [];
             snap.forEach(d => {
-                const data = d.data();
-                presenceSnapshotData.push(data);
-                const item = document.createElement('div');
-                item.className = 'presence-item';
-                const left = document.createElement('div');
-                left.className = 'presence-left';
-
-                const main = document.createElement('div');
-                main.className = 'presence-pseudo';
-                main.textContent = getProfDisplayLabel(data);
-
-                const team = getTeamForVisitor(data.visitorId);
-                if (team) {
-                    const teamBadge = document.createElement('span');
-                    teamBadge.style.fontSize = '0.6rem';
-                    teamBadge.style.padding = '1px 4px';
-                    teamBadge.style.borderRadius = '3px';
-                    teamBadge.style.background = team.teamColor;
-                    teamBadge.style.color = 'white';
-                    teamBadge.style.marginLeft = '4px';
-                    teamBadge.textContent = team.teamEmoji;
-                    main.appendChild(teamBadge);
-                }
-
-                const switches = data.tabSwitches || 0;
-                if (switches > 0) {
-                    const alertBadge = document.createElement('span');
-                    alertBadge.style.color = '#ef4444';
-                    alertBadge.style.fontSize = '0.7rem';
-                    alertBadge.style.marginLeft = '4px';
-                    alertBadge.title = switches + ' sortie(s) de page';
-                    alertBadge.textContent = '⚠️' + switches;
-                    main.appendChild(alertBadge);
-                }
-
-                left.appendChild(main);
-                const meta = getProfDisplayMeta(data);
-                if (meta) {
-                    const metaEl = document.createElement('div');
-                    metaEl.className = 'presence-meta';
-                    metaEl.textContent = meta;
-                    left.appendChild(metaEl);
-                }
-
-                const num = document.createElement('span');
-                num.className = 'presence-num';
-                num.textContent = 'n°' + (data.numero || '?');
-
-                item.appendChild(left);
-                item.appendChild(num);
-                list.appendChild(item);
+                rawPresenceSnapshotData.push(d.data());
             });
-            // Update team options chips when students connect/disconnect
-            if (gameMode !== 'solo') { updateTeamOptions(); }
+            renderPresenceSnapshot();
         });
+        presenceRefreshTimer = setInterval(renderPresenceSnapshot, 5000);
 
         const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));
         unsubReponses = onSnapshot(qResp, (snap) => {
@@ -1845,7 +1882,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const studentMap = {};
 
         // Init from presence
-        presenceSnapshotData.forEach(p => {
+        rawPresenceSnapshotData.forEach(p => {
             studentMap[p.visitorId] = {
                 visitorId: p.visitorId,
                 pseudo: p.pseudo || 'Eleve',

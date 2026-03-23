@@ -779,6 +779,7 @@
     let heartbeatInterval = null;
     let pendingFocusWarning = false;
     let lastFocusLossAt = 0;
+    let hiddenAt = 0;
     let unsubConfig = null;
 
     // --- Scoring ---
@@ -788,6 +789,10 @@
     let scoreVisible = false;
 
     const visitorId = localStorage.getItem('quiz_live_visitorId') || generateVisitorId();
+    const SESSION_PSEUDO_KEY = 'quiz_live_activePseudo';
+    const SESSION_CODE_KEY = 'quiz_live_activeSessionCode';
+    const SESSION_ELEVE_KEY = 'quiz_live_activeEleveCode';
+    const FOCUS_LOSS_MIN_MS = 2500;
     localStorage.setItem('quiz_live_visitorId', visitorId);
 
     function generateVisitorId() {
@@ -835,13 +840,33 @@
 
     function setIdentityChip() {
         const chip = document.getElementById('identity-chip');
-        if (!currentPseudo) {
-            chip.textContent = 'Non connecté';
-            return;
-        }
-        chip.textContent = currentEleveCode
+        let label = currentPseudo
             ? currentPseudo + ' · ' + currentEleveCode
             : currentPseudo;
+        if (!currentPseudo) {
+            label = navigator.onLine ? 'Non connecté' : 'Hors ligne';
+        } else if (!currentEleveCode) {
+            label = currentPseudo;
+        }
+        if (!navigator.onLine) {
+            label += currentPseudo ? ' · Hors ligne' : '';
+            chip.style.color = '#fde68a';
+        } else {
+            chip.style.color = '#e2e8f0';
+        }
+        chip.textContent = label;
+    }
+
+    function persistActiveIdentity() {
+        sessionStorage.setItem(SESSION_PSEUDO_KEY, currentPseudo || '');
+        sessionStorage.setItem(SESSION_CODE_KEY, currentSessionCode || '');
+        sessionStorage.setItem(SESSION_ELEVE_KEY, currentEleveCode || '');
+    }
+
+    function clearActiveIdentity() {
+        sessionStorage.removeItem(SESSION_PSEUDO_KEY);
+        sessionStorage.removeItem(SESSION_CODE_KEY);
+        sessionStorage.removeItem(SESSION_ELEVE_KEY);
     }
 
     function renderTeamPill(elementId) {
@@ -905,6 +930,7 @@
         currentShuffle = null;
         currentTeams = [];
         currentPhase = 'join';
+        clearActiveIdentity();
         setIdentityChip();
     }
 
@@ -985,6 +1011,10 @@
         const pseudo = String(document.getElementById('pseudo').value || '').trim();
         const eleveCode = normalizeCode(document.getElementById('eleve-code').value || localStorage.getItem('userCode'));
 
+        if (!navigator.onLine) {
+            showToast('Connexion internet requise pour rejoindre le quiz.', 'error');
+            return;
+        }
         if (!code) {
             showToast('Entre le code de session affiché au tableau.', 'error');
             return;
@@ -1011,6 +1041,7 @@
             currentSessionCode = code;
             currentPseudo = pseudo;
             currentEleveCode = eleveCode;
+            persistActiveIdentity();
 
             // Ne pas sauvegarder le pseudo (aléatoire à chaque session)
             if (eleveCode) localStorage.setItem('userCode', eleveCode);
@@ -1528,7 +1559,7 @@
     }
 
     function shouldTrackFocusLoss() {
-        return !!currentSessionId && (currentPhase === 'question' || currentPhase === 'results');
+        return !!currentSessionId && currentPhase === 'question';
     }
 
     async function reportFocusLoss() {
@@ -1565,18 +1596,27 @@
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
-            reportFocusLoss();
-        } else if (document.visibilityState === 'visible') {
+            hiddenAt = shouldTrackFocusLoss() ? Date.now() : 0;
+            return;
+        }
+        if (document.visibilityState === 'visible') {
+            const hiddenDuration = hiddenAt ? (Date.now() - hiddenAt) : 0;
+            hiddenAt = 0;
+            if (hiddenDuration >= FOCUS_LOSS_MIN_MS) {
+                reportFocusLoss();
+            }
             handleReturnToPage();
         }
     });
 
-    window.addEventListener('blur', () => {
-        reportFocusLoss();
+    window.addEventListener('online', () => {
+        setIdentityChip();
+        showToast('Connexion rétablie.', 'success');
     });
 
-    window.addEventListener('focus', () => {
-        handleReturnToPage();
+    window.addEventListener('offline', () => {
+        setIdentityChip();
+        showToast('Connexion perdue. Les envois peuvent échouer tant que le réseau n\'est pas revenu.', 'warn');
     });
 
     window.joinQuiz = joinQuiz;
@@ -1595,11 +1635,13 @@
     function prefillFromStorage() {
         const params = new URLSearchParams(window.location.search);
         const codeParam = normalizeCode(params.get('code'));
-        const savedCode = normalizeCode(localStorage.getItem('userCode') || '');
+        const savedSessionCode = normalizeCode(sessionStorage.getItem(SESSION_CODE_KEY) || '');
+        const savedPseudo = String(sessionStorage.getItem(SESSION_PSEUDO_KEY) || '').trim();
+        const savedCode = normalizeCode(sessionStorage.getItem(SESSION_ELEVE_KEY) || localStorage.getItem('userCode') || '');
 
         if (codeParam) document.getElementById('session-code').value = codeParam;
-        // Pseudo toujours aléatoire à chaque session (pas de restauration)
-        document.getElementById('pseudo').value = generateRandomPseudo();
+        else if (savedSessionCode) document.getElementById('session-code').value = savedSessionCode;
+        document.getElementById('pseudo').value = savedPseudo || generateRandomPseudo();
         if (savedCode) document.getElementById('eleve-code').value = savedCode;
     }
 
