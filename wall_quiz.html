@@ -408,6 +408,9 @@
     let wallTeams = [];
     let wallQuestions = [];
     let wallStudentQuizUrl = null;
+    let rawPresenceSnapshotData = [];
+    let presenceRefreshTimer = null;
+    const PRESENCE_STALE_MS = 45000;
 
     const STUDENT_QUIZ_PATHS = ['/eleve_quiz.html', '/PSE/eleve_quiz.html'];
 
@@ -432,6 +435,40 @@
         if (typeof value.seconds === 'number') return value.seconds * 1000;
         const parsed = Date.parse(value);
         return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function getActiveWallPresenceEntries() {
+        const now = Date.now();
+        return rawPresenceSnapshotData
+            .filter((entry) => {
+                const lastSeen = parseWallTimestamp(entry.lastSeen || entry.joinedAt);
+                return !lastSeen || (now - lastSeen) <= PRESENCE_STALE_MS;
+            })
+            .sort((a, b) => {
+                const numeroA = Number(a.numero || 0);
+                const numeroB = Number(b.numero || 0);
+                if (numeroA !== numeroB) return numeroA - numeroB;
+                return parseWallTimestamp(a.joinedAt) - parseWallTimestamp(b.joinedAt);
+            });
+    }
+
+    function renderWallPresenceSnapshot() {
+        const activeEntries = getActiveWallPresenceEntries();
+        playerCount = activeEntries.length;
+        document.getElementById('wall-counter').textContent = playerCount + ' actif(s)';
+
+        const container = document.getElementById('wall-players');
+        container.innerHTML = '';
+        activeEntries.forEach((entry) => {
+            const badge = document.createElement('div');
+            badge.className = 'player-badge';
+            badge.textContent = entry.pseudo;
+            container.appendChild(badge);
+        });
+
+        if (lastPhase === 'question') {
+            updateWallQuestionCounter();
+        }
     }
 
     function stopWallTimer() {
@@ -546,6 +583,7 @@
     // === LISTENERS ===
     function updateLobbyTeams() {
         const container = document.getElementById('wall-lobby-teams');
+        const activeVisitorIds = new Set(getActiveWallPresenceEntries().map(entry => entry.visitorId));
         if (wallGameMode === 'solo' || wallTeams.length === 0) {
             container.style.display = 'none';
             document.getElementById('wall-players').style.display = 'flex';
@@ -565,7 +603,7 @@
 
             const group = document.createElement('div');
             group.className = 'lobby-team-group';
-            t.members.forEach(m => {
+            t.members.filter(m => activeVisitorIds.has(m.visitorId)).forEach(m => {
                 const badge = document.createElement('div');
                 badge.className = 'player-badge';
                 badge.style.borderColor = t.teamColor;
@@ -577,6 +615,7 @@
     }
 
     function startWallListening() {
+        if (presenceRefreshTimer) clearInterval(presenceRefreshTimer);
         unsubConfig = onSnapshot(doc(db, "quiz_live_config", "global"), (snap) => {
             if (!snap.exists()) return;
             const d = snap.data();
@@ -637,22 +676,15 @@
         // Presence
         const qPres = query(collection(db, "quiz_live_presence"), where("sessionId", "==", currentSessionId));
         unsubPresence = onSnapshot(qPres, (snap) => {
-            playerCount = snap.size;
-            document.getElementById('wall-counter').textContent = playerCount + ' connecte(s)';
-
-            const container = document.getElementById('wall-players');
-            container.innerHTML = '';
-            snap.forEach(d => {
-                const badge = document.createElement('div');
-                badge.className = 'player-badge';
-                badge.textContent = d.data().pseudo;
-                container.appendChild(badge);
-            });
-
-            if (lastPhase === 'question') {
-                updateWallQuestionCounter();
-            }
+            rawPresenceSnapshotData = [];
+            snap.forEach(d => rawPresenceSnapshotData.push(d.data()));
+            renderWallPresenceSnapshot();
+            if (lastPhase === 'lobby') updateLobbyTeams();
         });
+        presenceRefreshTimer = setInterval(() => {
+            renderWallPresenceSnapshot();
+            if (lastPhase === 'lobby') updateLobbyTeams();
+        }, 5000);
 
         // Reponses
         const qResp = query(collection(db, "quiz_live_reponses"), where("sessionId", "==", currentSessionId));

@@ -42,7 +42,17 @@
         #room-container {
             display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px;
             background: #1a1a1a; border-radius: 20px; border: 1px solid #333; transition: 0.3s;
+            transform-origin: center center;
         }
+
+        #room-container.compact-preview { gap: 12px; padding: 12px; }
+        #room-container.compact-preview .teacher-marker { display: none; }
+        #room-container.compact-preview .front-zone { gap: 8px; }
+        #room-container.compact-preview .board.horizontal { height: 26px; margin: 8px 0; font-size: 0.82rem; }
+        #room-container.compact-preview .board.vertical { width: 26px; font-size: 0.82rem; }
+        #room-container.compact-preview #grid { gap: 10px; }
+        #room-container.compact-preview .desk { width: 100px; height: 64px; }
+        #room-container.compact-preview .chip { font-size: 0.78rem; padding: 5px 10px; }
         
         .front-zone {
             display: flex;
@@ -472,6 +482,7 @@
             if(pos === 'bottom') { container.style.flexDirection = 'column-reverse'; board.classList.add('horizontal'); }
             if(pos === 'left') { container.style.flexDirection = 'row'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
             if(pos === 'right') { container.style.flexDirection = 'row-reverse'; frontZone.classList.add('vertical'); board.classList.add('vertical'); }
+            requestAnimationFrame(fitProfessorPreview);
         };
 
         function initStructure(n) { for(let i=0; i<n; i++) if(state.structure[i] === undefined) state.structure[i] = 1; }
@@ -516,7 +527,39 @@
                 }
                 grid.appendChild(cell);
             }
+            requestAnimationFrame(fitProfessorPreview);
         };
+
+        function getProfessorPreviewScale() {
+            const main = document.getElementById('main');
+            const room = document.getElementById('room-container');
+            if (!main || !room) return 1;
+            const availableWidth = Math.max(0, main.clientWidth - 24);
+            const availableHeight = Math.max(0, main.clientHeight - 24);
+            const neededWidth = room.scrollWidth;
+            const neededHeight = room.scrollHeight;
+            if (!neededWidth || !neededHeight) return 1;
+            return Math.min(availableWidth / neededWidth, availableHeight / neededHeight, 1);
+        }
+
+        function fitProfessorPreview() {
+            const room = document.getElementById('room-container');
+            if (!room) return;
+
+            room.classList.remove('compact-preview');
+            room.style.transform = 'scale(1)';
+            let scale = getProfessorPreviewScale();
+
+            if (scale < 0.92) {
+                room.classList.add('compact-preview');
+                room.style.transform = 'scale(1)';
+                scale = getProfessorPreviewScale();
+            }
+
+            room.style.transform = `scale(${Math.min(scale, 1)})`;
+        }
+
+        window.addEventListener('resize', () => requestAnimationFrame(fitProfessorPreview));
 
         window.loadClass = () => {
             const cls = document.getElementById('classSelect').value;
