@@ -164,6 +164,18 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
 .crit.bad   .cb{background:rgba(248,113,113,.15);color:var(--bd)}
 .crit.grave .cb{background:rgba(255,59,48,.18);color:var(--gv)}
 
+/* ══ MINI-INCIDENTS ══ */
+.mi-row{padding:2px 8px 4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mi-tag{display:inline-flex;align-items:center;gap:2px;font-size:.6rem;font-weight:700;
+  padding:2px 7px;border-radius:99px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.mi-tag.on{opacity:1}.mi-tag:not(.on){opacity:.35;border-style:dashed}
+.mi-add{font-size:.65rem;color:var(--ac);cursor:pointer;padding:2px 5px;border:1px dashed var(--br);border-radius:99px}
+.mi-sel{position:absolute;z-index:50;background:var(--cd);border:1px solid var(--br);border-radius:var(--rs);
+  padding:5px;display:flex;flex-wrap:wrap;gap:3px;max-width:260px;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.mi-opt{font-size:.62rem;padding:3px 8px;border-radius:99px;cursor:pointer;border:1px solid var(--br);
+  background:var(--sf);color:var(--tx);white-space:nowrap}
+.mi-opt:active{opacity:.7}
+
 /* ══ COMMENT ══ */
 .cmrow{display:none;padding:0 8px 7px}
 .cmrow.open{display:block}
@@ -516,12 +528,23 @@ const CRIT=[
   {id:'plan', icon:'🪑',label:'Plan\nclasse',states:['ok','bad'],       pen:{ok:0,bad:1}},
   {id:'mat',  icon:'🎒',label:'Matériel',   states:['ok','bad'],       pen:{ok:0,bad:1}},
   {id:'ecrit',icon:'✍️',label:'Écriture',   states:['ok','bad'],       pen:{ok:0,bad:1}},
-  {id:'bav',  icon:'🤫',label:'Bavardage',  states:['ok','rem','warn1','warn2','bad'],
-                                             pen:{ok:0,rem:0,warn1:0,warn2:0,bad:1}},
+  {id:'bav',  icon:'🤫',label:'Bavardage',  states:['_counter'], counter:true, per:3,
+                                             pen:{}},
   {id:'phone',icon:'📵',label:'Portable',   states:['ok','warn1','bad','grave'],
                                              pen:{ok:0,warn1:0,bad:1,grave:2}},
 ];
 const BADGE={ok:'✓',bad:'✕−1',rem:'📝',warn1:'⚠×1',warn2:'⚠×2',grave:'⛔−2'};
+const MINI_INC=[
+  {id:'lever',  label:'Se lever',          icon:'🪑', color:'#f59e0b'},
+  {id:'moq',    label:'Moquerie',          icon:'😏', color:'#f472b6'},
+  {id:'vulg',   label:'Vulgarité',         icon:'🤬', color:'#ef4444'},
+  {id:'imppro', label:'Propos impertinents',icon:'💬', color:'#fb923c'},
+  {id:'impatt', label:'Attitude impertinente',icon:'😤',color:'#f97316'},
+  {id:'dort',   label:'Dort',              icon:'😴', color:'#8b5cf6'},
+  {id:'chew',   label:'Chewing-gum',       icon:'🫧', color:'#06b6d4'},
+  {id:'refus',  label:'Refus de travailler',icon:'🚫', color:'#dc2626'},
+  {id:'cadre',  label:'Transgression du cadre',icon:'⚠️',color:'#eab308'},
+];
 const SESSIONS=4;
 const BONUS_LEVELS=[
   {id:'encour', label:'👍 Encouragement', color:'rgba(52,211,153,.15)', tc:'var(--ok)'},
@@ -541,6 +564,12 @@ let defiGoal  = parseFloat(localStorage.getItem(LS.defi)||'0.75');
 let sessDates = lsGet(LS.sessDates) || {};
 let sessCfg   = lsGet(LS.sessCfg)  || {start:1, dates:Array(SESSIONS).fill('')};
 
+// migration: ajouter miniInc + convertir bavardage string→number
+students.forEach(s=>s.sessions.forEach(ss=>{
+  if(!ss.miniInc)ss.miniInc=[];
+  if(typeof ss.bav==='string') ss.bav=(ss.bav==='bad'?3:0);
+}));
+
 let curSess=sessCfg.start||1, curCls='', defiOpen=false;
 let ctxId=null, _csvParsed=null, _genCb=null, _bonusSid=null, _bonusLvl=null;
 
@@ -554,9 +583,9 @@ function sampleStudents(){
 function mkStu(name,classe,id){
   return{id,name,classe,
     sessions:Array.from({length:SESSIONS},()=>({
-      ...Object.fromEntries(CRIT.map(c=>[c.id,'ok'])),
+      ...Object.fromEntries(CRIT.map(c=>[c.id,c.counter?0:'ok'])),
       oral:false, absent:false, incident:false,
-      bonus:null, bonusMsg:''
+      bonus:null, bonusMsg:'', miniInc:[]
     })),
     comments:Array(SESSIONS).fill(''),
     confidential:Array(SESSIONS).fill(''),
@@ -575,7 +604,10 @@ function getScore(stu,si){
   const sess=stu.sessions[si];
   if(sess.absent) return null; // null = ABS
   if(sess.incident) return 0;
-  const p=CRIT.reduce((a,c)=>a+(c.pen[sess[c.id]]||0),0);
+  const p=CRIT.reduce((a,c)=>{
+    if(c.counter){const n=typeof sess[c.id]==='number'?sess[c.id]:0;return a+Math.floor(n/c.per);}
+    return a+(c.pen[sess[c.id]]||0);
+  },0);
   const bonus=sess.oral&&p>0?1:0;
   return Math.min(5,Math.max(0,5-p+bonus));
 }
@@ -609,7 +641,8 @@ function getPatterns(stu){
   return CRIT.filter(c=>{
     let str=0;
     for(let i=curSess-1;i>=0;i--){
-      if(!stu.sessions[i].absent&&(stu.sessions[i][c.id]==='bad'||stu.sessions[i][c.id]==='grave'))str++;
+      const v=stu.sessions[i][c.id];
+      if(!stu.sessions[i].absent&&(c.counter?(typeof v==='number'&&v>=c.per):(v==='bad'||v==='grave')))str++;
       else break;
     }
     return str>=2;
@@ -762,6 +795,16 @@ function buildCard(stu){
   }).join('');
 
   const critH=CRIT.map(c=>{
+    if(c.counter){
+      const n=typeof sess[c.id]==='number'?sess[c.id]:0;
+      const pen=Math.floor(n/c.per);
+      const cls=pen===0?'ok':pen<=1?'warn1':pen<=2?'warn2':pen<=3?'bad':'grave';
+      return`<div class="crit ${cls}" onclick="cycleCrit(${stu.id},'${c.id}')">
+        <div class="ci">${c.icon}</div>
+        <div class="cl">${c.label}</div>
+        <div class="cb">${n===0?'✓':pen>0?'×'+n+' −'+pen:'×'+n}</div>
+      </div>`;
+    }
     const st=sess[c.id];
     return`<div class="crit ${st}" onclick="cycleCrit(${stu.id},'${c.id}')">
       <div class="ci">${c.icon}</div>
@@ -814,6 +857,10 @@ function buildCard(stu){
       <textarea class="cminput" rows="2" placeholder="Note rapide…"
         onchange="saveCm(${stu.id},this.value)">${stu.comments[si]||''}</textarea>
     </div>
+    <div class="mi-row" id="mi-${stu.id}">
+      ${(sess.miniInc||[]).map(id=>{const m=MINI_INC.find(x=>x.id===id);return m?`<span class="mi-tag on" style="background:${m.color}22;color:${m.color};border:1px solid ${m.color}55" onclick="toggleMiniInc(${stu.id},'${m.id}')">${m.icon} ${m.label} ✕</span>`:''}).join('')}
+      <span class="mi-add" onclick="openMiniSel(event,${stu.id})">+ incident</span>
+    </div>
     <div class="arow">
       <button class="abtn" onclick="toggleCm(${stu.id})">✏️</button>
       <button class="abtn ${sess.absent?'abs-on':''}" onclick="toggleAbsent(${stu.id})">
@@ -841,8 +888,16 @@ function cycleCrit(sid,cid){
   if(stu.sessions[curSess-1].absent) return;
   const crit=CRIT.find(c=>c.id===cid);
   const si=curSess-1;
-  const states=crit.states;
-  stu.sessions[si][cid]=states[(states.indexOf(stu.sessions[si][cid])+1)%states.length];
+  if(crit.counter){
+    // Compteur bavardage : +1 par clic, max = 5*per (=15 → -5 = 0/5), reset après
+    const max=5*crit.per;
+    let n=(typeof stu.sessions[si][cid]==='number')?stu.sessions[si][cid]:0;
+    n=n>=max?0:n+1;
+    stu.sessions[si][cid]=n;
+  }else{
+    const states=crit.states;
+    stu.sessions[si][cid]=states[(states.indexOf(stu.sessions[si][cid])+1)%states.length];
+  }
   save(); refreshCard(stu);
 }
 function toggleOral(e,sid){
@@ -856,6 +911,43 @@ function toggleAbsent(sid){
   const si=curSess-1;
   stu.sessions[si].absent=!stu.sessions[si].absent;
   save(); refreshCard(stu);
+}
+
+// ════════════════════════════════
+// MINI-INCIDENTS
+// ════════════════════════════════
+let _miPop=null;
+function closeMiniSel(){if(_miPop){_miPop.remove();_miPop=null;}}
+document.addEventListener('click',e=>{if(_miPop&&!_miPop.contains(e.target))closeMiniSel();});
+
+function toggleMiniInc(sid,incId){
+  const stu=students.find(s=>s.id===sid);
+  const si=curSess-1;
+  if(!stu.sessions[si].miniInc) stu.sessions[si].miniInc=[];
+  const arr=stu.sessions[si].miniInc;
+  const idx=arr.indexOf(incId);
+  if(idx>=0) arr.splice(idx,1); else arr.push(incId);
+  save(); refreshCard(stu); closeMiniSel();
+}
+
+function openMiniSel(ev,sid){
+  ev.stopPropagation(); closeMiniSel();
+  const stu=students.find(s=>s.id===sid);
+  const si=curSess-1;
+  const active=stu.sessions[si].miniInc||[];
+  const pop=document.createElement('div');
+  pop.className='mi-sel';
+  pop.innerHTML=MINI_INC.map(m=>{
+    const on=active.includes(m.id);
+    return`<span class="mi-opt" style="${on?`background:${m.color}33;color:${m.color};border-color:${m.color}`:''}"
+      onclick="event.stopPropagation();toggleMiniInc(${sid},'${m.id}')">${m.icon} ${m.label}${on?' ✓':''}</span>`;
+  }).join('');
+  const rect=ev.target.getBoundingClientRect();
+  pop.style.position='fixed';
+  pop.style.left=Math.min(rect.left,window.innerWidth-270)+'px';
+  pop.style.top=(rect.bottom+4)+'px';
+  document.body.appendChild(pop);
+  _miPop=pop;
 }
 
 // ════════════════════════════════
