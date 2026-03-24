@@ -1245,9 +1245,12 @@ function parseCSV(file){
   const r=new FileReader();
   r.onload=e=>{
     const lines=e.target.result.split(/\r?\n/).filter(l=>l.trim()&&!l.startsWith('#'));
+    // Auto-détection séparateur (; ou ,) + suppression ligne d'en-tête
+    const sep=lines[0]&&lines[0].includes(';')?';':',';
+    const filtered=lines.filter(l=>!/^classe[;,]/i.test(l.trim()));
     const parsed=[];let errs=0;
-    lines.forEach(l=>{
-      const p=l.split(',').map(s=>s.trim());
+    filtered.forEach(l=>{
+      const p=l.split(sep).map(s=>s.trim());
       if(p.length>=3) parsed.push({classe:p[0],name:p[1]+' '+p[2]});
       else if(p.length===2) parsed.push({classe:p[0],name:p[1]});
       else errs++;
