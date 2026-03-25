@@ -875,7 +875,9 @@ function buildCard(stu){
   return card;
 }
 
+function touchSess(stu){stu.sessions[curSess-1]._ts=Date.now();}
 function refreshCard(stu){
+  touchSess(stu);
   const old=document.getElementById('sc-'+stu.id);
   if(old) old.replaceWith(buildCard(stu));
   updateThermo();
@@ -1464,16 +1466,102 @@ function importJSON(inp){
     try{
       const data=JSON.parse(e.target.result);
       if(!data.students)throw new Error();
-      if(!confirm(`Importer ${data.students.length} élève(s) depuis le ${data.exportDateFR||'?'} ?\nDonnées actuelles remplacées.`))return;
-      students=data.students; classes=data.classes||[];
-      sessDates=data.sessDates||{}; sessCfg=data.sessCfg||{start:1,dates:Array(SESSIONS).fill('')};
-      defiGoal=data.defiGoal||0.75;
-      curCls=data.classe||'';
-      save();render();closeM('mImpJSON');
-      alert('✅ Import réussi !');
-    }catch{alert('❌ Fichier JSON invalide.');}
+      const nb=data.students.length;
+      const dt=data.exportDateFR||'?';
+      const mode=prompt(
+        `📂 ${nb} élève(s) depuis le ${dt}\n\nTaper 1 ou 2 :\n\n1 — REMPLACER (tout écraser)\n2 — FUSIONNER (garder les deux, version la plus récente gagne)\n\nAnnuler pour annuler.`
+      );
+      if(!mode) return;
+      if(mode.trim()==='1'){
+        // Remplacement complet
+        students=data.students; classes=data.classes||[];
+        sessDates=data.sessDates||{}; sessCfg=data.sessCfg||{start:1,dates:Array(SESSIONS).fill('')};
+        defiGoal=data.defiGoal||0.75; curCls=data.classe||'';
+        save();render();closeM('mImpJSON');
+        alert('✅ Import (remplacement) réussi !');
+      }else if(mode.trim()==='2'){
+        // Fusion intelligente
+        const stats=mergeData(data);
+        save();render();closeM('mImpJSON');
+        alert(`✅ Fusion réussie !\n\n• ${stats.added} élève(s) ajouté(s)\n• ${stats.merged} élève(s) fusionné(s)\n• ${stats.kept} séance(s) mises à jour`);
+      }else{
+        alert('Choix invalide. Taper 1 ou 2.');
+      }
+    }catch(err){alert('❌ Fichier JSON invalide.\n'+err.message);}
   };
   r.readAsText(file,'UTF-8');
+}
+
+function mergeData(data){
+  const incoming=data.students||[];
+  const stats={added:0,merged:0,kept:0};
+
+  // Fusionner les classes
+  const inCls=data.classes||[];
+  inCls.forEach(c=>{if(!classes.includes(c)) classes.push(c);});
+
+  // Fusionner sessDates par classe (garder la plus récente si conflit)
+  const inDates=data.sessDates||{};
+  Object.keys(inDates).forEach(cls=>{
+    if(!sessDates[cls]) sessDates[cls]=inDates[cls];
+  });
+
+  // Fusionner élèves
+  incoming.forEach(inc=>{
+    // Trouver l'élève local par nom + classe
+    const local=students.find(s=>s.name===inc.name && s.classe===inc.classe);
+    if(!local){
+      // Nouvel élève → ajouter
+      inc.id=students.length?Math.max(...students.map(s=>s.id))+1:1;
+      students.push(inc);
+      stats.added++;
+      return;
+    }
+    // Élève existant → fusionner séance par séance
+    stats.merged++;
+    for(let si=0;si<SESSIONS;si++){
+      const lSess=local.sessions[si];
+      const iSess=inc.sessions[si];
+      if(!iSess) continue;
+      const lTs=lSess._ts||0;
+      const iTs=iSess._ts||0;
+
+      // Si la séance importée est plus récente, on la prend
+      if(iTs>lTs){
+        local.sessions[si]=iSess;
+        stats.kept++;
+      }
+      // Si la locale n'a jamais été touchée et l'importée oui
+      else if(lTs===0 && iTs===0){
+        // Les deux non modifiées — vérifier si l'importée a du contenu
+        const iHasData=iSess.absent||iSess.incident||iSess.oral||
+          CRIT.some(c=>iSess[c.id]!=='ok')||(inc.comments&&inc.comments[si]);
+        const lHasData=lSess.absent||lSess.incident||lSess.oral||
+          CRIT.some(c=>lSess[c.id]!=='ok')||(local.comments&&local.comments[si]);
+        if(iHasData&&!lHasData){
+          local.sessions[si]=iSess;
+          stats.kept++;
+        }
+      }
+      // Fusionner commentaires si vide localement
+      if(inc.comments&&inc.comments[si]&&(!local.comments[si])){
+        local.comments[si]=inc.comments[si];
+      }
+      if(inc.confidential&&inc.confidential[si]&&(!local.confidential[si])){
+        local.confidential[si]=inc.confidential[si];
+      }
+    }
+    // Fusionner contacts et signalements (ajouter ceux qu'on n'a pas)
+    (inc.contacts||[]).forEach(c=>{
+      if(!local.contacts.some(lc=>lc.date===c.date&&lc.note===c.note))
+        local.contacts.push(c);
+    });
+    (inc.signalements||[]).forEach(s=>{
+      if(!local.signalements.some(ls=>ls.date===s.date&&ls.msg===s.msg))
+        local.signalements.push(s);
+    });
+  });
+  return stats;
 }
 
 // ════════════════════════════════
