@@ -1083,6 +1083,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 '<td style="font-size:0.75rem; color:#94a3b8;">' + dateStr + '</td>' +
                 '<td>' +
                     '<button class="btn-sm btn-view" onclick="viewDetail(\'' + r.eleveCode + '\')" title="Detail">👁️</button>' +
+                    '<button class="btn-sm" style="background:#0ea5e9;" onclick="printStudentSheet(\'' + r.eleveCode + '\')" title="Imprimer fiche eleve">🖨️</button>' +
                     pubBtn +
                     delBtn +
                 '</td>';
@@ -1304,7 +1305,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const qs = currentEvalData.questions || [];
         const bareme = currentEvalData.bareme || 20;
 
-        document.getElementById('modal-title').textContent = '👤 ' + afficherAvecNom(eleveCode) + ' — ' + (currentEvalData.titre || 'Evaluation');
+        document.getElementById('modal-title').innerHTML = '👤 ' + afficherAvecNom(eleveCode) + ' — ' + (currentEvalData.titre || 'Evaluation') + ' <button onclick="printStudentSheet(\'' + eleveCode + '\')" style="margin-left:12px;padding:4px 10px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;font-size:0.75rem;cursor:pointer;" title="Imprimer la fiche corrigee">🖨️ Fiche</button>';
 
         let html = '';
 
@@ -1650,6 +1651,146 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             '</body></html>';
 
         const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+    };
+
+    // === PRINT STUDENT SHEET (Fiche corrigée individuelle) ===
+    window.printStudentSheet = function(eleveCode) {
+        const r = filteredResults.find(r => r.eleveCode === eleveCode);
+        if (!r || !currentEvalData) { showToast('Aucun resultat pour cet eleve.'); return; }
+
+        const qs = currentEvalData.questions || [];
+        const docs = currentEvalData.documents || [];
+        const bareme = currentEvalData.bareme || 20;
+        const titre = currentEvalData.titre || 'Evaluation';
+        const displayNote = getDisplayNote(r);
+        const pct = displayNote !== null ? (displayNote / bareme) * 100 : 0;
+        const now = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        // Competence summary
+        let compSummaryHtml = '';
+        for (let c = 1; c <= 6; c++) {
+            const comp = r.competences['C' + c];
+            if (comp && comp.max > 0) {
+                const compPct = (comp.pts / comp.max) * 100;
+                let level = 'NT', levelLabel = 'Non tente', color = '#94a3b8', bg = '#f1f5f9';
+                if (compPct >= 80) { level = 'M'; levelLabel = 'Maitrise'; color = '#166534'; bg = '#dcfce7'; }
+                else if (compPct >= 50) { level = 'A'; levelLabel = 'Acceptable'; color = '#1e40af'; bg = '#dbeafe'; }
+                else if (compPct > 0) { level = 'I'; levelLabel = 'Insuffisant'; color = '#b45309'; bg = '#fef3c7'; }
+                compSummaryHtml += '<td style="text-align:center;font-weight:700;color:' + color + ';background:' + bg + ';">' + level + '<br><span style="font-size:6pt;font-weight:400;">' + comp.pts.toFixed(1) + '/' + comp.max.toFixed(1) + '</span></td>';
+            }
+        }
+
+        // Questions detail
+        let questionsHtml = '';
+        qs.forEach((q, i) => {
+            const qResult = r.questionsResult['q_' + i] || { level: 'NT' };
+            const level = qResult.level || 'NT';
+            const studentAns = r.reponses[q.id];
+
+            let borderColor = '#e2e8f0';
+            let bgColor = '#fff';
+            let icon = '⚫';
+            if (level === 'M') { borderColor = '#22c55e'; bgColor = '#f0fdf4'; icon = '✅'; }
+            else if (level === 'I') { borderColor = '#ef4444'; bgColor = '#fef2f2'; icon = '❌'; }
+
+            questionsHtml += '<div style="border:1px solid ' + borderColor + ';border-left:4px solid ' + borderColor + ';border-radius:8px;padding:8px 10px;margin-bottom:6px;background:' + bgColor + ';page-break-inside:avoid;">';
+            questionsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+            questionsHtml += '<strong style="font-size:8pt;">Q' + (i + 1) + (q.competence ? ' — ' + q.competence : '') + ' (' + (q.points || 0) + ' pt' + ((q.points || 0) > 1 ? 's' : '') + ')</strong>';
+            questionsHtml += '<span style="font-size:7pt;">' + icon + '</span>';
+            questionsHtml += '</div>';
+            questionsHtml += '<div style="font-size:8pt;color:#334155;margin-bottom:4px;">' + (q.question || '') + '</div>';
+
+            // Student answer
+            if (studentAns !== undefined && studentAns !== null) {
+                questionsHtml += '<div style="font-size:7.5pt;color:#1e293b;background:#f8fafc;border-radius:4px;padding:4px 6px;margin-bottom:3px;"><strong>Ta reponse :</strong> ' + formatStudentAnswer(q, studentAns) + '</div>';
+            } else {
+                questionsHtml += '<div style="font-size:7.5pt;color:#94a3b8;margin-bottom:3px;"><em>Non repondu</em></div>';
+            }
+
+            // Correct answer
+            questionsHtml += '<div style="font-size:7.5pt;color:#166534;background:#f0fdf4;border-radius:4px;padding:4px 6px;margin-bottom:3px;"><strong>Reponse attendue :</strong> ' + formatCorrectAnswer(q) + '</div>';
+
+            // Correction / Explication (remediation)
+            if (q.correction) {
+                questionsHtml += '<div style="font-size:7pt;color:#b45309;background:#fffbeb;border-radius:4px;padding:3px 6px;margin-bottom:2px;">📝 ' + q.correction + '</div>';
+            }
+            if (q.explication) {
+                questionsHtml += '<div style="font-size:7pt;color:#7c3aed;background:#faf5ff;border-radius:4px;padding:3px 6px;">💡 ' + q.explication + '</div>';
+            }
+
+            questionsHtml += '</div>';
+        });
+
+        // Build full page
+        let html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">';
+        html += '<title>Fiche corrigee — ' + titre + '</title>';
+        html += '<style>';
+        html += '@page { margin: 0.8cm; }';
+        html += 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: #1e293b; font-size: 8pt; margin: 0; padding: 10px; }';
+        html += '.sheet { max-width: 800px; margin: 0 auto; }';
+        html += '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }';
+        html += '.header h1 { font-size: 13pt; margin: 0 0 2px; color: #0f172a; }';
+        html += '.header .meta { font-size: 7.5pt; color: #64748b; }';
+        html += '.score-box { text-align: center; padding: 8px 16px; background: #f0f9ff; border: 2px solid #3b82f6; border-radius: 12px; }';
+        html += '.score-box .note { font-size: 20pt; font-weight: 800; color: #1d4ed8; }';
+        html += '.score-box .label { font-size: 7pt; color: #64748b; text-transform: uppercase; }';
+        html += '.student-zone { display: flex; gap: 10px; margin-bottom: 10px; }';
+        html += '.student-zone .field { flex: 1; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 6px 8px; font-size: 7.5pt; color: #94a3b8; min-height: 28px; }';
+        html += '.student-zone .field strong { color: #475569; display: block; font-size: 7pt; margin-bottom: 2px; }';
+        html += '.comp-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }';
+        html += '.comp-table th { background: #1e293b; color: #fff; padding: 5px 8px; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.5px; }';
+        html += '.comp-table td { padding: 6px 8px; border: 1px solid #e2e8f0; font-size: 7.5pt; }';
+        html += '.legend { font-size: 6pt; color: #94a3b8; font-style: italic; margin-bottom: 10px; }';
+        html += '.questions-title { font-size: 9pt; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }';
+        html += '.footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }';
+        html += '.footer .info { font-size: 6.5pt; color: #94a3b8; }';
+        html += '@media print { body { padding: 0; } .sheet { max-width: 100%; } }';
+        html += '</style></head><body>';
+
+        html += '<div class="sheet">';
+
+        // Header
+        html += '<div class="header">';
+        html += '<div><h1>' + titre + '</h1>';
+        html += '<div class="meta">PSE · Fiche de correction individuelle · ' + now + '</div></div>';
+        html += '<div class="score-box"><div class="note">' + (displayNote !== null ? displayNote : '--') + ' / ' + bareme + '</div><div class="label">Note obtenue</div></div>';
+        html += '</div>';
+
+        // Student zone (RGPD — empty fields for teacher to fill)
+        html += '<div class="student-zone">';
+        html += '<div class="field"><strong>Nom</strong>_________________________</div>';
+        html += '<div class="field"><strong>Prenom</strong>_________________________</div>';
+        html += '<div class="field"><strong>Classe</strong>____________</div>';
+        html += '</div>';
+
+        // Competence summary table
+        if (compSummaryHtml) {
+            html += '<table class="comp-table"><thead><tr>';
+            for (let c = 1; c <= 6; c++) {
+                const comp = r.competences['C' + c];
+                if (comp && comp.max > 0) html += '<th>C' + c + '</th>';
+            }
+            html += '</tr></thead><tbody><tr>' + compSummaryHtml + '</tr></tbody></table>';
+            html += '<div class="legend">M = Maitrise · A = Acceptable · I = Insuffisant · NT = Non tente</div>';
+        }
+
+        // Questions detail
+        html += '<div class="questions-title">Detail des questions</div>';
+        html += questionsHtml;
+
+        // Footer with QR code placeholder
+        html += '<div class="footer">';
+        html += '<div class="info">Genere depuis CockpitPSE · ' + now + '</div>';
+        html += '</div>';
+
+        html += '</div>'; // .sheet
+        html += '<script>window.onload=function(){window.print();}<\/script>';
+        html += '</body></html>';
+
+        const w = window.open('', '_blank');
+        if (!w) { showToast('Autorise les popups pour imprimer.'); return; }
         w.document.write(html);
         w.document.close();
     };
