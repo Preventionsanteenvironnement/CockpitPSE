@@ -562,7 +562,23 @@ let students  = lsGet(LS.stu) || sampleStudents();
 let classes   = lsGet(LS.cls) || ['Exemple'];
 let defiGoal  = parseFloat(localStorage.getItem(LS.defi)||'0.75');
 let sessDates = lsGet(LS.sessDates) || {};
-let sessCfg   = lsGet(LS.sessCfg)  || {start:1, dates:Array(SESSIONS).fill('')};
+let sessCfg   = lsGet(LS.sessCfg)  || {};
+
+// migration: sessCfg ancien format (global) → par classe
+if(sessCfg.start!=null && sessCfg.dates){
+  // ancien format unique → on le copie dans chaque classe existante
+  const old={start:sessCfg.start, dates:[...sessCfg.dates]};
+  const allCls=lsGet(LS.cls)||['Exemple'];
+  sessCfg={};
+  allCls.forEach(c=>sessCfg[c]={...old, dates:[...old.dates]});
+  lsSet(LS.sessCfg, sessCfg);
+}
+
+function getCfg(cls){
+  if(!cls) return {start:1, dates:Array(SESSIONS).fill('')};
+  if(!sessCfg[cls]) sessCfg[cls]={start:1, dates:Array(SESSIONS).fill('')};
+  return sessCfg[cls];
+}
 
 // migration: ajouter miniInc + convertir bavardage string→number
 students.forEach(s=>s.sessions.forEach(ss=>{
@@ -570,7 +586,7 @@ students.forEach(s=>s.sessions.forEach(ss=>{
   if(typeof ss.bav==='string') ss.bav=(ss.bav==='bad'?3:0);
 }));
 
-let curSess=sessCfg.start||1, curCls='', defiOpen=false;
+let curSess=1, curCls='', defiOpen=false;
 let ctxId=null, _csvParsed=null, _genCb=null, _bonusSid=null, _bonusLvl=null;
 
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch{return null;}}
@@ -665,7 +681,11 @@ function rebuildCls(){
     sel.appendChild(o);
   });
 }
-function onCls(){curCls=document.getElementById('clsSel').value;render();}
+function onCls(){
+  curCls=document.getElementById('clsSel').value;
+  curSess=getCfg(curCls).start||1;
+  render();
+}
 function curStudents(){return curCls?students.filter(s=>s.classe===curCls):students;}
 
 // ════════════════════════════════
@@ -715,27 +735,32 @@ function saveDGoal(){localStorage.setItem(LS.defi,defiGoal);document.getElementB
 // SÉANCES CONFIG
 // ════════════════════════════════
 function sessLabel(si){
-  const date=sessCfg.dates&&sessCfg.dates[si]?sessCfg.dates[si]:'';
+  const cfg=getCfg(curCls);
+  const date=cfg.dates&&cfg.dates[si]?cfg.dates[si]:'';
   return date?`S${si+1} · ${date}`:`Séance ${si+1}`;
 }
-function sessDateForKey(cls,si){return sessDates[`${cls}_${si}`]||sessCfg.dates?.[si]||'';}
+function sessDateForKey(cls,si){
+  const cfg=getCfg(cls);
+  return sessDates[`${cls}_${si}`]||cfg.dates?.[si]||'';
+}
 
 function openSessCfg(){
-  document.getElementById('sessStart').value=sessCfg.start||1;
+  const cfg=getCfg(curCls);
+  document.getElementById('sessStart').value=cfg.start||1;
   const rows=document.getElementById('sessCfgRows');
   rows.innerHTML=Array.from({length:SESSIONS},(_,i)=>`
     <div class="sess-cfg-row">
       <label>Séance ${i+1}</label>
-      <input type="date" id="sdate${i}" value="${sessCfg.dates?.[i]||''}"
-        onchange="sessCfg.dates[${i}]=this.value">
+      <input type="date" id="sdate${i}" value="${cfg.dates?.[i]||''}">
     </div>`).join('');
   document.getElementById('mSessCfg').classList.add('open');
   document.getElementById('ov').classList.add('open');
 }
 function saveSessCfg(){
-  sessCfg.start=parseInt(document.getElementById('sessStart').value)||1;
-  sessCfg.dates=Array.from({length:SESSIONS},(_,i)=>document.getElementById('sdate'+i)?.value||'');
-  curSess=sessCfg.start;
+  const cfg=getCfg(curCls);
+  cfg.start=parseInt(document.getElementById('sessStart').value)||1;
+  cfg.dates=Array.from({length:SESSIONS},(_,i)=>document.getElementById('sdate'+i)?.value||'');
+  curSess=cfg.start;
   save();closeM('mSessCfg');render();
 }
 
@@ -750,7 +775,8 @@ function render(){
   pls.innerHTML='';
   for(let i=1;i<=SESSIONS;i++){
     const p=document.createElement('div');
-    const lbl=sessCfg.dates?.[i-1]?sessCfg.dates[i-1].slice(5).replace('-','/'):`${i}`;
+    const cfg=getCfg(curCls);
+    const lbl=cfg.dates?.[i-1]?cfg.dates[i-1].slice(5).replace('-','/'):`${i}`;
     p.className='pill'+(i===curSess?' active':i<curSess?' done':'');
     p.textContent=lbl; p.title=`Séance ${i}`;
     p.onclick=()=>{curSess=i;render();};
@@ -1140,7 +1166,7 @@ function openFiche(sid){
     const sess=stu.sessions[i];
     const done=i<curSess;
     const isAbs=done&&sc===null;
-    const date=sessCfg.dates?.[i]||sessDates[`${stu.classe}_${i}`]||'';
+    const date=getCfg(stu.classe).dates?.[i]||sessDates[`${stu.classe}_${i}`]||'';
     const cl=isAbs?'c-abs':scCls(sc);
     const bonusLvl=BONUS_LEVELS.find(b=>b.id===sess.bonus);
     return`<div class="sess-blk">
@@ -1197,7 +1223,7 @@ function openPronote(){
   document.getElementById('proClsN').textContent=curCls||'Tous';
   const head=`<tr>
     <th>Élève</th>
-    ${Array.from({length:SESSIONS},(_,i)=>`<th>S${i+1}${sessCfg.dates?.[i]?'<br><span style="font-weight:400;font-size:.6rem">'+sessCfg.dates[i]+'</span>':''}</th>`).join('')}
+    ${Array.from({length:SESSIONS},(_,i)=>{const d=getCfg(curCls).dates?.[i];return`<th>S${i+1}${d?'<br><span style="font-weight:400;font-size:.6rem">'+d+'</span>':''}</th>`;}).join('')}
     <th style="color:var(--wn)">/20</th>
   </tr>`;
 
@@ -1475,8 +1501,15 @@ function importJSON(inp){
       if(mode.trim()==='1'){
         // Remplacement complet
         students=data.students; classes=data.classes||[];
-        sessDates=data.sessDates||{}; sessCfg=data.sessCfg||{start:1,dates:Array(SESSIONS).fill('')};
+        sessDates=data.sessDates||{};
+        sessCfg=data.sessCfg||{};
+        // migration ancien format global → par classe
+        if(sessCfg.start!=null&&sessCfg.dates){
+          const old={start:sessCfg.start,dates:[...sessCfg.dates]};
+          sessCfg={};classes.forEach(c=>sessCfg[c]={...old,dates:[...old.dates]});
+        }
         defiGoal=data.defiGoal||0.75; curCls=data.classe||'';
+        curSess=getCfg(curCls).start||1;
         save();render();closeM('mImpJSON');
         alert('✅ Import (remplacement) réussi !');
       }else if(mode.trim()==='2'){
@@ -1500,10 +1533,21 @@ function mergeData(data){
   const inCls=data.classes||[];
   inCls.forEach(c=>{if(!classes.includes(c)) classes.push(c);});
 
-  // Fusionner sessDates par classe (garder la plus récente si conflit)
+  // Fusionner sessDates par classe
   const inDates=data.sessDates||{};
   Object.keys(inDates).forEach(cls=>{
     if(!sessDates[cls]) sessDates[cls]=inDates[cls];
+  });
+
+  // Fusionner sessCfg par classe
+  let inCfg=data.sessCfg||{};
+  // migration ancien format
+  if(inCfg.start!=null&&inCfg.dates){
+    const old={start:inCfg.start,dates:[...inCfg.dates]};
+    inCfg={};inCls.forEach(c=>inCfg[c]={...old,dates:[...old.dates]});
+  }
+  Object.keys(inCfg).forEach(cls=>{
+    if(!sessCfg[cls]) sessCfg[cls]=inCfg[cls];
   });
 
   // Fusionner élèves
