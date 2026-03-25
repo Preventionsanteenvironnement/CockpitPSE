@@ -604,6 +604,7 @@ function getScore(stu,si){
   const sess=stu.sessions[si];
   if(sess.absent) return null; // null = ABS
   if(sess.incident) return 0;
+  if(typeof sess._manualScore==='number') return sess._manualScore;
   const p=CRIT.reduce((a,c)=>{
     if(c.counter){const n=typeof sess[c.id]==='number'?sess[c.id]:0;return a+Math.floor(n/c.per);}
     return a+(c.pen[sess[c.id]]||0);
@@ -845,7 +846,7 @@ function buildCard(stu){
       </div>
       <div class="sr">
         <div class="score-ln">
-          <div class="s5 ${scoreCls}">${scoreDisp}<span class="s5d">${score===null?'':'/5'}</span></div>
+          <div class="s5 ${scoreCls}" onclick="editScore(event,${stu.id})" style="cursor:pointer" title="Cliquer pour modifier">${scoreDisp}${sess._manualScore!=null?'✎':''}<span class="s5d">${score===null?'':'/5'}</span></div>
           <div class="ssep">·</div>
           <div class="s20 ${proj20Cls}">${proj}<span class="s20d">/20</span></div>
         </div>
@@ -910,6 +911,28 @@ function toggleAbsent(sid){
   const stu=students.find(s=>s.id===sid);
   const si=curSess-1;
   stu.sessions[si].absent=!stu.sessions[si].absent;
+  save(); refreshCard(stu);
+}
+function editScore(e,sid){
+  e.stopPropagation();
+  const stu=students.find(s=>s.id===sid);
+  const si=curSess-1;
+  const sess=stu.sessions[si];
+  if(sess.absent||sess.incident) return;
+  const cur=getScore(stu,si);
+  const isManual=typeof sess._manualScore==='number';
+  const msg=isManual
+    ?`Note manuelle : ${cur}/5\nEntrer nouvelle note (0-5) ou laisser vide pour revenir au calcul auto :`
+    :`Note auto : ${cur}/5\nEntrer une note manuelle (0-5) ou Annuler :`;
+  const val=prompt(msg,isManual?cur:'');
+  if(val===null) return; // Annuler
+  if(val.trim()===''){
+    delete sess._manualScore;
+  }else{
+    const n=parseFloat(val);
+    if(isNaN(n)||n<0||n>5){alert('Note invalide (0 à 5)');return;}
+    sess._manualScore=Math.round(n*10)/10;
+  }
   save(); refreshCard(stu);
 }
 
