@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>50 Flashcards - Maîtriser les objectifs pédagogiques</title>
+<style>
+:root{--primary:#1a5276;--primary-light:#2980b9;--accent:#e74c3c;--success:#27ae60;--orange:#f39c12;--bg:#f0f4f8;--card:#fff;--text:#2c3e50;--gray:#95a5a6;--shadow:0 8px 30px rgba(0,0,0,.12);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;padding:20px;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.header h1{font-size:1.4rem;margin-bottom:6px;}
+.header-stats{display:flex;justify-content:center;gap:20px;font-size:.85rem;opacity:.9;}
+.progress-track{background:rgba(255,255,255,.2);height:6px;border-radius:3px;margin-top:10px;max-width:600px;margin-left:auto;margin-right:auto;}
+.progress-fill{background:#fff;height:100%;border-radius:3px;transition:width .4s;width:0%;}
+
+/* MODE SELECTOR */
+.mode-bar{display:flex;justify-content:center;gap:8px;padding:16px;flex-wrap:wrap;}
+.mode-btn{padding:10px 20px;border:2px solid var(--primary-light);background:#fff;border-radius:25px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s;color:var(--primary);}
+.mode-btn:hover,.mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+/* FLASHCARD MODE */
+.card-container{max-width:650px;margin:0 auto;padding:20px;perspective:1200px;}
+.flashcard{width:100%;min-height:350px;cursor:pointer;position:relative;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,.2,.2,1);}
+.flashcard.flipped{transform:rotateY(180deg);}
+.card-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;padding:35px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:var(--shadow);}
+.card-front{background:var(--card);border:3px solid var(--primary-light);}
+.card-back{background:linear-gradient(145deg,#eaf2f8,#d4e6f1);border:3px solid var(--success);transform:rotateY(180deg);}
+.card-category{position:absolute;top:16px;left:20px;background:var(--primary);color:#fff;padding:4px 14px;border-radius:15px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.card-num{position:absolute;top:16px;right:20px;color:var(--gray);font-size:.8rem;font-weight:600;}
+.card-question{font-size:1.2rem;line-height:1.6;font-weight:600;color:var(--primary);max-width:500px;}
+.card-front .card-question::before{content:'❓';display:block;font-size:2rem;margin-bottom:15px;}
+.card-answer{font-size:1.05rem;line-height:1.7;color:var(--text);max-width:500px;}
+.card-answer::before{content:'💡';display:block;font-size:2rem;margin-bottom:12px;}
+.card-answer strong{color:var(--success);}
+.card-answer em{color:var(--accent);font-style:normal;font-weight:600;}
+.card-tip{margin-top:15px;font-size:.85rem;background:rgba(39,174,96,.1);padding:10px 16px;border-radius:10px;border-left:3px solid var(--success);text-align:left;width:100%;}
+
+/* NAVIGATION */
+.card-nav{display:flex;justify-content:center;align-items:center;gap:15px;margin-top:20px;flex-wrap:wrap;}
+.nav-btn{width:50px;height:50px;border-radius:50%;border:none;font-size:1.3rem;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;}
+.nav-btn.prev,.nav-btn.next{background:var(--primary);color:#fff;}
+.nav-btn.prev:hover,.nav-btn.next:hover{background:var(--primary-light);transform:scale(1.1);}
+.nav-btn.know{background:var(--success);color:#fff;}
+.nav-btn.know:hover{background:#219a52;transform:scale(1.1);}
+.nav-btn.dontknow{background:var(--accent);color:#fff;}
+.nav-btn.dontknow:hover{background:#c0392b;transform:scale(1.1);}
+.nav-label{font-size:.7rem;text-align:center;margin-top:4px;color:var(--gray);}
+.flip-hint{text-align:center;color:var(--gray);font-size:.8rem;margin-top:12px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* QCM MODE */
+.qcm-container{max-width:700px;margin:0 auto;padding:20px;}
+.qcm-card{background:var(--card);border-radius:16px;padding:30px;box-shadow:var(--shadow);margin-bottom:20px;border-left:5px solid var(--primary-light);}
+.qcm-num{font-size:.8rem;color:var(--gray);font-weight:600;margin-bottom:8px;}
+.qcm-category{display:inline-block;background:var(--orange);color:#fff;padding:3px 12px;border-radius:12px;font-size:.72rem;font-weight:700;margin-bottom:10px;}
+.qcm-question{font-size:1.05rem;font-weight:600;color:var(--primary);margin-bottom:16px;line-height:1.5;}
+.qcm-options{display:flex;flex-direction:column;gap:8px;}
+.qcm-opt{padding:12px 18px;border:2px solid #dce6f0;border-radius:10px;cursor:pointer;transition:all .3s;font-size:.92rem;background:#fff;text-align:left;line-height:1.4;}
+.qcm-opt:hover{border-color:var(--primary-light);background:#eaf2f8;transform:translateX(4px);}
+.qcm-opt.selected{border-color:var(--primary);background:#d4e6f1;}
+.qcm-opt.correct{border-color:var(--success);background:#d4efdf;color:#1a7a42;}
+.qcm-opt.wrong{border-color:var(--accent);background:#fadbd8;color:#922b21;}
+.qcm-opt.disabled{pointer-events:none;opacity:.7;}
+.qcm-feedback{margin-top:12px;padding:12px 16px;border-radius:10px;font-size:.88rem;display:none;}
+.qcm-feedback.show{display:block;}
+.qcm-feedback.ok{background:#d4efdf;border:1px solid var(--success);color:#1a7a42;}
+.qcm-feedback.ko{background:#fadbd8;border:1px solid var(--accent);color:#922b21;}
+
+/* QCM CONTROLS */
+.qcm-controls{text-align:center;padding:20px;}
+.qcm-submit{padding:14px 40px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .3s;}
+.qcm-submit:hover{background:var(--primary-light);transform:translateY(-2px);box-shadow:var(--shadow);}
+
+/* SCORE MODAL */
+.score-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;justify-content:center;align-items:center;padding:20px;}
+.score-overlay.show{display:flex;}
+.score-modal{background:#fff;border-radius:24px;padding:40px;max-width:420px;width:100%;text-align:center;animation:popIn .4s ease;}
+@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+.score-circle{width:130px;height:130px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:20px auto;font-size:2.5rem;font-weight:800;color:#fff;}
+.score-circle.great{background:linear-gradient(135deg,var(--success),#2ecc71);}
+.score-circle.good{background:linear-gradient(135deg,var(--orange),#f1c40f);}
+.score-circle.retry{background:linear-gradient(135deg,var(--accent),#e67e22);}
+.score-circle small{font-size:.9rem;font-weight:400;}
+.score-msg{font-size:1.1rem;margin:15px 0;color:var(--text);}
+.score-btn{padding:12px 30px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-size:.95rem;font-weight:600;cursor:pointer;margin:5px;}
+.score-btn:hover{background:var(--primary-light);}
+.score-btn.secondary{background:#ecf0f1;color:var(--text);}
+
+/* SHUFFLE BAR */
+.shuffle-bar{display:flex;justify-content:center;gap:10px;margin:10px 0;flex-wrap:wrap;}
+.shuffle-btn{padding:8px 18px;background:#ecf0f1;border:none;border-radius:20px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);transition:all .3s;}
+.shuffle-btn:hover{background:var(--primary);color:#fff;}
+
+/* FILTER CHIPS */
+.filter-bar{display:flex;justify-content:center;gap:6px;padding:0 16px 10px;flex-wrap:wrap;}
+.filter-chip{padding:6px 14px;border:2px solid #dce6f0;border-radius:20px;font-size:.78rem;cursor:pointer;transition:all .3s;background:#fff;font-weight:600;}
+.filter-chip:hover,.filter-chip.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .card-container{padding:12px;}
+  .card-face{padding:25px 20px;}
+  .card-question{font-size:1rem;}
+  .card-answer{font-size:.92rem;}
+  .header h1{font-size:1.15rem;}
+  .qcm-card{padding:20px;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎴 50 Flashcards — Objectifs pédagogiques</h1>
+  <div class="header-stats">
+    <span id="statsKnow">✅ Acquis : 0</span>
+    <span id="statsLeft">📋 Restant : 50</span>
+    <span id="statsDont">🔄 À revoir : 0</span>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<!-- MODE SELECTOR -->
+<div class="mode-bar">
+  <button class="mode-btn active" onclick="setMode('flash')">🎴 Flashcards</button>
+  <button class="mode-btn" onclick="setMode('qcm')">📝 QCM (50 questions)</button>
+  <button class="mode-btn" onclick="setMode('speed')">⚡ Mode rapide</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar" id="filterBar">
+  <span class="filter-chip active" onclick="filterCat('all')">Toutes</span>
+  <span class="filter-chip" onclick="filterCat('Définition')">Définition</span>
+  <span class="filter-chip" onclick="filterCat('Performance')">Performance</span>
+  <span class="filter-chip" onclick="filterCat('Conditions')">Conditions</span>
+  <span class="filter-chip" onclick="filterCat('Critère')">Critère</span>
+  <span class="filter-chip" onclick="filterCat('Piège')">Pièges</span>
+  <span class="filter-chip" onclick="filterCat('Subtilité')">Subtilités</span>
+  <span class="filter-chip" onclick="filterCat('PSE')">PSE</span>
+  <span class="filter-chip" onclick="filterCat('Bloom')">Bloom</span>
+</div>
+
+<!-- SHUFFLE -->
+<div class="shuffle-bar">
+  <button class="shuffle-btn" onclick="shuffleCards()">🔀 Mélanger</button>
+  <button class="shuffle-btn" onclick="resetProgress()">🔄 Réinitialiser</button>
+  <button class="shuffle-btn" onclick="showOnlyWrong()">❌ Revoir les ratées</button>
+</div>
+
+<!-- FLASHCARD VIEW -->
+<div id="flashView">
+  <div class="card-container">
+    <div class="flashcard" id="flashcard" onclick="flipCard()">
+      <div class="card-face card-front">
+        <span class="card-category" id="cardCat"></span>
+        <span class="card-num" id="cardNum"></span>
+        <div class="card-question" id="cardQ"></div>
+      </div>
+      <div class="card-face card-back">
+        <span class="card-category" id="cardCatBack" style="background:var(--success);"></span>
+        <span class="card-num" id="cardNumBack"></span>
+        <div class="card-answer" id="cardA"></div>
+      </div>
+    </div>
+  </div>
+  <div class="flip-hint" id="flipHint">👆 Cliquez pour retourner la carte</div>
+  <div class="card-nav">
+    <div style="text-align:center"><button class="nav-btn prev" onclick="prevCard()">◀</button><div class="nav-label">Précédent</div></div>
+    <div style="text-align:center"><button class="nav-btn dontknow" onclick="markDontKnow()">✕</button><div class="nav-label">À revoir</div></div>
+    <div style="text-align:center"><button class="nav-btn know" onclick="markKnow()">✓</button><div class="nav-label">Acquis !</div></div>
+    <div style="text-align:center"><button class="nav-btn next" onclick="nextCard()">▶</button><div class="nav-label">Suivant</div></div>
+  </div>
+</div>
+
+<!-- QCM VIEW -->
+<div id="qcmView" style="display:none;">
+  <div class="qcm-container" id="qcmContainer"></div>
+  <div class="qcm-controls">
+    <button class="qcm-submit" onclick="submitQcm()">📊 Voir mon score</button>
+  </div>
+</div>
+
+<!-- SPEED VIEW -->
+<div id="speedView" style="display:none;">
+  <div class="card-container">
+    <div class="flashcard" id="speedCard">
+      <div class="card-face card-front" style="border-color:var(--orange);">
+        <span class="card-category" id="speedCat" style="background:var(--orange);"></span>
+        <span class="card-num" id="speedNum"></span>
+        <div class="card-question" id="speedQ" style="font-size:1.05rem;"></div>
+        <div class="qcm-options" id="speedOpts" style="margin-top:20px;width:100%;"></div>
+        <div class="qcm-feedback" id="speedFb"></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:10px;color:var(--gray);font-size:.85rem;" id="speedTimer">⏱️ 0:00</div>
+</div>
+
+<!-- SCORE MODAL -->
+<div class="score-overlay" id="scoreOverlay">
+  <div class="score-modal">
+    <h2 style="color:var(--primary);">Résultats</h2>
+    <div class="score-circle" id="scoreCircle"><span id="scoreNum">0</span><small id="scoreTotal">/50</small></div>
+    <div class="score-msg" id="scoreMsg"></div>
+    <button class="score-btn" onclick="closeScore()">Fermer</button>
+    <button class="score-btn secondary" onclick="retryWrong()">Revoir les erreurs</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA: 50 FLASHCARDS
+// ============================================================
+const allCards = [
+  // --- DÉFINITION (1-8) ---
+  {cat:"Définition",q:"Qu'est-ce qu'un objectif pédagogique ?",a:"C'est une description de ce que <strong>l'élève sera capable de faire</strong> à la fin d'un enseignement. Ce n'est pas un contenu de cours, mais un <strong>résultat attendu</strong> exprimé en termes de comportement observable.",tip:"Pensez « résultat », pas « processus ».",
+   qcm:["Ce que l'enseignant fera pendant le cours","Ce que l'élève sera capable de faire après le cours","Le contenu du programme officiel","La méthode pédagogique utilisée"],correct:1},
+
+  {cat:"Définition",q:"Quelle est la différence entre une description de cours et un objectif ?",a:"La <strong>description</strong> expose le contenu et les méthodes (le processus). L'<strong>objectif</strong> décrit ce que l'élève saura <em>faire</em> après (le produit/résultat).",tip:"Cours = processus. Objectif = produit.",
+   qcm:["Aucune, c'est la même chose","L'objectif décrit le résultat, la description décrit le processus","La description est plus précise","L'objectif est réservé aux examens"],correct:1},
+
+  {cat:"Définition",q:"Quelles sont les 3 composantes d'un objectif bien défini ?",a:"<strong>1. Performance</strong> (ce que l'élève fait)<br><strong>2. Conditions</strong> (dans quel contexte)<br><strong>3. Critère</strong> (quel niveau de réussite)",tip:"P + C + Cr = objectif complet.",
+   qcm:["Savoir, savoir-faire, savoir-être","Performance, conditions, critère","Introduction, développement, conclusion","Objectif, méthode, évaluation"],correct:1},
+
+  {cat:"Définition",q:"Quel est le test ultime d'un bon objectif ?",a:"<strong>\"Un collègue qui lit votre objectif évaluerait-il les élèves de la même façon que vous ?\"</strong> Si oui, l'objectif est clair. Sinon, il faut le préciser.",tip:"Si deux profs ne sont pas d'accord, l'objectif est flou.",
+   qcm:["L'objectif fait plus de 3 lignes","Un collègue évaluerait les élèves de la même façon","L'inspecteur valide l'objectif","L'objectif cite le référentiel"],correct:1},
+
+  {cat:"Définition",q:"L'objectif décrit ce que fait...",a:"<strong>L'élève</strong>, jamais l'enseignant. « Le professeur montrera... » n'est <em>pas</em> un objectif pédagogique.",tip:"L'élève est toujours le sujet de l'objectif.",
+   qcm:["L'enseignant","L'élève","L'inspecteur","Le programme"],correct:1},
+
+  {cat:"Définition",q:"Peut-on utiliser plusieurs phrases pour un seul objectif ?",a:"<strong>Oui !</strong> Rien n'oblige à tout mettre en une seule phrase. Parfois, plusieurs phrases sont nécessaires pour communiquer clairement vos intentions, surtout pour des performances complexes.",tip:"La clarté prime sur la brièveté.",
+   qcm:["Non, un objectif = une phrase obligatoirement","Oui, la clarté est plus importante que la brièveté","Seulement si l'inspecteur l'autorise","Maximum 2 phrases"],correct:1},
+
+  {cat:"Définition",q:"Que signifie la « règle d'or » en matière d'objectifs ?",a:"<strong>\"S'il y a désaccord sur le sens, ne discutez pas, réglez le désaccord\"</strong> — c'est-à-dire : modifiez l'objectif jusqu'à ce qu'il soit compris de la même façon par tous.",tip:"L'objectif est un outil de communication, pas de débat.",
+   qcm:["Un objectif doit toujours contenir le mot 'or'","Si le sens est ambigu, modifiez l'objectif plutôt que de le défendre","L'objectif doit être approuvé par la direction","L'objectif le plus court est toujours le meilleur"],correct:1},
+
+  {cat:"Définition",q:"Pourquoi communiquer les objectifs aux élèves ?",a:"C'est un <strong>contrat pédagogique</strong>. L'élève sait ce qu'on attend de lui, organise mieux ses efforts, et ne perd pas son énergie à deviner. Ne pas communiquer ses objectifs est une forme d'<em>injustice pédagogique</em>.",tip:"Surtout en lycée pro, où les élèves ont besoin d'être sécurisés.",
+   qcm:["Ce n'est pas nécessaire, c'est le rôle du prof","Ça les aide à organiser leur travail et c'est un contrat équitable","Seulement pour les bons élèves","Uniquement lors des CCF"],correct:1},
+
+  // --- PERFORMANCE (9-20) ---
+  {cat:"Performance",q:"Que doit décrire la performance dans un objectif ?",a:"Ce que l'élève <strong>fait concrètement</strong> pour prouver qu'il a atteint l'objectif. C'est toujours un <strong>verbe d'action observable</strong> : identifier, énumérer, classer, réaliser...",tip:"Si vous ne pouvez pas le VOIR ou le VÉRIFIER, ce n'est pas une performance.",
+   qcm:["Ce que l'élève pense","Ce que l'élève fait concrètement de manière observable","Ce que l'enseignant explique","Le contenu du cours"],correct:1},
+
+  {cat:"Performance",q:"Citez 5 verbes VAGUES à éviter dans un objectif.",a:"<em>Savoir, comprendre, apprécier, connaître, saisir le sens de</em>. Ces mots sont trop ambigus : on ne sait pas comment l'élève va PROUVER qu'il « sait » ou « comprend ».",tip:"Ces verbes ouvrent la porte à trop d'interprétations.",
+   qcm:["Écrire, calculer, tracer, mesurer, citer","Savoir, comprendre, apprécier, connaître, saisir","Identifier, comparer, classer, résoudre, énumérer","Analyser, évaluer, créer, appliquer, démontrer"],correct:1},
+
+  {cat:"Performance",q:"Citez 5 verbes D'ACTION à privilégier.",a:"<strong>Identifier, énumérer, comparer, classer, résoudre</strong>. Aussi : écrire, calculer, tracer, réaliser, citer, mesurer, dessiner, construire, proposer...",tip:"Un bon verbe = une action qu'on peut observer ou vérifier.",
+   qcm:["Savoir, comprendre, apprécier, croire, estimer","Identifier, énumérer, comparer, classer, résoudre","Connaître, saisir, intérioriser, se familiariser, acquérir","Être capable, être conscient, faire preuve, manifester, développer"],correct:1},
+
+  {cat:"Performance",q:"Quelle est la différence entre performance INTERNE et EXTERNE ?",a:"<strong>Externe</strong> = directement observable (écrire, courir, dessiner).<br><strong>Interne</strong> = opération mentale invisible (identifier, distinguer, choisir). Les deux sont des performances, mais l'interne nécessite un <strong>indicateur comportemental</strong>.",tip:"Interne + indicateur = observable.",
+   qcm:["Il n'y a pas de différence","Externe = observable, interne = mentale (nécessite un indicateur)","Interne = pour les élèves, externe = pour l'enseignant","Externe = en classe, interne = à la maison"],correct:1},
+
+  {cat:"Performance",q:"Que faire quand la performance est interne (mentale) ?",a:"Ajouter un <strong>indicateur de comportement</strong> qui rend la performance vérifiable.<br>Ex : « identifier » → « identifier <em>en entourant sur le document</em> » ou « identifier <em>par écrit</em> ».",tip:"La règle : chaque performance interne doit avoir son indicateur.",
+   qcm:["Supprimer l'objectif","Utiliser le verbe 'savoir' à la place","Ajouter un indicateur de comportement observable","Laisser l'objectif tel quel"],correct:2},
+
+  {cat:"Performance",q:"« Écrire » est une performance externe ou interne ?",a:"<strong>Externe</strong>. On peut directement voir si quelqu'un écrit. Pas besoin d'indicateur supplémentaire.",tip:"Si vous pouvez le VOIR directement, c'est externe.",
+   qcm:["Interne","Externe","Ni l'un ni l'autre","Ça dépend du contexte"],correct:1},
+
+  {cat:"Performance",q:"« Identifier » est une performance externe ou interne ?",a:"<strong>Interne</strong>. On ne peut pas « voir » quelqu'un identifier dans sa tête. Il faut ajouter un indicateur : « identifier <em>en cochant</em> », « identifier <em>en listant par écrit</em> ».",tip:"Identifier = mental. Il faut un indicateur pour le rendre observable.",
+   qcm:["Externe, car on peut vérifier","Interne, il faut un indicateur comportemental","Ça dépend de l'élève","C'est un verbe vague à éviter"],correct:1},
+
+  {cat:"Performance",q:"La performance doit utiliser un verbe d'ACTION et non d'ÉTAT. Donnez un exemple de chaque.",a:"<strong>Action :</strong> courir, résoudre, écrire, tracer, mesurer (observables).<br><strong>État :</strong> être heureux, comprendre, apprécier (non observables).",tip:"Action = mouvement/résultat visible. État = situation mentale.",
+   qcm:["Action : savoir / État : écrire","Action : écrire / État : comprendre","Action : apprécier / État : calculer","Action : connaître / État : résoudre"],correct:1},
+
+  {cat:"Performance",q:"« L'élève apprécie l'importance de l'hygiène. » Est-ce un objectif valable ?",a:"<strong>Non !</strong> « Apprécier » est un verbe d'état, pas d'action. On ne peut pas vérifier si l'élève « apprécie ». Mieux : « L'élève <em>énumère par écrit</em> 5 règles d'hygiène et <em>explique</em> leur utilité. »",tip:"Posez-vous : « Que FERA l'élève pour prouver qu'il apprécie ? »",
+   qcm:["Oui, c'est un bon objectif d'attitude","Non, 'apprécier' n'est pas observable — il faut un verbe d'action","Oui, si on ajoute un critère de temps","C'est valable mais incomplet"],correct:1},
+
+  {cat:"Performance",q:"Faut-il toujours indiquer l'objectif de BASE avant les indicateurs ?",a:"<strong>Oui.</strong> Écrivez d'abord la performance centrale (ce que l'élève doit accomplir), puis ajoutez l'indicateur si la performance est interne. L'objectif de base reste le plus important.",tip:"Base d'abord, indicateur ensuite.",
+   qcm:["Non, l'indicateur est plus important","Oui, la performance de base prime, l'indicateur la rend observable","L'ordre n'a aucune importance","Il ne faut jamais utiliser d'indicateurs"],correct:1},
+
+  {cat:"Performance",q:"« Sourire » est-il une performance ?",a:"<strong>Oui !</strong> Aussi surprenant que cela puisse paraître, sourire est directement observable. C'est donc une performance externe, même si elle semble triviale.",tip:"Si on peut le voir ou l'entendre, c'est une performance.",
+   qcm:["Non, c'est un état émotionnel","Oui, c'est directement observable","Seulement si c'est un objectif d'attitude","Non, c'est trop subjectif"],correct:1},
+
+  {cat:"Performance",q:"Un objectif peut-il comporter plusieurs performances ?",a:"<strong>Oui.</strong> Certains objectifs complexes nécessitent de décrire plusieurs actions. Ex : « L'élève <em>identifie</em> les risques ET <em>propose</em> des mesures de prévention. » Chaque performance peut avoir ses propres conditions et critères.",tip:"Écrivez autant de performances que nécessaire pour être clair.",
+   qcm:["Non, un objectif = une seule performance","Oui, un objectif peut décrire plusieurs actions liées","Seulement pour les objectifs terminaux","Maximum 2 performances par objectif"],correct:1},
+
+  // --- CONDITIONS (21-28) ---
+  {cat:"Conditions",q:"À quoi servent les conditions dans un objectif ?",a:"Elles précisent le <strong>contexte</strong> dans lequel l'élève devra réaliser la performance : ce qui est <strong>fourni</strong>, ce qui est <strong>interdit</strong>, le <strong>lieu</strong>, les <strong>outils</strong> autorisés.",tip:"Question-clé : « Avec quoi et dans quelle situation l'élève fait-il ce qu'il fait ? »",
+   qcm:["Elles décrivent le contenu du cours","Elles précisent le contexte de réalisation de la performance","Elles fixent la note de l'évaluation","Elles indiquent les prérequis de l'élève"],correct:1},
+
+  {cat:"Conditions",q:"Quelles sont les 4 questions à se poser pour définir les conditions ?",a:"1. À quelles <strong>informations</strong> l'élève a-t-il droit ?<br>2. Qu'est-ce qui lui est <strong>refusé</strong> ?<br>3. Dans quelles <strong>circonstances</strong> le comportement doit se manifester ?<br>4. Y a-t-il des aptitudes que vous n'essayez <strong>PAS</strong> de développer ?",tip:"Ces 4 questions couvrent tous les types de conditions.",
+   qcm:["Qui, quoi, où, quand","Informations autorisées, interdictions, circonstances, aptitudes exclues","Performance, conditions, critère, évaluation","Bloom 1, 2, 3, 4"],correct:1},
+
+  {cat:"Conditions",q:"Qu'est-ce qu'un « élément-test » ?",a:"C'est un <strong>exemple concret</strong> ajouté à l'objectif pour lever l'ambiguïté. On ne l'ajoute pas systématiquement, seulement quand l'objectif reste flou malgré la description.",tip:"Ex : Objectif = « Résoudre des équations linéaires. » Élément-test = « Trouver x dans : 2 + 4x = 12 »",
+   qcm:["Un QCM de vérification","Un exemple concret qui clarifie l'objectif quand il est ambigu","Le critère de réussite","L'évaluation finale du module"],correct:1},
+
+  {cat:"Conditions",q:"Faut-il TOUJOURS ajouter des conditions ?",a:"<strong>Non.</strong> Ajoutez-en suffisamment pour que l'objectif soit clair, mais pas plus. Si la performance et la qualité sont évidentes, inutile d'ajouter des conditions artificielles. Testez en demandant à un collègue ce qu'il comprend.",tip:"Assez pour être clair, pas plus.",
+   qcm:["Oui, toujours les 4 types","Non, seulement assez pour que l'objectif soit compris sans ambiguïté","Oui, sinon l'objectif est invalide","Non, les conditions sont facultatives et inutiles"],correct:1},
+
+  {cat:"Conditions",q:"« Étant donné trois jours de cours sur le bruit... » Est-ce une bonne condition ?",a:"<strong>Non !</strong> C'est une <em>fausse donnée</em>. Elle décrit le processus d'enseignement (3 jours de cours), pas la situation dans laquelle l'élève sera évalué. Une bonne condition : « Étant donné un schéma d'atelier avec des sources de bruit... »",tip:"Les conditions décrivent la situation d'ÉVALUATION, pas la durée du cours.",
+   qcm:["Oui, elle précise la durée","Non, c'est une fausse donnée qui décrit le processus, pas les conditions d'évaluation","Oui, si le temps est un critère","Ça dépend du module"],correct:1},
+
+  {cat:"Conditions",q:"Donnez un exemple de condition PSE en « ce qui est fourni ».",a:"« <strong>À partir d'un menu de cantine scolaire</strong>, l'élève classe chaque aliment... » ou « <strong>Étant donné un mannequin de secourisme et un DAE</strong>, l'élève réalise... »",tip:"« Étant donné... », « À partir de... », « Avec le matériel suivant... »",
+   qcm:["« Sans aucune aide »","« À partir d'un menu de cantine scolaire... »","« En 10 minutes »","« Au moins 4 sur 5 »"],correct:1},
+
+  {cat:"Conditions",q:"Donnez un exemple de condition en « ce qui est interdit ».",a:"« <strong>Sans document</strong>, de mémoire... », « <strong>Sans calculatrice</strong>... », « <strong>Sans l'aide d'aucune référence</strong>... »",tip:"Ces restrictions informent l'élève sur ce dont il devra se passer.",
+   qcm:["« Étant donné un document »","« En moins de 10 minutes »","« Sans document, de mémoire »","« Avec au moins 80% de réussite »"],correct:2},
+
+  {cat:"Conditions",q:"Pourquoi les conditions sont-elles si importantes en PSE ?",a:"En PSE, la <strong>situation professionnelle</strong> est centrale. Les conditions définissent si l'élève travaille sur un cas réel, un document, une photo d'atelier, un mannequin... Elles orientent toute l'évaluation (CCF notamment).",tip:"En PSE, la condition = souvent une situation professionnelle.",
+   qcm:["Elles ne sont pas importantes en PSE","Elles définissent la situation professionnelle qui oriente le CCF","Elles sont imposées par le référentiel uniquement","Elles ne servent qu'à l'oral"],correct:1},
+
+  // --- CRITÈRE (29-36) ---
+  {cat:"Critère",q:"Que représente le critère dans un objectif ?",a:"Le <strong>niveau minimal de performance acceptable</strong> — le seuil à partir duquel on considère que l'élève a atteint l'objectif. Ce n'est pas le minimum absolu mais le <strong>seuil souhaité</strong>.",tip:"On ne cherche pas le minimum possible mais le niveau souhaitable.",
+   qcm:["La note maximale","Le niveau minimal de performance acceptable (seuil souhaité)","Le nombre d'heures de cours","La méthode d'évaluation"],correct:1},
+
+  {cat:"Critère",q:"Quels sont les 3 types de critères ?",a:"<strong>1. Rapidité</strong> (temps) : « en moins de 30 secondes »<br><strong>2. Précision</strong> (exactitude) : « au moins 4 sur 5 », « à 0,5° près »<br><strong>3. Qualité/Conformité</strong> : « conforme au protocole SST »",tip:"Temps, quantité/précision, ou norme de qualité.",
+   qcm:["Facile, moyen, difficile","Rapidité, précision, qualité/conformité","Savoir, savoir-faire, savoir-être","Oral, écrit, pratique"],correct:1},
+
+  {cat:"Critère",q:"Faut-il TOUJOURS imposer un critère de temps ?",a:"<strong>Non !</strong> N'imposez un temps que si la rapidité est réellement importante pour la performance. Si l'important est la qualité, ne mettez pas de limite de temps artificielle.",tip:"Seuls les critères IMPORTANTS doivent être imposés.",
+   qcm:["Oui, toujours","Non, seulement si la rapidité est essentielle pour la performance","Oui, sinon l'évaluation est invalide","Non, le temps n'est jamais un bon critère"],correct:1},
+
+  {cat:"Critère",q:"Qu'est-ce que la « déviation acceptée » ?",a:"C'est une façon de définir le critère de qualité en indiquant <strong>l'écart maximal toléré</strong> par rapport à un standard. Ex : « Le cercle tracé ne doit pas dévier de plus de 3 mm par rapport au cercle témoin. »",tip:"Utile quand la perfection est impossible mais qu'on veut une norme mesurable.",
+   qcm:["L'écart entre deux élèves","L'écart maximal toléré par rapport à un standard de référence","Le nombre d'erreurs acceptées","La marge de notation de l'enseignant"],correct:1},
+
+  {cat:"Critère",q:"La distinction entre condition et critère est-elle toujours nette ?",a:"<strong>Non, et c'est normal !</strong> Parfois c'est flou (« sans instruments » = condition ou critère ?). L'important n'est pas l'étiquette, mais que la phrase apporte de la <strong>clarté</strong> sur ce qu'on attend.",tip:"Si ça précise la qualité attendue, c'est un critère. Sinon, c'est une condition. Et si vous hésitez... ce n'est pas grave !",
+   qcm:["Oui, il faut toujours les distinguer clairement","Non, c'est parfois flou et c'est acceptable — la clarté prime","Oui, sinon l'objectif est invalide","La distinction n'existe pas"],correct:1},
+
+  {cat:"Critère",q:"« Jusqu'à ce que l'enseignant soit satisfait » — bon ou mauvais critère ?",a:"<strong>Très mauvais !</strong> C'est un <em>critère erroné</em>. L'élève sait déjà qu'il doit satisfaire son prof — ça ne lui apprend rien. Un bon critère donne des informations <strong>nouvelles</strong> sur le niveau attendu.",tip:"Un critère doit apprendre quelque chose de NOUVEAU à l'élève.",
+   qcm:["Bon critère, car c'est le prof qui juge","Mauvais critère — il n'apprend rien de nouveau à l'élève","Bon critère si l'enseignant est compétent","Acceptable pour les CCF"],correct:1},
+
+  {cat:"Critère",q:"« 80% des élèves sauront... » — bon ou mauvais critère ?",a:"<strong>Mauvais !</strong> C'est un critère de <em>groupe</em>, pas individuel. Un élève ne peut rien faire d'un objectif qui parle du pourcentage de sa classe. Le critère doit toujours être <strong>individuel</strong>.",tip:"Le critère doit dire à CHAQUE élève ce qu'IL doit accomplir.",
+   qcm:["Bon, c'est un critère statistique valide","Mauvais — un critère doit être individuel, pas de groupe","Bon pour l'enseignant, mauvais pour l'élève","Acceptable si la classe est homogène"],correct:1},
+
+  {cat:"Critère",q:"Comment fixer un critère quand on ne sait pas quel niveau exiger ?",a:"Posez-vous 2 questions :<br><strong>1.</strong> Quelle qualité pour que l'amélioration ne soit plus qu'une question d'entraînement ?<br><strong>2.</strong> Quelle compétence avant de passer à l'étape suivante ?<br>Fixez le critère, puis ajustez-le pour qu'il soit raisonnable.",tip:"Fixez un seuil, testez-le, ajustez.",
+   qcm:["Ne pas mettre de critère","Demander à l'inspecteur","Se poser : 'Quelle qualité pour passer à l'étape suivante ?'","Copier le critère d'un collègue"],correct:2},
+
+  // --- PIÈGES (37-44) ---
+  {cat:"Piège",q:"Qu'est-ce qu'une « fausse performance » ?",a:"Un objectif qui <strong>n'a pas de verbe d'action du tout</strong>. Ex : « Ayez une compréhension approfondie de la physique atomique ». Ici, il n'y a <em>rien</em> à souligner comme performance. L'élève ne sait pas ce qu'il doit FAIRE.",tip:"Premier réflexe : souligner la performance. S'il n'y a rien à souligner, ce n'est pas un objectif.",
+   qcm:["Un objectif avec un verbe trop précis","Un objectif sans verbe d'action observable","Un objectif trop facile","Un objectif qui décrit une évaluation"],correct:1},
+
+  {cat:"Piège",q:"Qu'est-ce que des « fausses données » (fausses conditions) ?",a:"Des conditions qui décrivent le <strong>processus d'enseignement</strong> au lieu de la situation d'évaluation. Ex : « Étant donné 3 semaines de cours... », « Étant donné que l'étudiant a fait 6 expériences en labo... ». Ça ne dit pas dans quelles conditions l'élève sera évalué.",tip:"Les conditions décrivent la SITUATION D'ÉVALUATION, pas le parcours d'apprentissage.",
+   qcm:["Des conditions trop précises","Des conditions qui décrivent le processus d'enseignement au lieu de la situation d'évaluation","Des données statistiques incorrectes","Des conditions inventées par l'élève"],correct:1},
+
+  {cat:"Piège",q:"Qu'est-ce qu'une « baliverne » en matière d'objectifs ?",a:"Une phrase qui sonne bien mais ne veut <strong>rien dire de concret</strong>. Ex : « Manifestez une appréhension de plus en plus globale de la prévention ». Ça paraît profond, mais personne ne sait ce que l'élève doit FAIRE.",tip:"Si vous ne comprenez pas ce que l'élève doit faire en lisant l'objectif, c'est probablement une baliverne.",
+   qcm:["Un objectif trop simple","Un objectif qui sonne bien mais ne signifie rien de concret","Un objectif humoristique","Un objectif en langue étrangère"],correct:1},
+
+  {cat:"Piège",q:"Pourquoi « Le professeur montrera aux élèves... » n'est PAS un objectif ?",a:"Parce que ça décrit ce que fait l'<strong>enseignant</strong>, pas ce que fait l'<strong>élève</strong>. L'objectif pédagogique concerne toujours la performance de l'élève, jamais celle du professeur.",tip:"Sujet de l'objectif = l'élève. Toujours.",
+   qcm:["C'est trop vague","Ça décrit l'action de l'enseignant, pas celle de l'élève","Le mot 'montrer' est interdit","Il manque le critère"],correct:1},
+
+  {cat:"Piège",q:"Qu'est-ce qu'un « point de détail » déguisé en objectif ?",a:"C'est quand on confond une <strong>activité pédagogique</strong> (un exercice, un TP) avec l'objectif réel. Test : demandez-vous « <strong>Pourquoi</strong> l'élève fait cette tâche ? ». Si la réponse est « pour qu'il puisse ensuite... », alors la tâche n'est qu'un moyen, pas l'objectif.",tip:"Le test du « Pourquoi ? » : si la réponse est « pour que... alors... », c'est un moyen, pas un but.",
+   qcm:["Un objectif trop précis","Un exercice ou une activité confondu avec l'objectif réel","Un objectif sans conditions","Un objectif pour les élèves en difficulté"],correct:1},
+
+  {cat:"Piège",q:"Comment traiter un « objectif d'attitude » comme « Développez votre sens des responsabilités » ?",a:"Utilisez l'<strong>analyse de but</strong> : décomposez l'intention abstraite en <strong>performances concrètes</strong> qui la prouvent. Ex : « être conscient de la sécurité » → porter ses EPI, signaler les incidents, suivre les protocoles.",tip:"Attitude abstraite → liste de comportements observables qui la prouvent.",
+   qcm:["Le supprimer car c'est impossible à évaluer","Le garder tel quel","Le décomposer en performances concrètes observables via l'analyse de but","Le remplacer par un QCM"],correct:2},
+
+  {cat:"Piège",q:"Pourquoi ne faut-il pas évaluer autre chose que ce qu'on a enseigné ?",a:"Si vous enseignez à <strong>résoudre des équations</strong> mais évaluez sur des <strong>problèmes</strong>, les élèves échouent non par incompétence mais par décalage. L'évaluation doit correspondre <em>exactement</em> à l'objectif annoncé.",tip:"Objectif A → Évaluation A. Jamais Objectif A → Évaluation B.",
+   qcm:["C'est acceptable pour varier les examens","Ça crée un décalage injuste : l'évaluation doit correspondre exactement à l'objectif","C'est recommandé pour tester la compréhension profonde","Ça ne pose problème que pour les CCF"],correct:1},
+
+  {cat:"Piège",q:"Qu'est-ce que la « hiérarchie des objectifs » et pourquoi est-elle importante ?",a:"Les objectifs forment une <strong>pyramide</strong> : un objectif principal (ex : faire une pizza) se décompose en sous-objectifs (faire la pâte, la sauce, utiliser le four). Il faut rédiger les objectifs au <strong>bon niveau</strong> — sur les tâches principales, pas les tâches subordonnées.",tip:"Utilisez le « Pourquoi ? » ascendant et le « Quoi ? » descendant pour trouver le bon niveau.",
+   qcm:["Tous les objectifs ont la même importance","Les objectifs forment une pyramide — rédigez au bon niveau (tâches principales)","Les sous-objectifs sont plus importants","Il faut rédiger un objectif pour chaque sous-tâche"],correct:1},
+
+  // --- SUBTILITÉS (45-48) ---
+  {cat:"Subtilité",q:"Peut-on dire qu'un critère est « implicite » ?",a:"<strong>Attention !</strong> « Implicite » signifie « suggéré indirectement ». Mais une suggestion n'est pas une affirmation. Le désaccord est facile quand on se fie aux implications. Mieux vaut <strong>toujours expliciter</strong> le critère, même s'il semble évident.",tip:"Implicite ≠ explicite. Quand c'est important, écrivez-le.",
+   qcm:["Oui, un critère implicite est suffisant","Non, mieux vaut toujours expliciter le critère pour éviter les malentendus","Les critères sont toujours implicites","Seuls les critères de temps peuvent être implicites"],correct:1},
+
+  {cat:"Subtilité",q:"L'objectif n'est pas un programme — quelle est la nuance ?",a:"Le <strong>programme</strong> liste les thèmes à couvrir. L'<strong>objectif</strong> dit ce que l'élève saura faire grâce au programme. Le programme est une <em>suite d'activités</em>. L'objectif est un <em>produit</em> (résultat).",tip:"Programme = parcours. Objectif = destination.",
+   qcm:["Programme et objectif sont synonymes","Le programme est un parcours d'activités, l'objectif est le résultat attendu","L'objectif est plus détaillé que le programme","Le programme contient les objectifs"],correct:1},
+
+  {cat:"Subtilité",q:"Que faire quand on pense que certains aspects sont « impossibles à mesurer » ?",a:"Presque tout peut être analysé en <strong>performances concrètes</strong>. L'analyse de but permet de transformer même les notions les plus abstraites (attitudes, motivations) en comportements observables. Le critère n'a pas besoin d'être parfait, il doit être <strong>utile</strong>.",tip:"La question n'est pas 'peut-on tout mesurer ?' mais 'peut-on améliorer la clarté de l'objectif ?'",
+   qcm:["Abandonner ces objectifs","Laisser l'objectif sans critère","Utiliser l'analyse de but pour décomposer en performances observables","Demander à un collègue de décider"],correct:2},
+
+  {cat:"Subtilité",q:"Les questions d'examen doivent-elles correspondre exactement à l'objectif ?",a:"<strong>Oui !</strong> L'objectif est le plan, l'examen vérifie si le plan est réalisé. Évaluer autre chose que ce qui est annoncé dans l'objectif est injuste et contre-productif. Si l'objectif est « écrire des sonnets », ne testez pas avec « définissez un sonnet ».",tip:"L'examen est le miroir de l'objectif, pas son cousin éloigné.",
+   qcm:["Non, il faut varier pour surprendre les élèves","Oui, l'évaluation doit tester exactement la performance de l'objectif","Seulement pour les examens officiels","Les QCM sont toujours adaptés à tous les objectifs"],correct:1},
+
+  // --- PSE (49-50) ---
+  {cat:"PSE",q:"Rédigez un objectif PSE complet sur les addictions.",a:"« <strong>À partir de 3 témoignages écrits</strong> (conditions), l'élève <strong>identifie par écrit</strong> (performance) pour chaque témoignage : la substance, au moins 2 conséquences sur la santé et 1 structure d'aide, <strong>avec au moins 2 témoignages traités correctement sur 3</strong> (critère). »",tip:"P = identifie par écrit, C = 3 témoignages, Cr = 2 sur 3 corrects.",
+   qcm:["Sensibiliser aux dangers des addictions","L'élève connaîtra les substances addictives","À partir de 3 témoignages, identifier par écrit substance + conséquences + aide (2/3 corrects)","Le professeur présentera les risques des addictions"],correct:2},
+
+  {cat:"PSE",q:"Rédigez un objectif PSE complet sur les risques au poste de travail.",a:"« <strong>Étant donné une photographie d'un poste de travail en atelier</strong> (conditions), l'élève <strong>repère sur le document et nomme par écrit</strong> (performance) <strong>au moins 5 risques parmi les 7 présents</strong>, et <strong>propose pour chacun une mesure de prévention adaptée</strong> (critère). »",tip:"P = repérer + nommer + proposer, C = photo d'atelier, Cr = 5/7 + prévention adaptée.",
+   qcm:["Comprendre les risques professionnels","L'élève sera sensibilisé à la sécurité au travail","Sur photo d'atelier, repérer et nommer par écrit ≥5/7 risques + proposer une prévention pour chacun","Connaître le document unique d'évaluation des risques"],correct:2},
+
+  // --- BLOOM (bonus) ---
+  {cat:"Bloom",q:"Quels sont les 6 niveaux de la taxonomie de Bloom (du plus simple au plus complexe) ?",a:"<strong>1. Connaître</strong> (mémoriser)<br><strong>2. Comprendre</strong> (reformuler)<br><strong>3. Appliquer</strong> (utiliser)<br><strong>4. Analyser</strong> (décomposer)<br><strong>5. Évaluer</strong> (juger)<br><strong>6. Créer</strong> (produire du nouveau)",tip:"Con-Com-App-Ana-Éva-Cré — du simple au complexe.",
+   qcm:["Savoir, comprendre, appliquer, analyser, évaluer, créer","Écouter, lire, écrire, parler, créer, évaluer","Mémoriser, copier, résumer, critiquer, inventer, publier","Connaître, appliquer, analyser, créer, évaluer, comprendre"],correct:0}
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let cards = [...allCards];
+let currentIdx = 0;
+let known = new Set();
+let dontknow = new Set();
+let currentMode = 'flash';
+let qcmAnswers = {};
+let speedIdx = 0;
+let speedScore = 0;
+let speedStart = null;
+let speedTimer = null;
+
+// ============================================================
+// MODE SWITCHING
+// ============================================================
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.mode-btn[onclick="setMode('${mode}')"]`).classList.add('active');
+  document.getElementById('flashView').style.display = mode === 'flash' ? 'block' : 'none';
+  document.getElementById('qcmView').style.display = mode === 'qcm' ? 'block' : 'none';
+  document.getElementById('speedView').style.display = mode === 'speed' ? 'block' : 'none';
+  if (mode === 'flash') showCard();
+  if (mode === 'qcm') renderQcm();
+  if (mode === 'speed') startSpeed();
+}
+
+// ============================================================
+// FLASHCARD MODE
+// ============================================================
+function showCard() {
+  if (cards.length === 0) return;
+  if (currentIdx >= cards.length) currentIdx = 0;
+  if (currentIdx < 0) currentIdx = cards.length - 1;
+  const c = cards[currentIdx];
+  const fc = document.getElementById('flashcard');
+  fc.classList.remove('flipped');
+  document.getElementById('cardCat').textContent = c.cat;
+  document.getElementById('cardCatBack').textContent = c.cat;
+  document.getElementById('cardNum').textContent = `${currentIdx + 1}/${cards.length}`;
+  document.getElementById('cardNumBack').textContent = `${currentIdx + 1}/${cards.length}`;
+  document.getElementById('cardQ').innerHTML = c.q;
+  let answerHtml = c.a;
+  if (c.tip) answerHtml += `<div class="card-tip">💡 <strong>Astuce :</strong> ${c.tip}</div>`;
+  document.getElementById('cardA').innerHTML = answerHtml;
+  document.getElementById('flipHint').style.display = 'block';
+  updateStats();
+}
+
+function flipCard() {
+  document.getElementById('flashcard').classList.toggle('flipped');
+  document.getElementById('flipHint').style.display = 'none';
+}
+
+function nextCard() { currentIdx++; showCard(); }
+function prevCard() { currentIdx--; showCard(); }
+
+function markKnow() {
+  const origIdx = allCards.indexOf(cards[currentIdx]);
+  known.add(origIdx);
+  dontknow.delete(origIdx);
+  cards.splice(currentIdx, 1);
+  if (cards.length === 0) { showComplete(); return; }
+  if (currentIdx >= cards.length) currentIdx = 0;
+  showCard();
+}
+
+function markDontKnow() {
+  const origIdx = allCards.indexOf(cards[currentIdx]);
+  dontknow.add(origIdx);
+  known.delete(origIdx);
+  currentIdx++;
+  showCard();
+}
+
+function updateStats() {
+  document.getElementById('statsKnow').textContent = `✅ Acquis : ${known.size}`;
+  document.getElementById('statsLeft').textContent = `📋 Restant : ${cards.length}`;
+  document.getElementById('statsDont').textContent = `🔄 À revoir : ${dontknow.size}`;
+  const pct = Math.round((known.size / allCards.length) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+function showComplete() {
+  document.getElementById('flashcard').querySelector('.card-front').innerHTML = `
+    <div style="font-size:3rem;">🎉</div>
+    <div class="card-question" style="color:var(--success);">Bravo ! Toutes les cartes sont acquises !</div>
+  `;
+  updateStats();
+}
+
+// ============================================================
+// SHUFFLE / FILTER / RESET
+// ============================================================
+function shuffleCards() {
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+  currentIdx = 0;
+  showCard();
+}
+
+function resetProgress() {
+  cards = [...allCards];
+  known.clear();
+  dontknow.clear();
+  currentIdx = 0;
+  qcmAnswers = {};
+  showCard();
+  if (currentMode === 'qcm') renderQcm();
+}
+
+function showOnlyWrong() {
+  if (dontknow.size === 0) { alert('Aucune carte marquée "à revoir" !'); return; }
+  cards = allCards.filter((_, i) => dontknow.has(i));
+  currentIdx = 0;
+  showCard();
+}
+
+function filterCat(cat) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  if (cat === 'all') cards = allCards.filter((_, i) => !known.has(i));
+  else cards = allCards.filter((c, i) => c.cat === cat && !known.has(i));
+  currentIdx = 0;
+  if (currentMode === 'flash') showCard();
+  if (currentMode === 'qcm') renderQcm();
+}
+
+// ============================================================
+// QCM MODE
+// ============================================================
+function renderQcm() {
+  const container = document.getElementById('qcmContainer');
+  container.innerHTML = cards.map((c, i) => `
+    <div class="qcm-card" id="qcm${i}">
+      <div class="qcm-num">Question ${i + 1}/${cards.length}</div>
+      <span class="qcm-category">${c.cat}</span>
+      <div class="qcm-question">${c.q}</div>
+      <div class="qcm-options">
+        ${c.qcm.map((opt, j) => `<div class="qcm-opt" id="qo_${i}_${j}" onclick="selectQcm(${i},${j})">${opt}</div>`).join('')}
+      </div>
+      <div class="qcm-feedback" id="qfb_${i}"></div>
+    </div>
+  `).join('');
+  qcmAnswers = {};
+}
+
+function selectQcm(i, j) {
+  if (qcmAnswers[i] !== undefined && qcmAnswers[i].locked) return;
+  qcmAnswers[i] = { val: j, locked: false };
+  cards[i].qcm.forEach((_, k) => {
+    document.getElementById(`qo_${i}_${k}`).classList.remove('selected');
+  });
+  document.getElementById(`qo_${i}_${j}`).classList.add('selected');
+}
+
+function submitQcm() {
+  let score = 0;
+  cards.forEach((c, i) => {
+    const fb = document.getElementById(`qfb_${i}`);
+    const ans = qcmAnswers[i];
+    c.qcm.forEach((_, k) => {
+      const el = document.getElementById(`qo_${i}_${k}`);
+      el.classList.remove('selected');
+      el.classList.add('disabled');
+      if (k === c.correct) el.classList.add('correct');
+      if (ans && ans.val === k && k !== c.correct) el.classList.add('wrong');
+    });
+    if (ans && ans.val === c.correct) {
+      score++;
+      fb.className = 'qcm-feedback show ok';
+      fb.textContent = '✅ Correct !';
+    } else {
+      fb.className = 'qcm-feedback show ko';
+      fb.textContent = `❌ Réponse : ${c.qcm[c.correct]}`;
+      const origIdx = allCards.indexOf(c);
+      dontknow.add(origIdx);
+    }
+    if (ans) ans.locked = true;
+  });
+  showScore(score, cards.length);
+  updateStats();
+}
+
+// ============================================================
+// SPEED MODE
+// ============================================================
+function startSpeed() {
+  cards = [...allCards];
+  shuffleCards();
+  speedIdx = 0;
+  speedScore = 0;
+  speedStart = Date.now();
+  if (speedTimer) clearInterval(speedTimer);
+  speedTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - speedStart) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    document.getElementById('speedTimer').textContent = `⏱️ ${m}:${s.toString().padStart(2, '0')}`;
+  }, 1000);
+  showSpeedCard();
+}
+
+function showSpeedCard() {
+  if (speedIdx >= cards.length) {
+    clearInterval(speedTimer);
+    showScore(speedScore, cards.length);
+    return;
+  }
+  const c = cards[speedIdx];
+  document.getElementById('speedCat').textContent = c.cat;
+  document.getElementById('speedNum').textContent = `${speedIdx + 1}/${cards.length}`;
+  document.getElementById('speedQ').innerHTML = c.q;
+  document.getElementById('speedFb').className = 'qcm-feedback';
+  document.getElementById('speedOpts').innerHTML = c.qcm.map((opt, j) =>
+    `<div class="qcm-opt" onclick="answerSpeed(${j})">${opt}</div>`
+  ).join('');
+}
+
+function answerSpeed(j) {
+  const c = cards[speedIdx];
+  const opts = document.getElementById('speedOpts').children;
+  const fb = document.getElementById('speedFb');
+  Array.from(opts).forEach((el, k) => {
+    el.classList.add('disabled');
+    if (k === c.correct) el.classList.add('correct');
+    if (k === j && k !== c.correct) el.classList.add('wrong');
+  });
+  if (j === c.correct) {
+    speedScore++;
+    fb.className = 'qcm-feedback show ok';
+    fb.textContent = '✅ Bravo !';
+  } else {
+    fb.className = 'qcm-feedback show ko';
+    fb.textContent = `❌ ${c.qcm[c.correct]}`;
+  }
+  setTimeout(() => { speedIdx++; showSpeedCard(); }, 1200);
+}
+
+// ============================================================
+// SCORE DISPLAY
+// ============================================================
+function showScore(score, total) {
+  const pct = Math.round(score / total * 100);
+  const circle = document.getElementById('scoreCircle');
+  circle.className = 'score-circle ' + (pct >= 80 ? 'great' : pct >= 50 ? 'good' : 'retry');
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreTotal').textContent = `/${total}`;
+  const msgs = pct >= 90 ? '🏆 Exceptionnel ! Vous maîtrisez les objectifs pédagogiques !' :
+    pct >= 80 ? '🎉 Excellent ! Quelques points à consolider.' :
+    pct >= 60 ? '👍 Bien, mais relisez les sections concernées.' :
+    pct >= 40 ? '📚 Encourageant, continuez à réviser.' :
+    '🔄 Reprenez le guide depuis le début.';
+  document.getElementById('scoreMsg').textContent = msgs;
+  document.getElementById('scoreOverlay').classList.add('show');
+}
+
+function closeScore() { document.getElementById('scoreOverlay').classList.remove('show'); }
+function retryWrong() { closeScore(); showOnlyWrong(); }
+
+// INIT
+showCard();
+</script>
+</body>
+</html>
