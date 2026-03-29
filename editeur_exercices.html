@@ -507,6 +507,13 @@
                     </div>
                 </div>
             </div>
+            <div class="form-group" style="margin-top:12px; padding:10px 14px; background:linear-gradient(135deg,#fef3c7,#fde68a); border-radius:10px; border:2px solid #f59e0b;" id="ccf-group">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:700; color:#92400e;">
+                    <input type="checkbox" id="exo-ccf" style="width:18px; height:18px; accent-color:#f59e0b;">
+                    <span>🎯 Révision CCF</span>
+                    <span style="font-size:0.72rem; color:#b45309; font-weight:normal;">(apparaîtra aussi dans la section Révision CCF pour les CAP)</span>
+                </label>
+            </div>
         </div>
 
         <!-- CONTENT CARD -->
@@ -4087,8 +4094,9 @@
             var inferredDossier = window.inferDossier ? window.inferDossier(ex) : (ex.dossier || null);
             const dossierBadge = inferredDossier ? '<span class="ei-badge" style="background:#e0f2fe; color:#0369a1;">📁 ' + inferredDossier + '</span>' : '';
             const sousThemeBadge = ex.sous_theme ? '<span class="ei-badge" style="background:#fef3c7; color:#92400e;">' + ((BUDGET_SOUS_THEMES.find(function(s) { return s.id === ex.sous_theme; }) || {}).label || ex.sous_theme) + '</span>' : '';
+            const ccfBadge = ex.ccf ? '<span class="ei-badge" style="background:#f59e0b; color:#fff; font-weight:700;">🎯 CCF</span>' : '';
             item.innerHTML = '<div class="ei-title">' + (ex.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + dossierBadge + sousThemeBadge + '</div>' +
+                '<div class="ei-meta">' + typeBadge + pubBadge + diffBadge + classeBadge + moduleBadge + dossierBadge + sousThemeBadge + ccfBadge + '</div>' +
                 '<button class="ei-del" onclick="event.stopPropagation(); deleteExerciceById(\'' + ex.id + '\')">&times;</button>';
             item.onclick = () => loadExercice(ex.id);
             list.appendChild(item);
@@ -4138,10 +4146,12 @@
         document.getElementById('btn-unpublish').style.display = 'none';
         document.getElementById('btn-publish').style.display = '';
         document.getElementById('btn-test').style.display = 'none';
-        // Reset sourcePrompt
+        // Reset sourcePrompt & CCF
         currentSourcePrompt = null;
         var pf = document.getElementById('exo-source-prompt');
         if (pf) pf.value = '';
+        var ccfCb = document.getElementById('exo-ccf');
+        if (ccfCb) ccfCb.checked = false;
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
         if (window.innerWidth <= 768) closeMenu();
@@ -4198,6 +4208,9 @@
         document.getElementById('btn-duplicate').style.display = 'block';
         document.getElementById('btn-test').style.display = 'inline-block';
         updatePublishButtons(!!ex.publie);
+        // Restore CCF toggle
+        var ccfCb = document.getElementById('exo-ccf');
+        if (ccfCb) ccfCb.checked = !!ex.ccf;
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
         renderExoList();
@@ -4626,7 +4639,8 @@
             competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
         }
         var sourcePromptVal = (document.getElementById('exo-source-prompt') || {}).value || currentSourcePrompt || null;
-        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, sous_theme, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, sourcePrompt: sourcePromptVal, updatedAt: serverTimestamp() };
+        const ccf = document.getElementById('exo-ccf') ? document.getElementById('exo-ccf').checked : false;
+        const data = { titre, type, classeIds, classeId, moduleId, dossier, sous_dossier, sous_theme, niveau, difficulte: currentDifficulty, contenu, categorie, competences_cibles, sourcePrompt: sourcePromptVal, ccf, updatedAt: serverTimestamp() };
         try {
             if (currentExoId) {
                 await setDoc(doc(db, "exercices_banque", currentExoId), data, { merge: true });
@@ -4712,6 +4726,7 @@
             categorie,
             competences_cibles,
             sourcePrompt: (document.getElementById('exo-source-prompt') || {}).value || currentSourcePrompt || null,
+            ccf: document.getElementById('exo-ccf') ? document.getElementById('exo-ccf').checked : false,
             publie: false,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
