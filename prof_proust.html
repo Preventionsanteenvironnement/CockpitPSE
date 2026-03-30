@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Questionnaire de Proust - Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:white; display:flex; height:100vh; overflow:hidden; user-select:none; }
+        .sidebar { width:380px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:15px; background:#0f172a; border-bottom:1px solid #334155; }
+        .sec-head { padding:10px 15px; background:#162032; border-bottom:1px solid #334155; font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:bold; display:flex; justify-content:space-between; }
+        .sec-list { flex:1; overflow-y:auto; padding:8px; }
+        #session-bar { padding:12px; background:#1a1a2e; border-bottom:1px solid #334155; }
+        #session-bar label { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px; }
+        .session-btns { display:flex; gap:6px; margin-top:6px; }
+        .session-btns button { flex:1; padding:7px; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem; }
+        #session-id-display { font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center; }
+        .qr-wrap { text-align:center; margin-top:8px; }
+        #qr-code { width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none; }
+        #qr-label { font-size:0.6rem; color:#64748b; margin-top:4px; display:none; }
+
+        .q-item { padding:10px 12px; margin-bottom:4px; border-radius:8px; cursor:pointer; transition:0.2s; border:2px solid transparent; font-size:0.85rem; display:flex; align-items:center; gap:8px; }
+        .q-item:hover { background:#334155; }
+        .q-item.active { border-color:#7c3aed; background:rgba(124,58,237,0.15); }
+        .q-item .q-num { background:#7c3aed; color:white; min-width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.75rem; flex-shrink:0; }
+        .q-item .q-txt { line-height:1.3; }
+
+        .main-content { flex-grow:1; display:flex; flex-direction:column; background:radial-gradient(circle at center,#1e293b 0%,#0f172a 100%); position:relative; }
+        .btn-projection { position:absolute; top:15px; right:15px; background:#7c3aed; color:white; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer; z-index:50; }
+
+        #current-question { text-align:center; font-size:2.5rem; font-weight:800; color:#fff; padding:30px 40px; margin-top:40px; line-height:1.3; }
+        #current-q-num { text-align:center; font-size:1rem; color:#7c3aed; font-weight:bold; text-transform:uppercase; letter-spacing:2px; margin-top:20px; }
+
+        .responses-zone { flex:1; overflow-y:auto; padding:20px 40px; display:flex; flex-wrap:wrap; gap:15px; align-content:flex-start; }
+        .response-card { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:15px 20px; min-width:200px; max-width:350px; flex:1; animation:slideUp 0.4s ease-out; }
+        .response-card .rc-pseudo { font-size:0.75rem; color:#a78bfa; font-weight:bold; margin-bottom:6px; }
+        .response-card .rc-text { font-size:1.1rem; color:white; line-height:1.4; }
+        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .bottom-bar { padding:15px 40px; background:#1e293b; border-top:1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        .bottom-bar .count { font-size:1.2rem; font-weight:bold; color:#7c3aed; }
+        .btn-lock { padding:8px 20px; border:1px solid #22c55e; color:#22c55e; background:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9rem; }
+        .btn-reset { padding:8px 20px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+        .student-row { padding:6px 8px; border-bottom:1px solid #334155; font-size:0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2 style="margin:0;font-size:1.1rem;">💭 PROUST</h2></div>
+        <div id="session-bar">
+            <label>Session active</label>
+            <div class="session-btns">
+                <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display"></div>
+            <div class="qr-wrap"><img id="qr-code" src="" alt="QR"><div id="qr-label">📱 Scannez</div></div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <div class="sec-head"><span>📋 Questions (cliquez pour lancer)</span></div>
+            <div class="sec-list" id="questions-list"></div>
+        </div>
+        <div style="flex:0.3; display:flex; flex-direction:column; overflow:hidden; border-top:1px solid #334155;">
+            <div class="sec-head"><span>👥 Présents <span id="student-count">(0)</span></span></div>
+            <div class="sec-list" id="student-list"></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Projection</button>
+        <div id="current-q-num">En attente...</div>
+        <div id="current-question">Sélectionnez une question dans la liste</div>
+        <div class="responses-zone" id="responses-zone"></div>
+        <div class="bottom-bar">
+            <div class="count"><span id="resp-count">0</span> réponses</div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn-lock" id="btn-lock" onclick="toggleLock()">🔓 Ouvert</button>
+                <button class="btn-reset" onclick="resetAll()">🗑️ Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey:"AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain:"devoirs-pse.firebaseapp.com", projectId:"devoirs-pse", storageBucket:"devoirs-pse.firebasestorage.app", messagingSenderId:"614730413904", appId:"1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const QUESTIONS = [
+            "Ce qui me donne envie de me lever le matin",
+            "Ce pour quoi je suis reconnaissant(e)",
+            "Ce que j'aime apprendre",
+            "Une émotion agréable que je ressens souvent",
+            "Une expérience positive récente",
+            "Une erreur qui m'a fait grandir",
+            "Ma plus belle réussite",
+            "Mon objectif de l'année",
+            "Ma citation préférée",
+            "Une activité qui me fait du bien",
+            "Une activité physique que j'aime pratiquer",
+            "Un film, une série ou une blague qui me fait rire",
+            "Une musique qui me donne de l'énergie",
+            "Les amis sur qui je peux compter",
+            "Ce que j'apprécie le plus chez mes amis",
+            "Un professeur passionnant",
+            "Une personne que j'ai envie de remercier",
+            "Une personne qui m'inspire",
+            "Ma façon d'aider les autres",
+            "Ce que j'apprécie le plus dans ma vie"
+        ];
+
+        let currentSessionId = localStorage.getItem('proust_sessionId') || null;
+        let unsubReponses = null, unsubPresence = null;
+        let activeQuestionIdx = -1;
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        // Render questions list
+        const qList = document.getElementById('questions-list');
+        QUESTIONS.forEach((q, i) => {
+            const div = document.createElement('div');
+            div.className = 'q-item';
+            div.id = 'qi-' + i;
+            div.innerHTML = '<span class="q-num">' + (i + 1) + '</span><span class="q-txt">' + q + '</span>';
+            div.onclick = () => launchQuestion(i);
+            qList.appendChild(div);
+        });
+
+        async function launchQuestion(idx) {
+            activeQuestionIdx = idx;
+            document.querySelectorAll('.q-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('qi-' + idx).classList.add('active');
+            document.getElementById('current-q-num').innerText = 'QUESTION ' + (idx + 1) + ' / ' + QUESTIONS.length;
+            document.getElementById('current-question').innerText = QUESTIONS[idx];
+            document.getElementById('responses-zone').innerHTML = '';
+            document.getElementById('resp-count').innerText = '0';
+            await setDoc(doc(db, "proust_config", "global"), { question: QUESTIONS[idx], questionNum: idx + 1, isLocked: false, sessionId: currentSessionId }, { merge: true });
+            setupResponseListener(idx + 1);
+        }
+
+        function setupResponseListener(qNum) {
+            if (unsubReponses) unsubReponses();
+            if (!currentSessionId) return;
+            const q = query(collection(db, "proust_reponses"), where("sessionId", "==", currentSessionId), where("questionNum", "==", qNum));
+            unsubReponses = onSnapshot(q, (snap) => {
+                const zone = document.getElementById('responses-zone');
+                zone.innerHTML = '';
+                let count = 0;
+                snap.forEach(d => {
+                    count++;
+                    const data = d.data();
+                    const card = document.createElement('div');
+                    card.className = 'response-card';
+                    card.innerHTML = '<div class="rc-pseudo">👤 ' + escapeHtml(data.pseudo) + '</div><div class="rc-text">' + escapeHtml(data.reponse) + '</div>';
+                    zone.appendChild(card);
+                });
+                document.getElementById('resp-count').innerText = count;
+            });
+        }
+
+        window.toggleLock = async () => {
+            const btn = document.getElementById('btn-lock');
+            const isOpen = btn.innerText.includes("Ouvert");
+            await setDoc(doc(db, "proust_config", "global"), { isLocked: isOpen }, { merge: true });
+            btn.innerText = isOpen ? "🔒 Fermé" : "🔓 Ouvert";
+            btn.style.color = isOpen ? "#ef4444" : "#22c55e";
+            btn.style.borderColor = isOpen ? "#ef4444" : "#22c55e";
+        };
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('proust_sessionId', currentSessionId);
+            await setDoc(doc(db, "proust_config", "global"), { sessionId: currentSessionId, question: '', isLocked: false }, { merge: true });
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_proust.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupPresenceListener();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId || !confirm("⚠️ Effacer toutes les données ?")) return;
+            const batch = writeBatch(db);
+            for (const col of ["proust_reponses", "proust_presence"]) {
+                const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit();
+            location.reload();
+        };
+        window.resetAll = window.resetSession;
+
+        function setupPresenceListener() {
+            if (!currentSessionId) return;
+            if (unsubPresence) unsubPresence();
+            const q = query(collection(db, "proust_presence"), where("sessionId", "==", currentSessionId));
+            unsubPresence = onSnapshot(q, (snap) => {
+                const list = document.getElementById('student-list');
+                list.innerHTML = ''; let count = 0;
+                snap.forEach(d => { count++; list.innerHTML += '<div class="student-row">👤 ' + d.data().name + '</div>'; });
+                document.getElementById('student-count').innerText = '(' + count + ')';
+            });
+        }
+
+        window.toggleProjection = () => {
+            const w = window.open("", "_blank");
+            w.document.write(document.documentElement.outerHTML);
+            w.document.close();
+            const style = w.document.createElement('style');
+            style.innerHTML = '.sidebar{display:none!important;}.btn-projection{display:none!important;}.bottom-bar{display:none!important;}';
+            w.document.head.appendChild(style);
+        };
+
+        function escapeHtml(t) { return t ? t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''; }
+
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_proust.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupPresenceListener();
+        } else { window.newSession(); }
+    </script>
+</body>
+</html>

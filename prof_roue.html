@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Roue des Émotions - Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:white; display:flex; height:100vh; overflow:hidden; user-select:none; }
+        .sidebar { width:350px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; z-index:20; flex-shrink:0; }
+        .sidebar-header { padding:15px; background:#0f172a; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+        .sidebar-section { flex:1; display:flex; flex-direction:column; overflow:hidden; border-bottom:1px solid #334155; }
+        .sec-head { padding:10px 15px; background:#162032; border-bottom:1px solid #334155; font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
+        .sec-list { flex:1; overflow-y:auto; padding:10px; }
+        .btn-action { width:100%; padding:10px; border-radius:6px; border:none; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:0.2s; margin-top:5px; }
+        .btn-red { background:#ef4444; color:white; } .btn-red:hover { background:#dc2626; }
+        .student-row { display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #334155; font-size:0.9rem; }
+        .main-content { flex-grow:1; padding:20px; display:flex; flex-direction:column; position:relative; background:radial-gradient(circle at center,#1e293b 0%,#0f172a 100%); }
+        .btn-projection { position:absolute; top:15px; right:15px; background:#e91e63; color:white; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer; z-index:50; }
+        #display-title { text-align:center; font-size:2rem; font-weight:800; color:#fff; margin-top:10px; }
+        .wheel-display { flex-grow:1; display:flex; justify-content:center; align-items:center; position:relative; }
+        .famille-circle { position:absolute; width:120px; height:120px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:800; font-size:0.9rem; transition:0.5s; border:3px solid rgba(255,255,255,0.2); cursor:default; }
+        .famille-circle .fc-emoji { font-size:2.5rem; }
+        .famille-circle .fc-count { font-size:2rem; font-weight:900; margin-top:2px; }
+        .famille-circle .fc-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; opacity:0.8; }
+        .bubble-emotion { position:absolute; padding:8px 14px; border-radius:20px; font-weight:700; font-size:0.9rem; animation:popIn 0.5s ease-out; white-space:nowrap; pointer-events:none; }
+        @keyframes popIn { from { transform:scale(0); opacity:0; } to { transform:scale(1); opacity:1; } }
+        .stats-bar { position:absolute; bottom:15px; left:15px; right:15px; background:#1e293b; padding:12px 20px; border-radius:10px; display:flex; gap:20px; align-items:center; border:1px solid #334155; z-index:10; justify-content:center; flex-wrap:wrap; }
+        .stat-item { text-align:center; }
+        .stat-item .sv { font-size:1.5rem; font-weight:900; }
+        .stat-item .sl { font-size:0.65rem; color:#94a3b8; text-transform:uppercase; }
+        #session-bar { padding:12px; background:#1a1a2e; border-bottom:1px solid #334155; }
+        #session-bar label { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px; }
+        .session-btns { display:flex; gap:6px; margin-top:6px; }
+        .session-btns button { flex:1; padding:7px; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem; }
+        #session-id-display { font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center; }
+        .qr-wrap { text-align:center; margin-top:8px; }
+        #qr-code { width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none; }
+        #qr-label { font-size:0.6rem; color:#64748b; margin-top:4px; display:none; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2 style="margin:0;font-size:1.1rem;">🎯 ROUE ÉMOTIONS</h2>
+        </div>
+        <div id="session-bar">
+            <label>Session active</label>
+            <div class="session-btns">
+                <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display"></div>
+            <div class="qr-wrap">
+                <img id="qr-code" src="" alt="QR">
+                <div id="qr-label">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sec-head"><span>📊 Synthèse</span><span id="total-count">0 réponses</span></div>
+            <div class="sec-list" id="synthese-list" style="font-size:0.9rem;"></div>
+        </div>
+        <div class="sidebar-section" style="flex:0.5;">
+            <div class="sec-head"><span>👥 Présents <span id="student-count">(0)</span></span></div>
+            <div class="sec-list" id="student-list"></div>
+        </div>
+        <div style="padding:15px; border-top:1px solid #334155;">
+            <button class="btn-action btn-red" onclick="resetAll()">🗑️ RESET TOTAL</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Mode Projection</button>
+        <div id="display-title">🎯 Roue des Émotions</div>
+        <div class="wheel-display" id="wheel-display"></div>
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-item"><div class="sv" id="st-dominant">-</div><div class="sl">Émotion dominante</div></div>
+            <div class="stat-item"><div class="sv" id="st-intensity">-</div><div class="sl">Intensité moy.</div></div>
+            <div class="stat-item"><div class="sv" id="st-corps">-</div><div class="sl">Zone corps #1</div></div>
+            <div class="stat-item"><div class="sv" id="st-total">0</div><div class="sl">Réponses</div></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey:"AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain:"devoirs-pse.firebaseapp.com", projectId:"devoirs-pse", storageBucket:"devoirs-pse.firebasestorage.app", messagingSenderId:"614730413904", appId:"1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let currentSessionId = localStorage.getItem('roue_sessionId') || null;
+        let unsubReponses = null, unsubPresence = null;
+
+        const FAMILLES = [
+            { nom:'Joie', emoji:'😊', color:'#22c55e', angle:0 },
+            { nom:'Amour', emoji:'❤️', color:'#ec4899', angle:51 },
+            { nom:'Peur', emoji:'😨', color:'#8b5cf6', angle:103 },
+            { nom:'Colère', emoji:'😡', color:'#ef4444', angle:154 },
+            { nom:'Tristesse', emoji:'😢', color:'#3b82f6', angle:206 },
+            { nom:'Dégoût', emoji:'🤢', color:'#84cc16', angle:257 },
+            { nom:'Surprise', emoji:'😲', color:'#f59e0b', angle:309 }
+        ];
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        function renderWheel() {
+            const container = document.getElementById('wheel-display');
+            const cx = container.clientWidth / 2;
+            const cy = container.clientHeight / 2;
+            const radius = Math.min(cx, cy) * 0.6;
+            FAMILLES.forEach(f => {
+                let el = document.getElementById('fc-' + f.nom);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.className = 'famille-circle';
+                    el.id = 'fc-' + f.nom;
+                    el.innerHTML = '<span class="fc-emoji">' + f.emoji + '</span><span class="fc-count">0</span><span class="fc-label">' + f.nom + '</span>';
+                    el.style.background = f.color + '33';
+                    el.style.borderColor = f.color;
+                    container.appendChild(el);
+                }
+                const rad = (f.angle - 90) * Math.PI / 180;
+                el.style.left = (cx + radius * Math.cos(rad) - 60) + 'px';
+                el.style.top = (cy + radius * Math.sin(rad) - 60) + 'px';
+            });
+        }
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('roue_sessionId', currentSessionId);
+            await setDoc(doc(db, "roue_config", "global"), { sessionId: currentSessionId }, { merge: true });
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_roue.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId) return;
+            if (!confirm("⚠️ Effacer toutes les données ?")) return;
+            const batch = writeBatch(db);
+            for (const col of ["roue_reponses", "roue_presence"]) {
+                const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit();
+            location.reload();
+        };
+
+        window.resetAll = window.resetSession;
+
+        function setupListeners() {
+            if (!currentSessionId) return;
+            if (unsubReponses) unsubReponses();
+            if (unsubPresence) unsubPresence();
+
+            const qReponses = query(collection(db, "roue_reponses"), where("sessionId", "==", currentSessionId));
+            const qPresence = query(collection(db, "roue_presence"), where("sessionId", "==", currentSessionId));
+
+            unsubReponses = onSnapshot(qReponses, (snap) => {
+                let famCounts = {}; let totalIntensity = 0; let zoneCounts = {}; let count = 0;
+                FAMILLES.forEach(f => famCounts[f.nom] = 0);
+
+                snap.docChanges().forEach(change => {
+                    if (change.type === "added") {
+                        const d = change.doc.data();
+                        spawnBubble(d.emotion, d.famille);
+                    }
+                });
+
+                snap.forEach(d => {
+                    const data = d.data();
+                    count++;
+                    famCounts[data.famille] = (famCounts[data.famille] || 0) + 1;
+                    totalIntensity += data.intensite || 5;
+                    if (data.zone_corps) zoneCounts[data.zone_corps] = (zoneCounts[data.zone_corps] || 0) + 1;
+                });
+
+                FAMILLES.forEach(f => {
+                    const el = document.getElementById('fc-' + f.nom);
+                    if (el) {
+                        el.querySelector('.fc-count').innerText = famCounts[f.nom];
+                        const scale = 1 + (famCounts[f.nom] / Math.max(count, 1)) * 0.5;
+                        el.style.transform = 'scale(' + scale + ')';
+                    }
+                });
+
+                let dominant = '-'; let maxC = 0;
+                for (let [k, v] of Object.entries(famCounts)) { if (v > maxC) { maxC = v; dominant = k; } }
+                let topZone = '-'; let maxZ = 0;
+                const zoneLabels = { tete:'Tête', poitrine:'Poitrine', ventre:'Ventre', gorge:'Gorge', mains:'Mains', partout:'Partout', non_precise:'-' };
+                for (let [k, v] of Object.entries(zoneCounts)) { if (v > maxZ) { maxZ = v; topZone = zoneLabels[k] || k; } }
+
+                document.getElementById('st-dominant').innerText = count > 0 ? dominant : '-';
+                document.getElementById('st-intensity').innerText = count > 0 ? (totalIntensity / count).toFixed(1) : '-';
+                document.getElementById('st-corps').innerText = count > 0 ? topZone : '-';
+                document.getElementById('st-total').innerText = count;
+                document.getElementById('total-count').innerText = count + ' réponses';
+
+                const synthese = document.getElementById('synthese-list');
+                synthese.innerHTML = '';
+                const sorted = Object.entries(famCounts).sort((a, b) => b[1] - a[1]);
+                sorted.forEach(([nom, c]) => {
+                    const f = FAMILLES.find(x => x.nom === nom);
+                    const pct = count > 0 ? Math.round(c / count * 100) : 0;
+                    synthese.innerHTML += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #334155;"><span>' + f.emoji + ' ' + nom + '</span><span style="color:' + f.color + ';font-weight:bold;">' + c + ' (' + pct + '%)</span></div>';
+                });
+            });
+
+            unsubPresence = onSnapshot(qPresence, (snap) => {
+                const list = document.getElementById('student-list');
+                list.innerHTML = ''; let count = 0;
+                snap.forEach(d => { count++; list.innerHTML += '<div class="student-row"><span>👤 ' + d.data().name + '</span></div>'; });
+                document.getElementById('student-count').innerText = '(' + count + ')';
+            });
+        }
+
+        function spawnBubble(emotion, famille) {
+            const container = document.getElementById('wheel-display');
+            const f = FAMILLES.find(x => x.nom === famille);
+            if (!f) return;
+            const b = document.createElement('div');
+            b.className = 'bubble-emotion';
+            b.style.background = f.color;
+            b.style.color = 'white';
+            b.innerText = emotion;
+            const rad = ((f.angle + (Math.random() * 40 - 20)) - 90) * Math.PI / 180;
+            const r = Math.min(container.clientWidth, container.clientHeight) * (0.3 + Math.random() * 0.15);
+            b.style.left = (container.clientWidth / 2 + r * Math.cos(rad)) + 'px';
+            b.style.top = (container.clientHeight / 2 + r * Math.sin(rad)) + 'px';
+            container.appendChild(b);
+            setTimeout(() => { b.style.transition = 'opacity 1s'; b.style.opacity = '0'; setTimeout(() => b.remove(), 1000); }, 4000);
+        }
+
+        window.toggleProjection = () => {
+            const w = window.open("", "_blank");
+            w.document.write(document.documentElement.outerHTML);
+            w.document.close();
+            const style = w.document.createElement('style');
+            style.innerHTML = '.sidebar{display:none!important;}.btn-projection{display:none!important;}';
+            w.document.head.appendChild(style);
+        };
+
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 Session : ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_roue.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        } else { window.newSession(); }
+
+        setTimeout(renderWheel, 100);
+        window.addEventListener('resize', renderWheel);
+    </script>
+</body>
+</html>

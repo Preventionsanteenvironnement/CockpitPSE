@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Thermomètre de Stress - Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:white; display:flex; height:100vh; overflow:hidden; user-select:none; }
+        .sidebar { width:350px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:15px; background:#0f172a; border-bottom:1px solid #334155; }
+        .sec-head { padding:10px 15px; background:#162032; border-bottom:1px solid #334155; font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:bold; display:flex; justify-content:space-between; }
+        .sec-list { flex:1; overflow-y:auto; padding:10px; }
+        #session-bar { padding:12px; background:#1a1a2e; border-bottom:1px solid #334155; }
+        #session-bar label { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px; }
+        .session-btns { display:flex; gap:6px; margin-top:6px; }
+        .session-btns button { flex:1; padding:7px; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem; }
+        #session-id-display { font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center; }
+        .qr-wrap { text-align:center; margin-top:8px; }
+        #qr-code { width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none; }
+        #qr-label { font-size:0.6rem; color:#64748b; margin-top:4px; display:none; }
+        .btn-action { width:100%; padding:10px; border-radius:6px; border:none; font-weight:bold; cursor:pointer; margin-top:5px; }
+        .btn-red { background:#ef4444; color:white; }
+        .student-row { padding:6px 8px; border-bottom:1px solid #334155; font-size:0.85rem; }
+
+        .main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; background:radial-gradient(circle at center,#1e293b 0%,#0f172a 100%); }
+        .btn-projection { position:absolute; top:15px; right:15px; background:#ef4444; color:white; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer; z-index:50; }
+
+        .dashboard { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; padding:20px 30px; flex:1; align-content:center; }
+
+        /* THERMOMETRE CENTRAL */
+        .thermo-panel { grid-column:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .big-thermo { width:80px; height:300px; background:#334155; border-radius:40px; position:relative; overflow:hidden; border:3px solid #475569; }
+        .big-thermo-fill { position:absolute; bottom:0; left:0; width:100%; background:linear-gradient(180deg, #ef4444, #eab308, #22c55e); transition:height 1s; border-radius:0 0 37px 37px; }
+        .big-thermo-val { font-size:4rem; font-weight:900; margin-top:15px; }
+        .big-thermo-label { font-size:1rem; color:#94a3b8; font-weight:bold; margin-top:5px; }
+
+        /* SOURCES */
+        .sources-panel { grid-column:2; }
+        .panel-title { font-size:0.8rem; text-transform:uppercase; color:#94a3b8; font-weight:900; letter-spacing:1px; margin-bottom:15px; text-align:center; }
+        .source-bar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+        .source-bar .sb-label { width:80px; text-align:right; font-size:0.85rem; font-weight:600; }
+        .source-bar .sb-bg { flex:1; height:25px; background:#334155; border-radius:6px; overflow:hidden; }
+        .source-bar .sb-fill { height:100%; transition:width 0.5s; border-radius:6px; display:flex; align-items:center; padding-left:8px; font-size:0.75rem; font-weight:bold; }
+        .source-bar .sb-count { width:30px; text-align:center; font-weight:bold; font-size:0.9rem; }
+
+        /* STRATEGIES */
+        .strat-panel { grid-column:3; }
+        .strat-item { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #334155; font-size:0.95rem; }
+        .strat-item .si-count { background:#334155; padding:4px 12px; border-radius:12px; font-weight:bold; min-width:30px; text-align:center; }
+
+        /* COACH */
+        .coach-bar { padding:15px 30px; background:#1a1a1a; border-top:1px solid #334155; display:flex; align-items:center; gap:15px; }
+        .coach-icon { font-size:2rem; }
+        .coach-msg { font-size:1.2rem; font-weight:bold; color:#4ca1af; font-style:italic; }
+
+        /* RESPIRATION */
+        .breath-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; }
+        .breath-circle { width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, #22c55e 0%, #065f46 100%); display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:900; color:white; animation:breathe 12s infinite; }
+        @keyframes breathe { 0%,100% { transform:scale(0.6); } 33% { transform:scale(1.2); } 50% { transform:scale(1.2); } 83% { transform:scale(0.6); } }
+        .breath-text { font-size:1.5rem; color:white; margin-top:20px; font-weight:bold; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2 style="margin:0;font-size:1.1rem;">🌡️ STRESS</h2></div>
+        <div id="session-bar">
+            <label>Session</label>
+            <div class="session-btns">
+                <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display"></div>
+            <div class="qr-wrap"><img id="qr-code" src="" alt="QR"><div id="qr-label">📱 Scannez</div></div>
+        </div>
+        <div style="padding:15px; border-bottom:1px solid #334155;">
+            <button class="btn-action" style="background:#22c55e; color:white;" onclick="startBreathing()">🌬️ Exercice de Respiration</button>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <div class="sec-head"><span>👥 Présents <span id="student-count">(0)</span></span></div>
+            <div class="sec-list" id="student-list"></div>
+        </div>
+        <div style="padding:15px; border-top:1px solid #334155;">
+            <button class="btn-action btn-red" onclick="resetAll()">🗑️ RESET TOTAL</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Projection</button>
+        <div class="dashboard">
+            <div class="thermo-panel">
+                <div class="panel-title">Stress moyen</div>
+                <div class="big-thermo"><div class="big-thermo-fill" id="thermo-fill" style="height:50%;"></div></div>
+                <div class="big-thermo-val" id="avg-val">-</div>
+                <div class="big-thermo-label" id="avg-label">En attente...</div>
+                <div style="margin-top:10px; font-size:0.85rem; color:#64748b;"><span id="total-count">0</span> réponses</div>
+            </div>
+            <div class="sources-panel">
+                <div class="panel-title">Sources de stress</div>
+                <div id="sources-bars"></div>
+            </div>
+            <div class="strat-panel">
+                <div class="panel-title">Stratégies de régulation</div>
+                <div id="strat-list"></div>
+            </div>
+        </div>
+        <div class="coach-bar">
+            <span class="coach-icon" id="coach-icon">💡</span>
+            <span class="coach-msg" id="coach-msg">En attente des élèves...</span>
+        </div>
+    </div>
+
+    <div class="breath-overlay" id="breath-overlay" onclick="stopBreathing()">
+        <div class="breath-circle" id="breath-circle">INSPIRE</div>
+        <div class="breath-text">Exercice de respiration 4-7-8</div>
+        <div style="color:#64748b; margin-top:10px; font-size:0.9rem;">Cliquez pour fermer</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey:"AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain:"devoirs-pse.firebaseapp.com", projectId:"devoirs-pse", storageBucket:"devoirs-pse.firebasestorage.app", messagingSenderId:"614730413904", appId:"1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const SOURCES = [{k:'cours',l:'📚 Cours',c:'#3b82f6'},{k:'notes',l:'📝 Notes',c:'#8b5cf6'},{k:'famille',l:'🏠 Famille',c:'#ec4899'},{k:'amis',l:'👥 Amis',c:'#f59e0b'},{k:'avenir',l:'🔮 Avenir',c:'#06b6d4'},{k:'corps',l:'🪞 Corps',c:'#84cc16'},{k:'ecrans',l:'📱 Écrans',c:'#ef4444'},{k:'autre',l:'❓ Autre',c:'#64748b'}];
+        const STRATS = [{k:'respirer',l:'🌬️ Respirer'},{k:'musique',l:'🎵 Musique'},{k:'sport',l:'🏃 Sport'},{k:'parler',l:'🗣️ Parler'},{k:'ecrire',l:'✍️ Écrire'},{k:'repos',l:'😴 Repos'},{k:'nature',l:'🌿 Nature'},{k:'rien',l:'🤷 Je sais pas'}];
+
+        let currentSessionId = localStorage.getItem('stress_sessionId') || null;
+        let unsubReponses = null, unsubPresence = null;
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        // Render source bars
+        const sourcesDiv = document.getElementById('sources-bars');
+        SOURCES.forEach(s => {
+            sourcesDiv.innerHTML += '<div class="source-bar"><div class="sb-label">' + s.l + '</div><div class="sb-bg"><div class="sb-fill" id="sbf-' + s.k + '" style="background:' + s.c + ';width:0%;"></div></div><div class="sb-count" id="sbc-' + s.k + '">0</div></div>';
+        });
+
+        function setupListeners() {
+            if (!currentSessionId) return;
+            if (unsubReponses) unsubReponses();
+            if (unsubPresence) unsubPresence();
+
+            const qR = query(collection(db, "stress_reponses"), where("sessionId", "==", currentSessionId));
+            const qP = query(collection(db, "stress_presence"), where("sessionId", "==", currentSessionId));
+
+            unsubReponses = onSnapshot(qR, (snap) => {
+                let total = 0, sumNiveau = 0;
+                let srcCounts = {}; let stratCounts = {};
+                SOURCES.forEach(s => srcCounts[s.k] = 0);
+                STRATS.forEach(s => stratCounts[s.k] = 0);
+
+                snap.forEach(d => {
+                    const data = d.data();
+                    total++; sumNiveau += data.niveau || 5;
+                    if (data.source) srcCounts[data.source] = (srcCounts[data.source] || 0) + 1;
+                    if (data.strategie) stratCounts[data.strategie] = (stratCounts[data.strategie] || 0) + 1;
+                });
+
+                const avg = total > 0 ? (sumNiveau / total) : 0;
+                const avgRound = Math.round(avg * 10) / 10;
+                document.getElementById('avg-val').innerText = total > 0 ? avgRound : '-';
+                document.getElementById('avg-val').style.color = avg <= 3 ? '#22c55e' : (avg <= 6 ? '#eab308' : '#ef4444');
+                document.getElementById('thermo-fill').style.height = (avg * 10) + '%';
+                document.getElementById('total-count').innerText = total;
+
+                const labels = {1:'Très zen',2:'Zen',3:'Tranquille',4:'Légèrement tendu',5:'Modéré',6:'Tendu',7:'Stressé',8:'Très stressé',9:'Alerte',10:'Maximum'};
+                document.getElementById('avg-label').innerText = total > 0 ? (labels[Math.round(avg)] || '') : 'En attente...';
+
+                SOURCES.forEach(s => {
+                    const pct = total > 0 ? Math.round(srcCounts[s.k] / total * 100) : 0;
+                    document.getElementById('sbf-' + s.k).style.width = pct + '%';
+                    document.getElementById('sbc-' + s.k).innerText = srcCounts[s.k];
+                });
+
+                const stratList = document.getElementById('strat-list');
+                stratList.innerHTML = '';
+                const sorted = STRATS.map(s => ({...s, count: stratCounts[s.k]})).sort((a,b) => b.count - a.count);
+                sorted.forEach(s => {
+                    if (s.count > 0) stratList.innerHTML += '<div class="strat-item"><span>' + s.l + '</span><span class="si-count">' + s.count + '</span></div>';
+                });
+                if (total === 0) stratList.innerHTML = '<div style="color:#64748b; text-align:center; margin-top:20px;">En attente...</div>';
+
+                updateCoach(avg, total);
+            });
+
+            unsubPresence = onSnapshot(qP, (snap) => {
+                const list = document.getElementById('student-list');
+                list.innerHTML = ''; let count = 0;
+                snap.forEach(d => { count++; list.innerHTML += '<div class="student-row">👤 ' + d.data().name + '</div>'; });
+                document.getElementById('student-count').innerText = '(' + count + ')';
+            });
+        }
+
+        function updateCoach(avg, total) {
+            const msg = document.getElementById('coach-msg');
+            const ico = document.getElementById('coach-icon');
+            if (total === 0) { msg.innerText = "En attente des élèves..."; ico.innerText = "💡"; return; }
+            if (avg <= 3) { msg.innerText = "Classe zen ! Parfait pour travailler."; ico.innerText = "🧘"; }
+            else if (avg <= 5) { msg.innerText = "Stress modéré. On commence en douceur."; ico.innerText = "💡"; }
+            else if (avg <= 7) { msg.innerText = "Stress élevé. Un exercice de respiration serait utile."; ico.innerText = "⚠️"; }
+            else { msg.innerText = "Alerte stress ! Exercice de respiration recommandé."; ico.innerText = "🚨"; }
+        }
+
+        let breathInterval;
+        window.startBreathing = () => {
+            document.getElementById('breath-overlay').style.display = 'flex';
+            const circle = document.getElementById('breath-circle');
+            const phases = [{t:'INSPIRE',d:4000},{t:'RETIENS',d:7000},{t:'EXPIRE',d:8000}];
+            let i = 0;
+            circle.innerText = phases[0].t;
+            breathInterval = setInterval(() => {
+                i = (i + 1) % 3;
+                circle.innerText = phases[i].t;
+            }, phases[i].d);
+        };
+        window.stopBreathing = () => {
+            clearInterval(breathInterval);
+            document.getElementById('breath-overlay').style.display = 'none';
+        };
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('stress_sessionId', currentSessionId);
+            await setDoc(doc(db, "stress_config", "global"), { sessionId: currentSessionId });
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_stress.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId || !confirm("⚠️ Tout effacer ?")) return;
+            const batch = writeBatch(db);
+            for (const col of ["stress_reponses", "stress_presence"]) {
+                const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit(); location.reload();
+        };
+        window.resetAll = window.resetSession;
+
+        window.toggleProjection = () => {
+            const w = window.open("", "_blank");
+            w.document.write(document.documentElement.outerHTML);
+            w.document.close();
+            const style = w.document.createElement('style');
+            style.innerHTML = '.sidebar{display:none!important;}.btn-projection{display:none!important;}';
+            w.document.head.appendChild(style);
+        };
+
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_stress.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupListeners();
+        } else { window.newSession(); }
+    </script>
+</body>
+</html>
