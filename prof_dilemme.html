@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Dilemmes Moraux - Prof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:white; display:flex; height:100vh; overflow:hidden; user-select:none; }
+        .sidebar { width:400px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:15px; background:#0f172a; border-bottom:1px solid #334155; }
+        .sec-head { padding:10px 15px; background:#162032; border-bottom:1px solid #334155; font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:bold; display:flex; justify-content:space-between; }
+        .sec-list { flex:1; overflow-y:auto; padding:8px; }
+        #session-bar { padding:12px; background:#1a1a2e; border-bottom:1px solid #334155; }
+        #session-bar label { font-size:0.7rem; color:#888; text-transform:uppercase; letter-spacing:1px; }
+        .session-btns { display:flex; gap:6px; margin-top:6px; }
+        .session-btns button { flex:1; padding:7px; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem; }
+        #session-id-display { font-size:0.7rem; color:#64748b; margin-top:6px; text-align:center; }
+        .qr-wrap { text-align:center; margin-top:8px; }
+        #qr-code { width:120px; height:120px; border-radius:8px; background:white; padding:4px; display:none; }
+        #qr-label { font-size:0.6rem; color:#64748b; margin-top:4px; display:none; }
+
+        .dilemme-item { padding:10px; margin-bottom:6px; border-radius:8px; cursor:pointer; transition:0.2s; border:1px solid #334155; font-size:0.8rem; line-height:1.4; }
+        .dilemme-item:hover { background:#334155; }
+        .dilemme-item.active { border-color:#06b6d4; background:rgba(6,182,212,0.1); }
+        .dilemme-item .di-title { font-weight:700; margin-bottom:4px; color:#e2e8f0; }
+        .dilemme-item .di-choices { color:#64748b; font-size:0.7rem; }
+
+        .custom-zone { padding:12px; border-top:1px solid #334155; }
+        .custom-zone input, .custom-zone textarea { width:100%; background:#0f172a; border:1px solid #334155; color:white; padding:8px; border-radius:6px; margin-bottom:6px; font-family:'Inter',sans-serif; font-size:0.85rem; }
+        .custom-zone textarea { height:60px; resize:none; }
+        .btn-custom { width:100%; padding:8px; background:#06b6d4; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }
+
+        .main-content { flex-grow:1; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; background:radial-gradient(circle at center,#1e293b 0%,#0f172a 100%); padding:40px; }
+        .btn-projection { position:absolute; top:15px; right:15px; background:#06b6d4; color:white; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer; z-index:50; }
+
+        #display-scenario { font-size:2rem; font-weight:800; text-align:center; line-height:1.4; max-width:800px; margin-bottom:30px; }
+
+        .bars-display { width:100%; max-width:700px; }
+        .bd-row { display:flex; align-items:center; gap:15px; margin-bottom:15px; }
+        .bd-letter { width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.2rem; flex-shrink:0; }
+        .bd-text { width:250px; font-size:0.95rem; font-weight:600; flex-shrink:0; }
+        .bd-bar-bg { flex:1; height:40px; background:#334155; border-radius:8px; overflow:hidden; }
+        .bd-bar-fill { height:100%; border-radius:8px; transition:width 0.5s; display:flex; align-items:center; padding-left:12px; font-weight:bold; }
+        .bd-pct { width:60px; text-align:right; font-weight:900; font-size:1.2rem; }
+
+        .action-bar { position:absolute; bottom:20px; display:flex; gap:15px; }
+        .btn-reveal { padding:15px 40px; border:none; border-radius:12px; font-size:1.2rem; font-weight:800; cursor:pointer; background:#06b6d4; color:white; box-shadow:0 4px 0 #0891b2; }
+        .btn-reveal:active { transform:translateY(4px); box-shadow:none; }
+        .btn-lock { padding:12px 25px; border:1px solid #22c55e; color:#22c55e; background:none; border-radius:12px; cursor:pointer; font-weight:bold; }
+        .btn-reset { padding:12px 25px; background:#ef4444; color:white; border:none; border-radius:12px; cursor:pointer; font-weight:bold; }
+        .student-row { padding:6px 8px; border-bottom:1px solid #334155; font-size:0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2 style="margin:0;font-size:1.1rem;">⚖️ DILEMMES</h2></div>
+        <div id="session-bar">
+            <label>Session</label>
+            <div class="session-btns">
+                <button onclick="newSession()" style="background:#2ecc71;">🆕 Nouvelle</button>
+                <button onclick="resetSession()" style="background:#e74c3c;">🗑️ Reset</button>
+            </div>
+            <div id="session-id-display"></div>
+            <div class="qr-wrap"><img id="qr-code" src="" alt="QR"><div id="qr-label">📱 Scannez</div></div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <div class="sec-head"><span>📋 Dilemmes (cliquez)</span></div>
+            <div class="sec-list" id="dilemmes-list"></div>
+        </div>
+        <div class="custom-zone">
+            <div class="sec-head" style="padding:5px 0; border:none; margin-bottom:6px;"><span>✏️ Dilemme personnalisé</span></div>
+            <textarea id="custom-scenario" placeholder="La situation..."></textarea>
+            <input id="custom-a" placeholder="Choix A">
+            <input id="custom-b" placeholder="Choix B">
+            <input id="custom-c" placeholder="Choix C (optionnel)">
+            <button class="btn-custom" onclick="launchCustom()">LANCER</button>
+        </div>
+        <div style="flex:0.25; display:flex; flex-direction:column; overflow:hidden; border-top:1px solid #334155;">
+            <div class="sec-head"><span>👥 Présents <span id="student-count">(0)</span></span></div>
+            <div class="sec-list" id="student-list"></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <button class="btn-projection" onclick="toggleProjection()">📺 Projection</button>
+        <div id="display-scenario">⚖️ Sélectionnez un dilemme</div>
+        <div class="bars-display" id="bars-display"></div>
+        <div style="margin-top:15px; color:#64748b; font-size:0.9rem;" id="vote-count">0 votes</div>
+        <div class="action-bar">
+            <button class="btn-lock" id="btn-lock" onclick="toggleLock()">🔓 Ouvert</button>
+            <button class="btn-reveal" onclick="revealResults()">📊 RÉVÉLER</button>
+            <button class="btn-reset" onclick="resetAll()">🗑️ Reset</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey:"AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain:"devoirs-pse.firebaseapp.com", projectId:"devoirs-pse", storageBucket:"devoirs-pse.firebasestorage.app", messagingSenderId:"614730413904", appId:"1:614730413904:web:a5dd478af5de30f6bede55" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const COLORS = ['#06b6d4', '#f59e0b', '#ef4444', '#22c55e'];
+        const LETTERS = ['A', 'B', 'C', 'D'];
+
+        const DILEMMES = [
+            { s:"Ton ami triche pendant un contrôle. Tu...", c:["Ne dis rien","Lui dis d'arrêter","Préviens le prof"] },
+            { s:"Tu trouves un portefeuille avec 50€ dans la rue. Tu...", c:["Le gardes","Le rends au commissariat","Prends l'argent et rends le reste"] },
+            { s:"Un camarade est harcelé dans la cour. Tu...", c:["Tu interviens directement","Tu vas chercher un adulte","Tu ne fais rien par peur"] },
+            { s:"On te propose une cigarette pour la première fois. Tu...", c:["Tu essaies pour voir","Tu refuses","Tu dis 'peut-être plus tard'"] },
+            { s:"Tu es témoin d'une insulte raciste. Tu...", c:["Tu réagis sur le moment","Tu t'éloignes","Tu en parles après à un adulte"] },
+            { s:"Ton patron en stage te demande de faire quelque chose de dangereux. Tu...", c:["Tu obéis sans discuter","Tu refuses","Tu demandes des explications"] },
+            { s:"Un ami poste une photo gênante de toi sur les réseaux. Tu...", c:["Tu lui demandes de supprimer","Tu postes une photo de lui en retour","Tu signales la photo"] },
+            { s:"Tu vois un camarade voler dans un magasin. Tu...", c:["Tu ne dis rien","Tu lui dis d'arrêter","Tu préviens le magasin"] },
+            { s:"Quelqu'un que tu ne connais pas te demande ton numéro sur Instagram. Tu...", c:["Tu le donnes","Tu refuses poliment","Tu bloques directement"] },
+            { s:"Tu as cassé quelque chose chez un ami mais personne n'a vu. Tu...", c:["Tu ne dis rien","Tu avoues","Tu remplaces en secret"] }
+        ];
+
+        let currentSessionId = localStorage.getItem('dilemme_sessionId') || null;
+        let unsubReponses = null, unsubPresence = null;
+        let activeChoices = [];
+
+        function generateSessionId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        // Render dilemmes list
+        const dList = document.getElementById('dilemmes-list');
+        DILEMMES.forEach((d, i) => {
+            const div = document.createElement('div');
+            div.className = 'dilemme-item'; div.id = 'di-' + i;
+            div.innerHTML = '<div class="di-title">' + (i+1) + '. ' + d.s + '</div><div class="di-choices">' + d.c.map((c,j) => LETTERS[j] + ') ' + c).join(' | ') + '</div>';
+            div.onclick = () => launchDilemme(i);
+            dList.appendChild(div);
+        });
+
+        async function launchDilemme(idx) {
+            const d = DILEMMES[idx];
+            activeChoices = d.c;
+            document.querySelectorAll('.dilemme-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('di-' + idx).classList.add('active');
+            await sendDilemme(d.s, d.c);
+        }
+
+        window.launchCustom = async () => {
+            const scenario = document.getElementById('custom-scenario').value.trim();
+            const a = document.getElementById('custom-a').value.trim();
+            const b = document.getElementById('custom-b').value.trim();
+            const c = document.getElementById('custom-c').value.trim();
+            if (!scenario || !a || !b) { alert("Remplis au moins la situation + 2 choix"); return; }
+            const choices = [a, b];
+            if (c) choices.push(c);
+            activeChoices = choices;
+            await sendDilemme(scenario, choices);
+        };
+
+        async function sendDilemme(scenario, choices) {
+            document.getElementById('display-scenario').innerText = scenario;
+            renderBars(choices);
+
+            // Clear previous responses
+            if (currentSessionId) {
+                const batch = writeBatch(db);
+                const q = query(collection(db, "dilemme_reponses"), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+
+            await setDoc(doc(db, "dilemme_config", "global"), {
+                scenario, choices, showResult: false, isLocked: false,
+                sessionId: currentSessionId, resultCounts: {}
+            }, { merge: true });
+            setupResponseListener();
+        }
+
+        function renderBars(choices) {
+            const container = document.getElementById('bars-display');
+            container.innerHTML = '';
+            choices.forEach((c, i) => {
+                container.innerHTML += '<div class="bd-row"><div class="bd-letter" style="background:' + COLORS[i] + ';">' + LETTERS[i] + '</div><div class="bd-text">' + escapeHtml(c) + '</div><div class="bd-bar-bg"><div class="bd-bar-fill" id="bdf-' + i + '" style="background:' + COLORS[i] + ';width:0%;"></div></div><div class="bd-pct" id="bdp-' + i + '">0%</div></div>';
+            });
+        }
+
+        function setupResponseListener() {
+            if (unsubReponses) unsubReponses();
+            if (!currentSessionId) return;
+            const q = query(collection(db, "dilemme_reponses"), where("sessionId", "==", currentSessionId));
+            unsubReponses = onSnapshot(q, (snap) => {
+                let counts = {}; let total = 0;
+                snap.forEach(d => {
+                    const idx = d.data().choixIdx;
+                    counts[idx] = (counts[idx] || 0) + 1;
+                    total++;
+                });
+                document.getElementById('vote-count').innerText = total + ' votes';
+                activeChoices.forEach((c, i) => {
+                    const count = counts[i] || 0;
+                    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                    const fill = document.getElementById('bdf-' + i);
+                    const pctEl = document.getElementById('bdp-' + i);
+                    if (fill) { fill.style.width = pct + '%'; fill.innerText = count > 0 ? count : ''; }
+                    if (pctEl) pctEl.innerText = pct + '%';
+                });
+            });
+        }
+
+        window.revealResults = async () => {
+            // Compute counts
+            if (!currentSessionId) return;
+            const q = query(collection(db, "dilemme_reponses"), where("sessionId", "==", currentSessionId));
+            const snap = await getDocs(q);
+            let counts = {};
+            snap.forEach(d => {
+                const idx = d.data().choixIdx;
+                counts[idx] = (counts[idx] || 0) + 1;
+            });
+            await setDoc(doc(db, "dilemme_config", "global"), { showResult: true, isLocked: true, resultCounts: counts }, { merge: true });
+        };
+
+        window.toggleLock = async () => {
+            const btn = document.getElementById('btn-lock');
+            const isOpen = btn.innerText.includes("Ouvert");
+            await setDoc(doc(db, "dilemme_config", "global"), { isLocked: isOpen }, { merge: true });
+            btn.innerText = isOpen ? "🔒 Fermé" : "🔓 Ouvert";
+            btn.style.color = isOpen ? "#ef4444" : "#22c55e";
+            btn.style.borderColor = isOpen ? "#ef4444" : "#22c55e";
+        };
+
+        window.newSession = async () => {
+            currentSessionId = generateSessionId();
+            localStorage.setItem('dilemme_sessionId', currentSessionId);
+            await setDoc(doc(db, "dilemme_config", "global"), { sessionId: currentSessionId, scenario: '', choices: [], showResult: false, isLocked: false });
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_dilemme.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupPresenceListener();
+        };
+
+        window.resetSession = async () => {
+            if (!currentSessionId || !confirm("⚠️ Tout effacer ?")) return;
+            const batch = writeBatch(db);
+            for (const col of ["dilemme_reponses", "dilemme_presence"]) {
+                const q = query(collection(db, col), where("sessionId", "==", currentSessionId));
+                (await getDocs(q)).forEach(d => batch.delete(d.ref));
+            }
+            await batch.commit(); location.reload();
+        };
+        window.resetAll = window.resetSession;
+
+        function setupPresenceListener() {
+            if (!currentSessionId) return;
+            if (unsubPresence) unsubPresence();
+            const q = query(collection(db, "dilemme_presence"), where("sessionId", "==", currentSessionId));
+            unsubPresence = onSnapshot(q, (snap) => {
+                const list = document.getElementById('student-list');
+                list.innerHTML = ''; let count = 0;
+                snap.forEach(d => { count++; list.innerHTML += '<div class="student-row">👤 ' + d.data().name + '</div>'; });
+                document.getElementById('student-count').innerText = '(' + count + ')';
+            });
+        }
+
+        window.toggleProjection = () => {
+            const w = window.open("", "_blank");
+            w.document.write(document.documentElement.outerHTML);
+            w.document.close();
+            const style = w.document.createElement('style');
+            style.innerHTML = '.sidebar{display:none!important;}.btn-projection{display:none!important;}';
+            w.document.head.appendChild(style);
+        };
+
+        function escapeHtml(t) { return t ? t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''; }
+
+        if (currentSessionId) {
+            document.getElementById('session-id-display').textContent = '🔑 ' + currentSessionId;
+            const url = 'https://preventionsanteenvironnement.github.io/PSE/eleve_dilemme.html?sessionId=' + currentSessionId;
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+            document.getElementById('qr-label').style.display = 'block';
+            setupPresenceListener();
+        } else { window.newSession(); }
+    </script>
+</body>
+</html>
