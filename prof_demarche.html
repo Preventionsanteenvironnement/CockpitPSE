@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Démarche PSE - Tableau</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; height: 100vh; overflow: hidden; user-select: none; }
+
+        /* SIDEBAR */
+        .sidebar { width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 20; flex-shrink: 0; }
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; }
+        .sidebar-header h2 { font-size: 1rem; margin-bottom: 8px; }
+
+        .session-info { padding: 12px 15px; background: #162032; border-bottom: 1px solid #334155; text-align: center; }
+        .session-code { font-size: 2.5rem; font-weight: 800; color: #3b82f6; letter-spacing: 8px; }
+        .session-qr { margin-top: 8px; }
+        .session-qr img { width: 100px; height: 100px; border-radius: 6px; background: white; padding: 3px; }
+
+        /* TABS SIDEBAR */
+        .tab-buttons { display: flex; border-bottom: 1px solid #334155; }
+        .tab-btn { flex: 1; padding: 12px 8px; text-align: center; background: transparent; border: none; color: #64748b; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: white; border-bottom-color: #3b82f6; background: rgba(59,130,246,0.1); }
+        .tab-btn:hover { color: #94a3b8; }
+
+        /* CONTROLS */
+        .controls { padding: 12px 15px; border-bottom: 1px solid #334155; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer; font-size: 0.8rem; transition: 0.2s; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-blue { background: #3b82f6; color: white; } .btn-blue:hover { background: #2563eb; }
+        .btn-red { background: #ef4444; color: white; } .btn-red:hover { background: #dc2626; }
+        .btn-green { background: #22c55e; color: white; } .btn-green:hover { background: #16a34a; }
+        .btn-amber { background: #f59e0b; color: white; } .btn-amber:hover { background: #d97706; }
+        .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+
+        .lock-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; border: 1px solid #22c55e; color: #22c55e; background: transparent; cursor: pointer; font-weight: 700; font-size: 0.8rem; width: 100%; justify-content: center; margin-top: 8px; }
+        .lock-btn.locked { border-color: #ef4444; color: #ef4444; }
+
+        /* STUDENTS LIST */
+        .students-section { flex: 1; overflow-y: auto; border-top: 1px solid #334155; }
+        .sec-head { padding: 10px 15px; background: #162032; border-bottom: 1px solid #334155; font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; }
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; border-bottom: 1px solid #1e293b; font-size: 0.85rem; }
+        .student-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 8px; }
+
+        /* MAIN CONTENT */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .main-header { padding: 15px 25px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .main-header h1 { font-size: 1.3rem; }
+        .exercice-badge { padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.8rem; }
+        .badge-green { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .badge-amber { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .badge-purple { background: rgba(168,85,247,0.2); color: #a855f7; }
+
+        /* SITUATION DISPLAY */
+        .situation-bar { padding: 12px 25px; background: #162032; border-bottom: 1px solid #334155; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5; max-height: 100px; overflow-y: auto; }
+
+        /* EXERCISE AREA */
+        .exercise-area { flex: 1; padding: 25px; overflow-y: auto; }
+
+        /* EXERCICE 1 : COLONNES */
+        .columns-grid { display: flex; gap: 12px; height: 100%; }
+        .column { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
+        .column-header { padding: 12px; text-align: center; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid #334155; letter-spacing: 1px; border-radius: 12px 12px 0 0; }
+        .col-qui .column-header { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .col-quoi .column-header { background: rgba(34,197,94,0.15); color: #4ade80; }
+        .col-ou .column-header { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .col-quand .column-header { background: rgba(168,85,247,0.15); color: #c084fc; }
+        .col-probleme .column-header { background: rgba(239,68,68,0.15); color: #f87171; }
+        .col-consequences .column-header { background: rgba(236,72,153,0.15); color: #f472b6; }
+        .col-default .column-header { background: rgba(100,116,139,0.15); color: #94a3b8; }
+        .column-items { flex: 1; padding: 10px; overflow-y: auto; }
+        .col-item { background: #334155; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 0.9rem; animation: slideUp 0.3s; display: flex; justify-content: space-between; align-items: center; }
+        .col-item .count { background: #475569; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; color: #94a3b8; font-weight: 700; }
+
+        /* EXERCICE 2 : BARRES */
+        .notions-grid { display: flex; flex-direction: column; gap: 10px; }
+        .notion-bar-row { display: flex; align-items: center; gap: 12px; background: #1e293b; padding: 12px 16px; border-radius: 10px; border: 1px solid #334155; }
+        .notion-label { width: 250px; font-weight: 600; font-size: 0.95rem; flex-shrink: 0; }
+        .notion-bar-container { flex: 1; height: 28px; background: #0f172a; border-radius: 6px; overflow: hidden; position: relative; }
+        .notion-bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+        .notion-bar-fill.correct { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .notion-bar-fill.wrong { background: linear-gradient(90deg, #ef4444, #f87171); }
+        .notion-count { width: 60px; text-align: right; font-weight: 700; font-size: 0.9rem; color: #94a3b8; }
+        .notion-reveal { width: 40px; text-align: center; font-size: 1.2rem; opacity: 0; transition: 0.3s; }
+        .notion-reveal.visible { opacity: 1; }
+
+        /* EXERCICE 3 : COLONNES SOLUTIONS */
+        .solutions-grid { display: flex; gap: 12px; height: 100%; }
+        .sol-column { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
+        .sol-header { padding: 12px; text-align: center; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #334155; border-radius: 12px 12px 0 0; background: rgba(168,85,247,0.1); color: #c084fc; letter-spacing: 0.5px; }
+        .sol-items { flex: 1; padding: 10px; overflow-y: auto; }
+        .sol-item { background: #334155; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 0.9rem; animation: slideUp 0.3s; }
+        .sol-item .sol-student { font-size: 0.7rem; color: #64748b; margin-top: 3px; }
+
+        /* PROJECTION MODE */
+        body.projection .sidebar { display: none; }
+        body.projection .main { width: 100vw; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* STATS BAR */
+        .stats-bar { padding: 10px 25px; background: #162032; border-top: 1px solid #334155; display: flex; gap: 20px; font-size: 0.8rem; color: #64748b; }
+        .stat-item { display: flex; align-items: center; gap: 5px; }
+        .stat-value { font-weight: 700; color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>🧩 Démarche PSE</h2>
+            <div id="module-title" style="font-size:0.8rem; color:#64748b; margin-top:4px;"></div>
+        </div>
+
+        <div class="session-info">
+            <div class="session-code" id="display-code">----</div>
+            <div class="session-qr">
+                <img id="qr-code" src="" alt="QR" style="display:none;">
+                <div style="font-size:0.6rem; color:#64748b; margin-top:4px;">📱 Scannez pour rejoindre</div>
+            </div>
+        </div>
+
+        <!-- ONGLETS -->
+        <div class="tab-buttons">
+            <div class="tab-btn active" data-tab="1" onclick="switchExercise(1)">1. Repérer</div>
+            <div class="tab-btn" data-tab="2" onclick="switchExercise(2)">2. Savoirs</div>
+            <div class="tab-btn" data-tab="3" onclick="switchExercise(3)">3. Solutions</div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-blue" onclick="toggleProjection()">📺 Mode Projection</button>
+            <button class="lock-btn" id="lock-btn" onclick="toggleLock()">🔓 Ouvert — les élèves peuvent répondre</button>
+            <button class="btn btn-outline" style="margin-top:8px;" onclick="revealAnswers()">👁️ Révéler les réponses</button>
+            <button class="btn btn-red" style="margin-top:8px;" onclick="resetExercise()">🗑️ Reset exercice actif</button>
+        </div>
+
+        <div class="students-section">
+            <div class="sec-head">👥 Connectés <span id="student-count">(0)</span></div>
+            <div id="student-list"></div>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="main-header">
+            <h1 id="exercise-title">Exercice 1 — Décortiquer la situation</h1>
+            <span class="exercice-badge badge-green" id="exercise-badge">Exercice 1</span>
+        </div>
+
+        <div class="situation-bar" id="situation-bar">Chargement de la situation...</div>
+
+        <!-- EXERCICE 1 -->
+        <div class="exercise-area" id="area-1">
+            <div class="columns-grid" id="columns-container"></div>
+        </div>
+
+        <!-- EXERCICE 2 -->
+        <div class="exercise-area" id="area-2" style="display:none;">
+            <div class="notions-grid" id="notions-container"></div>
+        </div>
+
+        <!-- EXERCICE 3 -->
+        <div class="exercise-area" id="area-3" style="display:none;">
+            <div class="solutions-grid" id="solutions-container"></div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item">📊 Réponses : <span class="stat-value" id="stat-reponses">0</span></div>
+            <div class="stat-item">👥 Connectés : <span class="stat-value" id="stat-connectes">0</span></div>
+            <div class="stat-item">⏱️ <span id="stat-chrono">00:00</span></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, getDocs, addDoc, query, where, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.firebasestorage.app",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ── STATE ──
+        let sessionId = new URLSearchParams(window.location.search).get('sessionId');
+        let sessionConfig = null;
+        let currentExercise = 1;
+        let isOpen = true;
+        let revealed = false;
+        let chronoInterval = null;
+        let chronoSeconds = 0;
+
+        const colColors = ['col-qui', 'col-quoi', 'col-ou', 'col-quand', 'col-probleme', 'col-consequences', 'col-default', 'col-default'];
+
+        // ── INIT ──
+        async function init() {
+            if (!sessionId) { alert("Pas de sessionId. Lancez depuis l'éditeur."); return; }
+
+            // Charger la config de la session
+            const snap = await getDoc(doc(db, "demarche_sessions", sessionId));
+            if (!snap.exists()) { alert("Session introuvable"); return; }
+            sessionConfig = snap.data();
+
+            // Afficher infos
+            document.getElementById('module-title').textContent = sessionConfig.titre || '';
+            document.getElementById('situation-bar').textContent = sessionConfig.situation || 'Voir document papier';
+
+            // Générer code court (4 derniers chars du sessionId)
+            const code = sessionId.slice(-4).toUpperCase();
+            document.getElementById('display-code').textContent = code;
+
+            // QR Code
+            const url = window.location.href.replace('prof_demarche', 'eleve_demarche');
+            document.getElementById('qr-code').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&color=0f172a&bgcolor=ffffff&data=' + encodeURIComponent(url);
+            document.getElementById('qr-code').style.display = 'block';
+
+            // Écrire l'état dans Firebase
+            await setDoc(doc(db, "demarche_etat", "config"), {
+                sessionId: sessionId,
+                exerciceActif: 1,
+                isOpen: true
+            });
+
+            // Construire les exercices
+            buildExercise1();
+            buildExercise2();
+            buildExercise3();
+
+            // Listeners
+            setupListeners();
+            startChrono();
+        }
+
+        // ── BUILD EXERCISES ──
+        function buildExercise1() {
+            const container = document.getElementById('columns-container');
+            container.innerHTML = '';
+            (sessionConfig.categories || []).forEach((cat, i) => {
+                const col = document.createElement('div');
+                col.className = 'column ' + (colColors[i] || 'col-default');
+                col.innerHTML = `<div class="column-header">${cat}</div><div class="column-items" id="col-items-${i}"></div>`;
+                container.appendChild(col);
+            });
+        }
+
+        function buildExercise2() {
+            const container = document.getElementById('notions-container');
+            container.innerHTML = '';
+            (sessionConfig.notions || []).forEach((n, i) => {
+                const row = document.createElement('div');
+                row.className = 'notion-bar-row';
+                row.innerHTML = `
+                    <div class="notion-label">${n.texte}</div>
+                    <div class="notion-bar-container"><div class="notion-bar-fill" id="notion-bar-${i}" style="width:0%"></div></div>
+                    <div class="notion-count" id="notion-count-${i}">0</div>
+                    <div class="notion-reveal" id="notion-reveal-${i}">${n.correcte ? '✅' : '❌'}</div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function buildExercise3() {
+            const container = document.getElementById('solutions-container');
+            container.innerHTML = '';
+            (sessionConfig.categories_solutions || []).forEach((cat, i) => {
+                const col = document.createElement('div');
+                col.className = 'sol-column';
+                col.innerHTML = `<div class="sol-header">${cat}</div><div class="sol-items" id="sol-items-${i}"></div>`;
+                container.appendChild(col);
+            });
+        }
+
+        // ── LISTENERS ──
+        function setupListeners() {
+            // Réponses exercice 1
+            const q1 = query(collection(db, "demarche_reponses"), where("sessionId", "==", sessionId), where("exercice", "==", 1));
+            onSnapshot(q1, (snap) => {
+                // Reset columns
+                (sessionConfig.categories || []).forEach((_, i) => {
+                    const el = document.getElementById('col-items-' + i);
+                    if (el) el.innerHTML = '';
+                });
+                // Aggregate by text+category
+                const agg = {};
+                snap.forEach(d => {
+                    const data = d.data();
+                    const key = data.categorie + '||' + (data.texte || '').toLowerCase().trim();
+                    if (!agg[key]) agg[key] = { texte: data.texte, categorie: data.categorie, catIndex: data.catIndex, count: 0 };
+                    agg[key].count++;
+                });
+                Object.values(agg).forEach(item => {
+                    const el = document.getElementById('col-items-' + item.catIndex);
+                    if (!el) return;
+                    const div = document.createElement('div');
+                    div.className = 'col-item';
+                    div.innerHTML = `<span>${item.texte}</span><span class="count">×${item.count}</span>`;
+                    el.appendChild(div);
+                });
+                updateStats(snap.size);
+            });
+
+            // Réponses exercice 2
+            const q2 = query(collection(db, "demarche_reponses"), where("sessionId", "==", sessionId), where("exercice", "==", 2));
+            onSnapshot(q2, (snap) => {
+                const votes = {};
+                snap.forEach(d => {
+                    const selections = d.data().selections || [];
+                    selections.forEach(idx => { votes[idx] = (votes[idx] || 0) + 1; });
+                });
+                const total = snap.size || 1;
+                (sessionConfig.notions || []).forEach((n, i) => {
+                    const bar = document.getElementById('notion-bar-' + i);
+                    const count = document.getElementById('notion-count-' + i);
+                    const v = votes[i] || 0;
+                    if (bar) {
+                        bar.style.width = (v / total * 100) + '%';
+                        if (revealed) bar.className = 'notion-bar-fill ' + (n.correcte ? 'correct' : 'wrong');
+                    }
+                    if (count) count.textContent = v + '/' + total;
+                });
+            });
+
+            // Réponses exercice 3
+            const q3 = query(collection(db, "demarche_reponses"), where("sessionId", "==", sessionId), where("exercice", "==", 3));
+            onSnapshot(q3, (snap) => {
+                (sessionConfig.categories_solutions || []).forEach((_, i) => {
+                    const el = document.getElementById('sol-items-' + i);
+                    if (el) el.innerHTML = '';
+                });
+                snap.forEach(d => {
+                    const data = d.data();
+                    const el = document.getElementById('sol-items-' + data.catIndex);
+                    if (!el) return;
+                    const div = document.createElement('div');
+                    div.className = 'sol-item';
+                    div.innerHTML = `${data.texte}<div class="sol-student">— ${data.pseudo || 'Anonyme'}</div>`;
+                    el.appendChild(div);
+                });
+            });
+
+            // Présence
+            const qP = query(collection(db, "demarche_presence"), where("sessionId", "==", sessionId));
+            onSnapshot(qP, (snap) => {
+                const list = document.getElementById('student-list');
+                list.innerHTML = '';
+                let count = 0;
+                snap.forEach(d => {
+                    const data = d.data();
+                    // Stale check (45 sec)
+                    if (Date.now() - (data.lastSeen || 0) > 45000) return;
+                    count++;
+                    const row = document.createElement('div');
+                    row.className = 'student-row';
+                    row.innerHTML = `<span><span class="student-dot"></span>${data.pseudo || 'Anonyme'}</span>`;
+                    list.appendChild(row);
+                });
+                document.getElementById('student-count').textContent = `(${count})`;
+                document.getElementById('stat-connectes').textContent = count;
+            });
+        }
+
+        function updateStats(reponses) {
+            document.getElementById('stat-reponses').textContent = reponses;
+        }
+
+        // ── SWITCH EXERCISE ──
+        window.switchExercise = async (num) => {
+            currentExercise = num;
+            revealed = false;
+
+            // Tabs
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.tab-btn[data-tab="${num}"]`).classList.add('active');
+
+            // Areas
+            [1, 2, 3].forEach(n => { document.getElementById('area-' + n).style.display = n === num ? 'block' : 'none'; });
+
+            // Header
+            const titles = { 1: 'Exercice 1 — Décortiquer la situation', 2: 'Exercice 2 — Quelles connaissances mobiliser ?', 3: 'Exercice 3 — Proposer des solutions' };
+            const badges = { 1: ['Exercice 1', 'badge-green'], 2: ['Exercice 2', 'badge-amber'], 3: ['Exercice 3', 'badge-purple'] };
+            document.getElementById('exercise-title').textContent = titles[num];
+            document.getElementById('exercise-badge').textContent = badges[num][0];
+            document.getElementById('exercise-badge').className = 'exercice-badge ' + badges[num][1];
+
+            // Reveal reset
+            document.querySelectorAll('.notion-reveal').forEach(el => el.classList.remove('visible'));
+            document.querySelectorAll('.notion-bar-fill').forEach(el => el.className = 'notion-bar-fill');
+
+            // Update Firebase state
+            await setDoc(doc(db, "demarche_etat", "config"), { sessionId, exerciceActif: num, isOpen }, { merge: true });
+
+            // Reset chrono
+            chronoSeconds = 0;
+        };
+
+        // ── LOCK/UNLOCK ──
+        window.toggleLock = async () => {
+            isOpen = !isOpen;
+            const btn = document.getElementById('lock-btn');
+            if (isOpen) {
+                btn.textContent = '🔓 Ouvert — les élèves peuvent répondre';
+                btn.classList.remove('locked');
+            } else {
+                btn.textContent = '🔒 Fermé — votes clos';
+                btn.classList.add('locked');
+            }
+            await setDoc(doc(db, "demarche_etat", "config"), { isOpen }, { merge: true });
+        };
+
+        // ── REVEAL ──
+        window.revealAnswers = () => {
+            if (currentExercise !== 2) return;
+            revealed = true;
+            document.querySelectorAll('.notion-reveal').forEach(el => el.classList.add('visible'));
+            (sessionConfig.notions || []).forEach((n, i) => {
+                const bar = document.getElementById('notion-bar-' + i);
+                if (bar) bar.className = 'notion-bar-fill ' + (n.correcte ? 'correct' : 'wrong');
+            });
+        };
+
+        // ── RESET ──
+        window.resetExercise = async () => {
+            if (!confirm("Effacer les réponses de l'exercice " + currentExercise + " ?")) return;
+            const q = query(collection(db, "demarche_reponses"), where("sessionId", "==", sessionId), where("exercice", "==", currentExercise));
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        };
+
+        // ── PROJECTION ──
+        window.toggleProjection = () => { document.body.classList.toggle('projection'); };
+
+        // ── CHRONO ──
+        function startChrono() {
+            chronoInterval = setInterval(() => {
+                chronoSeconds++;
+                const m = String(Math.floor(chronoSeconds / 60)).padStart(2, '0');
+                const s = String(chronoSeconds % 60).padStart(2, '0');
+                document.getElementById('stat-chrono').textContent = m + ':' + s;
+            }, 1000);
+        }
+
+        // ── GO ──
+        init();
+    </script>
+</body>
+</html>
