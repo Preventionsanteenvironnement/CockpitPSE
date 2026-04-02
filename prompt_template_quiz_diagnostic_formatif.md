@@ -319,6 +319,14 @@ Voici un exemple pour le meme module C8 "AT/MP" en quiz formatif. Notez la diffe
 - [ ] PAS de champs "points", "scenario", "consigne", "competence", "bareme" (format quiz uniquement)
 - [ ] Le contenu est DIFFERENT des exemples ci-dessus
 
-Genere maintenant un quiz complet avec les parametres personnalises ci-dessus. Fournis UNIQUEMENT le JSON brut, sans commentaires avant ou apres.
+Genere maintenant un quiz complet avec les parametres personnalises ci-dessus.
+
+SORTIE STRICTE (la reponse sera collee dans un importeur JSON strict) :
+- Commence EXACTEMENT par { et termine EXACTEMENT par }
+- AUCUN texte avant le premier { ni apres le dernier }
+- AUCUN bloc Markdown (pas de backticks, pas de ```json)
+- AUCUNE phrase d'introduction, d'explication ou de conclusion
+- NE RECOMPTE PAS les questions, NE REFORMULE PAS la demande
+- Si tu ajoutes un seul caractere hors du JSON, la reponse sera rejetee
 
 ## FIN DU PROMPT A COPIER
