@@ -956,6 +956,7 @@
               <select id="printModeSelect" class="panel-select">
                 <option value="compact">Impression compacte</option>
                 <option value="detaillee">Impression détaillée</option>
+                <option value="grille">Grille vierge + indicateurs</option>
               </select>
             </div>
           </div>
@@ -1960,7 +1961,27 @@ function buildMasterPromptSchemaExample(){
   };
 }
 
+function buildModuleReferenceForPrompt(){
+  if(typeof MODULES_PSE === 'undefined' && (!window.MODULES_PSE)) return '';
+  var src = window.MODULES_PSE || (typeof MODULES_PSE !== 'undefined' ? MODULES_PSE : null);
+  if(!src) return '';
+  var lines = ['R\u00e9f\u00e9rentiel des modules PSE et notions cl\u00e9s :'];
+  var lvl = { CAP:'CAP', BAC_PRO_2NDE:'Seconde Bac Pro', BAC_PRO_1ERE:'Premi\u00e8re Bac Pro', BAC_PRO_TERM:'Terminale Bac Pro' };
+  Object.keys(lvl).forEach(function(k){
+    var mods = src[k];
+    if(!mods || !mods.length) return;
+    lines.push('');
+    lines.push('--- ' + lvl[k] + ' ---');
+    mods.forEach(function(m){
+      var n = (m.notions && m.notions.length) ? ' | Notions : ' + m.notions.join(', ') : '';
+      lines.push(m.id + ' - ' + m.titre + n);
+    });
+  });
+  return lines.join('\n');
+}
+
 function buildMasterPrompt(){
+  var moduleRef = buildModuleReferenceForPrompt();
   return [
     "Tu es un expert de l'évaluation PSE en lycée professionnel français.",
     "",
@@ -2056,7 +2077,62 @@ function buildMasterPrompt(){
     "- générer l'entrée C6 finale",
     "- produire le JSON maître complet et valide",
     "",
-    "Rends maintenant le JSON maître complet."
+    "Rem\u00e9diation et modules :",
+    "- Pour chaque question, dans remediation.module, indique l\u2019identifiant exact du module PSE (ex: C1, B5, A7).",
+    "- Dans remediation.notion, indique la ou les notions cl\u00e9s du programme que l\u2019\u00e9l\u00e8ve doit revoir.",
+    "- Dans remediation.conseil, r\u00e9dige un conseil concret orient\u00e9 vers les notions du cours.",
+    "",
+    "Grille g\u00e9n\u00e9rique des indicateurs par comp\u00e9tence (r\u00e9f\u00e9rence Foucher) :",
+    "Utilise cette grille comme CADRE DE R\u00c9F\u00c9RENCE pour r\u00e9diger les crit\u00e8res NT/I/A/M de chaque question.",
+    "Correspondance des niveaux : Non ma\u00eetris\u00e9e = NT, Insuffisamment ma\u00eetris\u00e9e = I, Ma\u00eetris\u00e9e = A (Acceptable), Bien ma\u00eetris\u00e9e = M.",
+    "",
+    "R\u00c8GLE ABSOLUE sur la pr\u00e9cision des crit\u00e8res :",
+    "- Les crit\u00e8res NT/I/A/M doivent \u00eatre QUANTIFI\u00c9S et V\u00c9RIFIABLES, jamais vagues.",
+    "- INTERDIT d\u2019\u00e9crire : \u00ab majorit\u00e9 des \u00e9l\u00e9ments \u00bb, \u00ab quelques \u00e9l\u00e9ments \u00bb, \u00ab solution vague \u00bb, \u00ab r\u00e9ponse incompl\u00e8te \u00bb.",
+    "- OBLIGATOIRE d\u2019\u00e9crire avec des NOMBRES pr\u00e9cis : \u00ab 1 \u00e9l\u00e9ment sur 5 \u00bb, \u00ab 2 mesures sur 3 \u00bb, \u00ab 4 \u00e9l\u00e9ments ou plus \u00bb.",
+    "- Chaque crit\u00e8re doit permettre \u00e0 l\u2019\u00e9l\u00e8ve de V\u00c9RIFIER LUI-M\u00caME s\u2019il a atteint le niveau.",
+    "- Exemple MAUVAIS : \u00ab La majorit\u00e9 des \u00e9l\u00e9ments du QQOQCP est renseign\u00e9e \u00bb.",
+    "- Exemple BON : \u00ab 4 \u00e9l\u00e9ments sur 6 du QQOQCP correctement renseign\u00e9s \u00bb.",
+    "- Exemple MAUVAIS : \u00ab Solution pertinente mais vague \u00bb.",
+    "- Exemple BON : \u00ab 1 mesure de pr\u00e9vention correcte propos\u00e9e sur les 3 attendues \u00bb.",
+    "- Quand le corrig\u00e9 ou la grille officielle donne un nombre attendu, utilise-le syst\u00e9matiquement.",
+    "",
+    "C1 - Traiter l\u2019information :",
+    "  NT : Aucune information identifi\u00e9e, ou information fausse/erron\u00e9e.",
+    "  I : Information attendue identifi\u00e9e mais incompl\u00e8te (pr\u00e9ciser le nombre attendu vs obtenu, ex: 1 \u00e9l\u00e9ment sur 4).",
+    "  A : Information attendue identifi\u00e9e correctement (pr\u00e9ciser le seuil, ex: 3 \u00e9l\u00e9ments sur 4).",
+    "  M : Information attendue identifi\u00e9e compl\u00e8tement et reformul\u00e9e/synth\u00e9tis\u00e9e (pr\u00e9ciser: tous les \u00e9l\u00e9ments + reformulation).",
+    "",
+    "C2 - Appliquer une d\u00e9marche d\u2019analyse (QQOQCP, ITAMAMI, ou autre outil) :",
+    "  NT : Probl\u00e8me non identifi\u00e9 / 0 \u00e9l\u00e9ment de l\u2019outil d\u2019analyse renseign\u00e9.",
+    "  I : Probl\u00e8me identifi\u00e9 mais mal formul\u00e9 / 1 \u00e0 2 \u00e9l\u00e9ments renseign\u00e9s sur N (pr\u00e9ciser N selon l\u2019outil).",
+    "  A : Probl\u00e8me identifi\u00e9 / N-1 \u00e9l\u00e9ments sur N correctement renseign\u00e9s (pr\u00e9ciser le nombre exact).",
+    "  M : Probl\u00e8me clairement identifi\u00e9 et bien formul\u00e9 / N \u00e9l\u00e9ments sur N correctement renseign\u00e9s et coh\u00e9rents.",
+    "  Si la question utilise le QQOQCP (6 \u00e9l\u00e9ments) : Qui, Quoi, O\u00f9, Quand, Comment, Pourquoi.",
+    "  Si la question utilise l\u2019ITAMAMI (7 \u00e9l\u00e9ments) : Individu, T\u00e2che, Activit\u00e9, Mat\u00e9riel, Ambiance, Milieu, Installation.",
+    "  Adapte N au nombre d\u2019\u00e9l\u00e9ments demand\u00e9s par la question.",
+    "",
+    "C3 - Expliquer un ph\u00e9nom\u00e8ne en lien avec la pr\u00e9vention :",
+    "  NT : Aucune explication ou explication hors sujet.",
+    "  I : Explication partielle (pr\u00e9ciser : 1 \u00e9l\u00e9ment correct sur N attendus, ou explication sans vocabulaire adapt\u00e9).",
+    "  A : Explication correcte avec vocabulaire adapt\u00e9 (pr\u00e9ciser le seuil, ex: m\u00e9canisme d\u00e9crit mais sans mise en relation).",
+    "  M : Explication compl\u00e8te avec vocabulaire sp\u00e9cifique et mise en relation (pr\u00e9ciser tous les \u00e9l\u00e9ments attendus).",
+    "",
+    "C4 - Proposer une solution :",
+    "  NT : Aucune solution propos\u00e9e ou solution totalement inadapt\u00e9e \u00e0 la situation.",
+    "  I : 1 solution correcte propos\u00e9e sur N attendues (pr\u00e9ciser N).",
+    "  A : N-1 solutions correctes propos\u00e9es sur N attendues (pr\u00e9ciser).",
+    "  M : N solutions correctes, r\u00e9alistes et adapt\u00e9es au contexte (pr\u00e9ciser N et les cat\u00e9gories attendues si applicable).",
+    "",
+    "C5 - Argumenter un choix :",
+    "  NT : Aucun argument ou r\u00e9ponse hors sujet.",
+    "  I : Choix correct mais sans justification, ou justification non reli\u00e9e \u00e0 la situation.",
+    "  A : Choix correct avec 1 argument valide reli\u00e9 \u00e0 la situation (pr\u00e9ciser le nombre d\u2019arguments attendus).",
+    "  M : Choix correct avec N arguments pertinents reli\u00e9s \u00e0 la situation et aux documents (pr\u00e9ciser N).",
+    "",
+    moduleRef,
+    "",
+    "Rends maintenant le JSON ma\u00eetre complet."
   ].join('\n');
 }
 
@@ -3657,7 +3733,7 @@ function applyClassSnapshot(payload, sourceLabel){
 
 function buildPrintMarkup(mode){
   saveCurrentStudentState();
-  const printMode = mode === 'detaillee' ? 'detaillee' : 'compact';
+  const printMode = (mode === 'detaillee' || mode === 'grille') ? mode : 'compact';
   const total = computeTotalNote();
   const comment = document.getElementById('finalComment').value.trim();
   const revisionText = buildRevisionText().trim();
@@ -3719,9 +3795,11 @@ function buildPrintMarkup(mode){
 
   const compSummary = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; }).map(function(code){
     const metrics = computeCompetenceMetrics(code);
+    var qNums = appState.rows.filter(function(r){ return r.competence === code; }).map(function(r){ return r.num; });
+    var qLabel = qNums.length ? ' <span style="font-size:6.5pt;color:#64748b;font-weight:400">(' + qNums.join(', ') + ')</span>' : '';
     return '<tr>'
       + '<td style="font-family:IBM Plex Mono,monospace;font-weight:700">' + esc(code) + '</td>'
-      + '<td>' + esc(metrics.label) + '</td>'
+      + '<td>' + esc(metrics.label) + qLabel + '</td>'
       + '<td style="text-align:center">' + esc(String(metrics.counts.NT)) + '</td>'
       + '<td style="text-align:center">' + esc(String(metrics.counts.I)) + '</td>'
       + '<td style="text-align:center">' + esc(String(metrics.counts.A)) + '</td>'
@@ -3731,21 +3809,22 @@ function buildPrintMarkup(mode){
   }).join('');
 
   const compactDetailRows = appState.rows.map(function(row){
-    const state = appState.rowStates[row.id];
-    const parts = [];
-    const teacherComment = String(state.teacherComment || '').trim();
-    const teacherRemediation = String(state.teacherRemediation || '').trim();
-    const fallbackComment = String(state.commentairePropose || '').trim();
-    const fallbackRemediation = String(state.remediationProposee || row.remediation.conseil || '').trim();
-    if(teacherComment) parts.push(teacherComment);
-    else if(fallbackComment && state.selectedLevel) parts.push(fallbackComment);
-    if(teacherRemediation) parts.push('Remédiation : ' + teacherRemediation);
-    else if(fallbackRemediation && state.selectedLevel && !teacherComment) parts.push('Remédiation : ' + fallbackRemediation);
-    if(!parts.length) return '';
+    var state = appState.rowStates[row.id];
+    if(!state.selectedLevel && !row.neutralisee) return '';
+    var level = state.selectedLevel || '\u2014';
+    var attenduText = (level !== '\u2014' && row.criteres && row.criteres[level]) ? String(row.criteres[level]).trim() : '';
+    var tRemed = String(state.teacherRemediation || '').trim();
+    var fRemed = String(state.remediationProposee || row.remediation.conseil || '').trim();
+    var remedText = tRemed || fRemed || '';
+    var modRef = (row.remediation && row.remediation.module) || row.module || '';
+    var modPfx = modRef ? '[Module ' + modRef + '] ' : '';
+    var finalRemed = remedText ? modPfx + remedText : '';
+    if(!attenduText && !finalRemed) return '';
     return '<tr>'
-      + '<td style="width:11%;font-family:IBM Plex Mono,monospace;font-weight:700;white-space:nowrap">' + esc(row.num) + '</td>'
-      + '<td style="width:9%;text-align:center;font-family:IBM Plex Mono,monospace">' + esc(state.selectedLevel || '—') + '</td>'
-      + '<td class="comment">' + esc(parts.join(' \n')) + '</td>'
+      + '<td style="width:8%;font-family:IBM Plex Mono,monospace;font-weight:700;white-space:nowrap">' + esc(row.num) + '</td>'
+      + '<td style="width:6%;text-align:center;font-family:IBM Plex Mono,monospace;font-weight:700">' + esc(level) + '</td>'
+      + '<td style="width:40%" class="comment">' + esc(attenduText) + '</td>'
+      + '<td style="width:46%" class="comment">' + esc(finalRemed) + '</td>'
       + '</tr>';
   }).filter(Boolean).join('');
 
@@ -3753,44 +3832,44 @@ function buildPrintMarkup(mode){
     const state = appState.rowStates[row.id];
     const criteriaEntries = buildVisibleCriteriaEntries(row);
     const criteriaHtml = row.neutralisee
-      ? '<div class="p-empty">Question neutralisée : visible dans la grille, mais exclue du calcul.</div>'
+      ? '<div class="p-empty">Question neutralis\u00e9e : visible dans la grille, mais exclue du calcul.</div>'
       : (criteriaEntries.length
         ? criteriaEntries.map(function(item){
-            return '<div class="p-criterion ' + item.level.toLowerCase() + '"><strong>' + esc(item.level + ' — ' + LEVEL_LABELS[item.level]) + '</strong><div>' + esc(item.text) + '</div></div>';
+            return '<div class="p-criterion ' + item.level.toLowerCase() + '"><strong>' + esc(item.level + ' \u2014 ' + LEVEL_LABELS[item.level]) + '</strong><div>' + esc(item.text) + '</div></div>';
           }).join('')
-        : '<div class="p-empty">Aucun critère détaillé disponible.</div>');
+        : '<div class="p-empty">Aucun crit\u00e8re d\u00e9taill\u00e9 disponible.</div>');
     const imported = String(state.importedText || '').trim();
     const verified = String(state.verifiedText || '').trim();
     const remark = String(state.extractionRemark || '').trim();
-    const teacherComment = String(state.teacherComment || '').trim();
     const teacherRemediation = String(state.teacherRemediation || '').trim();
+    const fallbackRemediation = String(state.remediationProposee || row.remediation.conseil || '').trim();
+    const remedText = teacherRemediation || fallbackRemediation || '';
+    const moduleRef = (row.remediation && row.remediation.module) || row.module || '';
+    const modulePrefix = moduleRef ? '[Module ' + moduleRef + '] ' : '';
+    const finalRemed = remedText ? modulePrefix + remedText : '';
     return '<section class="box question-sheet">'
-      + '<div class="question-sheet-head"><div><strong>' + esc(row.num) + '</strong> — ' + esc(row.libelle) + '</div><div class="question-meta">'
-      + '<span class="p-tag">' + esc(row.competence + ' — ' + appState.master.competences[row.competence].label) + '</span>'
-      + '<span class="p-tag">' + esc('Niveaux : ' + row.niveaux_autorises.join(' · ')) + '</span>'
-      + '<span class="p-tag strong">' + esc('Niveau retenu : ' + (state.selectedLevel || '—')) + '</span>'
-      + (state.aVerifier ? '<span class="p-tag warn">À vérifier</span>' : '')
+      + '<div class="question-sheet-head"><div><strong>' + esc(row.num) + '</strong> \u2014 ' + esc(row.libelle) + '</div><div class="question-meta">'
+      + '<span class="p-tag">' + esc(row.competence + ' \u2014 ' + appState.master.competences[row.competence].label) + '</span>'
+      + '<span class="p-tag">' + esc('Niveaux : ' + row.niveaux_autorises.join(' \u00b7 ')) + '</span>'
+      + '<span class="p-tag strong">' + esc('Niveau retenu : ' + (state.selectedLevel || '\u2014')) + '</span>'
+      + (state.aVerifier ? '<span class="p-tag warn">\u00c0 v\u00e9rifier</span>' : '')
       + '</div></div>'
-      + '<div class="detail-print-grid">'
+      + '<div class="detail-print-grid" style="grid-template-columns:1fr 1fr">'
       + '<div class="print-panel attendus"><h3>Attendus</h3>' + criteriaHtml + '</div>'
-      + '<div class="print-panel reponse"><h3>Réponse de l’élève</h3>'
-      + '<div class="p-block' + (imported ? '' : ' empty') + '"><strong>Réponse brute</strong><br>' + esc(imported || 'Aucune réponse importée.') + '</div>'
-      + '<div class="p-block' + (verified ? '' : ' empty') + '"><strong>Réponse reformulée</strong><br>' + esc(verified || 'Aucune reformulation proposée.') + '</div>'
-      + (remark ? '<div class="p-block"><strong>Remarque d’extraction</strong><br>' + esc(remark) + '</div>' : '')
-      + '</div>'
-      + '<div class="print-panel analyse"><h3>Analyse IA / Enseignant</h3>'
-      + '<div class="p-block' + (state.commentairePropose ? '' : ' empty') + '"><strong>Commentaire proposé</strong><br>' + esc(state.commentairePropose || 'Aucun commentaire proposé.') + '</div>'
-      + '<div class="p-block' + ((state.remediationProposee || row.remediation.conseil) ? '' : ' empty') + '"><strong>Remédiation proposée</strong><br>' + esc(state.remediationProposee || row.remediation.conseil || 'Aucune remédiation proposée.') + '</div>'
-      + '<div class="p-block' + ((teacherComment || teacherRemediation) ? '' : ' empty') + '"><strong>Ajout enseignant</strong><br>' + esc((teacherComment ? ('Commentaire : ' + teacherComment + '\n') : '') + (teacherRemediation ? ('Remédiation : ' + teacherRemediation) : '') || 'Aucun ajout enseignant.') + '</div>'
+      + '<div class="print-panel reponse"><h3>R\u00e9ponse et rem\u00e9diation</h3>'
+      + '<div class="p-block' + (imported ? '' : ' empty') + '"><strong>R\u00e9ponse brute</strong><br>' + esc(imported || 'Aucune r\u00e9ponse import\u00e9e.') + '</div>'
+      + '<div class="p-block' + (verified ? '' : ' empty') + '"><strong>R\u00e9ponse reformul\u00e9e</strong><br>' + esc(verified || 'Aucune reformulation propos\u00e9e.') + '</div>'
+      + (remark ? '<div class="p-block"><strong>Remarque</strong><br>' + esc(remark) + '</div>' : '')
+      + (finalRemed ? '<div class="p-block" style="background:#fff8eb;border-color:#f59e0b"><strong>Rem\u00e9diation</strong><br>' + esc(finalRemed) + '</div>' : '')
       + '</div></div>'
       + '</section>';
   }).join('');
 
-  const baseStyle = '@page{margin:0.8cm}'
-    + 'body{font-family:IBM Plex Sans,Arial,sans-serif;color:#162033;font-size:' + (printMode === 'detaillee' ? '8.2pt' : '8pt') + ';line-height:1.25}'
+  const baseStyle = '@page{margin:0.6cm}'
+    + 'body{font-family:IBM Plex Sans,Arial,sans-serif;color:#162033;font-size:' + (printMode === 'detaillee' ? '7.8pt' : '7.5pt') + ';line-height:1.2}'
     + 'h1,h2,h3{margin:0}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #dbe2ea;padding:3px 4px;vertical-align:top}'
+    + 'th,td{border:1px solid #dbe2ea;padding:2px 3px;vertical-align:top}'
     + 'th{background:#f8fafc}'
     + 'small{color:#64748b}'
     + '.sheet{display:grid;gap:0}'
@@ -3865,7 +3944,7 @@ function buildPrintMarkup(mode){
 
   const compactSecondPage = '<section class="detail-page"><div class="box"><strong>Correction détaillée</strong>'
     + (compactDetailRows
-      ? '<table><thead><tr><th style="width:11%">Question</th><th style="width:9%">Niveau</th><th>Détail</th></tr></thead><tbody>' + compactDetailRows + '</tbody></table>'
+      ? '<table><thead><tr><th style="width:8%">Question</th><th style="width:6%">Niveau</th><th style="width:40%">Attendu</th><th style="width:46%">Rem\u00e9diation</th></tr></thead><tbody>' + compactDetailRows + '</tbody></table>'
       : '<div class="comment">Aucune correction détaillée saisie pour le moment.</div>')
     + '</div></section>';
 
@@ -3873,6 +3952,92 @@ function buildPrintMarkup(mode){
     + resourceBox;
 
   const detailedSecondPage = '<section class="detail-page">' + detailedSections + '</section>';
+
+  // === GRILLE VIERGE + INDICATEURS + CORRECTION (mode enseignant) ===
+  var activeComps = COMP_ORDER.filter(function(code){ return appState.master.competences[code]; });
+  var nbActiveComps = activeComps.length;
+
+  // Tableau indicateurs : Q | C | Non Trait\u00e9 | Insuffisant | Acceptable | Ma\u00eetris\u00e9
+  var grilleIndicRows = appState.rows.map(function(row){
+    var entries = buildVisibleCriteriaEntries(row);
+    var cells = ['NT','I','A','M'].map(function(lv){
+      var entry = entries.filter(function(e){ return e.level === lv; })[0];
+      var txt = entry ? entry.text : '';
+      var bg = !row.niveaux_autorises.includes(lv) ? ' style="background:#e5e7eb;color:#9ca3af"' : '';
+      return '<td' + bg + '>' + esc(txt) + '</td>';
+    }).join('');
+    return '<tr><td style="font-family:IBM Plex Mono,monospace;font-weight:700">' + esc(row.num) + '</td>'
+      + '<td style="font-family:IBM Plex Mono,monospace;font-weight:700">' + esc(row.competence) + '</td>'
+      + cells + '</tr>';
+  }).join('');
+
+  // Ligne Note par comp\u00e9tence avec bar\u00e8me
+  var grilleNoteRow = '<tr style="border-top:2px solid #374151"><td colspan="1" style="font-weight:700">Note</td>' + activeComps.map(function(code){
+    var def = appState.master.competences[code];
+    return '<td colspan="4" style="text-align:center;font-weight:700;font-size:9pt;border:2px solid #374151">/' + def.bareme + '</td>';
+  }).join('') + '</tr>';
+
+  // Ligne Commentaire + Total
+  var totalBareme = activeComps.reduce(function(s, code){ return s + Number(appState.master.competences[code].bareme || 0); }, 0);
+  var commentColspan = 1 + (nbActiveComps - 1) * 4;
+  var grilleCommentRow = '<tr><td colspan="' + commentColspan + '" style="font-weight:700;vertical-align:top;min-height:30px">Commentaire :<div style="min-height:28px"></div></td>'
+    + '<td colspan="4" style="text-align:center;font-weight:700;font-size:10pt;vertical-align:middle;border:2px solid #374151">Total<br>/' + totalBareme + '</td></tr>';
+
+  // Grille vierge avec cases vides
+  var grilleEmptyGrid = '<div class="box"><table class="print-grid"><thead><tr><th rowspan="2" class="qcol">Question</th>' + compHeaders + '</tr><tr>' + subHeaders + '</tr></thead><tbody>' + appState.rows.map(function(row){
+    var cells = activeComps.map(function(code){
+      var palette = printColors[code] || printColors.C2;
+      return LEVELS.map(function(level){
+        if(code !== row.competence) return '<td style="background:#f8fafc"></td>';
+        var levelIndex = LEVELS.indexOf(level);
+        var start = levelIndex === 0 ? ';border-left:2px solid ' + palette.line : '';
+        var end = levelIndex === LEVELS.length - 1 ? ';border-right:2px solid ' + palette.line : '';
+        if(row.neutralisee || !row.niveaux_autorises.includes(level))
+          return '<td style="background:#374151;border-top:2px solid ' + palette.line + ';border-bottom:2px solid ' + palette.line + start + end + '"></td>';
+        return '<td style="background:' + palette.bg + ';border-top:2px solid ' + palette.line + ';border-bottom:2px solid ' + palette.line + start + end + '"></td>';
+      }).join('');
+    }).join('');
+    return '<tr><td style="font-family:IBM Plex Mono,monospace;font-weight:700;white-space:nowrap">' + esc(row.num) + (row.neutralisee ? '<div style="font-weight:400;color:#7b8597;font-size:6.6pt;margin-top:2px">neutralis\u00e9e</div>' : '') + '</td>' + cells + '</tr>';
+  }).join('') + grilleNoteRow + grilleCommentRow + '</tbody></table></div>';
+
+  // En-t\u00eate vierge (sans nom d'\u00e9l\u00e8ve)
+  var grilleTopNoStudent = '<div class="print-hero">'
+    + '<div class="head-main">'
+    + '<h1>' + esc(rawTitle) + '</h1>'
+    + '<div class="hero-meta">' + esc([appState.master.meta.niveau, appState.master.meta.date].filter(Boolean).join(' \u00b7 ')) + '</div>'
+    + '<div class="student-line"><strong>\u00c9l\u00e8ve</strong><div style="min-height:18px;border-bottom:1px dotted #aaa"></div></div>'
+    + '</div>'
+    + '<div class="head-side">'
+    + '<div class="note-card"><div class="label">Note / 20</div><div class="value" style="min-height:20px"></div></div>'
+    + '<div class="comment-card"><strong>Commentaires</strong><div class="comment" style="min-height:40px"></div></div>'
+    + '</div></div>';
+
+  // Tableau indicateurs + correction (r\u00e9ponse M)
+  var grilleIndicTable = '<div class="box">'
+    + '<table><thead><tr><th style="width:5%">Q</th><th style="width:4%">C</th><th style="width:20%">Non Trait\u00e9</th><th style="width:17%">Insuffisant</th><th style="width:20%">Acceptable</th><th style="width:34%">Ma\u00eetris\u00e9</th></tr></thead><tbody>'
+    + grilleIndicRows + '</tbody></table></div>';
+
+  var grilleFirstPage = grilleEmptyGrid;
+  var grilleSecondPage = '<section class="detail-page">' + grilleIndicTable + '</section>';
+
+  var grilleQrUrl = correctionUrl || 'https://mapse.fr';
+  var grilleFooter = '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:7pt;color:#64748b">'
+    + '<img alt="QR" style="width:36px;height:36px;border-radius:6px;border:1px solid #dbe2ea" src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=' + encodeURIComponent(grilleQrUrl) + '">'
+    + '<div>R\u00e9vision et correction du devoir \u2014 <strong>mapse.fr</strong>' + (correctionUrl ? '<br><span style="font-size:6pt">' + esc(correctionUrl) + '</span>' : '') + '</div>'
+    + '</div>';
+
+  if(printMode === 'grille'){
+    return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>' + esc(rawTitle + ' - Grille vierge') + '</title>'
+      + '<style>' + baseStyle + '</style></head><body>'
+      + '<div class="sheet">'
+      + '<section class="print-page">'
+      + grilleTopNoStudent
+      + grilleFirstPage
+      + '</section>'
+      + grilleSecondPage
+      + grilleFooter
+      + '</div></body></html>';
+  }
 
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>' + esc(printTitle) + '</title>'
     + '<style>' + baseStyle + '</style></head><body>'
@@ -3958,7 +4123,7 @@ document.getElementById('btnDetailedView').addEventListener('click', function(){
 document.getElementById('btnExpandAllDetails').addEventListener('click', expandAllDetails);
 document.getElementById('btnCollapseAllDetails').addEventListener('click', collapseAllDetails);
 document.getElementById('printModeSelect').addEventListener('change', function(){
-  appState.printMode = this.value === 'detaillee' ? 'detaillee' : 'compact';
+  appState.printMode = ['detaillee','grille'].indexOf(this.value) >= 0 ? this.value : 'compact';
 });
 document.getElementById('btnPrint').addEventListener('click', printSheet);
 document.getElementById('btnExportWord').addEventListener('click', exportWord);

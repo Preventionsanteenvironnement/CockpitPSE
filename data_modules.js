@@ -76,44 +76,44 @@ window.MODULES_PSE = {
     // ─────────────────────────────────────────────────────────────────────
     "CAP": [
         // Thème A - Santé
-        { id: "MA1", titre: "Le système de santé", theme: "A" },
-        { id: "MA2", titre: "Le sommeil, un rythme biologique", theme: "A" },
-        { id: "MA3", titre: "L'activité physique", theme: "A" },
-        { id: "MA4", titre: "Les addictions", theme: "A" },
-        { id: "MA5", titre: "La sexualité – La contraception", theme: "A" },
-        { id: "MA6", titre: "Prévenir les IST", theme: "A" },
-        { id: "MA7", titre: "L'alimentation adaptée à son activité", theme: "A" },
+        { id: "MA1", titre: "Le système de santé", theme: "A", notions: ["Plan santé", "Prévention", "Individu", "Santé OMS", "Capital santé", "Facteurs internes", "Facteurs externes", "Solidarité", "Assurance maladie", "Parcours de soins coordonnés"] },
+        { id: "MA2", titre: "Le sommeil, un rythme biologique", theme: "A", notions: ["Rythmes biologiques", "Fréquence", "Cycle", "Récupération physique", "Récupération mentale", "Hygiène du sommeil", "Prévention individuelle"] },
+        { id: "MA3", titre: "L'activité physique", theme: "A", notions: ["Contraction musculaire", "Système nerveux", "Système cardiorespiratoire", "Consommation d'énergie", "Activité physique", "Sédentarité", "Bien-être"] },
+        { id: "MA4", titre: "Les addictions", theme: "A", notions: ["Addiction", "Facteurs de risque addictif", "Effets immédiats", "Effets à long terme", "Polyconsommation", "Prévention individuelle", "Prévention collective", "Produit licite/illicite"] },
+        { id: "MA5", titre: "La sexualité – La contraception", theme: "A", notions: ["Spermatozoïde", "Ovule", "Fécondation", "Nidation", "Hormone", "Contraception préventive", "Contraception d'urgence", "IVG"] },
+        { id: "MA6", titre: "Prévenir les IST", theme: "A", notions: ["Infection", "IST", "VIH/SIDA", "Modes de contamination", "Symptômes", "Préservatif", "Vaccin", "Dépistage"] },
+        { id: "MA7", titre: "L'alimentation adaptée à son activité", theme: "A", notions: ["Besoins nutritionnels", "Nutriment/aliment", "Groupes alimentaires", "Répartition des repas", "Excès", "Carences", "Contraintes professionnelles"] },
         
         // Thème B - Environnement
-        { id: "MB1", titre: "Les ressources en eau", theme: "B" },
-        { id: "MB2", titre: "Le risque majeur", theme: "B" },
-        { id: "MB3", titre: "Les ressources en énergie", theme: "B" },
-        { id: "MB4", titre: "Le bruit au quotidien", theme: "B" },
+        { id: "MB1", titre: "Les ressources en eau", theme: "B", notions: ["Eau douce/eau salée", "Potabilisation", "Eau potable", "Eau usée", "Épuration", "Empreinte eau", "Mesures individuelles", "Mesures collectives"] },
+        { id: "MB2", titre: "Le risque majeur", theme: "B", notions: ["Risque majeur", "Aléa", "Enjeu", "Risque naturel", "Risque technologique", "Signal d'alerte", "DICRIM", "Protection", "Sécurité"] },
+        { id: "MB3", titre: "Les ressources en énergie", theme: "B", notions: ["Énergie renouvelable", "Énergie non renouvelable", "Effet de serre", "Empreinte carbone", "Dérèglements climatiques", "Mesures individuelles", "Mesures collectives"] },
+        { id: "MB4", titre: "Le bruit au quotidien", theme: "B", notions: ["Son/bruit", "Onde sonore", "Intensité", "Fréquence", "Seuil d'audibilité", "Appareil auditif", "Effets auditifs", "Effets extra-auditifs", "Prévention"] },
         
         // Thème C - Travail
-        { id: "MC1", titre: "Les différents contrats de travail", theme: "C" },
-        { id: "MC2", titre: "Les enjeux de la santé et sécurité au travail", theme: "C" },
-        { id: "MC3", titre: "La démarche de prévention (activité)", theme: "C" },
-        { id: "MC4", titre: "La démarche de prévention (risque spécifique)", theme: "C" },
-        { id: "C4.1", titre: "Le risque lié au bruit", theme: "C", parent: "MC4" },
-        { id: "C4.2", titre: "Le risque lié aux poussières", theme: "C", parent: "MC4" },
-        { id: "C4.3", titre: "Le risque chimique", theme: "C", parent: "MC4" },
-        { id: "C4.4", titre: "Le risque mécanique", theme: "C", parent: "MC4" },
-        { id: "C4.5", titre: "Le risque électrique", theme: "C", parent: "MC4" },
-        { id: "C4.6", titre: "Le risque lié à l'éclairage", theme: "C", parent: "MC4" },
-        { id: "C4.7", titre: "Le risque de chute", theme: "C", parent: "MC4" },
-        { id: "C4.8", titre: "Le risque incendie", theme: "C", parent: "MC4" },
-        { id: "MC5", titre: "Les risques liés à l'activité physique", theme: "C" },
-        { id: "MC6", titre: "Les acteurs et organismes de prévention", theme: "C" },
-        { id: "MC7", titre: "Le suivi médical et la vaccination", theme: "C" },
+        { id: "MC1", titre: "Les différents contrats de travail", theme: "C", notions: ["CDI/CDD", "Contrat d'apprentissage", "Droits", "Obligations"] },
+        { id: "MC2", titre: "Les enjeux de la santé et sécurité au travail", theme: "C", notions: ["Enjeux humains", "Enjeux socio-économiques", "Accident du travail", "Maladie professionnelle", "Lésion", "Exposition chronique", "Cadre réglementaire", "Obligations employeur", "Droits du salarié", "Droit de retrait"] },
+        { id: "MC3", titre: "La démarche de prévention (activité)", theme: "C", notions: ["Instruction/information", "Activité de travail", "Danger", "Dommage", "Situation dangereuse", "Risque", "Protection collective", "Protection individuelle"] },
+        { id: "MC4", titre: "La démarche de prévention (risque spécifique)", theme: "C", notions: ["Risque spécifique", "Processus d'apparition d'un dommage", "Effets physiopathologiques", "Protection collective", "Protection individuelle"] },
+        { id: "C4.1", titre: "Le risque lié au bruit", theme: "C", parent: "MC4", notions: ["Bruit professionnel", "Seuil de danger", "Protection auditive"] },
+        { id: "C4.2", titre: "Le risque lié aux poussières", theme: "C", parent: "MC4", notions: ["Poussières", "Inhalation", "Protection respiratoire"] },
+        { id: "C4.3", titre: "Le risque chimique", theme: "C", parent: "MC4", notions: ["Produit chimique", "Pictogramme", "FDS", "EPI"] },
+        { id: "C4.4", titre: "Le risque mécanique", theme: "C", parent: "MC4", notions: ["Risque mécanique", "Coupure", "Écrasement", "Protection machine"] },
+        { id: "C4.5", titre: "Le risque électrique", theme: "C", parent: "MC4", notions: ["Risque électrique", "Habilitation", "Contact direct/indirect"] },
+        { id: "C4.6", titre: "Le risque lié à l'éclairage", theme: "C", parent: "MC4", notions: ["Éclairage", "Fatigue visuelle", "Normes"] },
+        { id: "C4.7", titre: "Le risque de chute", theme: "C", parent: "MC4", notions: ["Chute de hauteur", "Chute de plain-pied", "Protection collective"] },
+        { id: "C4.8", titre: "Le risque incendie", theme: "C", parent: "MC4", notions: ["Incendie", "Triangle du feu", "Extincteur", "Évacuation"] },
+        { id: "MC5", titre: "Les risques liés à l'activité physique", theme: "C", notions: ["Activité physique", "Travail statique/dynamique", "Posture", "Fatigue musculaire", "Troubles musculo-squelettiques", "Ergonomie", "Économie d'effort"] },
+        { id: "MC6", titre: "Les acteurs et organismes de prévention", theme: "C", notions: ["Prévention", "Salarié compétent PPRP", "Comité social et économique", "Médecin du travail", "Inspection du travail", "CARSAT"] },
+        { id: "MC7", titre: "Le suivi médical et la vaccination", theme: "C", notions: ["Suivi médical", "Aptitude au travail", "Vaccination", "Antigène", "Anticorps", "Protection individuelle", "Protection collective"] },
         
         // Thème D - Consommation
-        { id: "MD1", titre: "L'assurance", theme: "D" },
-        { id: "MD2", titre: "Le budget", theme: "D" },
-        { id: "MD3", titre: "Les achats", theme: "D" },
+        { id: "MD1", titre: "L'assurance", theme: "D", notions: ["Risque", "Sinistre", "Assurance", "Garanties", "Responsabilité civile", "Déclaration"] },
+        { id: "MD2", titre: "Le budget", theme: "D", notions: ["Revenus", "Dépenses", "Budget équilibré", "Épargne", "Crédit", "Surendettement"] },
+        { id: "MD3", titre: "Les achats", theme: "D", notions: ["E-commerce", "Conditions de vente", "DLC/DDM", "Allergène", "Label", "Commerce équitable"] },
 
         // Chef d'œuvre
-        { id: "CDO", titre: "Chef d'œuvre", theme: "E" }
+        { id: "CDO", titre: "Chef d'œuvre", theme: "E", notions: ["Chef d'œuvre", "Projet", "Compétences transversales"] }
     ],
     
     // ─────────────────────────────────────────────────────────────────────
@@ -121,19 +121,19 @@ window.MODULES_PSE = {
     // ─────────────────────────────────────────────────────────────────────
     "BAC_PRO_2NDE": [
         // Thème A - Santé
-        { id: "A1", titre: "Le système de santé", theme: "A" },
-        { id: "A2", titre: "Les rythmes biologiques – Le sommeil", theme: "A" },
-        { id: "A3", titre: "L'activité physique", theme: "A" },
-        { id: "A4", titre: "Les addictions", theme: "A" },
-        { id: "A5", titre: "La sexualité – La contraception", theme: "A" },
-        
+        { id: "A1", titre: "Le système de santé", theme: "A", notions: ["Individu", "Santé", "Capital santé", "Facteurs internes", "Facteurs externes", "Plan santé", "Prévention collective", "Solidarité", "Assurance maladie", "Parcours de soins coordonnés"] },
+        { id: "A2", titre: "Les rythmes biologiques – Le sommeil", theme: "A", notions: ["Rythmes biologiques", "Cycle", "Fréquence", "Phases du sommeil", "Récupération physique", "Récupération mentale", "Synchronisation/désynchronisation", "Horloge biologique", "Hygiène du sommeil", "Compte professionnel de prévention"] },
+        { id: "A3", titre: "L'activité physique", theme: "A", notions: ["Muscle strié squelettique", "Excitabilité", "Contractilité", "Consommation d'énergie", "Rythme cardiaque", "Rythme respiratoire", "Activité physique", "Sédentarité", "Bien-être"] },
+        { id: "A4", titre: "Les addictions", theme: "A", notions: ["Addiction", "Facteurs de risque addictif", "Substances psychoactives", "Synapse", "Neurotransmetteur", "Circuit de la récompense", "Dépendance", "Polyconsommation", "Prévention individuelle", "Prévention collective"] },
+        { id: "A5", titre: "La sexualité – La contraception", theme: "A", notions: ["Anatomie reproductrice", "Gamètes", "Cycle ovarien", "Hormones sexuelles", "Fécondation", "Nidation", "Contraception préventive", "Contraception d'urgence", "IVG"] },
+
         // Thème B - Environnement
-        { id: "B1", titre: "L'alimentation écoresponsable", theme: "B" },
-        { id: "B2", titre: "Les risques majeurs", theme: "B" },
-        
+        { id: "B1", titre: "L'alimentation écoresponsable", theme: "B", notions: ["Impact environnemental", "Circuit court", "Saisonnalité", "Agriculture biologique", "Développement durable", "Gaspillage alimentaire", "Surconsommation", "Mesures collectives", "Mesures individuelles"] },
+        { id: "B2", titre: "Les risques majeurs", theme: "B", notions: ["Risque majeur", "Aléa", "Enjeu", "Risque naturel", "Risque technologique", "Signal d'alerte", "DICRIM", "Protection", "Sécurité"] },
+
         // Thème C - Travail
-        { id: "C1", titre: "Les enjeux de la santé et sécurité au travail", theme: "C" },
-        { id: "C2", titre: "Les notions de base en prévention", theme: "C" }
+        { id: "C1", titre: "Les enjeux de la santé et sécurité au travail", theme: "C", notions: ["Enjeux humains", "Enjeux socio-économiques", "Accident du travail", "Maladie professionnelle", "Lésion", "Exposition chronique", "Cadre réglementaire", "Obligations employeur", "Droits du salarié", "Droit de retrait", "Responsabilité civile", "Responsabilité pénale"] },
+        { id: "C2", titre: "Les notions de base en prévention", theme: "C", notions: ["Instruction/information", "Consignes de sécurité", "Activité de travail", "Danger", "Situation dangereuse", "Dommage potentiel", "Risques professionnels", "Familles de risque"] }
     ],
     
     // ─────────────────────────────────────────────────────────────────────
@@ -141,19 +141,19 @@ window.MODULES_PSE = {
     // ─────────────────────────────────────────────────────────────────────
     "BAC_PRO_1ERE": [
         // Thème A - Santé
-        { id: "A6", titre: "Les infections sexuellement transmissibles", theme: "A" },
-        { id: "A7", titre: "Les pratiques alimentaires", theme: "A" },
-        { id: "A8", titre: "Le stress au quotidien", theme: "A" },
-        
+        { id: "A6", titre: "Les infections sexuellement transmissibles", theme: "A", notions: ["IST", "Microorganisme", "Contamination bactérienne", "Contamination virale", "VIH/SIDA", "Séropositivité", "Dépistage", "Vaccin", "Préservatif"] },
+        { id: "A7", titre: "Les pratiques alimentaires", theme: "A", notions: ["Appareil digestif", "Digestion", "Aliment/Nutriment", "Absorption intestinale", "Pratique alimentaire choisie/subie", "Carence nutritionnelle", "Excès alimentaire", "Aliment ultra-transformé", "Nutri-Score"] },
+        { id: "A8", titre: "Le stress au quotidien", theme: "A", notions: ["Stress", "Vulnérabilité", "Adaptation", "Facteur de stress", "Phase du stress", "Adrénaline", "Cortisol", "Stress aigu", "Stress chronique"] },
+
         // Thème B - Environnement
-        { id: "B3", titre: "Le bruit au quotidien", theme: "B" },
-        { id: "B4", titre: "L'eau et le développement durable", theme: "B" },
-        
+        { id: "B3", titre: "Le bruit au quotidien", theme: "B", notions: ["Son/Bruit", "Onde sonore", "Fréquence", "Intensité", "Seuil d'audibilité", "Appareil auditif", "Surdité de transmission", "Surdité de perception", "Effet auditif", "Effet extra-auditif"] },
+        { id: "B4", titre: "L'eau et le développement durable", theme: "B", notions: ["Eau douce", "Eau potable", "Stress hydrique", "Circuit urbain de l'eau", "Épuration", "Empreinte eau", "Consommation directe/indirecte", "Mesures de préservation"] },
+
         // Thème C - Travail
-        { id: "C3", titre: "Les acteurs de prévention", theme: "C" },
-        { id: "C4", titre: "L'assistance et le secours en milieu professionnel", theme: "C" },
-        { id: "C5", titre: "L'analyse des risques professionnels", theme: "C" },
-        { id: "C6", titre: "L'analyse d'un risque spécifique", theme: "C" }
+        { id: "C3", titre: "Les acteurs de prévention", theme: "C", notions: ["Comité social et économique", "Salarié compétent", "Sauveteur secouriste du travail", "Service de santé au travail", "Inspection du travail", "CARSAT"] },
+        { id: "C4", titre: "L'assistance et le secours en milieu professionnel", theme: "C", notions: ["Plan d'évacuation", "Signalisation", "Procédure d'alerte", "Message d'alerte", "Responsabilité civile/pénale", "Non-assistance à personne en danger"] },
+        { id: "C5", titre: "L'analyse des risques professionnels", theme: "C", notions: ["Activité de travail", "Opérateur", "Tâche", "Danger", "Situation dangereuse", "Événement déclencheur", "Dommage", "Gravité", "Probabilité d'occurrence", "Niveau de priorité", "Protection collective", "Protection individuelle"] },
+        { id: "C6", titre: "L'analyse d'un risque spécifique", theme: "C", notions: ["Risque spécifique", "Nature du risque", "Processus d'apparition d'un dommage", "Affection aiguë", "Affection chronique", "Mesures de prévention hiérarchisées"] }
     ],
     
     // ─────────────────────────────────────────────────────────────────────
@@ -161,18 +161,18 @@ window.MODULES_PSE = {
     // ─────────────────────────────────────────────────────────────────────
     "BAC_PRO_TERM": [
         // Thème A - Santé
-        { id: "A9", titre: "La sécurité alimentaire", theme: "A" },
-        
+        { id: "A9", titre: "La sécurité alimentaire", theme: "A", notions: ["Qualité microbiologique", "Qualité chimique", "Agent contaminant", "Chaîne du froid", "Date limite de consommation", "Allergène", "Additif", "Principe de précaution"] },
+
         // Thème B - Environnement
-        { id: "B5", titre: "Les ressources en énergie et développement durable", theme: "B" },
-        
+        { id: "B5", titre: "Les ressources en énergie et développement durable", theme: "B", notions: ["Énergie renouvelable/non renouvelable", "Effet de serre", "Réchauffement climatique", "Empreinte carbone", "Épuisement des ressources", "Pollution", "Mesure collective", "Geste écocitoyen"] },
+
         // Thème C - Travail
-        { id: "C7", titre: "Le suivi de la santé au travail", theme: "C" },
-        { id: "C8", titre: "Déclaration et réparation des AT/MP", theme: "C" },
-        { id: "C9", titre: "Les risques psychosociaux", theme: "C" },
-        { id: "C10", titre: "Les risques liés à l'activité physique", theme: "C" },
-        { id: "C11", titre: "L'analyse d'une situation de travail", theme: "C" },
-        { id: "C12", titre: "L'égalité de traitement au travail", theme: "C" }
+        { id: "C7", titre: "Le suivi de la santé au travail", theme: "C", notions: ["Visite d'information et de prévention", "Examen médical d'aptitude", "Suivi médical", "Vaccination", "Barrière cutanéo-muqueuse", "Immunité non spécifique", "Immunité spécifique", "Antigène", "Anticorps", "Mémoire immunitaire"] },
+        { id: "C8", titre: "Déclaration et réparation des AT/MP", theme: "C", notions: ["Déclaration AT/MP", "Délai", "Reconnaissance", "Faute inexcusable", "Responsabilité civile", "Responsabilité pénale", "Prestation en nature", "Prestation en espèces", "Rente d'incapacité"] },
+        { id: "C9", titre: "Les risques psychosociaux", theme: "C", notions: ["Risque psychosocial", "Intégrité physique", "Intégrité mentale", "Stress", "Violence interne", "Violence externe", "Coût", "Climat social"] },
+        { id: "C10", titre: "Les risques liés à l'activité physique", theme: "C", notions: ["Activité physique", "Activité dynamique", "Activité statique", "Posture", "Trouble musculo-squelettique", "Fatigue musculaire", "Colonne vertébrale", "Disque intervertébral", "Économie d'effort"] },
+        { id: "C11", titre: "L'analyse d'une situation de travail", theme: "C", notions: ["Déterminant", "Travail réel/travail prescrit", "Activité/tâche", "Ergonomie", "Causalité", "Multifactoriel", "Suppression du risque", "Réduction du risque"] },
+        { id: "C12", titre: "L'égalité de traitement au travail", theme: "C", notions: ["Discrimination", "Critère de discrimination", "Égalité professionnelle", "Législation", "Comité social économique", "Défenseur des droits"] }
     ]
 };
 

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Éditeur Démarche PSE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; min-height: 100vh; }
+
+        /* HEADER */
+        .header { background: #1e293b; border-bottom: 1px solid #334155; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
+        .header-actions { display: flex; gap: 10px; }
+
+        /* LAYOUT */
+        .layout { display: flex; height: calc(100vh - 60px); }
+        .sidebar { width: 280px; background: #1e293b; border-right: 1px solid #334155; overflow-y: auto; flex-shrink: 0; }
+        .main { flex: 1; overflow-y: auto; padding: 30px; }
+
+        /* SIDEBAR - SESSIONS */
+        .sidebar-title { padding: 15px; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; border-bottom: 1px solid #334155; }
+        .session-item { padding: 12px 15px; border-bottom: 1px solid #334155; cursor: pointer; transition: 0.2s; }
+        .session-item:hover { background: #334155; }
+        .session-item.active { background: #1d4ed8; border-left: 3px solid #60a5fa; }
+        .session-item .title { font-weight: 600; font-size: 0.9rem; }
+        .session-item .meta { font-size: 0.7rem; color: #94a3b8; margin-top: 3px; }
+        .session-item.active .meta { color: #bfdbfe; }
+
+        /* FORM */
+        .section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 25px; margin-bottom: 20px; }
+        .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .section-header h2 { font-size: 1.1rem; }
+        .section-num { background: #3b82f6; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; flex-shrink: 0; }
+        .section-num.green { background: #22c55e; }
+        .section-num.amber { background: #f59e0b; }
+        .section-num.purple { background: #a855f7; }
+
+        label { display: block; font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px; }
+        input[type="text"], textarea, select { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px 12px; border-radius: 8px; font-family: inherit; font-size: 0.95rem; transition: 0.2s; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+        textarea { resize: vertical; min-height: 100px; }
+        .field { margin-bottom: 18px; }
+
+        /* TAGS / CHIPS */
+        .chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .chip { display: flex; align-items: center; gap: 6px; background: #334155; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid #475569; }
+        .chip.correct { border-color: #22c55e; background: rgba(34,197,94,0.15); }
+        .chip.wrong { border-color: #ef4444; background: rgba(239,68,68,0.1); }
+        .chip .remove { cursor: pointer; color: #94a3b8; font-weight: bold; }
+        .chip .remove:hover { color: #ef4444; }
+
+        /* CATEGORY EDITOR */
+        .cat-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .cat-row input { flex: 1; }
+        .cat-row .btn-remove { background: #ef4444; border: none; color: white; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+        /* NOTION ROW */
+        .notion-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .notion-row input[type="text"] { flex: 1; }
+        .notion-row .toggle-correct { width: 38px; height: 38px; border-radius: 8px; border: 2px solid #475569; background: #0f172a; color: #94a3b8; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .notion-row .toggle-correct.on { border-color: #22c55e; background: rgba(34,197,94,0.2); color: #22c55e; }
+
+        /* BUTTONS */
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+        .btn-outline:hover { border-color: #3b82f6; color: #3b82f6; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-add { background: #334155; border: 1px dashed #475569; color: #94a3b8; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: 0.2s; }
+        .btn-add:hover { border-color: #3b82f6; color: #3b82f6; }
+
+        /* JSON IMPORT */
+        .json-zone { background: #0f172a; border: 2px dashed #334155; border-radius: 12px; padding: 20px; text-align: center; margin-top: 15px; }
+        .json-zone textarea { min-height: 120px; font-family: 'Courier New', monospace; font-size: 0.8rem; }
+
+        /* TOAST */
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 600; transform: translateY(100px); opacity: 0; transition: 0.3s; z-index: 1000; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.error { background: #ef4444; }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .layout { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; max-height: 200px; }
+            .main { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧩 Éditeur Démarche PSE</h1>
+        <div class="header-actions">
+            <button class="btn btn-outline" onclick="showImportJSON()">📋 Importer JSON</button>
+            <button class="btn btn-success" onclick="saveSession()">💾 Sauvegarder</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <!-- SIDEBAR : SESSIONS -->
+        <div class="sidebar">
+            <div class="sidebar-title">📁 Mes sessions</div>
+            <div id="session-list"></div>
+            <div style="padding:15px;">
+                <button class="btn btn-primary" style="width:100%;" onclick="newSession()">+ Nouvelle session</button>
+            </div>
+        </div>
+
+        <!-- MAIN : ÉDITEUR -->
+        <div class="main">
+            <div id="no-session" style="text-align:center; padding:60px 20px; color:#64748b;">
+                <div style="font-size:3rem; margin-bottom:15px;">🧩</div>
+                <h2 style="color:#94a3b8;">Créez ou sélectionnez une session</h2>
+                <p style="margin-top:8px;">Chaque session correspond à un module (C7, B3, A5...)</p>
+            </div>
+
+            <div id="editor-form" style="display:none;">
+
+                <!-- BLOC 0 : INFOS MODULE -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-num">0</div>
+                        <h2>Informations du module</h2>
+                    </div>
+                    <div class="field">
+                        <label>Titre du module</label>
+                        <input type="text" id="module-titre" placeholder="Ex: C7 - Le suivi de la santé au travail">
+                    </div>
+                    <div class="field">
+                        <label>Niveau</label>
+                        <select id="module-niveau">
+                            <option value="CAP">CAP</option>
+                            <option value="BAC_PRO_2NDE">Bac Pro Seconde</option>
+                            <option value="BAC_PRO_1ERE">Bac Pro Première</option>
+                            <option value="BAC_PRO_TERM">Bac Pro Terminale</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- BLOC 1 : SITUATION -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-num">1</div>
+                        <h2>La situation-problème</h2>
+                    </div>
+                    <div class="field">
+                        <label>Texte de la situation (ou "Voir document papier")</label>
+                        <textarea id="situation-texte" placeholder="Collez ici le texte de la situation du module..."></textarea>
+                    </div>
+                </div>
+
+                <!-- BLOC 2 : EXERCICE 1 — DÉCORTIQUER -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-num green">1</div>
+                        <h2>Exercice 1 — Décortiquer la situation</h2>
+                    </div>
+                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:15px;">Les élèves envoient des éléments importants et les classent dans des catégories.</p>
+                    <div class="field">
+                        <label>Catégories (colonnes d'affichage au tableau)</label>
+                        <div id="categories-list"></div>
+                        <button class="btn-add" onclick="addCategory()">+ Ajouter une catégorie</button>
+                    </div>
+                </div>
+
+                <!-- BLOC 3 : EXERCICE 2 — CONNAISSANCES -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-num amber">2</div>
+                        <h2>Exercice 2 — Quelles connaissances mobiliser ?</h2>
+                    </div>
+                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:15px;">Les élèves sélectionnent les notions utiles. ✅ = bonne réponse, ❌ = piège.</p>
+                    <div class="field">
+                        <label>Liste des notions</label>
+                        <div id="notions-list"></div>
+                        <button class="btn-add" onclick="addNotion()">+ Ajouter une notion</button>
+                    </div>
+                </div>
+
+                <!-- BLOC 4 : EXERCICE 3 — SOLUTIONS -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-num purple">3</div>
+                        <h2>Exercice 3 — Proposer des solutions</h2>
+                    </div>
+                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:15px;">Les élèves proposent des mesures de prévention et les classent par catégorie.</p>
+                    <div class="field">
+                        <label>Catégories de solutions (colonnes)</label>
+                        <div id="solutions-cats-list"></div>
+                        <button class="btn-add" onclick="addSolutionCat()">+ Ajouter une catégorie de solution</button>
+                    </div>
+                </div>
+
+                <!-- ACTIONS -->
+                <div style="display:flex; gap:12px; justify-content:flex-end; padding-bottom:40px;">
+                    <button class="btn btn-danger" onclick="deleteSession()">🗑️ Supprimer</button>
+                    <button class="btn btn-success" onclick="saveSession()">💾 Sauvegarder</button>
+                    <button class="btn btn-primary" onclick="launchSession()">🚀 Lancer la session</button>
+                </div>
+            </div>
+
+            <!-- MODAL IMPORT JSON -->
+            <div id="json-modal" style="display:none;">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>📋 Importer un JSON</h2>
+                    </div>
+                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:15px;">Collez un JSON généré par ChatGPT ou Claude pour pré-remplir les exercices.</p>
+                    <div class="json-zone">
+                        <textarea id="json-input" placeholder='{"titre": "C7 - Le suivi de la santé au travail", "situation": "...", "categories": [...], "notions": [...], "solutions_categories": [...]}'></textarea>
+                        <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                            <button class="btn btn-outline" onclick="hideImportJSON()">Annuler</button>
+                            <button class="btn btn-primary" onclick="importJSON()">Importer</button>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; background:#0f172a; padding:15px; border-radius:8px; border:1px solid #334155;">
+                        <label style="margin-bottom:10px;">💡 Prompt à copier dans ChatGPT :</label>
+                        <div style="font-family:'Courier New', monospace; font-size:0.75rem; color:#94a3b8; line-height:1.6; white-space:pre-wrap;" id="prompt-template">Voici une situation-problème PSE pour le module [NOM DU MODULE].
+
+Situation : [COLLER LA SITUATION]
+
+Notions du programme : [COLLER LES NOTIONS]
+
+Génère un JSON avec cette structure exacte :
+{
+  "titre": "Code et titre du module",
+  "niveau": "CAP ou BAC_PRO_2NDE ou BAC_PRO_1ERE ou BAC_PRO_TERM",
+  "situation": "Le texte de la situation",
+  "categories_decortiquer": ["QUI", "QUOI", "OÙ", "QUAND", "PROBLÈME", "CONSÉQUENCES"],
+  "notions": [
+    {"texte": "Nom de la notion", "correcte": true},
+    {"texte": "Notion piège", "correcte": false}
+  ],
+  "categories_solutions": ["Supprimer le risque", "Protection collective", "Protection individuelle", "Formation/Information"]
+}
+
+Inclus 10-12 notions dont 3-4 pièges (notions qui ne sont pas pertinentes pour ce module).
+Les catégories de décorticage doivent être adaptées au type de situation.
+Les catégories de solutions doivent correspondre aux niveaux de prévention pertinents.</div>
+                        <button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="copyPrompt()">📋 Copier le prompt</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.firebasestorage.app",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let currentSessionId = null;
+        let sessions = {};
+
+        // ═══════════════════════════════════════════
+        // SESSIONS MANAGEMENT
+        // ═══════════════════════════════════════════
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 4); }
+
+        // Charger toutes les sessions
+        onSnapshot(collection(db, "demarche_sessions"), (snap) => {
+            sessions = {};
+            snap.forEach(d => { sessions[d.id] = d.data(); });
+            renderSessionList();
+        });
+
+        function renderSessionList() {
+            const list = document.getElementById('session-list');
+            list.innerHTML = '';
+            const sorted = Object.entries(sessions).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+            sorted.forEach(([id, data]) => {
+                const div = document.createElement('div');
+                div.className = 'session-item' + (id === currentSessionId ? ' active' : '');
+                div.innerHTML = `<div class="title">${data.titre || 'Sans titre'}</div><div class="meta">${data.niveau || ''} • ${new Date(data.updatedAt || Date.now()).toLocaleDateString('fr-FR')}</div>`;
+                div.onclick = () => loadSession(id);
+                list.appendChild(div);
+            });
+        }
+
+        window.newSession = () => {
+            currentSessionId = generateId();
+            document.getElementById('editor-form').style.display = 'block';
+            document.getElementById('no-session').style.display = 'none';
+            document.getElementById('json-modal').style.display = 'none';
+            // Reset form
+            document.getElementById('module-titre').value = '';
+            document.getElementById('module-niveau').value = 'BAC_PRO_TERM';
+            document.getElementById('situation-texte').value = '';
+            // Default categories
+            window._categories = ["QUI", "QUOI", "OÙ", "QUAND", "PROBLÈME", "CONSÉQUENCES"];
+            window._notions = [];
+            window._solutionsCats = ["Supprimer le risque", "Protection collective", "Protection individuelle", "Formation / Information"];
+            renderCategories();
+            renderNotions();
+            renderSolutionsCats();
+            renderSessionList();
+        };
+
+        function loadSession(id) {
+            currentSessionId = id;
+            const data = sessions[id];
+            document.getElementById('editor-form').style.display = 'block';
+            document.getElementById('no-session').style.display = 'none';
+            document.getElementById('json-modal').style.display = 'none';
+            document.getElementById('module-titre').value = data.titre || '';
+            document.getElementById('module-niveau').value = data.niveau || 'BAC_PRO_TERM';
+            document.getElementById('situation-texte').value = data.situation || '';
+            window._categories = data.categories || ["QUI", "QUOI", "OÙ", "QUAND", "PROBLÈME", "CONSÉQUENCES"];
+            window._notions = data.notions || [];
+            window._solutionsCats = data.categories_solutions || ["Supprimer le risque", "Protection collective", "Protection individuelle", "Formation / Information"];
+            renderCategories();
+            renderNotions();
+            renderSolutionsCats();
+            renderSessionList();
+        }
+
+        // ═══════════════════════════════════════════
+        // CATEGORIES (Exercice 1)
+        // ═══════════════════════════════════════════
+        window._categories = [];
+
+        function renderCategories() {
+            const list = document.getElementById('categories-list');
+            list.innerHTML = '';
+            window._categories.forEach((cat, i) => {
+                const row = document.createElement('div');
+                row.className = 'cat-row';
+                row.innerHTML = `<input type="text" value="${cat}" onchange="window._categories[${i}]=this.value"><button class="btn-remove" onclick="window._categories.splice(${i},1);renderCategories();">✕</button>`;
+                list.appendChild(row);
+            });
+        }
+        window.renderCategories = renderCategories;
+
+        window.addCategory = () => {
+            window._categories.push('');
+            renderCategories();
+            const inputs = document.querySelectorAll('#categories-list input');
+            inputs[inputs.length - 1].focus();
+        };
+
+        // ═══════════════════════════════════════════
+        // NOTIONS (Exercice 2)
+        // ═══════════════════════════════════════════
+        window._notions = [];
+
+        function renderNotions() {
+            const list = document.getElementById('notions-list');
+            list.innerHTML = '';
+            window._notions.forEach((n, i) => {
+                const row = document.createElement('div');
+                row.className = 'notion-row';
+                row.innerHTML = `
+                    <button class="toggle-correct ${n.correcte ? 'on' : ''}" onclick="window._notions[${i}].correcte=!window._notions[${i}].correcte; this.classList.toggle('on');">${n.correcte ? '✅' : '❌'}</button>
+                    <input type="text" value="${n.texte}" onchange="window._notions[${i}].texte=this.value">
+                    <button class="btn-remove" onclick="window._notions.splice(${i},1);renderNotions();">✕</button>
+                `;
+                list.appendChild(row);
+            });
+        }
+        window.renderNotions = renderNotions;
+
+        window.addNotion = () => {
+            window._notions.push({ texte: '', correcte: true });
+            renderNotions();
+            const inputs = document.querySelectorAll('#notions-list input[type="text"]');
+            inputs[inputs.length - 1].focus();
+        };
+
+        // ═══════════════════════════════════════════
+        // SOLUTIONS CATEGORIES (Exercice 3)
+        // ═══════════════════════════════════════════
+        window._solutionsCats = [];
+
+        function renderSolutionsCats() {
+            const list = document.getElementById('solutions-cats-list');
+            list.innerHTML = '';
+            window._solutionsCats.forEach((cat, i) => {
+                const row = document.createElement('div');
+                row.className = 'cat-row';
+                row.innerHTML = `<input type="text" value="${cat}" onchange="window._solutionsCats[${i}]=this.value"><button class="btn-remove" onclick="window._solutionsCats.splice(${i},1);renderSolutionsCats();">✕</button>`;
+                list.appendChild(row);
+            });
+        }
+        window.renderSolutionsCats = renderSolutionsCats;
+
+        window.addSolutionCat = () => {
+            window._solutionsCats.push('');
+            renderSolutionsCats();
+            const inputs = document.querySelectorAll('#solutions-cats-list input');
+            inputs[inputs.length - 1].focus();
+        };
+
+        // ═══════════════════════════════════════════
+        // SAVE / DELETE / LAUNCH
+        // ═══════════════════════════════════════════
+        window.saveSession = async () => {
+            if (!currentSessionId) { toast("Créez d'abord une session", true); return; }
+            // Sync categories from DOM
+            document.querySelectorAll('#categories-list input').forEach((inp, i) => { window._categories[i] = inp.value; });
+            document.querySelectorAll('#notions-list input[type="text"]').forEach((inp, i) => { window._notions[i].texte = inp.value; });
+            document.querySelectorAll('#solutions-cats-list input').forEach((inp, i) => { window._solutionsCats[i] = inp.value; });
+
+            const data = {
+                titre: document.getElementById('module-titre').value,
+                niveau: document.getElementById('module-niveau').value,
+                situation: document.getElementById('situation-texte').value,
+                categories: window._categories.filter(c => c.trim()),
+                notions: window._notions.filter(n => n.texte.trim()),
+                categories_solutions: window._solutionsCats.filter(c => c.trim()),
+                updatedAt: Date.now()
+            };
+            await setDoc(doc(db, "demarche_sessions", currentSessionId), data);
+            toast("Session sauvegardée !");
+        };
+
+        window.deleteSession = async () => {
+            if (!currentSessionId) return;
+            if (!confirm("Supprimer cette session ?")) return;
+            await deleteDoc(doc(db, "demarche_sessions", currentSessionId));
+            currentSessionId = null;
+            document.getElementById('editor-form').style.display = 'none';
+            document.getElementById('no-session').style.display = 'block';
+            toast("Session supprimée");
+        };
+
+        window.launchSession = async () => {
+            await window.saveSession();
+            // Ouvrir prof_demarche.html avec le sessionId
+            window.open('prof_demarche.html?sessionId=' + currentSessionId, '_blank');
+        };
+
+        // ═══════════════════════════════════════════
+        // JSON IMPORT
+        // ═══════════════════════════════════════════
+        window.showImportJSON = () => {
+            document.getElementById('json-modal').style.display = 'block';
+            document.getElementById('editor-form').style.display = 'none';
+            document.getElementById('no-session').style.display = 'none';
+        };
+
+        window.hideImportJSON = () => {
+            document.getElementById('json-modal').style.display = 'none';
+            if (currentSessionId) {
+                document.getElementById('editor-form').style.display = 'block';
+            } else {
+                document.getElementById('no-session').style.display = 'block';
+            }
+        };
+
+        window.importJSON = () => {
+            try {
+                const json = JSON.parse(document.getElementById('json-input').value);
+                // Créer une nouvelle session si nécessaire
+                if (!currentSessionId) { currentSessionId = generateId(); }
+                document.getElementById('editor-form').style.display = 'block';
+                document.getElementById('json-modal').style.display = 'none';
+
+                if (json.titre) document.getElementById('module-titre').value = json.titre;
+                if (json.niveau) document.getElementById('module-niveau').value = json.niveau;
+                if (json.situation) document.getElementById('situation-texte').value = json.situation;
+                if (json.categories_decortiquer) { window._categories = json.categories_decortiquer; renderCategories(); }
+                if (json.categories) { window._categories = json.categories; renderCategories(); }
+                if (json.notions) { window._notions = json.notions.map(n => typeof n === 'string' ? { texte: n, correcte: true } : n); renderNotions(); }
+                if (json.categories_solutions) { window._solutionsCats = json.categories_solutions; renderSolutionsCats(); }
+
+                toast("JSON importé avec succès !");
+            } catch (e) {
+                toast("Erreur JSON : " + e.message, true);
+            }
+        };
+
+        window.copyPrompt = () => {
+            const text = document.getElementById('prompt-template').textContent;
+            navigator.clipboard.writeText(text).then(() => toast("Prompt copié !"));
+        };
+
+        // ═══════════════════════════════════════════
+        // TOAST
+        // ═══════════════════════════════════════════
+        function toast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(() => { t.className = 'toast'; }, 3000);
+        }
+        window.toast = toast;
+    </script>
+</body>
+</html>

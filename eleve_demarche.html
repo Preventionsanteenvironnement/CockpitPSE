@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Démarche PSE</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; color: #333; max-width: 500px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+        /* HEADER */
+        .app-header { background: white; padding: 15px 20px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .app-header h1 { font-size: 1.1rem; color: #1e293b; }
+        .app-header .badge { background: #3b82f6; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+
+        /* JOIN SCREEN */
+        .join-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; }
+        .join-screen .logo { font-size: 3rem; margin-bottom: 15px; }
+        .join-screen h2 { font-size: 1.5rem; color: #1e293b; margin-bottom: 25px; }
+        .join-field { width: 100%; margin-bottom: 15px; }
+        .join-field label { display: block; font-size: 0.8rem; color: #64748b; margin-bottom: 5px; font-weight: 600; text-transform: uppercase; }
+        .join-field input { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1.1rem; text-align: center; transition: 0.2s; }
+        .join-field input:focus { border-color: #3b82f6; outline: none; }
+        .join-btn { width: 100%; padding: 16px; background: #3b82f6; color: white; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 0 #2563eb; transition: 0.1s; margin-top: 10px; }
+        .join-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* EXERCISE SCREENS */
+        .exercise-screen { display: none; flex: 1; flex-direction: column; }
+        .exercise-screen.active { display: flex; }
+
+        /* EXERCISE HEADER */
+        .ex-header { background: white; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; }
+        .ex-header .ex-num { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+        .ex-header .ex-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+        .ex-header .ex-consigne { font-size: 0.85rem; color: #64748b; margin-top: 6px; line-height: 1.4; }
+        .ex-num-green { color: #22c55e; }
+        .ex-num-amber { color: #f59e0b; }
+        .ex-num-purple { color: #a855f7; }
+
+        /* EXERCICE 1 - Input + Category */
+        .ex-body { flex: 1; padding: 20px; overflow-y: auto; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 0.8rem; color: #64748b; margin-bottom: 5px; font-weight: 600; }
+        .text-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; transition: 0.2s; }
+        .text-input:focus { border-color: #3b82f6; outline: none; }
+        select { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; background: white; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; }
+        .send-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; color: white; transition: 0.1s; margin-top: 10px; }
+        .send-btn:active { transform: translateY(2px); }
+        .send-btn-green { background: #22c55e; box-shadow: 0 3px 0 #16a34a; }
+        .send-btn-amber { background: #f59e0b; box-shadow: 0 3px 0 #d97706; }
+        .send-btn-purple { background: #a855f7; box-shadow: 0 3px 0 #9333ea; }
+
+        /* SENT ITEMS */
+        .sent-list { margin-top: 20px; }
+        .sent-title { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+        .sent-item { background: white; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; border-left: 3px solid #3b82f6; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s; }
+        .sent-item .cat { font-size: 0.7rem; color: #64748b; background: #f1f5f9; padding: 3px 8px; border-radius: 8px; }
+
+        /* EXERCICE 2 - Checkboxes */
+        .checkbox-list { display: flex; flex-direction: column; gap: 8px; }
+        .checkbox-item { background: white; padding: 14px 16px; border-radius: 10px; border: 2px solid #e2e8f0; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s; -webkit-tap-highlight-color: transparent; }
+        .checkbox-item.checked { border-color: #3b82f6; background: #eff6ff; }
+        .checkbox-item .check-box { width: 24px; height: 24px; border-radius: 6px; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.2s; font-size: 0.9rem; }
+        .checkbox-item.checked .check-box { background: #3b82f6; border-color: #3b82f6; color: white; }
+        .checkbox-item .check-label { font-size: 1rem; font-weight: 500; }
+
+        /* EXERCICE 3 - Input + Radio */
+        .radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .radio-item { background: white; padding: 12px 14px; border-radius: 8px; border: 2px solid #e2e8f0; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; -webkit-tap-highlight-color: transparent; }
+        .radio-item.selected { border-color: #a855f7; background: #faf5ff; }
+        .radio-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #cbd5e1; flex-shrink: 0; transition: 0.2s; }
+        .radio-item.selected .radio-dot { border-color: #a855f7; background: #a855f7; box-shadow: inset 0 0 0 3px white; }
+
+        /* LOCK OVERLAY */
+        .lock-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; flex-direction: column; }
+        .lock-overlay.show { display: flex; }
+        .lock-overlay .lock-icon { font-size: 4rem; margin-bottom: 15px; }
+        .lock-overlay .lock-text { color: white; font-size: 1.2rem; font-weight: 700; }
+
+        /* STATUS */
+        .status-msg { text-align: center; padding: 8px; font-weight: 600; font-size: 0.9rem; transition: 0.3s; }
+        .status-success { color: #22c55e; }
+        .status-error { color: #ef4444; }
+
+        /* WARNING */
+        .warning-box { background: #fff3cd; color: #856404; padding: 12px 15px; border-radius: 10px; border: 1px solid #ffeeba; font-size: 0.85rem; margin: 15px 20px 0; line-height: 1.4; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+    <!-- JOIN SCREEN -->
+    <div id="join-screen" class="join-screen">
+        <div class="logo">🧩</div>
+        <h2>Démarche PSE</h2>
+        <div class="join-field">
+            <label>Ton prénom</label>
+            <input type="text" id="input-pseudo" placeholder="Ton prénom..." autocomplete="off">
+        </div>
+        <button class="join-btn" onclick="joinSession()">Rejoindre</button>
+        <div id="join-error" style="color:#ef4444; font-size:0.85rem; margin-top:10px; font-weight:600;"></div>
+    </div>
+
+    <!-- EXERCICE 1 -->
+    <div id="screen-1" class="exercise-screen">
+        <div class="app-header">
+            <h1>🧩 Démarche PSE</h1>
+            <span class="badge" style="background:#22c55e;">Exercice 1</span>
+        </div>
+        <div class="ex-header">
+            <div class="ex-num ex-num-green">Exercice 1</div>
+            <div class="ex-title">Décortiquer la situation</div>
+            <div class="ex-consigne">Lis la situation. Envoie les éléments importants que tu repères et classe-les.</div>
+        </div>
+        <div class="warning-box">
+            Lis bien la situation au tableau ou sur ton document papier avant de répondre.
+        </div>
+        <div class="ex-body">
+            <div class="input-group">
+                <label>Élément repéré</label>
+                <input type="text" class="text-input" id="input-element" placeholder="Un mot ou une info importante..." autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>Catégorie</label>
+                <select id="select-categorie"></select>
+            </div>
+            <button class="send-btn send-btn-green" onclick="sendElement()">Envoyer</button>
+            <div id="status-1" class="status-msg"></div>
+            <div class="sent-list">
+                <div class="sent-title">Mes envois</div>
+                <div id="sent-list-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXERCICE 2 -->
+    <div id="screen-2" class="exercise-screen">
+        <div class="app-header">
+            <h1>🧩 Démarche PSE</h1>
+            <span class="badge" style="background:#f59e0b;">Exercice 2</span>
+        </div>
+        <div class="ex-header">
+            <div class="ex-num ex-num-amber">Exercice 2</div>
+            <div class="ex-title">Quelles connaissances mobiliser ?</div>
+            <div class="ex-consigne">Pour comprendre la situation et proposer des solutions, quelles notions sont utiles selon toi ?</div>
+        </div>
+        <div class="ex-body">
+            <div class="checkbox-list" id="notions-checkboxes"></div>
+            <button class="send-btn send-btn-amber" onclick="sendNotions()" style="margin-top:20px;">Valider mes choix</button>
+            <div id="status-2" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- EXERCICE 3 -->
+    <div id="screen-3" class="exercise-screen">
+        <div class="app-header">
+            <h1>🧩 Démarche PSE</h1>
+            <span class="badge" style="background:#a855f7;">Exercice 3</span>
+        </div>
+        <div class="ex-header">
+            <div class="ex-num ex-num-purple">Exercice 3</div>
+            <div class="ex-title">Proposer des solutions</div>
+            <div class="ex-consigne">Propose une mesure de prévention et classe-la dans la bonne catégorie.</div>
+        </div>
+        <div class="ex-body">
+            <div class="input-group">
+                <label>Ta proposition de solution</label>
+                <input type="text" class="text-input" id="input-solution" placeholder="Une mesure de prévention..." autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>Catégorie de prévention</label>
+                <div class="radio-group" id="solutions-radios"></div>
+            </div>
+            <button class="send-btn send-btn-purple" onclick="sendSolution()">Envoyer</button>
+            <div id="status-3" class="status-msg"></div>
+            <div class="sent-list">
+                <div class="sent-title">Mes propositions</div>
+                <div id="sent-list-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WAITING -->
+    <div id="screen-wait" class="exercise-screen" style="align-items:center; justify-content:center; padding:40px; text-align:center;">
+        <div style="font-size:3rem; margin-bottom:15px;">⏳</div>
+        <div style="font-size:1.2rem; font-weight:700; color:#1e293b;">En attente du prof...</div>
+        <div style="font-size:0.9rem; color:#64748b; margin-top:8px;">L'exercice va bientôt commencer.</div>
+    </div>
+
+    <!-- LOCK OVERLAY -->
+    <div class="lock-overlay" id="lock-overlay">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-text">Les votes sont clos</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, onSnapshot, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+            authDomain: "devoirs-pse.firebaseapp.com",
+            projectId: "devoirs-pse",
+            storageBucket: "devoirs-pse.firebasestorage.app",
+            messagingSenderId: "614730413904",
+            appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let sessionId = new URLSearchParams(window.location.search).get('sessionId');
+        let pseudo = '';
+        let visitorId = localStorage.getItem('demarche_visitorId') || (Date.now().toString(36) + Math.random().toString(36).substr(2, 6));
+        localStorage.setItem('demarche_visitorId', visitorId);
+        let sessionConfig = null;
+        let currentExercise = 0;
+        let selectedSolutionCat = -1;
+        let presenceInterval = null;
+
+        // ── JOIN ──
+        window.joinSession = async () => {
+            pseudo = document.getElementById('input-pseudo').value.trim();
+            if (!pseudo) { document.getElementById('join-error').textContent = "Entre ton prénom"; return; }
+            if (!sessionId) { document.getElementById('join-error').textContent = "Lien invalide"; return; }
+
+            // Load session config
+            const snap = await getDoc(doc(db, "demarche_sessions", sessionId));
+            if (!snap.exists()) { document.getElementById('join-error').textContent = "Session introuvable"; return; }
+            sessionConfig = snap.data();
+
+            // Build exercise UIs
+            buildExercise1();
+            buildExercise2();
+            buildExercise3();
+
+            // Register presence
+            await setDoc(doc(db, "demarche_presence", visitorId), { sessionId, pseudo, lastSeen: Date.now() });
+            presenceInterval = setInterval(async () => {
+                await setDoc(doc(db, "demarche_presence", visitorId), { sessionId, pseudo, lastSeen: Date.now() }, { merge: true });
+            }, 15000);
+
+            // Hide join, listen to state
+            document.getElementById('join-screen').style.display = 'none';
+            listenState();
+        };
+
+        // ── BUILD UIs ──
+        function buildExercise1() {
+            const select = document.getElementById('select-categorie');
+            select.innerHTML = '';
+            (sessionConfig.categories || []).forEach((cat, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+        }
+
+        function buildExercise2() {
+            const container = document.getElementById('notions-checkboxes');
+            container.innerHTML = '';
+            // Shuffle notions for display (but keep original indices)
+            const indices = (sessionConfig.notions || []).map((_, i) => i);
+            // Fisher-Yates shuffle
+            for (let i = indices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indices[i], indices[j]] = [indices[j], indices[i]];
+            }
+            indices.forEach(idx => {
+                const n = sessionConfig.notions[idx];
+                const item = document.createElement('div');
+                item.className = 'checkbox-item';
+                item.dataset.index = idx;
+                item.innerHTML = `<div class="check-box"></div><div class="check-label">${n.texte}</div>`;
+                item.onclick = () => {
+                    item.classList.toggle('checked');
+                    item.querySelector('.check-box').textContent = item.classList.contains('checked') ? '✓' : '';
+                };
+                container.appendChild(item);
+            });
+        }
+
+        function buildExercise3() {
+            const container = document.getElementById('solutions-radios');
+            container.innerHTML = '';
+            selectedSolutionCat = -1;
+            (sessionConfig.categories_solutions || []).forEach((cat, i) => {
+                const item = document.createElement('div');
+                item.className = 'radio-item';
+                item.dataset.index = i;
+                item.innerHTML = `<div class="radio-dot"></div><div>${cat}</div>`;
+                item.onclick = () => {
+                    document.querySelectorAll('#solutions-radios .radio-item').forEach(r => r.classList.remove('selected'));
+                    item.classList.add('selected');
+                    selectedSolutionCat = i;
+                };
+                container.appendChild(item);
+            });
+        }
+
+        // ── LISTEN STATE ──
+        function listenState() {
+            onSnapshot(doc(db, "demarche_etat", "config"), (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                if (data.sessionId !== sessionId) return;
+
+                // Lock overlay
+                const lockEl = document.getElementById('lock-overlay');
+                if (data.isOpen === false) { lockEl.classList.add('show'); }
+                else { lockEl.classList.remove('show'); }
+
+                // Switch exercise
+                const ex = data.exerciceActif || 0;
+                if (ex !== currentExercise) {
+                    currentExercise = ex;
+                    showScreen(ex);
+                }
+            });
+        }
+
+        function showScreen(num) {
+            document.querySelectorAll('.exercise-screen').forEach(s => { s.classList.remove('active'); s.style.display = 'none'; });
+            const screen = document.getElementById('screen-' + num);
+            if (screen) { screen.style.display = 'flex'; screen.classList.add('active'); }
+            else { const wait = document.getElementById('screen-wait'); wait.style.display = 'flex'; wait.classList.add('active'); }
+        }
+
+        // ── SEND EXERCICE 1 ──
+        window.sendElement = async () => {
+            const input = document.getElementById('input-element');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const catIndex = parseInt(document.getElementById('select-categorie').value);
+            const catName = sessionConfig.categories[catIndex];
+
+            await addDoc(collection(db, "demarche_reponses"), {
+                sessionId,
+                exercice: 1,
+                pseudo,
+                visitorId,
+                texte: text,
+                categorie: catName,
+                catIndex: catIndex,
+                timestamp: Date.now()
+            });
+
+            // Show in sent list
+            const list = document.getElementById('sent-list-1');
+            const div = document.createElement('div');
+            div.className = 'sent-item';
+            div.innerHTML = `<span>${text}</span><span class="cat">${catName}</span>`;
+            list.prepend(div);
+
+            input.value = '';
+            input.focus();
+            showStatus('status-1', 'Envoyé !', false);
+        };
+
+        // ── SEND EXERCICE 2 ──
+        window.sendNotions = async () => {
+            const checked = document.querySelectorAll('#notions-checkboxes .checkbox-item.checked');
+            const selections = Array.from(checked).map(el => parseInt(el.dataset.index));
+
+            if (selections.length === 0) { showStatus('status-2', 'Sélectionne au moins une notion', true); return; }
+
+            // Delete previous vote if exists
+            const q = query(collection(db, "demarche_reponses"), where("sessionId", "==", sessionId), where("exercice", "==", 2), where("visitorId", "==", visitorId));
+
+            await addDoc(collection(db, "demarche_reponses"), {
+                sessionId,
+                exercice: 2,
+                pseudo,
+                visitorId,
+                selections: selections,
+                timestamp: Date.now()
+            });
+
+            showStatus('status-2', `${selections.length} notions sélectionnées !`, false);
+            // Disable further votes
+            document.querySelectorAll('#notions-checkboxes .checkbox-item').forEach(el => { el.style.pointerEvents = 'none'; el.style.opacity = '0.7'; });
+            document.querySelector('#screen-2 .send-btn').disabled = true;
+            document.querySelector('#screen-2 .send-btn').style.opacity = '0.5';
+        };
+
+        // ── SEND EXERCICE 3 ──
+        window.sendSolution = async () => {
+            const input = document.getElementById('input-solution');
+            const text = input.value.trim();
+            if (!text) return;
+            if (selectedSolutionCat < 0) { showStatus('status-3', 'Choisis une catégorie', true); return; }
+
+            const catName = sessionConfig.categories_solutions[selectedSolutionCat];
+
+            await addDoc(collection(db, "demarche_reponses"), {
+                sessionId,
+                exercice: 3,
+                pseudo,
+                visitorId,
+                texte: text,
+                categorie: catName,
+                catIndex: selectedSolutionCat,
+                timestamp: Date.now()
+            });
+
+            // Show in sent list
+            const list = document.getElementById('sent-list-3');
+            const div = document.createElement('div');
+            div.className = 'sent-item';
+            div.innerHTML = `<span>${text}</span><span class="cat">${catName}</span>`;
+            list.prepend(div);
+
+            input.value = '';
+            input.focus();
+            // Reset radio
+            document.querySelectorAll('#solutions-radios .radio-item').forEach(r => r.classList.remove('selected'));
+            selectedSolutionCat = -1;
+            showStatus('status-3', 'Envoyé !', false);
+        };
+
+        // ── UTILS ──
+        function showStatus(id, msg, isError) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'status-msg ' + (isError ? 'status-error' : 'status-success');
+            setTimeout(() => { el.textContent = ''; }, 3000);
+        }
+
+        // ── KEYBOARD SHORTCUTS ──
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (currentExercise === 1) window.sendElement();
+                if (currentExercise === 3) window.sendSolution();
+            }
+        });
+
+        // ── AUTO JOIN IF SESSION IN URL ──
+        if (sessionId) {
+            document.getElementById('join-screen').style.display = 'flex';
+        }
+
+        // Cleanup on leave
+        window.addEventListener('beforeunload', () => {
+            if (presenceInterval) clearInterval(presenceInterval);
+            // Best effort cleanup
+            if (visitorId) {
+                navigator.sendBeacon && fetch(`https://firestore.googleapis.com/v1/projects/devoirs-pse/databases/(default)/documents/demarche_presence/${visitorId}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+            }
+        });
+    </script>
+</body>
+</html>
