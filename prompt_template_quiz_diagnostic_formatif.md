@@ -55,17 +55,20 @@ ATTENTION : Ce JSON est destine a l'editeur de quiz (editeur_quiz.html). Il est 
       "type": "qcm",
       "question": "Texte de la question",
       "choices": ["Choix A", "Choix B", "Choix C", "Choix D"],
-      "correct": 0
+      "correct": 0,
+      "explication": "Courte phrase qui explique pourquoi c'est la bonne reponse"
     },
     {
       "type": "vf",
       "question": "Affirmation a evaluer comme vraie ou fausse",
-      "correct": true
+      "correct": true,
+      "explication": "Courte phrase qui explique pourquoi c'est vrai (ou faux)"
     },
     {
       "type": "mot",
       "question": "Question dont la reponse est un mot ou une expression courte",
-      "reponse": "reponse attendue"
+      "reponse": "reponse attendue",
+      "explication": "Courte phrase qui eclaire la reponse"
     }
   ]
 }
@@ -99,7 +102,8 @@ Il y a exactement 3 types possibles :
 - Le champ "type" doit valoir exactement "diagnostique" ou "formatif" (en minuscules)
 - Le tableau "questions" contient entre 8 et 12 objets
 - Chaque question a un champ "type" qui vaut "qcm", "vf" ou "mot" (rien d'autre)
-- PAS de champ "consigne", "scenario", "explication", "competence", "points" ou "bareme" — ce n'est PAS une evaluation, c'est un quiz rapide
+- PAS de champ "consigne", "scenario", "competence", "points" ou "bareme" — ce n'est PAS une evaluation, c'est un quiz rapide
+- Chaque question DOIT avoir un champ "explication" : une phrase courte (1-2 lignes max) qui aide l'eleve a comprendre la bonne reponse. Ne PAS commencer par "Explication :" ou "En effet," — aller droit au fait. Ton pedagogique, simple et clair.
 
 **Repartition des types de questions :**
 - Quiz diagnostique : environ 40% VF, 40% QCM, 20% mot (favoriser la rapidite)
@@ -141,56 +145,66 @@ Voici un exemple pour le module C8 "AT/MP" en quiz diagnostique. CHANGE le conte
     {
       "type": "vf",
       "question": "Un accident du travail est un evenement qui se produit uniquement sur le lieu de travail.",
-      "correct": false
+      "correct": false,
+      "explication": "Un AT peut aussi survenir lors d'une mission pour l'employeur, en dehors des locaux de l'entreprise."
     },
     {
       "type": "qcm",
       "question": "Selon vous, qui doit declarer un accident du travail a la Securite sociale ?",
       "choices": ["Le salarie lui-meme", "L'employeur", "Le medecin", "La police"],
-      "correct": 1
+      "correct": 1,
+      "explication": "C'est l'employeur qui a l'obligation legale de declarer l'AT a la CPAM."
     },
     {
       "type": "vf",
       "question": "Une maladie professionnelle apparait toujours de maniere soudaine, comme un accident.",
-      "correct": false
+      "correct": false,
+      "explication": "Contrairement a l'AT qui est soudain, une maladie professionnelle se developpe progressivement suite a une exposition prolongee."
     },
     {
       "type": "qcm",
       "question": "Que signifie le sigle AT en milieu professionnel ?",
       "choices": ["Arret Temporaire", "Accident du Travail", "Allocation de Transport", "Aide au Travailleur"],
-      "correct": 1
+      "correct": 1,
+      "explication": "AT est l'abreviation courante d'Accident du Travail dans le domaine de la prevention."
     },
     {
       "type": "mot",
       "question": "Comment s'appelle l'organisme qui gere l'assurance maladie en France (sigle en 4 lettres) ?",
-      "reponse": "CPAM"
+      "reponse": "CPAM",
+      "explication": "La Caisse Primaire d'Assurance Maladie gere les remboursements de soins et les declarations d'AT/MP."
     },
     {
       "type": "vf",
       "question": "Si un salarie se blesse en glissant sur un sol mouille dans son entreprise, c'est un accident du travail.",
-      "correct": true
+      "correct": true,
+      "explication": "C'est un fait soudain, causant une lesion corporelle, survenu pendant le travail : les 3 conditions de l'AT sont reunies."
     },
     {
       "type": "qcm",
       "question": "A votre avis, quand un salarie a un accident au travail, ses soins medicaux sont rembourses :",
       "choices": ["A 50%", "A 70%", "A 100%", "Ils ne sont pas rembourses"],
-      "correct": 2
+      "correct": 2,
+      "explication": "En cas d'AT reconnu, les soins medicaux sont pris en charge a 100% par la Securite sociale."
     },
     {
       "type": "vf",
       "question": "L'employeur n'a aucune responsabilite legale si un salarie se blesse au travail.",
-      "correct": false
+      "correct": false,
+      "explication": "L'employeur a une obligation de securite envers ses salaries. Sa responsabilite civile, voire penale, peut etre engagee."
     },
     {
       "type": "qcm",
       "question": "A votre avis, que sont les indemnites journalieres ?",
       "choices": ["Des primes de productivite", "Des compensations versees pendant un arret de travail", "Des amendes pour l'employeur", "Des remboursements de frais de transport"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Les IJ compensent la perte de salaire du salarie pendant son arret de travail."
     },
     {
       "type": "vf",
       "question": "Un accident survenu sur le trajet entre le domicile et le lieu de travail peut etre reconnu comme accident du travail.",
-      "correct": true
+      "correct": true,
+      "explication": "On parle d'accident de trajet : il est assimile a un AT s'il survient sur le parcours habituel domicile-travail."
     }
   ]
 }
@@ -209,66 +223,78 @@ Voici un exemple pour le meme module C8 "AT/MP" en quiz formatif. Notez la diffe
       "type": "qcm",
       "question": "Quelles sont les 3 conditions pour qu'un evenement soit reconnu comme accident du travail ?",
       "choices": ["Fait soudain, lesion corporelle, lien avec le travail", "Douleur, arret de travail, visite medicale", "Declaration, temoins, certificat medical", "Negligence, blessure, hospitalisation"],
-      "correct": 0
+      "correct": 0,
+      "explication": "Les 3 criteres cumulatifs sont : un fait soudain (date certaine), une lesion corporelle ou psychologique, et un lien avec le travail."
     },
     {
       "type": "vf",
       "question": "Le salarie dispose de 48 heures pour informer son employeur d'un accident du travail.",
-      "correct": false
+      "correct": false,
+      "explication": "Le salarie doit informer son employeur dans les 24 heures (et non 48h). C'est l'employeur qui a ensuite 48h pour declarer a la CPAM."
     },
     {
       "type": "mot",
       "question": "Quel est le delai dont dispose le salarie pour informer son employeur d'un AT ?",
-      "reponse": "24 heures"
+      "reponse": "24 heures",
+      "explication": "Le salarie dispose de 24 heures pour prevenir son employeur, sauf cas de force majeure."
     },
     {
       "type": "qcm",
       "question": "Quel document le medecin etablit-il pour constater les lesions d'un accident du travail ?",
       "choices": ["Un arret de travail", "Un certificat medical initial (CMI)", "Une ordonnance", "Un bon de sortie"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Le CMI decrit les lesions constatees et sert de piece justificative pour la prise en charge par la CPAM."
     },
     {
       "type": "vf",
       "question": "Une maladie professionnelle est la consequence d'une exposition prolongee a un risque lie au travail.",
-      "correct": true
+      "correct": true,
+      "explication": "A la difference de l'AT (fait soudain), la MP resulte d'une exposition repetee ou prolongee a un risque professionnel."
     },
     {
       "type": "mot",
       "question": "Quel est le delai dont dispose l'employeur pour declarer un AT a la CPAM ?",
-      "reponse": "48 heures"
+      "reponse": "48 heures",
+      "explication": "L'employeur doit remplir la DAT (Declaration d'Accident du Travail) et l'envoyer a la CPAM sous 48 heures."
     },
     {
       "type": "qcm",
       "question": "Les prestations en nature dans le cadre d'un AT correspondent a :",
       "choices": ["Des indemnites journalieres", "Le remboursement des soins medicaux a 100%", "Une rente d'incapacite", "Des dommages et interets"],
-      "correct": 1
+      "correct": 1,
+      "explication": "Les prestations en nature couvrent les frais medicaux (soins, medicaments, hospitalisation) rembourses a 100%."
     },
     {
       "type": "vf",
       "question": "A partir du 29e jour d'arret, les indemnites journalieres passent de 60% a 80% du salaire journalier de base.",
-      "correct": true
+      "correct": true,
+      "explication": "Les IJ sont a 60% du salaire journalier les 28 premiers jours, puis passent a 80% a partir du 29e jour."
     },
     {
       "type": "qcm",
       "question": "La responsabilite civile de l'employeur vise a :",
       "choices": ["Punir l'employeur par une amende", "Reparer le prejudice subi par la victime", "Licencier le salarie", "Fermer l'entreprise"],
-      "correct": 1
+      "correct": 1,
+      "explication": "La responsabilite civile a pour but la reparation du dommage (indemnisation), contrairement a la responsabilite penale qui vise a sanctionner."
     },
     {
       "type": "mot",
       "question": "Comment appelle-t-on la faute de l'employeur qui avait conscience du danger mais n'a pas agi ?",
-      "reponse": "faute inexcusable"
+      "reponse": "faute inexcusable",
+      "explication": "La faute inexcusable est reconnue quand l'employeur avait ou aurait du avoir conscience du danger et n'a pas pris les mesures necessaires."
     },
     {
       "type": "vf",
       "question": "Le salarie victime d'une maladie professionnelle doit la declarer a la CPAM dans les 15 jours.",
-      "correct": true
+      "correct": true,
+      "explication": "Le salarie a 15 jours apres la cessation du travail pour declarer sa MP a la CPAM, accompagnee du CMI."
     },
     {
       "type": "qcm",
       "question": "Quel est le delai de prescription pour engager une action en faute inexcusable ?",
       "choices": ["6 mois", "1 an", "2 ans", "5 ans"],
-      "correct": 2
+      "correct": 2,
+      "explication": "Le delai de prescription est de 2 ans a compter de la date de l'accident ou de la reconnaissance de la MP."
     }
   ]
 }
@@ -289,7 +315,8 @@ Voici un exemple pour le meme module C8 "AT/MP" en quiz formatif. Notez la diffe
 - [ ] Si diagnostique : questions accessibles, pas de vocabulaire technique du cours
 - [ ] Si formatif : questions ciblant les notions cles, vocabulaire technique autorise
 - [ ] Pas d'accents dans le JSON
-- [ ] PAS de champs "explication", "points", "scenario", "consigne" (format quiz uniquement)
+- [ ] Chaque question a un champ "explication" (phrase courte, pedagogique, sans commencer par "Explication :")
+- [ ] PAS de champs "points", "scenario", "consigne", "competence", "bareme" (format quiz uniquement)
 - [ ] Le contenu est DIFFERENT des exemples ci-dessus
 
 Genere maintenant un quiz complet avec les parametres personnalises ci-dessus. Fournis UNIQUEMENT le JSON brut, sans commentaires avant ou apres.
