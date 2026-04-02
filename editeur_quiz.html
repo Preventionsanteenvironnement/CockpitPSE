@@ -1522,6 +1522,15 @@ RÉPONDS UNIQUEMENT AVEC UN JSON VALIDE.
 
         // Vérification des accolades/crochets
         var boundaryErr = JsonImportUtils.getJsonBoundaryError(cleaned);
+
+        // Si le nettoyage principal echoue, tenter une extraction brute par accolades equilibrees
+        if (boundaryErr) {
+            var fallback = JsonImportUtils.extractBalancedJson(jsonString) || JsonImportUtils.extractParsableJson(jsonString);
+            if (fallback) {
+                cleaned = fallback;
+                boundaryErr = null;
+            }
+        }
         if (boundaryErr) {
             return { ok: false, data: null, errors: [boundaryErr] };
         }
@@ -1529,8 +1538,19 @@ RÉPONDS UNIQUEMENT AVEC UN JSON VALIDE.
         try {
             data = JSON.parse(cleaned);
         } catch(e) {
-            var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
-            return { ok: false, data: null, errors: diagErrors };
+            // Dernier recours : extraction brute sur le texte original
+            var rawFallback = JsonImportUtils.extractParsableJson(jsonString);
+            if (rawFallback) {
+                try {
+                    data = JSON.parse(rawFallback);
+                } catch(e2) {
+                    var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
+                    return { ok: false, data: null, errors: diagErrors };
+                }
+            } else {
+                var diagErrors = JsonImportUtils.buildImportParseErrors(e, cleaned, cleanResult.stats);
+                return { ok: false, data: null, errors: diagErrors };
+            }
         }
 
         // Normalisation universelle (adapte tout format d'IA)
