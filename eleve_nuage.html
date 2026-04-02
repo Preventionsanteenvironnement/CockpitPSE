@@ -6,7 +6,7 @@
     <title>Nuage de Mots - Participation</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; text-align: center; padding: 20px; color: #333; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; min-height: 90vh; }
-        
+
         /* QUESTION */
         #question-box {
             background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
@@ -15,7 +15,15 @@
         #prof-question { font-size: 1.4rem; font-weight: bold; color: #2c3e50; margin: 0; }
         #waiting-msg { color: #7f8c8d; font-style: italic; font-size: 0.9rem; }
 
-        /* CONSIGNE RESPONSABILITÉ */
+        /* PSEUDO INPUT */
+        #pseudo-zone {
+            background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #pseudo-zone input { width: 100%; padding: 12px; border: 2px solid #dfe6e9; border-radius: 12px; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
+        #pseudo-zone button { background: #3498db; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        /* CONSIGNE */
         .warning-box {
             background: #fff3cd; color: #856404; padding: 15px; border-radius: 10px; border: 1px solid #ffeeba;
             font-size: 0.9rem; margin-bottom: 20px; text-align: left; line-height: 1.5;
@@ -23,10 +31,8 @@
 
         /* INPUT ZONE */
         .input-group { margin-top: auto; margin-bottom: auto; transition: 0.3s; }
-        
-        /* Quand c'est verrouillé */
         .locked-mode { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-        
+
         input[type="text"] {
             width: 100%; padding: 15px; border: 2px solid #dfe6e9; border-radius: 12px;
             font-size: 1.2rem; box-sizing: border-box; transition: 0.3s; text-align: center;
@@ -40,39 +46,48 @@
         }
         #send-btn:active { transform: translateY(4px); box-shadow: none; }
 
-        /* Message de verrouillage */
-        #lock-msg { 
-            display: none; background: #e74c3c; color: white; padding: 15px; border-radius: 10px; 
+        #lock-msg {
+            display: none; background: #e74c3c; color: white; padding: 15px; border-radius: 10px;
             font-weight: bold; margin-top: 20px; animation: popIn 0.3s;
         }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        /* NOTIFICATION */
         #status-msg { margin-top: 15px; height: 20px; color: #27ae60; font-weight: bold; opacity: 0; transition: opacity 0.5s; }
         .error-msg { color: #e74c3c !important; }
 
+        #main-zone { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="question-box">
-        <div style="text-transform: uppercase; font-size: 0.75rem; color: #aaa; margin-bottom: 5px;">Question du prof :</div>
-        <p id="prof-question">...</p>
-        <span id="waiting-msg">En attente...</span>
+    <!-- ETAPE 1 : Saisie du pseudo -->
+    <div id="pseudo-zone">
+        <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 10px;">Quel est ton prenom ?</div>
+        <input type="text" id="pseudo-input" placeholder="Ton prenom..." autocomplete="off">
+        <button onclick="validerPseudo()">Rejoindre</button>
     </div>
 
-    <div class="warning-box">
-        ⚠️ <strong>Attention :</strong> Ta réponse s'affichera en GRAND au tableau.
-        <br>Sois pertinent et respectueux. Tout abus est identifié.
-    </div>
+    <!-- ETAPE 2 : Participation (cache au debut) -->
+    <div id="main-zone">
+        <div id="question-box">
+            <div style="text-transform: uppercase; font-size: 0.75rem; color: #aaa; margin-bottom: 5px;">Question du prof :</div>
+            <p id="prof-question">...</p>
+            <span id="waiting-msg">En attente...</span>
+        </div>
 
-    <div id="input-zone" class="input-group">
-        <input type="text" id="word-input" placeholder="Ton mot ici..." autocomplete="off">
-        <button id="send-btn" onclick="envoyerMot()">Envoyer 🚀</button>
-        <div id="status-msg">Envoyé !</div>
-    </div>
+        <div class="warning-box">
+            &#x26A0;&#xFE0F; <strong>Attention :</strong> Ta reponse s'affichera en GRAND au tableau.
+            <br>Sois pertinent et respectueux. Tout abus est identifie.
+        </div>
 
-    <div id="lock-msg">🛑 Les votes sont clos pour l'instant.</div>
+        <div id="input-zone" class="input-group">
+            <input type="text" id="word-input" placeholder="Ton mot ici..." autocomplete="off">
+            <button id="send-btn" onclick="envoyerMot()">Envoyer &#x1F680;</button>
+            <div id="status-msg">Envoye !</div>
+        </div>
+
+        <div id="lock-msg">&#x1F6D1; Les votes sont clos pour l'instant.</div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -91,15 +106,43 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- 1. ÉCOUTER L'ÉTAT DU COURS (Question + Verrouillage) ---
-        onSnapshot(doc(db, "nuage_etat", "config"), (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
-                
-                // Mise à jour de la question
+        // --- Extraction du sessionId depuis l'URL ---
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('sessionId');
+
+        let studentName = '';
+
+        // --- Validation pseudo + inscription presence ---
+        window.validerPseudo = async () => {
+            const input = document.getElementById('pseudo-input');
+            const name = input.value.trim();
+            if (!name) { input.style.borderColor = '#e74c3c'; return; }
+            studentName = name;
+
+            // Inscription dans la liste de presence
+            if (sessionId) {
+                try {
+                    await addDoc(collection(db, "nuage_presence"), {
+                        name: studentName,
+                        sessionId: sessionId,
+                        timestamp: Date.now()
+                    });
+                } catch(e) { console.error('Erreur presence:', e); }
+            }
+
+            document.getElementById('pseudo-zone').style.display = 'none';
+            document.getElementById('main-zone').style.display = 'block';
+            document.getElementById('word-input').focus();
+        };
+
+        // --- Ecouter l'etat du cours (Question + Verrouillage) ---
+        onSnapshot(doc(db, "nuage_etat", "config"), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+
                 const qDiv = document.getElementById("prof-question");
                 const wDiv = document.getElementById("waiting-msg");
-                if(data.question && data.question.length > 0) {
+                if (data.question && data.question.length > 0) {
                     qDiv.innerText = data.question;
                     qDiv.style.display = "block";
                     wDiv.style.display = "none";
@@ -108,18 +151,15 @@
                     wDiv.style.display = "block";
                 }
 
-                // GESTION DU VERROUILLAGE (Cadenas)
                 const inputZone = document.getElementById("input-zone");
                 const lockMsg = document.getElementById("lock-msg");
                 const inputField = document.getElementById("word-input");
 
                 if (data.isOpen === false) {
-                    // C'est fermé
                     inputZone.classList.add("locked-mode");
                     inputField.disabled = true;
                     lockMsg.style.display = "block";
                 } else {
-                    // C'est ouvert
                     inputZone.classList.remove("locked-mode");
                     inputField.disabled = false;
                     lockMsg.style.display = "none";
@@ -127,7 +167,7 @@
             }
         });
 
-        // --- 2. FILTRE & ENVOI ---
+        // --- Filtre insultes & Envoi vers SALLE D'ATTENTE ---
         const badWords = ["merde", "connard", "salaud", "putain", "pd", "salope", "tg", "con", "foutre", "bite", "cul"];
 
         window.envoyerMot = async () => {
@@ -135,33 +175,43 @@
             const status = document.getElementById('status-msg');
             let mot = input.value.trim();
 
-            if(!mot) return;
+            if (!mot) return;
 
-            if(badWords.some(bw => mot.toLowerCase().includes(bw))) {
-                status.innerText = "🚫 Mot interdit !";
+            if (badWords.some(bw => mot.toLowerCase().includes(bw))) {
+                status.innerText = "\u{1F6AB} Mot interdit !";
                 status.className = "error-msg";
                 status.style.opacity = 1;
-                navigator.vibrate(200);
+                if (navigator.vibrate) navigator.vibrate(200);
                 setTimeout(() => { status.style.opacity = 0; }, 2000);
                 return;
             }
 
             try {
-                await addDoc(collection(db, "nuage_mots"), {
+                // Envoi vers nuage_attente (le prof valide avant affichage)
+                await addDoc(collection(db, "nuage_attente"), {
                     text: mot,
+                    student: studentName || 'Anonyme',
+                    sessionId: sessionId || '',
                     timestamp: Date.now()
                 });
                 input.value = "";
-                status.innerText = "Envoyé !";
+                status.innerText = "Envoye ! Le prof va valider.";
                 status.className = "";
                 status.style.opacity = 1;
                 setTimeout(() => { status.style.opacity = 0; }, 2000);
-                input.focus(); 
+                input.focus();
             } catch (e) {
-                // Si l'envoi échoue
                 alert("Impossible d'envoyer (Votes clos ?)");
             }
-        }
+        };
+
+        // Enter = envoyer
+        document.getElementById('word-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') window.envoyerMot();
+        });
+        document.getElementById('pseudo-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') window.validerPseudo();
+        });
     </script>
 </body>
 </html>
