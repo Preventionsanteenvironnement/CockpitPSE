@@ -196,6 +196,16 @@
         .btn-unpub { background: #ef4444; }
         .btn-del { background: #dc2626; }
         .btn-del:hover { opacity: 0.85; }
+        .btn-retry { background: #f59e0b; }
+        .badge-2e-chance {
+            font-size: 0.55rem; background: rgba(245,158,11,0.2); color: #fbbf24;
+            padding: 1px 4px; border-radius: 3px; font-weight: 700;
+            border: 1px solid rgba(245,158,11,0.4); margin-left: 4px;
+        }
+        .badge-attente-2e {
+            background: rgba(245,158,11,0.15); color: #f59e0b;
+            padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+        }
         .btn-edit-note {
             background: transparent; border: none; cursor: pointer;
             font-size: 0.75rem; color: #64748b; padding: 2px;
@@ -805,6 +815,40 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             results = await Promise.all(promises);
             results = results.filter(r => r !== null);
 
+            // Load students with pending 2nd chance (have _t1 archive but no current submission)
+            const submittedCodes = new Set(results.map(r => r.eleveCode));
+            const pendingList = (currentEvalData && currentEvalData.deuxieme_chance_eleves) || [];
+            for (const code of pendingList) {
+                if (!submittedCodes.has(code)) {
+                    try {
+                        const t1Ref = doc(db, "resultats", code, "evaluations", currentEvalId + '_eval_t1');
+                        const t1Snap = await getDoc(t1Ref);
+                        if (t1Snap.exists()) {
+                            const t1Data = t1Snap.data();
+                            results.push({
+                                eleveCode: code,
+                                classe: t1Data.classe || '',
+                                note: null,
+                                note_ajustee: null,
+                                note_tentative_1: t1Data.note_ajustee ?? t1Data.note_finale ?? null,
+                                bareme: currentEvalData ? (currentEvalData.bareme || 20) : 20,
+                                competences: {},
+                                questionsResult: {},
+                                publie: false,
+                                tempsSecondes: 0,
+                                tabSwitchCount: 0, copyPasteCount: 0, rightClickCount: 0, screenshotCount: 0,
+                                submittedAt: '',
+                                reponses: {},
+                                evalDocId: currentEvalId + '_eval',
+                                evalData: {},
+                                reponseDocId: null,
+                                enAttente2eChance: true
+                            });
+                        }
+                    } catch(e) { /* ignore */ }
+                }
+            }
+
             buildClassFilters();
             applyFilters();
             renderStats();
@@ -838,11 +882,23 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                 questionsResult = evalData.questions || {};
             }
 
+            // Check for archived first attempt (_t1)
+            let note_tentative_1 = null;
+            try {
+                const t1Ref = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval_t1');
+                const t1Snap = await getDoc(t1Ref);
+                if (t1Snap.exists()) {
+                    const t1Data = t1Snap.data();
+                    note_tentative_1 = t1Data.note_ajustee ?? t1Data.note_finale ?? null;
+                }
+            } catch(e) { /* archive may not exist */ }
+
             return {
                 eleveCode,
                 classe: resp.classe || '',
                 note,
                 note_ajustee: evalData.note_ajustee ?? null,
+                note_tentative_1,
                 bareme: currentEvalData ? (currentEvalData.bareme || 20) : 20,
                 competences,
                 questionsResult,
@@ -1023,6 +1079,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                     noteHtml += ' <span class="note-adjusted-badge">ajuste</span>';
                 }
                 noteHtml += ' <button class="btn-edit-note" onclick="editNote(\'' + r.eleveCode + '\', event)" title="Modifier la note">✏️</button>';
+                if (r.note_tentative_1 !== null && r.note_tentative_1 !== undefined) {
+                    noteHtml += ' <span class="badge-2e-chance" title="Note tentative 1">T1: ' + r.note_tentative_1 + '/' + bareme + '</span>';
+                }
             } else {
                 noteHtml = '--';
             }
@@ -1045,9 +1104,14 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             }
 
             // Status
-            const statusHtml = r.publie
-                ? '<span class="status-badge status-published">Publie</span>'
-                : '<span class="status-badge status-submitted">Soumis</span>';
+            let statusHtml;
+            if (r.enAttente2eChance) {
+                statusHtml = '<span class="badge-attente-2e">⏳ En attente 2e chance</span>';
+            } else if (r.publie) {
+                statusHtml = '<span class="status-badge status-published">Publie</span>';
+            } else {
+                statusHtml = '<span class="status-badge status-submitted">Soumis</span>';
+            }
 
             // Time
             const mins = Math.floor(r.tempsSecondes / 60);
@@ -1071,6 +1135,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             // Delete button
             const delBtn = '<button class="btn-sm btn-del" onclick="deleteResult(\'' + r.eleveCode + '\')" title="Supprimer ce resultat">🗑️</button>';
 
+            // Second chance button (hide if already waiting)
+            const retryBtn = r.enAttente2eChance ? '' : '<button class="btn-sm btn-retry" onclick="grantSecondChance(\'' + r.eleveCode + '\')" title="Accorder une 2e chance">🔄</button>';
+
             const displayName = afficherAvecNom(r.eleveCode);
 
             tr.innerHTML =
@@ -1085,6 +1152,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
                     '<button class="btn-sm btn-view" onclick="viewDetail(\'' + r.eleveCode + '\')" title="Detail">👁️</button>' +
                     '<button class="btn-sm" style="background:#0ea5e9;" onclick="printStudentSheet(\'' + r.eleveCode + '\')" title="Imprimer fiche eleve">🖨️</button>' +
                     pubBtn +
+                    retryBtn +
                     delBtn +
                 '</td>';
 
@@ -1232,6 +1300,72 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
     };
 
+    // === GRANT SECOND CHANCE ===
+    window.grantSecondChance = async function(eleveCode) {
+        if (!currentAuthUser) {
+            showToast('🔐 Connectez-vous d\'abord');
+            connexionProf();
+            return;
+        }
+        const r = results.find(r => r.eleveCode === eleveCode);
+        if (!r) return;
+        const displayName = afficherAvecNom(eleveCode);
+        const displayNote = getDisplayNote(r);
+        const bareme = r.bareme || 20;
+        const noteInfo = displayNote !== null ? ' (note actuelle : ' + displayNote + '/' + bareme + ')' : '';
+        if (!confirm('Accorder une 2e chance a ' + displayName + ' ?' + noteInfo + '\n\nLa note actuelle sera archivee et l\'eleve pourra refaire l\'evaluation.')) return;
+
+        try {
+            // 1. Read current result to archive it
+            const evalDocRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval');
+            const evalSnap = await getDoc(evalDocRef);
+
+            if (evalSnap.exists()) {
+                // 2. Archive to _t1 document
+                const archiveRef = doc(db, "resultats", eleveCode, "evaluations", currentEvalId + '_eval_t1');
+                await setDoc(archiveRef, evalSnap.data());
+
+                // 3. Delete current result
+                await deleteDoc(evalDocRef);
+            }
+
+            // 4. Delete eval_reponses (this unlocks the eval for the student)
+            if (r.reponseDocId) {
+                const reponseDocRef = doc(db, "eval_reponses", r.reponseDocId);
+                await deleteDoc(reponseDocRef);
+            }
+
+            // 5. Delete copy if exists
+            try {
+                const copyRef = doc(db, "resultats", eleveCode, "copies", currentEvalId + '_autoeval');
+                await deleteDoc(copyRef);
+            } catch(e) { /* copy may not exist */ }
+
+            // 6. Register in eval's deuxieme_chance list
+            const evalRef = doc(db, "eval_banque", currentEvalId);
+            const evalSnap2 = await getDoc(evalRef);
+            const currentList = evalSnap2.exists() ? (evalSnap2.data().deuxieme_chance_eleves || []) : [];
+            if (!currentList.includes(eleveCode)) {
+                currentList.push(eleveCode);
+                await updateDoc(evalRef, { deuxieme_chance_eleves: currentList });
+            }
+            if (currentEvalData) currentEvalData.deuxieme_chance_eleves = currentList;
+
+            // 7. Remove from local results and refresh
+            const idx = results.indexOf(r);
+            if (idx > -1) results.splice(idx, 1);
+
+            applyFilters();
+            buildClassFilters();
+            renderStats();
+            renderTable();
+            showToast('🔄 2e chance accordee a ' + displayName);
+        } catch(e) {
+            console.error("Erreur 2e chance:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
     // === EDIT NOTE (inline) ===
     window.editNote = function(eleveCode, event) {
         if (event) event.stopPropagation();
@@ -1323,6 +1457,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (r.copyPasteCount > 0) html += ' | 📋 ' + r.copyPasteCount + ' copier-coller';
         if (r.rightClickCount > 0) html += ' | 🖱️ ' + r.rightClickCount + ' clic(s) droit';
         if (r.screenshotCount > 0) html += ' | 📸 ' + r.screenshotCount + ' capture(s) d\'ecran';
+        if (r.note_tentative_1 !== null && r.note_tentative_1 !== undefined) {
+            html += '<div style="font-size:0.8rem; color:#f59e0b; margin-top:6px; padding:6px 10px; background:rgba(245,158,11,0.1); border-radius:6px; border:1px solid rgba(245,158,11,0.3);">🔄 <strong>2e chance</strong> — Tentative 1 : ' + r.note_tentative_1 + '/' + bareme + '</div>';
+        }
         html += '</div></div>';
 
         // Per-question detail
