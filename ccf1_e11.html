@@ -552,6 +552,32 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
 .note-orange { color: var(--warn); font-weight: 700; }
 .note-red { color: var(--danger); font-weight: 700; }
 
+/* ============= VALIDATION BANNER ============= */
+.validation-banner {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: var(--radius);
+  padding: 10px 40px 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.88em;
+  color: #856404;
+  position: relative;
+  line-height: 1.6;
+}
+.validation-banner .banner-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 1.3em;
+  cursor: pointer;
+  color: #856404;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.validation-banner .banner-close:hover { color: #533f03; }
+
 /* ============= HIDDEN ============= */
 .hidden { display: none !important; }
 
@@ -644,6 +670,7 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
     <button class="btn btn-outline btn-sm" onclick="showClassSummary()">Vue synth&egrave;se classe</button>
     <button class="btn btn-danger btn-sm" id="btnAbsent" onclick="markAbsent()">Absent</button>
     <button class="btn btn-info btn-sm" id="btnDiffere" onclick="markDiffere()">Diff&eacute;r&eacute;</button>
+    <button class="btn btn-outline btn-sm" id="btnReset" onclick="resetStudent()">R&eacute;initialiser l'&eacute;l&egrave;ve</button>
     <input type="file" id="fileImport" accept=".json" class="hidden" onchange="handleImport(event)">
   </div>
 </div>
@@ -659,6 +686,12 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
 
 <!-- EVALUATION CONTENT (hidden until student selected) -->
 <div id="evalContent" class="hidden">
+
+  <!-- Validation warning banner (shown when all notes filled but elements missing) -->
+  <div class="validation-banner" id="validationBanner" style="display:none;">
+    <button class="banner-close" onclick="document.getElementById('validationBanner').style.display='none'">&times;</button>
+    <span id="validationBannerText"></span>
+  </div>
 
   <!-- Student info bar -->
   <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -1471,6 +1504,61 @@ function saveData() {
   updateTotal(data);
   renderStudents();
   saveToStorage();
+  checkValidation();
+}
+
+// ============= VALIDATION CHECK =============
+function checkValidation() {
+  if (!currentStudent) return;
+  var data = getStudentData(currentClass, currentStudent);
+  // Only check if all 4 notes are filled and status is not absent/differe
+  if (data.status === 'absent' || data.status === 'differe') {
+    document.getElementById('validationBanner').style.display = 'none';
+    return;
+  }
+  var allNotesFilled = true;
+  for (var p = 1; p <= 4; p++) {
+    if (data.notes[p] === null || data.notes[p] === undefined) {
+      allNotesFilled = false;
+      break;
+    }
+  }
+  if (!allNotesFilled) {
+    document.getElementById('validationBanner').style.display = 'none';
+    return;
+  }
+  // Check for missing elements
+  var warnings = [];
+  var phaseNames = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4'];
+  for (var ph = 1; ph <= 4; ph++) {
+    // Missing indicators
+    var indCount = PHASE_IND_COUNT[ph - 1];
+    var missingInd = 0;
+    for (var i = 0; i < indCount; i++) {
+      if (data.indicators[ph][i] === null || data.indicators[ph][i] === undefined) {
+        missingInd++;
+      }
+    }
+    if (missingInd > 0) {
+      warnings.push(phaseNames[ph - 1] + ' : ' + missingInd + ' indicateur(s) non renseign\u00e9(s)');
+    }
+    // Missing observations
+    if (!data.observations[ph] || data.observations[ph].trim() === '') {
+      warnings.push(phaseNames[ph - 1] + ' : observations manquantes');
+    }
+  }
+  // Missing appreciation
+  if (!data.appreciation || data.appreciation.trim() === '') {
+    warnings.push('Appr\u00e9ciation g\u00e9n\u00e9rale non renseign\u00e9e');
+  }
+  var banner = document.getElementById('validationBanner');
+  if (warnings.length > 0) {
+    document.getElementById('validationBannerText').innerHTML =
+      '\u26a0 Attention : ' + warnings.join(' \u2022 ') + '. Ces \u00e9l\u00e9ments sont recommand\u00e9s avant de finaliser l\'\u00e9valuation.';
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 // ============= CHIP COMMENTS =============
@@ -1542,6 +1630,33 @@ function markDiffere() {
   }
   loadStudentEval(data);
   saveData();
+}
+
+// ============= RESET STUDENT =============
+function resetStudent() {
+  if (!currentStudent) return;
+  var data = getStudentData(currentClass, currentStudent);
+  var name = data.name;
+  if (!confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données de ' + name + ' ? Cette action est irréversible.')) return;
+  if (!confirm('Confirmez la réinitialisation de ' + name + '. Toutes les notes, observations et appréciations seront supprimées.')) return;
+  // Clear all data
+  data.status = 'todo';
+  data.indicators = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null] };
+  data.notes = { 1: null, 2: null, 3: null, 4: null };
+  data.observations = { 1: '', 2: '', 3: '', 4: '' };
+  data.appreciation = '';
+  data.sigESC = '';
+  data.sigHG = '';
+  data.date = new Date().toISOString().slice(0,10);
+  // Remove any backed-up notes
+  var key = getStudentKey(currentClass, currentStudent);
+  delete previousNotesBackup[key];
+  // Dismiss any warning banner
+  var banner = document.getElementById('validationBanner');
+  if (banner) banner.style.display = 'none';
+  saveToStorage();
+  loadStudentEval(data);
+  renderStudents();
 }
 
 // ============= TOOLTIP TOGGLE =============
@@ -1803,17 +1918,17 @@ function exportWord() {
     for (var i = 0; i < rowspan; i++) {
       rows += '<tr>';
       if (i === 0) {
-        rows += '<td rowspan="' + rowspan + '" style="font-weight:bold;vertical-align:top;padding:6px;border:1px solid #999;width:180px;">' +
-          escapeHtml(phaseNames[phase]) + '<br><span style="font-size:9pt;font-weight:normal;font-style:italic;">' + escapeHtml(objectives[phase]) + '</span></td>';
+        rows += '<td rowspan="' + rowspan + '" style="font-weight:bold;vertical-align:top;text-align:left;padding:4px 5px;border:1px solid #999;width:140px;font-size:8pt;">' +
+          escapeHtml(phaseNames[phase]) + '<br><span style="font-size:7pt;font-weight:normal;font-style:italic;">' + escapeHtml(objectives[phase]) + '</span></td>';
       }
-      rows += '<td style="padding:4px 6px;border:1px solid #999;">' + escapeHtml(indLabels[i]) + '</td>';
+      rows += '<td style="padding:3px 5px;border:1px solid #999;text-align:left;vertical-align:top;font-size:8pt;">' + escapeHtml(indLabels[i]) + '</td>';
       for (var v = 0; v < 4; v++) {
-        var checked = (inds[i] === v) ? '<b style="font-size:14pt;">X</b>' : '';
-        rows += '<td style="text-align:center;border:1px solid #999;width:35px;">' + checked + '</td>';
+        var checked = (inds[i] === v) ? '<b style="font-size:11pt;">X</b>' : '';
+        rows += '<td style="text-align:center;vertical-align:middle;border:1px solid #999;width:28px;font-size:8pt;">' + checked + '</td>';
       }
       if (i === 0) {
-        rows += '<td rowspan="' + rowspan + '" style="text-align:center;vertical-align:middle;font-weight:bold;font-size:14pt;border:1px solid #999;width:50px;">' + escapeHtml(String(note)) + '<br><span style="font-size:9pt;font-weight:normal;">/ ' + PHASE_MAX[phase-1] + '</span></td>';
-        rows += '<td rowspan="' + rowspan + '" style="vertical-align:top;padding:4px 6px;border:1px solid #999;font-size:9pt;width:180px;">' + obs + '</td>';
+        rows += '<td rowspan="' + rowspan + '" style="text-align:center;vertical-align:middle;font-weight:bold;font-size:12pt;border:1px solid #999;width:40px;">' + escapeHtml(String(note)) + '<br><span style="font-size:7pt;font-weight:normal;">/ ' + PHASE_MAX[phase-1] + '</span></td>';
+        rows += '<td rowspan="' + rowspan + '" style="vertical-align:top;text-align:left;padding:3px 5px;border:1px solid #999;font-size:7pt;width:220px;">' + obs + '</td>';
       }
       rows += '</tr>';
     }
@@ -1829,41 +1944,45 @@ function exportWord() {
   var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
 '<head><meta charset="utf-8"><title>Grille CCF1 E1.1</title>' +
 '<!-- Format .doc HTML \u2014 ouvrir avec Microsoft Word ou LibreOffice -->' +
+'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
 '<style>' +
-'  body { font-family: Arial, sans-serif; font-size: 10pt; }' +
+'  @page { size: A4 portrait; margin: 1cm 1cm 1cm 1cm; }' +
+'  body { font-family: Arial, sans-serif; font-size: 8pt; margin: 0; padding: 0; }' +
 '  table { border-collapse: collapse; width: 100%; }' +
-'  td, th { border: 1px solid #999; padding: 4px 6px; }' +
-'  .header-block { margin-bottom: 10px; }' +
-'  .header-block td { border: none; padding: 2px 6px; font-size: 9pt; }' +
+'  td, th { border: 1px solid #999; padding: 2px 4px; vertical-align: top; text-align: left; font-size: 8pt; }' +
+'  th { font-size: 8pt; }' +
+'  .header-block { margin-bottom: 6px; }' +
+'  .header-block td { border: none; padding: 1px 4px; font-size: 8pt; }' +
+'  h2 { font-size: 11pt; margin: 6px 0; }' +
 '</style>' +
 '</head>' +
 '<body>' +
-'<p style="font-size:8pt;color:#888;text-align:right;">Grille locale d\'\u00e9valuation \u2014 conforme \u00e0 la NS DGER/SDPFE/2025-605</p>' +
-'<table class="header-block" style="width:100%;margin-bottom:8px;">' +
+'<p style="font-size:9pt;font-weight:bold;text-align:center;margin:0 0 2px 0;">Grille locale d\'\u00e9valuation \u2014 conforme \u00e0 la NS DGER/SDPFE/2025-605</p>' +
+'<table class="header-block" style="width:100%;margin-bottom:4px;">' +
 '<tr><td style="width:33%"><b>R\u00e9gion :</b> Auvergne-Rh\u00f4ne-Alpes</td><td style="width:33%"><b>\u00c9tablissement :</b> ' + escapeHtml(settings.etablissement) + '</td><td><b>Promotion :</b> ' + escapeHtml(settings.session) + '</td></tr>' +
 '</table>' +
-'<table class="header-block" style="width:100%;margin-bottom:8px;">' +
+'<table class="header-block" style="width:100%;margin-bottom:4px;">' +
 '<tr><td><b>Champ professionnel :</b> Jardinier Paysagiste</td><td><b>Capacit\u00e9 \u00e9valu\u00e9e :</b> CG 1.1</td><td><b>Coefficient :</b> 1</td></tr>' +
 '<tr><td><b>CCF :</b> CCF1</td><td><b>P\u00e9riode :</b> 2nde ann\u00e9e</td><td><b>Forme :</b> Oral</td></tr>' +
 '<tr><td colspan="2"><b>Lieu :</b> ' + escapeHtml(settings.etablissement) + '</td><td></td></tr>' +
 '<tr><td colspan="3"><b>Objectif :</b> Prendre position dans une situation \u00e0 caract\u00e8re social et civique</td></tr>' +
 '<tr><td colspan="3"><b>Th\u00e8me :</b> ' + escapeHtml(settings.theme) + ' <i>(th\u00e8me choisi par l\'\u00e9quipe p\u00e9dagogique)</i></td></tr>' +
 '</table>' +
-'<h2 style="text-align:center;margin:12px 0;">GRILLE D\'\u00c9VALUATION E 1.1</h2>' +
-'<table style="width:100%;margin-bottom:8px;">' +
-'<tr><td style="border:none;"><b>Candidat(e) :</b> ' + escapeHtml(data.name) + '</td><td style="border:none;"><b>Date :</b> ' + escapeHtml(data.date || '') + '</td><td style="border:none;"><b>CAPa :</b> Jardinier Paysagiste</td></tr>' +
+'<h2 style="text-align:center;margin:6px 0;">GRILLE D\'\u00c9VALUATION E 1.1</h2>' +
+'<table style="width:100%;margin-bottom:4px;">' +
+'<tr><td style="border:none;font-size:8pt;"><b>Candidat(e) :</b> ' + escapeHtml(data.name) + '</td><td style="border:none;font-size:8pt;"><b>Date :</b> ' + escapeHtml(data.date || '') + '</td><td style="border:none;font-size:8pt;"><b>CAPa :</b> Jardinier Paysagiste</td></tr>' +
 '</table>' +
 '<table style="width:100%;">' +
 '<thead>' +
 '<tr style="background:#2c3e50;color:#fff;">' +
-'<th style="width:180px;">Crit\u00e8res</th>' +
-'<th>Indicateurs</th>' +
-'<th style="width:35px;">--</th>' +
-'<th style="width:35px;">-</th>' +
-'<th style="width:35px;">+</th>' +
-'<th style="width:35px;">++</th>' +
-'<th style="width:50px;">Note</th>' +
-'<th style="width:180px;">Observations</th>' +
+'<th style="width:140px;text-align:left;">Crit\u00e8res</th>' +
+'<th style="text-align:left;">Indicateurs</th>' +
+'<th style="width:28px;text-align:center;">--</th>' +
+'<th style="width:28px;text-align:center;">-</th>' +
+'<th style="width:28px;text-align:center;">+</th>' +
+'<th style="width:28px;text-align:center;">++</th>' +
+'<th style="width:40px;text-align:center;">Note</th>' +
+'<th style="width:220px;text-align:left;">Observations</th>' +
 '</tr>' +
 '</thead>' +
 '<tbody>' +
@@ -1873,22 +1992,22 @@ evalCells(3) +
 evalCells(4) +
 '</tbody>' +
 '</table>' +
-'<table style="width:100%;margin-top:8px;">' +
-'<tr><td style="text-align:right;font-weight:bold;font-size:14pt;border:2px solid #333;padding:8px;">' +
+'<table style="width:100%;margin-top:4px;">' +
+'<tr><td style="text-align:right;font-weight:bold;font-size:12pt;border:2px solid #333;padding:4px 8px;">' +
 'TOTAL : ' + total.toFixed(1) + ' / 20' +
 '</td></tr>' +
 '</table>' +
-'<table style="width:100%;margin-top:10px;">' +
-'<tr><td style="border:2px solid #333;padding:8px;">' +
-'<b>APPR\u00c9CIATION G\u00c9N\u00c9RALE :</b><br><br>' +
+'<table style="width:100%;margin-top:4px;">' +
+'<tr><td style="border:2px solid #333;padding:4px 6px;font-size:8pt;">' +
+'<b>APPR\u00c9CIATION G\u00c9N\u00c9RALE :</b><br>' +
 escapeHtml(data.appreciation || '').replace(/\n/g, '<br>') +
-'<br><br>' +
+'<br>' +
 '</td></tr>' +
 '</table>' +
-'<table style="width:100%;margin-top:10px;">' +
+'<table style="width:100%;margin-top:4px;">' +
 '<tr>' +
-'<td style="border:1px solid #999;padding:8px;width:50%;"><b>Enseignant ESC :</b> ' + escapeHtml(data.sigESC || '') + '</td>' +
-'<td style="border:1px solid #999;padding:8px;width:50%;"><b>Enseignant HG :</b> ' + escapeHtml(data.sigHG || '') + '</td>' +
+'<td style="border:1px solid #999;padding:4px 6px;width:50%;font-size:8pt;"><b>Enseignant ESC :</b> ' + escapeHtml(data.sigESC || '') + '</td>' +
+'<td style="border:1px solid #999;padding:4px 6px;width:50%;font-size:8pt;"><b>Enseignant HG :</b> ' + escapeHtml(data.sigHG || '') + '</td>' +
 '</tr>' +
 '</table>' +
 '</body></html>';
