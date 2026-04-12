@@ -551,6 +551,146 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
 .note-green { color: var(--accent); font-weight: 700; }
 .note-orange { color: var(--warn); font-weight: 700; }
 .note-red { color: var(--danger); font-weight: 700; }
+.summary-table .row-absent td { color: #999; background: #f5f5f5; }
+.summary-table .row-differe td { color: var(--info); background: #eaf4fc; }
+.summary-table .row-number { width: 30px; text-align: center; color: var(--text-light); font-size: 0.85em; }
+
+/* ============= STAT CARDS ============= */
+.stat-cards {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.stat-card {
+  flex: 1;
+  min-width: 100px;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.stat-card .stat-value {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+}
+.stat-card .stat-label {
+  font-size: 0.75em;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* ============= BAR CHART ============= */
+.bar-chart { margin-top: 18px; }
+.bar-chart h3 { margin-bottom: 10px; }
+.bar-chart-container { position: relative; padding-left: 0; }
+.bar-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 0.85em;
+}
+.bar-name {
+  width: 110px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track {
+  flex: 1;
+  height: 22px;
+  background: #eee;
+  border-radius: 4px;
+  position: relative;
+  overflow: visible;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+.bar-value {
+  position: absolute;
+  right: -36px;
+  top: 1px;
+  font-size: 0.85em;
+  font-weight: 600;
+  width: 34px;
+  text-align: left;
+}
+.bar-track-wrapper {
+  flex: 1;
+  position: relative;
+  margin-right: 40px;
+}
+.bar-threshold {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed #999;
+  z-index: 1;
+  pointer-events: none;
+}
+.bar-threshold-label {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  transform: translateX(-50%);
+  font-size: 0.7em;
+  color: #999;
+}
+
+/* ============= DISTRIBUTION CHART ============= */
+.distrib-chart { margin-top: 20px; }
+.distrib-chart h3 { margin-bottom: 10px; }
+.distrib-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding: 0 4px;
+  border-bottom: 2px solid var(--border);
+}
+.distrib-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+.distrib-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s ease;
+  min-height: 0;
+}
+.distrib-count {
+  font-size: 0.75em;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: var(--text);
+}
+.distrib-labels {
+  display: flex;
+  gap: 6px;
+  padding: 4px 4px 0;
+}
+.distrib-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.7em;
+  color: var(--text-light);
+}
 
 /* ============= VALIDATION BANNER ============= */
 .validation-banner {
@@ -644,6 +784,7 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
   .timer-bar, .action-bar, .settings-gear { display: none !important; }
   .btn-next { display: none !important; }
   .save-indicator { display: none !important; }
+  .modal-overlay { display: none !important; }
   .chip-container { display: none !important; }
   .student-grid { display: none !important; }
   .class-tabs { display: none !important; }
@@ -2135,20 +2276,28 @@ function showClassSummary() {
   function noteClass(val, max) {
     if (val === null || val === undefined || val === '') return '';
     var ratio = (val / max) * 20;
-    if (ratio >= 10) return 'note-green';
-    if (ratio >= 8) return 'note-orange';
+    if (ratio >= 12) return 'note-green';
+    if (ratio >= 10) return 'note-orange';
     return 'note-red';
+  }
+
+  function totalColor(val) {
+    if (val >= 12) return '#27ae60';
+    if (val >= 10) return '#f39c12';
+    return '#e74c3c';
   }
 
   function totalClass(val) {
-    if (val >= 10) return 'note-green';
-    if (val >= 8) return 'note-orange';
+    if (val >= 12) return 'note-green';
+    if (val >= 10) return 'note-orange';
     return 'note-red';
   }
 
-  var rows = '';
+  // --- Collect student data ---
+  var students = [];
   var sumTotal = 0, countTotal = 0;
   var sumP = [0, 0, 0, 0], countP = [0, 0, 0, 0];
+  var highest = -1, lowest = 21;
 
   CLASSES[currentClass].forEach(function(name) {
     var data = getStudentData(currentClass, name);
@@ -2168,10 +2317,13 @@ function showClassSummary() {
     }
     total = Math.round(total * 2) / 2;
 
-    // Exclude absent and differe from averages
-    if (hasNotes && data.status !== 'differe' && data.status !== 'absent') {
+    var isExcluded = (data.status === 'absent' || data.status === 'differe');
+
+    if (hasNotes && !isExcluded) {
       sumTotal += total;
       countTotal++;
+      if (total > highest) highest = total;
+      if (total < lowest) lowest = total;
       for (var pp = 0; pp < 4; pp++) {
         if (pVals[pp] !== null) {
           sumP[pp] += pVals[pp];
@@ -2180,34 +2332,133 @@ function showClassSummary() {
       }
     }
 
-    rows += '<tr>';
-    rows += '<td>' + escapeHtml(name) + '</td>';
-    for (var p2 = 0; p2 < 4; p2++) {
-      var v = pVals[p2];
-      var cls = v !== null ? noteClass(v, PHASE_MAX[p2]) : '';
-      rows += '<td class="' + cls + '">' + (v !== null ? v.toFixed(1) : '-') + '</td>';
+    students.push({
+      name: name,
+      pVals: pVals,
+      total: total,
+      hasNotes: hasNotes,
+      status: data.status,
+      isExcluded: isExcluded
+    });
+  });
+
+  var avgTotal = countTotal > 0 ? (sumTotal / countTotal) : null;
+  var totalStudents = CLASSES[currentClass].length;
+  var successCount = 0;
+  students.forEach(function(s) {
+    if (s.hasNotes && !s.isExcluded && s.total >= 10) successCount++;
+  });
+  var successRate = countTotal > 0 ? Math.round((successCount / countTotal) * 100) : 0;
+
+  // --- Sort evaluated students by total descending ---
+  var sorted = students.slice().sort(function(a, b) {
+    if (a.isExcluded && !b.isExcluded) return 1;
+    if (!a.isExcluded && b.isExcluded) return -1;
+    if (a.isExcluded && b.isExcluded) return 0;
+    if (!a.hasNotes && b.hasNotes) return 1;
+    if (a.hasNotes && !b.hasNotes) return -1;
+    return b.total - a.total;
+  });
+
+  // --- Build table rows ---
+  var rows = '';
+  sorted.forEach(function(s, idx) {
+    var rowCls = '';
+    if (s.status === 'absent') rowCls = ' class="row-absent"';
+    else if (s.status === 'differe') rowCls = ' class="row-differe"';
+
+    rows += '<tr' + rowCls + '>';
+    rows += '<td class="row-number">' + (idx + 1) + '</td>';
+    rows += '<td>' + escapeHtml(s.name) + '</td>';
+
+    if (s.status === 'absent') {
+      rows += '<td colspan="4" style="text-align:center;font-style:italic;">ABI</td>';
+      rows += '<td style="font-style:italic;">ABI</td>';
+      rows += '<td>' + statusLabels[s.status] + '</td>';
+    } else if (s.status === 'differe') {
+      rows += '<td colspan="4" style="text-align:center;font-style:italic;">DIF</td>';
+      rows += '<td style="font-style:italic;">DIF</td>';
+      rows += '<td>' + statusLabels[s.status] + '</td>';
+    } else {
+      for (var p2 = 0; p2 < 4; p2++) {
+        var v = s.pVals[p2];
+        var cls = v !== null ? noteClass(v, PHASE_MAX[p2]) : '';
+        rows += '<td class="' + cls + '">' + (v !== null ? v.toFixed(1) : '-') + '</td>';
+      }
+      rows += '<td class="' + (s.hasNotes ? totalClass(s.total) : '') + '">' + (s.hasNotes ? s.total.toFixed(1) : '-') + '</td>';
+      rows += '<td>' + (statusLabels[s.status] || '') + '</td>';
     }
-    rows += '<td class="' + (hasNotes ? totalClass(total) : '') + '">' + (hasNotes ? total.toFixed(1) : '-') + '</td>';
-    rows += '<td>' + (statusLabels[data.status] || '') + '</td>';
     rows += '</tr>';
   });
 
   // Average row
-  var avgRow = '<tr class="avg-row"><td>Moyenne</td>';
+  var avgRow = '<tr class="avg-row"><td></td><td>Moyenne</td>';
   for (var p3 = 0; p3 < 4; p3++) {
     var avg = countP[p3] > 0 ? (sumP[p3] / countP[p3]) : null;
     avgRow += '<td>' + (avg !== null ? avg.toFixed(1) : '-') + '</td>';
   }
-  var avgTotal = countTotal > 0 ? (sumTotal / countTotal) : null;
   avgRow += '<td>' + (avgTotal !== null ? avgTotal.toFixed(1) : '-') + '</td>';
   avgRow += '<td>' + countTotal + ' \u00e9valu\u00e9(s)</td></tr>';
 
+  // --- Build bar chart rows (only evaluated, non-excluded) ---
+  var barHtml = '';
+  sorted.forEach(function(s) {
+    if (s.isExcluded || !s.hasNotes) return;
+    var pct = (s.total / 20) * 100;
+    var col = totalColor(s.total);
+    barHtml += '<div class="bar-row">' +
+      '<div class="bar-name">' + escapeHtml(s.name) + '</div>' +
+      '<div class="bar-track-wrapper">' +
+      '<div class="bar-track">' +
+      '<div class="bar-fill" style="width:' + pct + '%;background:' + col + ';"></div>' +
+      '<div class="bar-value" style="left:' + pct + '%;right:auto;">' + s.total.toFixed(1) + '</div>' +
+      '</div>' +
+      '<div class="bar-threshold"></div>' +
+      '</div>' +
+      '</div>';
+  });
+
+  // --- Build distribution ---
+  var brackets = [
+    { label: '0-4', min: 0, max: 4.5, count: 0, color: '#e74c3c' },
+    { label: '5-7', min: 4.5, max: 7.5, count: 0, color: '#e74c3c' },
+    { label: '8-9', min: 7.5, max: 9.5, count: 0, color: '#f39c12' },
+    { label: '10-11', min: 9.5, max: 11.5, count: 0, color: '#f39c12' },
+    { label: '12-14', min: 11.5, max: 14.5, count: 0, color: '#27ae60' },
+    { label: '15-17', min: 14.5, max: 17.5, count: 0, color: '#27ae60' },
+    { label: '18-20', min: 17.5, max: 20.5, count: 0, color: '#27ae60' }
+  ];
+  var maxCount = 0;
+  sorted.forEach(function(s) {
+    if (s.isExcluded || !s.hasNotes) return;
+    for (var b = 0; b < brackets.length; b++) {
+      if (s.total >= brackets[b].min && s.total < brackets[b].max) {
+        brackets[b].count++;
+        if (brackets[b].count > maxCount) maxCount = brackets[b].count;
+        break;
+      }
+    }
+  });
+
+  var distribBars = '';
+  var distribLabels = '';
+  for (var b2 = 0; b2 < brackets.length; b2++) {
+    var hPct = maxCount > 0 ? (brackets[b2].count / maxCount) * 100 : 0;
+    distribBars += '<div class="distrib-col">' +
+      '<div class="distrib-count">' + (brackets[b2].count > 0 ? brackets[b2].count : '') + '</div>' +
+      '<div class="distrib-bar" style="height:' + hPct + '%;background:' + brackets[b2].color + ';"></div>' +
+      '</div>';
+    distribLabels += '<div class="distrib-label">' + brackets[b2].label + '</div>';
+  }
+
+  // --- Assemble modal ---
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
   var content = document.createElement('div');
   content.className = 'modal-content wide';
+  content.style.cssText = 'max-width:900px;-webkit-overflow-scrolling:touch;';
 
   var closeBtn = document.createElement('button');
   closeBtn.className = 'modal-close';
@@ -2219,14 +2470,49 @@ function showClassSummary() {
   title.textContent = 'Synth\u00e8se \u2014 ' + currentClass;
   content.appendChild(title);
 
+  // Stat cards
+  var statsDiv = document.createElement('div');
+  statsDiv.className = 'stat-cards';
+  statsDiv.innerHTML =
+    '<div class="stat-card"><div class="stat-value">' + countTotal + ' / ' + totalStudents + '</div><div class="stat-label">\u00c9l\u00e8ves \u00e9valu\u00e9s</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + (avgTotal !== null ? avgTotal.toFixed(1) : '-') + '</div><div class="stat-label">Moyenne / 20</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + (highest >= 0 && highest <= 20 ? highest.toFixed(1) : '-') + '</div><div class="stat-label">Note max</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + (lowest >= 0 && lowest <= 20 ? lowest.toFixed(1) : '-') + '</div><div class="stat-label">Note min</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + successRate + '%</div><div class="stat-label">R\u00e9ussite (\u2265 10)</div></div>';
+  content.appendChild(statsDiv);
+
+  // Summary table
   var tableDiv = document.createElement('div');
-  // Table HTML uses escaped student names via escapeHtml above
   tableDiv.innerHTML =
     '<table class="summary-table">' +
-    '<thead><tr><th>Nom</th><th>Ph.1 (/5)</th><th>Ph.2 (/6)</th><th>Ph.3 (/6)</th><th>Ph.4 (/3)</th><th>Total (/20)</th><th>Statut</th></tr></thead>' +
+    '<thead><tr><th>#</th><th>Nom</th><th>Ph.1 (/5)</th><th>Ph.2 (/6)</th><th>Ph.3 (/6)</th><th>Ph.4 (/3)</th><th>Total (/20)</th><th>Statut</th></tr></thead>' +
     '<tbody>' + rows + avgRow + '</tbody>' +
     '</table>';
   content.appendChild(tableDiv);
+
+  // Bar chart
+  if (barHtml) {
+    var barDiv = document.createElement('div');
+    barDiv.className = 'bar-chart';
+    barDiv.innerHTML = '<h3>R\u00e9partition des notes</h3>' +
+      '<div class="bar-chart-container" style="position:relative;">' +
+      '<div style="position:relative;">' +
+      '<div class="bar-threshold-label">10/20</div>' +
+      '</div>' +
+      barHtml +
+      '</div>';
+    content.appendChild(barDiv);
+  }
+
+  // Distribution chart
+  if (countTotal > 0) {
+    var distribDiv = document.createElement('div');
+    distribDiv.className = 'distrib-chart';
+    distribDiv.innerHTML = '<h3>Distribution des notes</h3>' +
+      '<div class="distrib-container">' + distribBars + '</div>' +
+      '<div class="distrib-labels">' + distribLabels + '</div>';
+    content.appendChild(distribDiv);
+  }
 
   overlay.appendChild(content);
   document.body.appendChild(overlay);
