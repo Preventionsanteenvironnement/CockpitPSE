@@ -849,7 +849,9 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
     <button class="btn btn-outline btn-sm" onclick="timerReset()">Reset</button>
   </div>
   <div class="action-bar">
-    <button class="btn btn-primary btn-sm" onclick="exportJSON()">Exporter JSON</button>
+    <button class="btn btn-primary btn-sm" onclick="exportJSON()">JSON global</button>
+    <button class="btn btn-primary btn-sm" onclick="exportJSONClasse()">JSON classe</button>
+    <button class="btn btn-primary btn-sm" onclick="exportJSONEleve()">JSON &eacute;l&egrave;ve</button>
     <button class="btn btn-outline btn-sm" onclick="importJSON()">Importer JSON</button>
     <button class="btn btn-primary btn-sm" onclick="exportWord()">Exporter Word</button>
     <button class="btn btn-primary btn-sm" onclick="exportCSV()">Exporter CSV</button>
@@ -1994,6 +1996,108 @@ function exportJSON() {
   a.href = url;
   var dateStr = new Date().toISOString().slice(0,10);
   a.download = 'CCF1_E11_data_' + dateStr + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============= EXPORT JSON CLASSE =============
+function buildStudentRecord(cls, name) {
+  var data = getStudentData(cls, name);
+  var total = 0;
+  for (var p = 1; p <= 4; p++) {
+    if (data.notes[p] !== null && data.notes[p] !== undefined) total += data.notes[p];
+  }
+  total = Math.round(total * 2) / 2;
+  var indLabels = {
+    1: ["Pertinence des informations presentees","Mise en relation et critique des documents","Diversite et identification des sources","Clarte de l'expression orale"],
+    2: ["Faire partager ses idees","Justification personnelle du choix","Attitude dans l'echange","Implication personnelle"],
+    3: ["Prises de position citoyennes","Mobilisation de reperes historiques","Mobilisation de reperes geographiques","Capacite a prendre en compte d'autres points de vue"],
+    4: ["Auto-evaluation critique","Argumentation et justification des choix"]
+  };
+  var phaseNames = {1:"Presentation du dossier",2:"Entretien sur le choix du sujet",3:"Discussion sur le theme",4:"Bilan et prise de position"};
+  var phaseMax = {1:5,2:6,3:6,4:3};
+  var evalLabels = ["--","-","+","++"];
+  var phases = {};
+  for (var p = 1; p <= 4; p++) {
+    var indicators = [];
+    var inds = data.indicators[p] || [];
+    for (var i = 0; i < inds.length; i++) {
+      indicators.push({
+        label: indLabels[p][i],
+        niveau: inds[i] !== null ? evalLabels[inds[i]] : null,
+        valeur: inds[i]
+      });
+    }
+    phases[p] = {
+      nom: phaseNames[p],
+      bareme: phaseMax[p],
+      note: data.notes[p],
+      indicateurs: indicators,
+      observations: data.observations[p] || ""
+    };
+  }
+  return {
+    nom: data.name,
+    classe: cls,
+    statut: data.status,
+    date: data.date,
+    phases: phases,
+    total: total,
+    total_sur: 20,
+    appreciation_generale: data.appreciation || "",
+    enseignant_esc: data.sigESC || "",
+    enseignant_hg: data.sigHG || ""
+  };
+}
+
+function exportJSONClasse() {
+  var students = CLASSES[currentClass] || [];
+  var records = [];
+  for (var i = 0; i < students.length; i++) {
+    records.push(buildStudentRecord(currentClass, students[i]));
+  }
+  var exportObj = {
+    _version: 2,
+    _exportDate: new Date().toISOString(),
+    _type: "classe",
+    epreuve: "CCF1 E1.1",
+    capacite: "CG1.1 - Prendre position dans une situation a caractere social et civique",
+    theme: settings.theme,
+    session: settings.session,
+    etablissement: settings.etablissement,
+    classe: currentClass,
+    nombre_eleves: students.length,
+    eleves: records
+  };
+  var blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'CCF1_E11_' + cleanFilename(currentClass) + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============= EXPORT JSON ELEVE =============
+function exportJSONEleve() {
+  if (!currentStudent) { alert('Selectionnez un eleve.'); return; }
+  var record = buildStudentRecord(currentClass, currentStudent);
+  var exportObj = {
+    _version: 2,
+    _exportDate: new Date().toISOString(),
+    _type: "eleve",
+    epreuve: "CCF1 E1.1",
+    capacite: "CG1.1 - Prendre position dans une situation a caractere social et civique",
+    theme: settings.theme,
+    session: settings.session,
+    etablissement: settings.etablissement,
+    eleve: record
+  };
+  var blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'CCF1_E11_' + cleanFilename(currentStudent) + '_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
