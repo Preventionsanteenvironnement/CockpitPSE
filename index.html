@@ -2206,10 +2206,98 @@ QN80,Wael HWORI</pre>
                 const data = doc.data();
                 const date = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
                 const status = data.isActive ? '<span class="pill pill-green">Active</span>' : '<span class="pill pill-orange">Terminée</span>';
-                html += `<div style="padding:8px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between;"><div><strong>${data.title}</strong><br><small style="color:#64748b;">${date}</small></div>${status}</div>`;
+                html += `<div style="padding:8px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; cursor:pointer;" onclick="viewSessionResults('${doc.id}')"><div><strong>${data.title || 'Sans titre'}</strong><br><small style="color:#64748b;">${date}</small></div>${status}</div>`;
             });
             histDiv.innerHTML = html || '<p style="text-align:center; color:#94a3b8;">Aucun historique</p>';
         } catch(e) { console.error("Erreur loadHistory:", e); }
+    };
+
+    // === viewSessionResults : voir les résultats d'une session archivée ===
+    window.viewSessionResults = async function(sessionId) {
+        try {
+            const inputsSnap = await getDocs(collection(db, `sessions/${sessionId}/inputs`));
+            if (inputsSnap.empty) {
+                alert("Aucune donnée enregistrée pour cette session.");
+                return;
+            }
+            const inputs = [];
+            inputsSnap.forEach(d => inputs.push(d.data()));
+
+            // Grouper par type
+            const byType = {};
+            inputs.forEach(inp => {
+                const t = inp.type || "autre";
+                if (!byType[t]) byType[t] = [];
+                byType[t].push(inp.content);
+            });
+
+            let html = '<div style="padding:15px;">';
+            // Sondage / Poll
+            if (byType.poll) {
+                const counts = {};
+                byType.poll.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+                const total = byType.poll.length;
+                html += `<h4 style="margin:0 0 10px;">📊 Sondage (${total} votes)</h4>`;
+                Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([opt, cnt]) => {
+                    const pct = Math.round(cnt / total * 100);
+                    html += `<div style="margin-bottom:6px;"><span style="font-weight:bold;">${opt}</span> — ${cnt} (${pct}%)<div style="background:#e2e8f0; border-radius:4px; height:12px; margin-top:3px;"><div style="background:#3b82f6; height:100%; border-radius:4px; width:${pct}%;"></div></div></div>`;
+                });
+                html += '<br>';
+            }
+            // Quiz
+            if (byType.quiz) {
+                const counts = {};
+                byType.quiz.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+                const total = byType.quiz.length;
+                html += `<h4 style="margin:0 0 10px;">🏆 Quiz (${total} réponses)</h4>`;
+                Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([opt, cnt]) => {
+                    html += `<div style="margin-bottom:4px;"><strong>${opt}</strong> — ${cnt} (${Math.round(cnt / total * 100)}%)</div>`;
+                });
+                html += '<br>';
+            }
+            // Nuage de mots
+            if (byType.word) {
+                const counts = {};
+                byType.word.forEach(w => { const k = w.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
+                html += `<h4 style="margin:0 0 10px;">☁️ Nuage (${byType.word.length} mots)</h4><div style="display:flex; flex-wrap:wrap; gap:6px;">`;
+                Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([w, cnt]) => {
+                    const size = Math.min(0.8 + cnt * 0.15, 2);
+                    html += `<span style="background:#f0f9ff; padding:4px 10px; border-radius:20px; font-size:${size}rem;">${w} <small>(${cnt})</small></span>`;
+                });
+                html += '</div><br>';
+            }
+            // Météo
+            if (byType.meteo_full) {
+                html += `<h4 style="margin:0 0 10px;">😎 Météo (${byType.meteo_full.length} réponses)</h4>`;
+                const moods = { super: 0, bien: 0, bof: 0, mauvais: 0 };
+                const emojis = { super: '🤩', bien: '🙂', bof: '🤔', mauvais: '😰' };
+                let totalEnergy = 0;
+                byType.meteo_full.forEach(raw => {
+                    try { const d = JSON.parse(raw); moods[d.mood] = (moods[d.mood] || 0) + 1; totalEnergy += d.energy || 0; } catch(e) {}
+                });
+                const avgEnergy = Math.round(totalEnergy / byType.meteo_full.length);
+                Object.entries(moods).forEach(([m, cnt]) => {
+                    if (cnt > 0) html += `<span style="margin-right:12px;">${emojis[m] || m} ${cnt}</span>`;
+                });
+                html += `<div style="margin-top:6px;">⚡ Énergie moyenne : <strong>${avgEnergy}%</strong></div><br>`;
+            }
+            html += '</div>';
+
+            // Afficher dans une modale simple
+            const overlay = document.createElement("div");
+            overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center;";
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            overlay.innerHTML = `<div style="background:white; border-radius:12px; max-width:500px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 15px 0;">
+                    <h3 style="margin:0;">📋 Résultats de la session</h3>
+                    <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">✕</button>
+                </div>
+                ${html}</div>`;
+            document.body.appendChild(overlay);
+        } catch(e) {
+            console.error("Erreur viewSessionResults:", e);
+            alert("Erreur lors du chargement : " + e.message);
+        }
     };
 
     window.loadLibrary = async function() {
@@ -2224,7 +2312,7 @@ QN80,Wael HWORI</pre>
                 const data = { id: doc.id, ...doc.data() };
                 libraryData.push(data);
                 const tag = data.type === "poll" ? '<span class="tag tag-poll">Sondage</span>' : data.type === "quiz" ? '<span class="tag tag-quiz">Quiz</span>' : '<span class="tag tag-cloud">Nuage</span>';
-                html += `<li class="lib-item" onclick="loadFromLibrary('${data.id}')"><div>${tag}<strong>${data.title}</strong></div></li>`;
+                html += `<li class="lib-item" onclick="loadFromLibrary('${data.id}')"><div>${tag}<strong>${data.title || 'Sans titre'}</strong></div></li>`;
             });
             ul.innerHTML = html || '<li style="text-align:center; color:#94a3b8; padding:20px;">Bibliothèque vide</li>';
         } catch(e) { console.error("Erreur loadLibrary:", e); }
@@ -2235,13 +2323,221 @@ QN80,Wael HWORI</pre>
         panel.style.display = panel.style.display === "none" ? "block" : "none";
     };
 
-    window.updateCreatorForm = function() {};
-    window.addOptionInput = function() {};
-    window.saveToLibrary = async function() { alert("Enregistrement bibliothèque"); };
-    window.loadFromLibrary = function(id) { alert("Chargement item " + id); };
-    window.setMode = function(mode) { console.log("Mode:", mode); };
-    window.revealQuiz = function() {};
-    window.resetQuiz = function() {};
+    // === updateCreatorForm : adapter le formulaire selon le type ===
+    window.updateCreatorForm = function() {
+        const type = document.getElementById("create-type").value;
+        const optContainer = document.getElementById("options-container");
+        const questionInput = document.getElementById("create-question");
+        if (type === "cloud") {
+            optContainer.innerHTML = "";
+            questionInput.placeholder = "Consigne (ex: Un mot pour décrire...)";
+        } else {
+            questionInput.placeholder = "Question";
+            if (optContainer.children.length === 0) {
+                addOptionInput();
+                addOptionInput();
+            }
+        }
+    };
+
+    // === addOptionInput : ajouter un champ option ===
+    window.addOptionInput = function() {
+        const container = document.getElementById("options-container");
+        const idx = container.children.length + 1;
+        const type = document.getElementById("create-type").value;
+        const wrapper = document.createElement("div");
+        wrapper.style.cssText = "display:flex; gap:6px; margin-bottom:6px; align-items:center;";
+        let html = `<input type="text" class="opt-input" placeholder="Option ${idx}" style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1; box-sizing:border-box;">`;
+        if (type === "quiz") {
+            html += `<label style="font-size:0.75rem; white-space:nowrap; cursor:pointer;"><input type="radio" name="quiz-correct" value="${idx - 1}"> ✅</label>`;
+        }
+        html += `<button onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:1.1rem;" title="Supprimer">✕</button>`;
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper);
+    };
+
+    // === saveToLibrary : sauvegarder dans Firestore ===
+    window.saveToLibrary = async function() {
+        const type = document.getElementById("create-type").value;
+        const title = document.getElementById("create-title").value.trim();
+        const question = document.getElementById("create-question").value.trim();
+        const editId = document.getElementById("edit-id").value;
+        if (!title) { alert("Mettez un titre !"); return; }
+
+        const options = [];
+        document.querySelectorAll("#options-container .opt-input").forEach(inp => {
+            const v = inp.value.trim();
+            if (v) options.push(v);
+        });
+
+        let quizCorrect = null;
+        if (type === "quiz") {
+            const checked = document.querySelector('input[name="quiz-correct"]:checked');
+            quizCorrect = checked ? parseInt(checked.value) : null;
+        }
+
+        const data = { type, title, question, options, createdAt: serverTimestamp() };
+        if (quizCorrect !== null) data.quizCorrect = quizCorrect;
+
+        try {
+            if (editId) {
+                await updateDoc(doc(db, "library", editId), data);
+            } else {
+                await addDoc(collection(db, "library"), data);
+            }
+            document.getElementById("edit-id").value = "";
+            document.getElementById("create-title").value = "";
+            document.getElementById("create-question").value = "";
+            document.getElementById("options-container").innerHTML = "";
+            document.getElementById("creator-panel").style.display = "none";
+            await loadLibrary();
+        } catch(e) {
+            console.error("Erreur saveToLibrary:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === loadFromLibrary : charger un item et pré-remplir le formulaire ===
+    window.loadFromLibrary = function(id) {
+        const item = libraryData.find(d => d.id === id);
+        if (!item) { alert("Item introuvable"); return; }
+
+        // Ouvrir le panel créateur pré-rempli
+        document.getElementById("creator-panel").style.display = "block";
+        document.getElementById("edit-id").value = item.id;
+        document.getElementById("create-type").value = item.type || "poll";
+        document.getElementById("create-title").value = item.title || "";
+        document.getElementById("create-question").value = item.question || "";
+
+        // Options
+        const container = document.getElementById("options-container");
+        container.innerHTML = "";
+        if (item.options && item.options.length > 0) {
+            item.options.forEach((opt, i) => {
+                const wrapper = document.createElement("div");
+                wrapper.style.cssText = "display:flex; gap:6px; margin-bottom:6px; align-items:center;";
+                let html = `<input type="text" class="opt-input" value="${opt}" style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1; box-sizing:border-box;">`;
+                if (item.type === "quiz") {
+                    html += `<label style="font-size:0.75rem; white-space:nowrap; cursor:pointer;"><input type="radio" name="quiz-correct" value="${i}" ${item.quizCorrect === i ? 'checked' : ''}> ✅</label>`;
+                }
+                html += `<button onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:1.1rem;" title="Supprimer">✕</button>`;
+                wrapper.innerHTML = html;
+                container.appendChild(wrapper);
+            });
+        }
+
+        // Si session active, proposer de lancer directement
+        if (currentSessionId) {
+            const configZone = document.getElementById("config-zone");
+            const modeMap = { poll: "sondage", quiz: "quiz", cloud: "nuage" };
+            const mode = modeMap[item.type] || "sondage";
+            configZone.innerHTML = `<div style="text-align:center; width:100%;">
+                <p style="margin:0 0 10px; color:#0f172a;"><strong>${item.title}</strong> — ${item.question || ''}</p>
+                <button onclick="launchLibraryItem('${item.id}')" style="background:#db2777; color:white; border:none; padding:10px 25px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.95rem;">▶️ Lancer sur l'Écran Géant</button>
+            </div>`;
+        }
+    };
+
+    // === launchLibraryItem : envoyer un item de la biblio vers l'écran géant ===
+    window.launchLibraryItem = async function(id) {
+        const item = libraryData.find(d => d.id === id);
+        if (!item || !currentSessionId) return;
+
+        const modeMap = { poll: "sondage", quiz: "quiz", cloud: "nuage" };
+        const mode = modeMap[item.type] || "sondage";
+        const liveData = { currentStep: mode, updatedAt: serverTimestamp() };
+
+        if (item.type === "poll") {
+            liveData.pollQuestion = item.question || item.title;
+            liveData.pollOptions = item.options || [];
+        } else if (item.type === "quiz") {
+            liveData.quizQuestion = item.question || item.title;
+            liveData.quizOptions = item.options || [];
+            liveData.quizCorrect = item.quizCorrect ?? 0;
+            liveData.quizState = "voting";
+        }
+
+        try {
+            await setDoc(doc(db, "config", "live"), liveData, { merge: true });
+            document.getElementById("quiz-controls").style.display = (item.type === "quiz") ? "block" : "none";
+            const configZone = document.getElementById("config-zone");
+            configZone.innerHTML = `<p style="text-align:center; color:#16a34a; margin:0; font-weight:bold;">✅ "${item.title}" lancé sur l'écran !</p>`;
+        } catch(e) {
+            console.error("Erreur launchLibraryItem:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === setMode : changer le mode live (sans item pré-sélectionné) ===
+    window.setMode = function(mode) {
+        const configZone = document.getElementById("config-zone");
+        document.getElementById("quiz-controls").style.display = "none";
+
+        if (mode === "meteo") {
+            configZone.innerHTML = `<div style="text-align:center; width:100%;">
+                <p style="margin:0 0 10px;">😎 Mode <strong>Météo</strong> — Les élèves partagent leur humeur.</p>
+                <button onclick="activateMode('meteo')" style="background:#db2777; color:white; border:none; padding:8px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">▶️ Activer</button>
+            </div>`;
+        } else if (mode === "nuage") {
+            configZone.innerHTML = `<div style="text-align:center; width:100%;">
+                <p style="margin:0 0 10px;">☁️ Mode <strong>Nuage de mots</strong></p>
+                <button onclick="activateMode('nuage')" style="background:#db2777; color:white; border:none; padding:8px 20px; border-radius:6px; cursor:pointer; font-weight:bold;">▶️ Activer</button>
+            </div>`;
+        } else if (mode === "sondage") {
+            // Afficher la liste des sondages disponibles
+            const polls = libraryData.filter(d => d.type === "poll");
+            let html = `<div style="width:100%;"><p style="margin:0 0 10px; font-weight:bold;">📊 Choisir un sondage :</p>`;
+            if (polls.length === 0) {
+                html += `<p style="color:#94a3b8;">Aucun sondage dans la bibliothèque. Créez-en un d'abord.</p>`;
+            } else {
+                polls.forEach(p => {
+                    html += `<div onclick="launchLibraryItem('${p.id}')" style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'"><strong>${p.title}</strong><br><small style="color:#64748b;">${p.question || ''}</small></div>`;
+                });
+            }
+            html += `</div>`;
+            configZone.innerHTML = html;
+        } else if (mode === "quiz") {
+            const quizzes = libraryData.filter(d => d.type === "quiz");
+            let html = `<div style="width:100%;"><p style="margin:0 0 10px; font-weight:bold;">🏆 Choisir un quiz :</p>`;
+            if (quizzes.length === 0) {
+                html += `<p style="color:#94a3b8;">Aucun quiz dans la bibliothèque. Créez-en un d'abord.</p>`;
+            } else {
+                quizzes.forEach(q => {
+                    html += `<div onclick="launchLibraryItem('${q.id}')" style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:6px; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'"><strong>${q.title}</strong><br><small style="color:#64748b;">${q.question || ''}</small></div>`;
+                });
+            }
+            html += `</div>`;
+            configZone.innerHTML = html;
+            document.getElementById("quiz-controls").style.display = "block";
+        }
+    };
+
+    // === activateMode : activer un mode simple (météo, nuage) ===
+    window.activateMode = async function(mode) {
+        if (!currentSessionId) { alert("Lancez une session d'abord !"); return; }
+        try {
+            await setDoc(doc(db, "config", "live"), { currentStep: mode, updatedAt: serverTimestamp() }, { merge: true });
+            const configZone = document.getElementById("config-zone");
+            const labels = { meteo: "😎 Météo", nuage: "☁️ Nuage de mots" };
+            configZone.innerHTML = `<p style="text-align:center; color:#16a34a; margin:0; font-weight:bold;">✅ ${labels[mode] || mode} activé sur l'écran !</p>`;
+        } catch(e) {
+            console.error("Erreur activateMode:", e);
+            alert("Erreur : " + e.message);
+        }
+    };
+
+    // === revealQuiz / resetQuiz ===
+    window.revealQuiz = async function() {
+        try {
+            await setDoc(doc(db, "config", "live"), { quizState: "revealed", updatedAt: serverTimestamp() }, { merge: true });
+        } catch(e) { console.error("Erreur revealQuiz:", e); }
+    };
+
+    window.resetQuiz = async function() {
+        try {
+            await setDoc(doc(db, "config", "live"), { quizState: "voting", updatedAt: serverTimestamp() }, { merge: true });
+        } catch(e) { console.error("Erreur resetQuiz:", e); }
+    };
 
     // ═══════════════════════════════════════════════════════
     // DEMANDES DE 2ÈME CHANCE
