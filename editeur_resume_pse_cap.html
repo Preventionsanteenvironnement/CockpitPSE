@@ -2781,41 +2781,96 @@ function importMindMapJSON() {
 }
 
 function exportMindMapPNG() {
-  // Find the SVG in the preview
-  const previewArea = document.getElementById('preview-area');
-  if (!previewArea) { alert('Générez d\'abord un aperçu.'); return; }
-  const svgEl = previewArea.querySelector('svg');
-  if (!svgEl) { alert('Aucune carte mentale à exporter. Vérifiez que la Section 5 est remplie et que l\'aperçu est généré.'); return; }
+  const mmData = collectMindMapRecursive();
+  if (!mmData.centre && !mmData.branches.length) {
+    alert('La carte mentale est vide. Remplissez la Section 5 ou importez un JSON.');
+    return;
+  }
 
-  // Clone SVG and set explicit dimensions for high-res export
-  const clone = svgEl.cloneNode(true);
-  const exportW = 2400; // High res for printing
-  const exportH = Math.round(exportW * 500 / 900);
-  clone.setAttribute('width', exportW);
-  clone.setAttribute('height', exportH);
-  clone.style.width = exportW + 'px';
-  clone.style.height = exportH + 'px';
+  const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
+  const nb = mmData.branches.length || 1;
+  const svgW = 1000, svgH = 560;
+  const cx = svgW / 2, cy = svgH / 2;
 
-  const svgData = new XMLSerializer().serializeToString(clone);
-  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(svgBlob);
+  function esc(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  const img = new Image();
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="' + svgW + '" height="' + svgH + '" style="font-family:Segoe UI,Calibri,sans-serif;">';
+  svg += '<rect width="' + svgW + '" height="' + svgH + '" fill="white"/>';
+
+  const leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
+  const rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
+
+  function drawBr(branch, bx, by, idx, side) {
+    const col = branchColors[idx % branchColors.length];
+    const dir = side === 'left' ? -1 : 1;
+    const anchor = side === 'left' ? 'end' : 'start';
+    const cp1x = cx + dir * 60, cp2x = cx + dir * 100;
+    svg += '<path d="M' + cx + ',' + cy + ' C' + cp1x + ',' + cy + ' ' + cp2x + ',' + by + ' ' + bx + ',' + by + '" fill="none" stroke="' + col + '" stroke-width="5" stroke-linecap="round" opacity="0.5"/>';
+    svg += '<text x="' + bx + '" y="' + (by + 5) + '" text-anchor="' + anchor + '" font-size="14" font-weight="800" fill="' + col + '">' + esc(branch.titre) + '</text>';
+    const items = [];
+    if (branch.sous_branches) branch.sous_branches.forEach(function(sb) { items.push(sb); });
+    if (branch.mots_cles) branch.mots_cles.forEach(function(kw) { items.push({ titre: kw.replace(/^[\u25ba>\u2022\-\s]+/, ''), _isKw: true }); });
+    if (items.length) {
+      const subSpacing = Math.min(30, 140 / items.length);
+      const startY = by - (items.length - 1) * subSpacing / 2;
+      const subX = bx + dir * 120;
+      items.forEach(function(item, si) {
+        const subY = startY + si * subSpacing;
+        svg += '<path d="M' + bx + ',' + by + ' Q' + (bx + dir * 40) + ',' + by + ' ' + subX + ',' + subY + '" fill="none" stroke="' + col + '" stroke-width="' + (item._isKw ? 1.5 : 2.5) + '" stroke-linecap="round" opacity="0.35"/>';
+        if (item._isKw) {
+          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="10" fill="#666">' + esc(item.titre) + '</text>';
+        } else {
+          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="12" font-weight="600" fill="' + col + '">' + esc(item.titre) + '</text>';
+          const subItems = [];
+          if (item.mots_cles) item.mots_cles.forEach(function(kw) { subItems.push(kw.replace(/^[\u25ba>\u2022\-\s]+/, '')); });
+          if (item.sous_branches) item.sous_branches.forEach(function(ssb) { subItems.push(ssb.titre); if (ssb.mots_cles) ssb.mots_cles.forEach(function(kw) { subItems.push('  ' + kw.replace(/^[\u25ba>\u2022\-\s]+/, '')); }); });
+          if (subItems.length) {
+            const kwX = subX + dir * 100;
+            const kwSpacing = Math.min(16, 60 / subItems.length);
+            const kwStartY = subY - (subItems.length - 1) * kwSpacing / 2;
+            subItems.forEach(function(kw, ki) {
+              const kwY = kwStartY + ki * kwSpacing;
+              const isInd = kw.startsWith('  ');
+              const kwT = esc(kw.trim());
+              const kwFX = isInd ? kwX + dir * 10 : kwX;
+              svg += '<line x1="' + subX + '" y1="' + subY + '" x2="' + kwFX + '" y2="' + kwY + '" stroke="' + col + '" stroke-width="0.8" opacity="0.2"/>';
+              svg += '<text x="' + kwFX + '" y="' + (kwY + 3) + '" text-anchor="' + anchor + '" font-size="' + (isInd ? 8 : 9) + '" fill="' + (isInd ? '#888' : '#555') + '"' + (isInd ? '' : ' font-weight="500"') + '>' + kwT + '</text>';
+            });
+          }
+        }
+      });
+    }
+  }
+
+  leftBranches.forEach(function(b, i) { var sp = svgH / (leftBranches.length + 1); drawBr(b, cx - 160, sp * (i + 1), i, 'left'); });
+  rightBranches.forEach(function(b, i) { var sp = svgH / (rightBranches.length + 1); drawBr(b, cx + 160, sp * (i + 1), i + leftBranches.length, 'right'); });
+
+  var ct = esc(mmData.centre || 'Module');
+  var cw = Math.max(130, Math.min(ct.length * 8.5 + 40, 240));
+  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (cw/2) + '" ry="34" fill="#1B4F72" stroke="#0D3452" stroke-width="3"/>';
+  svg += '<text x="' + cx + '" y="' + (cy + 1) + '" text-anchor="middle" font-size="13" font-weight="800" fill="white">' + ct + '</text>';
+  svg += '</svg>';
+
+  var exportW = 2400;
+  var exportH = Math.round(exportW * svgH / svgW);
+  var svgHiRes = svg.replace('width="' + svgW + '"', 'width="' + exportW + '"').replace('height="' + svgH + '"', 'height="' + exportH + '"');
+  var blob = new Blob([svgHiRes], { type: 'image/svg+xml;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+
+  var img = new Image();
   img.onload = function() {
-    const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
     canvas.width = exportW;
     canvas.height = exportH;
-    const ctx = canvas.getContext('2d');
+    var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, exportW, exportH);
     ctx.drawImage(img, 0, 0, exportW, exportH);
     URL.revokeObjectURL(url);
-
-    canvas.toBlob(function(blob) {
-      const a = document.createElement('a');
-      const mod = document.getElementById('moduleSelect').value || 'module';
-      a.download = 'carte_mentale_' + mod + '.png';
-      a.href = URL.createObjectURL(blob);
+    canvas.toBlob(function(pngBlob) {
+      var a = document.createElement('a');
+      a.download = 'carte_mentale_' + (document.getElementById('moduleSelect').value || 'module') + '.png';
+      a.href = URL.createObjectURL(pngBlob);
       a.click();
       URL.revokeObjectURL(a.href);
     }, 'image/png');
