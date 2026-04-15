@@ -458,6 +458,10 @@ body {
     <!-- SECTION 5: CARTE MENTALE -->
     <div class="section">
       <div class="section-header" style="background:var(--green);"><span>Section 5 — Carte mentale</span></div>
+        <div style="display:flex;gap:8px;margin:8px 0;">
+          <button class="btn-purple" onclick="openMindMapPromptModal()" style="font-size:0.8rem;">🧠 Prompt IA Carte Mentale</button>
+          <button class="btn-secondary" onclick="importMindMapJSON()" style="font-size:0.8rem;">📥 Importer JSON Carte Mentale</button>
+        </div>
       <div class="section-body">
         <label>Idée centrale</label>
         <input type="text" id="mindmap_center" placeholder="Ex: C2 — Prévention des risques professionnels" oninput="markUnsaved()">
@@ -2651,6 +2655,203 @@ function switchMode(mode) {
 }
 
 // ============================================================================
+// CARTE MENTALE — PROMPT IA DÉDIÉ + IMPORT
+// ============================================================================
+
+function openMindMapPromptModal() {
+  const level = document.getElementById('levelSelect').value;
+  const modCode = document.getElementById('moduleSelect').value;
+  const PROGRAMME = window.PROGRAMME || {};
+  const modules = PROGRAMME[level] || [];
+  const mod = modules.find(m => m.code === modCode);
+
+  const moduleName = mod ? `${mod.code} — ${mod.titre}` : modCode;
+  const objectifs = mod ? mod.objectifs.map((o,i) => `${i+1}. ${o}`).join('\n') : '';
+  const notions = mod ? mod.notions.map(n => n.terme).join(', ') : '';
+
+  // Get resume content if available
+  const sections = [];
+  document.querySelectorAll('.resume-section-content').forEach(el => {
+    if (el.value && el.value.trim()) sections.push(el.value.trim());
+  });
+  const resumeContext = sections.length ? '\n\nCONTENU DU RÉSUMÉ DÉJÀ RÉDIGÉ :\n' + sections.join('\n\n') : '';
+
+  const prompt = `Tu es un expert en cartes mentales pédagogiques pour l'enseignement de la PSE (Prévention Santé Environnement), niveau ${level}.
+
+MISSION : Générer une carte mentale structurée en JSON pour le module ${moduleName}.
+
+OBJECTIFS DU MODULE :
+${objectifs}
+
+NOTIONS CLÉS : ${notions}
+${resumeContext}
+
+RÈGLES DE CONSTRUCTION :
+1. Le CENTRE de la carte = le titre du module
+2. Créer 4 à 6 BRANCHES PRINCIPALES correspondant aux grands thèmes du module
+3. Chaque branche principale doit avoir 2 à 4 SOUS-BRANCHES
+4. Chaque sous-branche peut avoir des MOTS-CLÉS (2-4 mots-clés courts)
+5. Les sous-branches peuvent elles-mêmes avoir des sous-branches si nécessaire
+6. Utiliser des mots COURTS et SIMPLES (pas de phrases)
+7. Couvrir TOUS les objectifs et TOUTES les notions clés du programme
+8. Adapter au niveau ${level} : vocabulaire accessible
+
+FORMAT JSON STRICT :
+{
+  "centre": "Titre du module",
+  "branches": [
+    {
+      "titre": "Branche principale 1",
+      "sous_branches": [
+        {
+          "titre": "Sous-branche 1.1",
+          "mots_cles": ["mot1", "mot2", "mot3"]
+        },
+        {
+          "titre": "Sous-branche 1.2",
+          "sous_branches": [
+            {
+              "titre": "Sous-sous-branche",
+              "mots_cles": ["mot1", "mot2"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "titre": "Branche principale 2",
+      "sous_branches": [
+        {
+          "titre": "Sous-branche 2.1",
+          "mots_cles": ["mot1", "mot2"]
+        }
+      ]
+    }
+  ]
+}
+
+IMPORTANT :
+- Réponds UNIQUEMENT avec le JSON, sans texte avant/après
+- Chaque branche DOIT avoir soit "sous_branches", soit "mots_cles", soit les deux
+- Les mots-clés doivent être courts (1-4 mots maximum)
+- GARDE TOUS LES ACCENTS
+- Couvre l'intégralité du programme du module`;
+
+  document.getElementById('mindmapPromptText').value = prompt;
+  document.getElementById('mindmapPromptModal').classList.add('active');
+}
+
+function copyMindMapPrompt() {
+  const txt = document.getElementById('mindmapPromptText');
+  navigator.clipboard.writeText(txt.value).then(() => {
+    const btn = document.querySelector('#mindmapPromptModal .btn-primary');
+    btn.textContent = '✅ Copié !';
+    setTimeout(() => { btn.textContent = 'Copier le prompt'; }, 2000);
+  });
+}
+
+function importMindMapJSON() {
+  const jsonStr = prompt('Collez le JSON de la carte mentale généré par l\'IA :');
+  if (!jsonStr) return;
+  try {
+    const data = JSON.parse(jsonStr);
+    if (!data.centre) { alert('JSON invalide : pas de "centre"'); return; }
+    // Set center
+    document.getElementById('mindmap_center').value = data.centre;
+    // Clear existing branches
+    document.getElementById('mindmap-branches').innerHTML = '';
+    // Add branches recursively
+    if (data.branches && data.branches.length) {
+      data.branches.forEach(branch => {
+        addMindMapBranchRecursive(branch, 0);
+      });
+    }
+    markUnsaved();
+    alert('✅ Carte mentale importée avec succès !');
+  } catch(e) {
+    alert('Erreur JSON : ' + e.message);
+  }
+}
+
+function addMindMapBranchRecursive(branchData, depth) {
+  // Flatten recursive structure into the existing branch format
+  const title = branchData.titre || '';
+  const keywords = [];
+
+  if (branchData.mots_cles) {
+    keywords.push(...branchData.mots_cles);
+  }
+  if (branchData.sous_branches) {
+    branchData.sous_branches.forEach(sb => {
+      const prefix = depth === 0 ? '► ' : '  • ';
+      keywords.push(prefix + (sb.titre || ''));
+      if (sb.mots_cles) {
+        sb.mots_cles.forEach(kw => keywords.push('    ' + kw));
+      }
+      if (sb.sous_branches) {
+        sb.sous_branches.forEach(ssb => {
+          keywords.push('    ► ' + (ssb.titre || ''));
+          if (ssb.mots_cles) {
+            ssb.mots_cles.forEach(kw => keywords.push('      ' + kw));
+          }
+        });
+      }
+    });
+  }
+
+  addMindMapBranch(title, keywords);
+}
+
+// Collect carte_mentale with recursive structure for SVG rendering
+function collectMindMapRecursive() {
+  const centre = document.getElementById('mindmap_center').value;
+  const branches = [];
+  document.querySelectorAll('#mindmap-branches .mindmap-branch').forEach(branchEl => {
+    const title = branchEl.querySelector('.mindmap-branch-title');
+    const keywords = branchEl.querySelector('.mindmap-branch-keywords');
+    if (!title) return;
+    const titleVal = title.value.trim();
+    if (!titleVal) return;
+
+    const lines = keywords ? keywords.value.split('\n').map(l => l.trim()).filter(Boolean) : [];
+
+    // Parse indented lines back into sub-branches
+    const branch = { titre: titleVal, sous_branches: [], mots_cles: [] };
+    let currentSub = null;
+    let currentSubSub = null;
+
+    lines.forEach(line => {
+      if (line.startsWith('► ') || line.startsWith('> ')) {
+        currentSub = { titre: line.replace(/^[►>]\s*/, ''), mots_cles: [], sous_branches: [] };
+        branch.sous_branches.push(currentSub);
+        currentSubSub = null;
+      } else if (line.startsWith('    ► ') || line.startsWith('    > ')) {
+        if (currentSub) {
+          currentSubSub = { titre: line.replace(/^\s*[►>]\s*/, ''), mots_cles: [] };
+          currentSub.sous_branches.push(currentSubSub);
+        }
+      } else if (line.startsWith('      ') && currentSubSub) {
+        currentSubSub.mots_cles.push(line.trim());
+      } else if (line.startsWith('    ') && currentSub) {
+        currentSub.mots_cles.push(line.trim());
+      } else if (line.startsWith('  • ') || line.startsWith('  - ')) {
+        if (currentSub) {
+          currentSub.mots_cles.push(line.replace(/^\s*[•\-]\s*/, ''));
+        } else {
+          branch.mots_cles.push(line.replace(/^\s*[•\-]\s*/, ''));
+        }
+      } else {
+        branch.mots_cles.push(line);
+      }
+    });
+
+    branches.push(branch);
+  });
+
+  return { centre, branches };
+}
+
+// ============================================================================
 // PREVIEW RENDERING
 // ============================================================================
 function renderPreview() {
@@ -2757,54 +2958,123 @@ function renderPreview() {
   if (mindMap.centre || mindMap.branches.length) {
     const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
     const branchBgs = ['#E8F5E9', '#E3F2FD', '#F3E5F5', '#FFF3E0', '#FFEBEE', '#E0F2F1'];
-    html += `<div class="pv-section-title" style="color:${c('#27AE60','#000')};margin-top:14px;">CARTE MENTALE EXPRESS</div>`;
-    const nb = mindMap.branches.length || 1;
-    const svgW = 700, svgH = 420;
+    html += `<div class="pv-section-title" style="color:${c('#27AE60','#000')};margin-top:14px;">CARTE MENTALE</div>`;
+
+    // Collect recursive data
+    const mmData = collectMindMapRecursive();
+    const nb = mmData.branches.length || 1;
+
+    // Landscape SVG
+    const svgW = 900, svgH = 500;
     const cx = svgW / 2, cy = svgH / 2;
-    const radiusBranch = 155;
-    const radiusKw = 235;
-    html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow:hidden;">`;
-    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:sans-serif;">`;
-    // Draw branch lines and nodes
-    mindMap.branches.forEach((branch, idx) => {
-      const angle = -Math.PI/2 + (idx / nb) * 2 * Math.PI;
-      const bx = cx + radiusBranch * Math.cos(angle);
-      const by = cy + radiusBranch * Math.sin(angle);
+
+    html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow-x:auto;">`;
+    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:'Segoe UI',sans-serif;">`;
+
+    // Background
+    html += `<rect width="${svgW}" height="${svgH}" fill="${isColor ? '#fafbfc' : '#fff'}" rx="12"/>`;
+
+    // Draw branches — split left and right
+    const leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
+    const rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
+
+    function drawBranch(branch, bx, by, idx, side) {
       const col = isColor ? branchColors[idx % branchColors.length] : '#666';
       const bgCol = isColor ? branchBgs[idx % branchBgs.length] : '#F0F0F0';
-      // Curved line from center to branch
-      const cpx = cx + (bx - cx) * 0.5 - (by - cy) * 0.15;
-      const cpy = cy + (by - cy) * 0.5 + (bx - cx) * 0.15;
-      html += `<path d="M${cx},${cy} Q${cpx},${cpy} ${bx},${by}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" opacity="0.6"/>`;
+      const dir = side === 'left' ? -1 : 1;
+
+      // Thick curved line from center to branch
+      const midX = cx + dir * 80;
+      html += `<path d="M${cx},${cy} C${midX},${cy} ${midX},${by} ${bx},${by}" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity="0.7"/>`;
+
       // Branch bubble
-      const titleText = esc(branch.titre || ('Branche ' + (idx + 1)));
-      const tw = Math.max(80, Math.min(titleText.length * 6 + 24, 140));
-      html += `<rect x="${bx - tw/2}" y="${by - 16}" width="${tw}" height="32" rx="16" fill="${bgCol}" stroke="${col}" stroke-width="2.5"/>`;
-      html += `<text x="${bx}" y="${by + 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${col}">${titleText}</text>`;
-      // Keywords
+      const tw = Math.max(90, Math.min(branch.titre.length * 7 + 28, 160));
+      const bxOff = side === 'left' ? bx - tw : bx;
+      html += `<rect x="${bxOff}" y="${by - 16}" width="${tw}" height="32" rx="16" fill="${bgCol}" stroke="${col}" stroke-width="2.5"/>`;
+      const textX = side === 'left' ? bx - tw/2 : bx + tw/2;
+      html += `<text x="${textX}" y="${by + 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${col}">${esc(branch.titre)}</text>`;
+
+      // Sub-branches or keywords
+      const items = [];
+      if (branch.sous_branches && branch.sous_branches.length) {
+        branch.sous_branches.forEach(sb => items.push(sb));
+      }
       if (branch.mots_cles && branch.mots_cles.length) {
-        const kwPerLine = Math.min(branch.mots_cles.length, 3);
-        branch.mots_cles.forEach((mot, ki) => {
-          const kwAngle = angle + (ki - (branch.mots_cles.length - 1) / 2) * 0.18;
-          const kwx = cx + radiusKw * Math.cos(kwAngle);
-          const kwy = cy + radiusKw * Math.sin(kwAngle);
-          // Small line from branch to keyword
-          html += `<line x1="${bx}" y1="${by}" x2="${kwx}" y2="${kwy}" stroke="${col}" stroke-width="1" opacity="0.3"/>`;
-          // Keyword pill
-          const kwText = esc(mot);
-          const kwW = Math.max(50, Math.min(kwText.length * 5.5 + 16, 120));
-          html += `<rect x="${kwx - kwW/2}" y="${kwy - 10}" width="${kwW}" height="20" rx="10" fill="white" stroke="${col}" stroke-width="1"/>`;
-          html += `<text x="${kwx}" y="${kwy + 4}" text-anchor="middle" font-size="7.5" fill="#333">${kwText}</text>`;
+        branch.mots_cles.forEach(kw => items.push({ titre: kw, _isKw: true }));
+      }
+
+      if (items.length) {
+        const subSpacing = Math.min(28, 120 / items.length);
+        const startY = by - (items.length - 1) * subSpacing / 2;
+        const subX = side === 'left' ? bx - tw - 30 : bx + tw + 30;
+
+        items.forEach((item, si) => {
+          const subY = startY + si * subSpacing;
+          const lineStartX = side === 'left' ? bxOff : bx + tw;
+
+          // Thinner line to sub-branch
+          html += `<line x1="${lineStartX}" y1="${by}" x2="${subX}" y2="${subY}" stroke="${col}" stroke-width="${item._isKw ? 1 : 2}" opacity="0.4"/>`;
+
+          if (item._isKw) {
+            // Simple keyword pill
+            const kwText = esc(item.titre.replace(/^[►>•\-\s]+/, ''));
+            const kwW = Math.max(40, Math.min(kwText.length * 5.5 + 14, 110));
+            const kwXOff = side === 'left' ? subX - kwW : subX;
+            html += `<rect x="${kwXOff}" y="${subY - 9}" width="${kwW}" height="18" rx="9" fill="white" stroke="${col}" stroke-width="1"/>`;
+            const kwTextX = side === 'left' ? subX - kwW/2 : subX + kwW/2;
+            html += `<text x="${kwTextX}" y="${subY + 4}" text-anchor="middle" font-size="7" fill="#333">${kwText}</text>`;
+          } else {
+            // Sub-branch bubble
+            const sbText = esc(item.titre);
+            const sbW = Math.max(70, Math.min(sbText.length * 6 + 20, 130));
+            const sbXOff = side === 'left' ? subX - sbW : subX;
+            html += `<rect x="${sbXOff}" y="${subY - 12}" width="${sbW}" height="24" rx="12" fill="white" stroke="${col}" stroke-width="1.5"/>`;
+            const sbTextX = side === 'left' ? subX - sbW/2 : subX + sbW/2;
+            html += `<text x="${sbTextX}" y="${subY + 4}" text-anchor="middle" font-size="8" font-weight="600" fill="${col}">${sbText}</text>`;
+
+            // Sub-branch keywords
+            if (item.mots_cles && item.mots_cles.length) {
+              const kwX2 = side === 'left' ? subX - sbW - 20 : subX + sbW + 20;
+              item.mots_cles.forEach((kw, ki) => {
+                const kwY2 = subY + (ki - (item.mots_cles.length-1)/2) * 14;
+                const lineX = side === 'left' ? sbXOff : subX + sbW;
+                html += `<line x1="${lineX}" y1="${subY}" x2="${kwX2}" y2="${kwY2}" stroke="${col}" stroke-width="0.8" opacity="0.3"/>`;
+                const kwText2 = esc(kw.replace(/^[►>•\-\s]+/, ''));
+                const kwW2 = Math.max(35, Math.min(kwText2.length * 5 + 12, 90));
+                const kw2XOff = side === 'left' ? kwX2 - kwW2 : kwX2;
+                html += `<rect x="${kw2XOff}" y="${kwY2 - 7}" width="${kwW2}" height="14" rx="7" fill="${bgCol}" stroke="${col}" stroke-width="0.5" opacity="0.8"/>`;
+                const kw2TextX = side === 'left' ? kwX2 - kwW2/2 : kwX2 + kwW2/2;
+                html += `<text x="${kw2TextX}" y="${kwY2 + 3}" text-anchor="middle" font-size="6.5" fill="#444">${kwText2}</text>`;
+              });
+            }
+          }
         });
       }
+    }
+
+    // Draw left branches
+    leftBranches.forEach((branch, idx) => {
+      const spacing = svgH / (leftBranches.length + 1);
+      const by = spacing * (idx + 1);
+      const bx = cx - 140;
+      drawBranch(branch, bx, by, idx, 'left');
     });
-    // Center node (drawn last to be on top)
-    const centerText = esc(mindMap.centre || 'Module');
-    const centerW = Math.max(100, Math.min(centerText.length * 7 + 30, 200));
-    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="28" fill="${isColor ? '#1B4F72' : '#555'}" stroke="${isColor ? '#0D3452' : '#333'}" stroke-width="3"/>`;
-    html += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" font-weight="700" fill="white">${centerText}</text>`;
-    html += `</svg>`;
-    html += `</div>`;
+
+    // Draw right branches
+    rightBranches.forEach((branch, idx) => {
+      const spacing = svgH / (rightBranches.length + 1);
+      const by = spacing * (idx + 1);
+      const bx = cx + 140;
+      drawBranch(branch, bx, by, idx + leftBranches.length, 'right');
+    });
+
+    // Center node (on top)
+    const centerText = esc(mmData.centre || 'Module');
+    const centerW = Math.max(120, Math.min(centerText.length * 8 + 40, 220));
+    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="32" fill="${isColor ? '#1B4F72' : '#555'}" stroke="${isColor ? '#0D3452' : '#333'}" stroke-width="3"/>`;
+    html += `<text x="${cx}" y="${cy + 1}" text-anchor="middle" font-size="12" font-weight="800" fill="white">${centerText}</text>`;
+
+    html += `</svg></div>`;
   }
   html += `</div>`; // end page 1
 
@@ -3788,6 +4058,20 @@ function escAttr(str) {
   return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
+
+<!-- MODAL: PROMPT IA CARTE MENTALE -->
+<div class="modal-overlay" id="mindmapPromptModal">
+  <div class="modal-content" style="max-width:800px;">
+    <button class="modal-close" onclick="closeModal('mindmapPromptModal')">&times;</button>
+    <h3>🧠 Prompt IA — Carte Mentale</h3>
+    <p class="info-text" style="margin-bottom:10px;">Copiez ce prompt dans ChatGPT, Claude ou Gemini. Collez le JSON obtenu via le bouton "Importer JSON Carte Mentale".</p>
+    <textarea id="mindmapPromptText" readonly style="width:100%;min-height:300px;font-size:0.8rem;font-family:monospace;padding:10px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical;"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn-primary" onclick="copyMindMapPrompt()">Copier le prompt</button>
+      <button class="btn-secondary" onclick="closeModal('mindmapPromptModal')">Fermer</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
