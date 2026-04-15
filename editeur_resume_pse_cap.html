@@ -2789,69 +2789,99 @@ function exportMindMapPNG() {
 
   const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
   const nb = mmData.branches.length || 1;
-  const svgW = 1000, svgH = 560;
-  const cx = svgW / 2, cy = svgH / 2;
 
   function esc(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function countItems(branch) {
+    var count = 0;
+    if (branch.sous_branches) branch.sous_branches.forEach(function(sb) {
+      count += 1;
+      if (sb.mots_cles) count += Math.min(sb.mots_cles.length, 4);
+      if (sb.sous_branches) sb.sous_branches.forEach(function(ssb) { count += 1; if (ssb.mots_cles) count += Math.min(ssb.mots_cles.length, 3); });
+    });
+    if (branch.mots_cles) count += Math.min(branch.mots_cles.length, 4);
+    return Math.max(count, 3);
+  }
 
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="' + svgW + '" height="' + svgH + '" style="font-family:Segoe UI,Calibri,sans-serif;">';
+  var leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
+  var rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
+  var leftTotal = 0, rightTotal = 0;
+  leftBranches.forEach(function(b) { leftTotal += countItems(b); });
+  rightBranches.forEach(function(b) { rightTotal += countItems(b); });
+
+  var maxItems = Math.max(leftTotal, rightTotal, 10);
+  var svgW = 1400;
+  var svgH = Math.max(600, Math.min(maxItems * 22 + 100, 1200));
+  var cx = svgW / 2, cy = svgH / 2;
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="' + svgW + '" height="' + svgH + '" style="font-family:Segoe UI,Calibri,sans-serif;">';
   svg += '<rect width="' + svgW + '" height="' + svgH + '" fill="white"/>';
 
-  const leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
-  const rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
+  function calcPos(branches, totalH) {
+    var positions = [], totalI = 0, margin = 50;
+    branches.forEach(function(b) { totalI += countItems(b); });
+    if (!totalI) totalI = branches.length || 1;
+    var usableH = totalH - 2 * margin, curY = margin;
+    branches.forEach(function(b) { var h = (countItems(b) / totalI) * usableH; positions.push(curY + h / 2); curY += h; });
+    return positions;
+  }
+
+  var leftPos = calcPos(leftBranches, svgH);
+  var rightPos = calcPos(rightBranches, svgH);
 
   function drawBr(branch, bx, by, idx, side) {
-    const col = branchColors[idx % branchColors.length];
-    const dir = side === 'left' ? -1 : 1;
-    const anchor = side === 'left' ? 'end' : 'start';
-    const cp1x = cx + dir * 60, cp2x = cx + dir * 100;
-    svg += '<path d="M' + cx + ',' + cy + ' C' + cp1x + ',' + cy + ' ' + cp2x + ',' + by + ' ' + bx + ',' + by + '" fill="none" stroke="' + col + '" stroke-width="5" stroke-linecap="round" opacity="0.5"/>';
-    svg += '<text x="' + bx + '" y="' + (by + 5) + '" text-anchor="' + anchor + '" font-size="14" font-weight="800" fill="' + col + '">' + esc(branch.titre) + '</text>';
-    const items = [];
+    var col = branchColors[idx % branchColors.length];
+    var dir = side === 'left' ? -1 : 1;
+    var anchor = side === 'left' ? 'end' : 'start';
+    var cp1x = cx + dir * 80, cp2x = cx + dir * 140;
+    svg += '<path d="M' + cx + ',' + cy + ' C' + cp1x + ',' + cy + ' ' + cp2x + ',' + by + ' ' + bx + ',' + by + '" fill="none" stroke="' + col + '" stroke-width="4.5" stroke-linecap="round" opacity="0.45"/>';
+    svg += '<text x="' + bx + '" y="' + (by + 5) + '" text-anchor="' + anchor + '" font-size="13" font-weight="800" fill="' + col + '">' + esc(branch.titre) + '</text>';
+    var items = [];
     if (branch.sous_branches) branch.sous_branches.forEach(function(sb) { items.push(sb); });
-    if (branch.mots_cles) branch.mots_cles.forEach(function(kw) { items.push({ titre: kw.replace(/^[\u25ba>\u2022\-\s]+/, ''), _isKw: true }); });
+    if (branch.mots_cles) branch.mots_cles.forEach(function(kw) { items.push({ titre: kw.replace(/^[>\-\s]+/, ''), _isKw: true }); });
     if (items.length) {
-      const subSpacing = Math.min(30, 140 / items.length);
-      const startY = by - (items.length - 1) * subSpacing / 2;
-      const subX = bx + dir * 120;
-      items.forEach(function(item, si) {
-        const subY = startY + si * subSpacing;
-        svg += '<path d="M' + bx + ',' + by + ' Q' + (bx + dir * 40) + ',' + by + ' ' + subX + ',' + subY + '" fill="none" stroke="' + col + '" stroke-width="' + (item._isKw ? 1.5 : 2.5) + '" stroke-linecap="round" opacity="0.35"/>';
+      var totalSub = 0;
+      items.forEach(function(item) { totalSub += 1; if (!item._isKw && item.mots_cles) totalSub += Math.min(item.mots_cles.length, 4); if (!item._isKw && item.sous_branches) item.sous_branches.forEach(function(ssb) { totalSub += 1; if (ssb.mots_cles) totalSub += Math.min(ssb.mots_cles.length, 3); }); });
+      var lineH = 18, totalBlockH = totalSub * lineH, curSubY = by - totalBlockH / 2;
+      var subX = bx + dir * 160;
+      items.forEach(function(item) {
+        var subY = curSubY + lineH / 2;
+        svg += '<path d="M' + bx + ',' + by + ' Q' + (bx + dir * 60) + ',' + by + ' ' + subX + ',' + subY + '" fill="none" stroke="' + col + '" stroke-width="' + (item._isKw ? 1.2 : 2) + '" stroke-linecap="round" opacity="0.3"/>';
         if (item._isKw) {
-          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="10" fill="#666">' + esc(item.titre) + '</text>';
+          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="9.5" fill="#555">' + esc(item.titre) + '</text>';
+          curSubY += lineH;
         } else {
-          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="12" font-weight="600" fill="' + col + '">' + esc(item.titre) + '</text>';
-          const subItems = [];
-          if (item.mots_cles) item.mots_cles.forEach(function(kw) { subItems.push(kw.replace(/^[\u25ba>\u2022\-\s]+/, '')); });
-          if (item.sous_branches) item.sous_branches.forEach(function(ssb) { subItems.push(ssb.titre); if (ssb.mots_cles) ssb.mots_cles.forEach(function(kw) { subItems.push('  ' + kw.replace(/^[\u25ba>\u2022\-\s]+/, '')); }); });
-          if (subItems.length) {
-            const kwX = subX + dir * 100;
-            const kwSpacing = Math.min(16, 60 / subItems.length);
-            const kwStartY = subY - (subItems.length - 1) * kwSpacing / 2;
-            subItems.forEach(function(kw, ki) {
-              const kwY = kwStartY + ki * kwSpacing;
-              const isInd = kw.startsWith('  ');
-              const kwT = esc(kw.trim());
-              const kwFX = isInd ? kwX + dir * 10 : kwX;
-              svg += '<line x1="' + subX + '" y1="' + subY + '" x2="' + kwFX + '" y2="' + kwY + '" stroke="' + col + '" stroke-width="0.8" opacity="0.2"/>';
-              svg += '<text x="' + kwFX + '" y="' + (kwY + 3) + '" text-anchor="' + anchor + '" font-size="' + (isInd ? 8 : 9) + '" fill="' + (isInd ? '#888' : '#555') + '"' + (isInd ? '' : ' font-weight="500"') + '>' + kwT + '</text>';
-            });
-          }
+          svg += '<text x="' + subX + '" y="' + (subY + 4) + '" text-anchor="' + anchor + '" font-size="11" font-weight="600" fill="' + col + '">' + esc(item.titre) + '</text>';
+          curSubY += lineH;
+          var kwX = subX + dir * 130, subSubItems = [];
+          if (item.mots_cles) item.mots_cles.slice(0, 4).forEach(function(kw) { subSubItems.push({ text: kw.replace(/^[>\-\s]+/, ''), isSub: false }); });
+          if (item.sous_branches) item.sous_branches.forEach(function(ssb) { subSubItems.push({ text: ssb.titre, isSub: true }); if (ssb.mots_cles) ssb.mots_cles.slice(0, 3).forEach(function(kw) { subSubItems.push({ text: kw.replace(/^[>\-\s]+/, ''), isSub: false, indent: true }); }); });
+          subSubItems.forEach(function(kw) {
+            var kwY = curSubY + lineH / 2;
+            var kwFX = kw.indent ? kwX + dir * 15 : kwX;
+            svg += '<line x1="' + subX + '" y1="' + subY + '" x2="' + kwFX + '" y2="' + kwY + '" stroke="' + col + '" stroke-width="0.6" opacity="0.18"/>';
+            if (kw.isSub) {
+              svg += '<text x="' + kwFX + '" y="' + (kwY + 3) + '" text-anchor="' + anchor + '" font-size="9.5" font-weight="500" fill="' + col + '" opacity="0.8">' + esc(kw.text) + '</text>';
+            } else {
+              svg += '<text x="' + kwFX + '" y="' + (kwY + 3) + '" text-anchor="' + anchor + '" font-size="' + (kw.indent ? 8 : 8.5) + '" fill="' + (kw.indent ? '#999' : '#666') + '">' + esc(kw.text) + '</text>';
+            }
+            curSubY += lineH;
+          });
         }
       });
     }
   }
 
-  leftBranches.forEach(function(b, i) { var sp = svgH / (leftBranches.length + 1); drawBr(b, cx - 160, sp * (i + 1), i, 'left'); });
-  rightBranches.forEach(function(b, i) { var sp = svgH / (rightBranches.length + 1); drawBr(b, cx + 160, sp * (i + 1), i + leftBranches.length, 'right'); });
+  leftBranches.forEach(function(b, i) { drawBr(b, cx - 200, leftPos[i], i, 'left'); });
+  rightBranches.forEach(function(b, i) { drawBr(b, cx + 200, rightPos[i], i + leftBranches.length, 'right'); });
 
   var ct = esc(mmData.centre || 'Module');
-  var cw = Math.max(130, Math.min(ct.length * 8.5 + 40, 240));
-  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (cw/2) + '" ry="34" fill="#1B4F72" stroke="#0D3452" stroke-width="3"/>';
-  svg += '<text x="' + cx + '" y="' + (cy + 1) + '" text-anchor="middle" font-size="13" font-weight="800" fill="white">' + ct + '</text>';
+  var cw = Math.max(140, Math.min(ct.length * 9 + 50, 260));
+  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (cw/2) + '" ry="36" fill="#1B4F72" stroke="#0D3452" stroke-width="3"/>';
+  svg += '<text x="' + cx + '" y="' + (cy + 2) + '" text-anchor="middle" font-size="14" font-weight="800" fill="white">' + ct + '</text>';
   svg += '</svg>';
 
-  var exportW = 2400;
+  // High-res export
+  var exportW = 2800;
   var exportH = Math.round(exportW * svgH / svgW);
   var svgHiRes = svg.replace('width="' + svgW + '"', 'width="' + exportW + '"').replace('height="' + svgH + '"', 'height="' + exportH + '"');
   var blob = new Blob([svgHiRes], { type: 'image/svg+xml;charset=utf-8' });
@@ -3063,103 +3093,148 @@ function renderPreview() {
   if (mindMap.centre || mindMap.branches.length) {
     const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
     html += `<div class="pv-section-title" style="color:${c('#27AE60','#000')};margin-top:14px;">CARTE MENTALE</div>`;
-
+    
     const mmData = collectMindMapRecursive();
     const nb = mmData.branches.length || 1;
-    const svgW = 1000, svgH = 560;
-    const cx = svgW / 2, cy = svgH / 2;
-
-    html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow-x:auto;">`;
-    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:'Segoe UI',Calibri,sans-serif;" xmlns="http://www.w3.org/2000/svg">`;
-    html += `<rect width="${svgW}" height="${svgH}" fill="white" rx="0"/>`;
-
+    
+    // Calculate total items per side to determine SVG height dynamically
+    function countItems(branch) {
+      let count = 0;
+      if (branch.sous_branches) branch.sous_branches.forEach(sb => {
+        count += 1;
+        if (sb.mots_cles) count += Math.min(sb.mots_cles.length, 4);
+        if (sb.sous_branches) sb.sous_branches.forEach(ssb => {
+          count += 1;
+          if (ssb.mots_cles) count += Math.min(ssb.mots_cles.length, 3);
+        });
+      });
+      if (branch.mots_cles) count += Math.min(branch.mots_cles.length, 4);
+      return Math.max(count, 3);
+    }
+    
     const leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
     const rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
-
-    function drawCleanBranch(branch, bx, by, idx, side) {
+    
+    let leftTotal = 0, rightTotal = 0;
+    leftBranches.forEach(b => leftTotal += countItems(b));
+    rightBranches.forEach(b => rightTotal += countItems(b));
+    
+    const maxItems = Math.max(leftTotal, rightTotal, 10);
+    const svgW = 1400;
+    const svgH = Math.max(600, Math.min(maxItems * 22 + 100, 1200));
+    const cx = svgW / 2, cy = svgH / 2;
+    
+    html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow-x:auto;">`;
+    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:'Segoe UI',Calibri,sans-serif;" xmlns="http://www.w3.org/2000/svg">`;
+    html += `<rect width="${svgW}" height="${svgH}" fill="white"/>`;
+    
+    // Calculate Y positions for each branch based on item count
+    function calcBranchPositions(branches, totalH) {
+      const positions = [];
+      let totalItems = 0;
+      branches.forEach(b => totalItems += countItems(b));
+      if (totalItems === 0) totalItems = branches.length;
+      const margin = 50;
+      const usableH = totalH - 2 * margin;
+      let currentY = margin;
+      branches.forEach(b => {
+        const items = countItems(b);
+        const blockH = (items / totalItems) * usableH;
+        positions.push(currentY + blockH / 2);
+        currentY += blockH;
+      });
+      return positions;
+    }
+    
+    const leftPositions = calcBranchPositions(leftBranches, svgH);
+    const rightPositions = calcBranchPositions(rightBranches, svgH);
+    
+    function drawAdaptiveBranch(branch, bx, by, idx, side) {
       const col = isColor ? branchColors[idx % branchColors.length] : '#555';
       const dir = side === 'left' ? -1 : 1;
       const anchor = side === 'left' ? 'end' : 'start';
-
-      // Thick organic curve from center to branch
-      const cp1x = cx + dir * 60, cp1y = cy;
-      const cp2x = cx + dir * 100, cp2y = by;
-      html += `<path d="M${cx},${cy} C${cp1x},${cp1y} ${cp2x},${cp2y} ${bx},${by}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" opacity="0.5"/>`;
-
-      // Branch title — just bold text, no background
-      html += `<text x="${bx}" y="${by + 5}" text-anchor="${anchor}" font-size="14" font-weight="800" fill="${col}">${esc(branch.titre)}</text>`;
-
-      // Collect items
+      
+      // Thick organic curve from center
+      const cp1x = cx + dir * 80, cp2x = cx + dir * 140;
+      html += `<path d="M${cx},${cy} C${cp1x},${cy} ${cp2x},${by} ${bx},${by}" fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round" opacity="0.45"/>`;
+      
+      // Branch title — bold colored text
+      html += `<text x="${bx}" y="${by + 5}" text-anchor="${anchor}" font-size="13" font-weight="800" fill="${col}">${esc(branch.titre)}</text>`;
+      
+      // Collect sub-items
       const items = [];
-      if (branch.sous_branches && branch.sous_branches.length) branch.sous_branches.forEach(sb => items.push(sb));
-      if (branch.mots_cles && branch.mots_cles.length) branch.mots_cles.forEach(kw => items.push({ titre: kw.replace(/^[►>•\-\s]+/, ''), _isKw: true }));
-
+      if (branch.sous_branches) branch.sous_branches.forEach(sb => items.push(sb));
+      if (branch.mots_cles) branch.mots_cles.forEach(kw => items.push({ titre: kw.replace(/^[\u25ba>\u2022\-\s]+/, ''), _isKw: true }));
+      
       if (items.length) {
-        const subSpacing = Math.min(30, 140 / items.length);
-        const startY = by - (items.length - 1) * subSpacing / 2;
-        const subX = bx + dir * 120;
-
-        items.forEach((item, si) => {
-          const subY = startY + si * subSpacing;
-
-          // Medium line branch -> sub-branch
-          html += `<path d="M${bx},${by} Q${bx + dir * 40},${by} ${subX},${subY}" fill="none" stroke="${col}" stroke-width="${item._isKw ? 1.5 : 2.5}" stroke-linecap="round" opacity="0.35"/>`;
-
+        // Calculate spacing based on total sub-items
+        let totalSubItems = 0;
+        items.forEach(item => {
+          totalSubItems += 1;
+          if (!item._isKw && item.mots_cles) totalSubItems += Math.min(item.mots_cles.length, 4);
+          if (!item._isKw && item.sous_branches) item.sous_branches.forEach(ssb => {
+            totalSubItems += 1;
+            if (ssb.mots_cles) totalSubItems += Math.min(ssb.mots_cles.length, 3);
+          });
+        });
+        
+        const lineH = 18;
+        const totalBlockH = totalSubItems * lineH;
+        let currentSubY = by - totalBlockH / 2;
+        const subX = bx + dir * 160;
+        
+        items.forEach(item => {
+          const subY = currentSubY + lineH / 2;
+          
+          // Line to sub-item
+          html += `<path d="M${bx},${by} Q${bx + dir * 60},${by} ${subX},${subY}" fill="none" stroke="${col}" stroke-width="${item._isKw ? 1.2 : 2}" stroke-linecap="round" opacity="0.3"/>`;
+          
           if (item._isKw) {
-            // Keyword — small text only, no background
-            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="10" fill="#666">${esc(item.titre)}</text>`;
+            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="9.5" fill="#555">${esc(item.titre)}</text>`;
+            currentSubY += lineH;
           } else {
-            // Sub-branch title — medium text, no background
-            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="${col}">${esc(item.titre)}</text>`;
-
-            // Sub-branch keywords
-            const subItems = [];
-            if (item.mots_cles) item.mots_cles.forEach(kw => subItems.push(kw.replace(/^[►>•\-\s]+/, '')));
+            // Sub-branch title
+            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="${col}">${esc(item.titre)}</text>`;
+            currentSubY += lineH;
+            
+            // Sub-branch keywords + sub-sub-branches
+            const kwX = subX + dir * 130;
+            const subSubItems = [];
+            if (item.mots_cles) item.mots_cles.slice(0, 4).forEach(kw => subSubItems.push({ text: kw.replace(/^[\u25ba>\u2022\-\s]+/, ''), isSub: false }));
             if (item.sous_branches) item.sous_branches.forEach(ssb => {
-              subItems.push(ssb.titre);
-              if (ssb.mots_cles) ssb.mots_cles.forEach(kw => subItems.push('  ' + kw.replace(/^[►>•\-\s]+/, '')));
+              subSubItems.push({ text: ssb.titre, isSub: true });
+              if (ssb.mots_cles) ssb.mots_cles.slice(0, 3).forEach(kw => subSubItems.push({ text: kw.replace(/^[\u25ba>\u2022\-\s]+/, ''), isSub: false, indent: true }));
             });
-
-            if (subItems.length) {
-              const kwX = subX + dir * 100;
-              const kwSpacing = Math.min(16, 60 / subItems.length);
-              const kwStartY = subY - (subItems.length - 1) * kwSpacing / 2;
-
-              subItems.forEach((kw, ki) => {
-                const kwY = kwStartY + ki * kwSpacing;
-                const isIndented = kw.startsWith('  ');
-                const kwText = esc(kw.trim());
-                const kwFinalX = isIndented ? kwX + dir * 10 : kwX;
-
-                // Thin line
-                html += `<line x1="${subX}" y1="${subY}" x2="${kwFinalX}" y2="${kwY}" stroke="${col}" stroke-width="0.8" opacity="0.2"/>`;
-                // Small text only
-                html += `<text x="${kwFinalX}" y="${kwY + 3}" text-anchor="${anchor}" font-size="${isIndented ? 8 : 9}" fill="${isIndented ? '#888' : '#555'}" ${isIndented ? '' : 'font-weight="500"'}>${kwText}</text>`;
-              });
-            }
+            
+            subSubItems.forEach(kw => {
+              const kwY = currentSubY + lineH / 2;
+              const kwFX = kw.indent ? kwX + dir * 15 : kwX;
+              
+              html += `<line x1="${subX}" y1="${subY}" x2="${kwFX}" y2="${kwY}" stroke="${col}" stroke-width="0.6" opacity="0.18"/>`;
+              
+              if (kw.isSub) {
+                html += `<text x="${kwFX}" y="${kwY + 3}" text-anchor="${anchor}" font-size="9.5" font-weight="500" fill="${col}" opacity="0.8">${esc(kw.text)}</text>`;
+              } else {
+                html += `<text x="${kwFX}" y="${kwY + 3}" text-anchor="${anchor}" font-size="${kw.indent ? 8 : 8.5}" fill="${kw.indent ? '#999' : '#666'}">${esc(kw.text)}</text>`;
+              }
+              currentSubY += lineH;
+            });
           }
         });
       }
     }
-
-    // Left branches
-    leftBranches.forEach((branch, idx) => {
-      const spacing = svgH / (leftBranches.length + 1);
-      drawCleanBranch(branch, cx - 160, spacing * (idx + 1), idx, 'left');
-    });
-
-    // Right branches
-    rightBranches.forEach((branch, idx) => {
-      const spacing = svgH / (rightBranches.length + 1);
-      drawCleanBranch(branch, cx + 160, spacing * (idx + 1), idx + leftBranches.length, 'right');
-    });
-
-    // Center node (on top) — the ONLY filled shape
+    
+    // Draw left
+    leftBranches.forEach((b, i) => drawAdaptiveBranch(b, cx - 200, leftPositions[i], i, 'left'));
+    // Draw right
+    rightBranches.forEach((b, i) => drawAdaptiveBranch(b, cx + 200, rightPositions[i], i + leftBranches.length, 'right'));
+    
+    // Center node (on top)
     const centerText = esc(mmData.centre || 'Module');
-    const centerW = Math.max(130, Math.min(centerText.length * 8.5 + 40, 240));
-    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="34" fill="${isColor ? '#1B4F72' : '#444'}" stroke="${isColor ? '#0D3452' : '#222'}" stroke-width="3"/>`;
-    html += `<text x="${cx}" y="${cy + 1}" text-anchor="middle" font-size="13" font-weight="800" fill="white">${centerText}</text>`;
-
+    const centerW = Math.max(140, Math.min(centerText.length * 9 + 50, 260));
+    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="36" fill="${isColor ? '#1B4F72' : '#444'}" stroke="${isColor ? '#0D3452' : '#222'}" stroke-width="3"/>`;
+    html += `<text x="${cx}" y="${cy + 2}" text-anchor="middle" font-size="14" font-weight="800" fill="white">${centerText}</text>`;
+    
     html += `</svg></div>`;
   }
   html += `</div>`; // end page 1
