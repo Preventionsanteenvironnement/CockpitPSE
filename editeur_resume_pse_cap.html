@@ -455,9 +455,21 @@ body {
       </div>
     </div>
 
-    <!-- SECTION 5: EXEMPLE CONCRET -->
+    <!-- SECTION 5: CARTE MENTALE -->
     <div class="section">
-      <div class="section-header" style="background:var(--orange);"><span>Section 5 — Exemple — Démarche de résolution de problème</span><label class="export-toggle"><input type="checkbox" id="export_exemple" checked> Exporter</label></div>
+      <div class="section-header" style="background:var(--green);"><span>Section 5 — Carte mentale</span></div>
+      <div class="section-body">
+        <label>Idée centrale</label>
+        <input type="text" id="mindmap_center" placeholder="Ex: C2 — Prévention des risques professionnels" oninput="markUnsaved()">
+        <div id="mindmap-branches"></div>
+        <button class="btn-add" onclick="addMindMapBranch()">+ Ajouter une branche</button>
+        <div class="info-text" style="margin-top:6px;">Une branche = un titre + quelques mots-clés courts, un par ligne.</div>
+      </div>
+    </div>
+
+    <!-- SECTION 6: EXEMPLE CONCRET -->
+    <div class="section">
+      <div class="section-header" style="background:var(--orange);"><span>Section 6 — Exemple — Démarche de résolution de problème</span><label class="export-toggle"><input type="checkbox" id="export_exemple" checked> Exporter</label></div>
       <div class="section-body">
         <div class="sub-section border-yellow">
           <h4>SITUATION</h4>
@@ -492,18 +504,18 @@ body {
       </div>
     </div>
 
-    <!-- SECTION 6: VÉRIFIE TES CONNAISSANCES -->
+    <!-- SECTION 7: VÉRIFIE TES CONNAISSANCES -->
     <div class="section">
-      <div class="section-header" style="background:var(--dark-purple);"><span>Section 6 — Vérifie tes connaissances</span><label class="export-toggle"><input type="checkbox" id="export_exercices" checked> Exporter</label></div>
+      <div class="section-header" style="background:var(--dark-purple);"><span>Section 7 — Vérifie tes connaissances</span><label class="export-toggle"><input type="checkbox" id="export_exercices" checked> Exporter</label></div>
       <div class="section-body" id="exercices-body">
         <div id="exercices-list"></div>
         <button class="btn-add" onclick="addExercice()">+ Ajouter une question</button>
       </div>
     </div>
 
-    <!-- SECTION 7: QR CODES -->
+    <!-- SECTION 8: QR CODES -->
     <div class="section">
-      <div class="section-header" style="background:var(--dark);"><span>Section 7 — QR Codes</span><label class="export-toggle"><input type="checkbox" id="export_qrcodes" checked> Exporter</label></div>
+      <div class="section-header" style="background:var(--dark);"><span>Section 8 — QR Codes</span><label class="export-toggle"><input type="checkbox" id="export_qrcodes" checked> Exporter</label></div>
       <div class="section-body">
         <label>Label QR 1</label>
         <input type="text" id="qr1_label" value="Réviser ce module en ligne" oninput="markUnsaved()">
@@ -527,7 +539,7 @@ body {
   <div class="modal">
     <button class="modal-close" onclick="closeModal('promptModal')">&times;</button>
     <h3>Prompt IA — Génération de contenu</h3>
-    <p class="info-text" style="margin-bottom:10px;">Copiez ce prompt et collez-le dans ChatGPT, Claude ou Gemini.<br><strong>Important :</strong> remplacez le placeholder par le contenu du module depuis votre livre scolaire (Foucher, Delagrave, etc.). L'IA s'appuiera exclusivement sur ce contenu — elle ne doit pas inventer.</p>
+    <p class="info-text" style="margin-bottom:10px;">Copiez ce prompt et collez-le dans ChatGPT, Claude ou Gemini.<br><strong>Important :</strong> remplacez le placeholder par le contenu du module depuis votre livre scolaire (Foucher, Delagrave, etc.). L'IA s'appuiera exclusivement sur ce contenu — elle ne doit pas inventer. Le JSON demandé inclut aussi une carte mentale exploitable dans l'éditeur.</p>
     <textarea id="promptText" readonly></textarea>
     <div class="modal-actions">
       <button class="btn-primary" onclick="copyPrompt()">Copier le prompt</button>
@@ -769,6 +781,7 @@ window.addEventListener('DOMContentLoaded', () => {
   addMesure('');
   addNotion('','');
   addNotion('','');
+  addMindMapBranch('', []);
   addCause('','');
   addSolution('');
   addExercice();
@@ -837,6 +850,10 @@ function onModuleChange() {
   const codeLow = mod.code.toLowerCase();
   document.getElementById('qr1_url').value = `https://mapse.fr/index.html#${prefix}-${codeLow}`;
   document.getElementById('qr2_url').value = `https://mapse.fr/exercices.html`;
+  const mindMapCenter = document.getElementById('mindmap_center');
+  if (mindMapCenter && !mindMapCenter.value.trim()) {
+    mindMapCenter.value = `${mod.code} — ${mod.titre}`;
+  }
   markUnsaved();
 }
 
@@ -874,6 +891,12 @@ function prefillFromProgram() {
   const titles = (profile && profile.section_titles) ? profile.section_titles : defaultTitles;
   const subTitleInputs = document.querySelectorAll('.resume-sub-title');
   titles.forEach((t, i) => { if (subTitleInputs[i]) subTitleInputs[i].value = t; });
+  // Carte mentale
+  document.getElementById('mindmap_center').value = `${mod.code} — ${mod.titre}`;
+  document.getElementById('mindmap-branches').innerHTML = '';
+  titles.forEach(title => addMindMapBranch(title, []));
+  const notionTerms = mod.notions.map(n => ensureString(n.terme)).filter(Boolean).slice(0, 6);
+  if (notionTerms.length) addMindMapBranch('Notions clés', notionTerms);
   // QR
   const prefix = getUrlPrefix(level);
   const codeLow = mod.code.toLowerCase();
@@ -920,6 +943,24 @@ function addSolution(val) {
   const div = document.createElement('div');
   div.className = 'list-item';
   div.innerHTML = `<input type="text" value="${escAttr(val || '')}" oninput="markUnsaved()" placeholder="Solution..."><button class="btn-rm" onclick="this.parentElement.remove();markUnsaved();">&times;</button>`;
+  list.appendChild(div);
+}
+
+function addMindMapBranch(title, keywords) {
+  const list = document.getElementById('mindmap-branches');
+  const div = document.createElement('div');
+  div.className = 'sub-section border-green mindmap-branch';
+  const lines = Array.isArray(keywords) ? keywords.join('\n') : (keywords || '');
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+      <h4 style="margin-bottom:0;">Branche</h4>
+      <button class="btn-rm" onclick="this.closest('.mindmap-branch').remove();markUnsaved();">&times;</button>
+    </div>
+    <label>Titre de la branche</label>
+    <input type="text" class="mindmap-branch-title" value="${escAttr(title || '')}" oninput="markUnsaved()" placeholder="Ex: Repères essentiels">
+    <label>Mots-clés / idées courtes</label>
+    <textarea class="mindmap-branch-keywords" rows="3" oninput="markUnsaved()" placeholder="Un mot-clé ou une idée courte par ligne">${esc(lines)}</textarea>
+  `;
   list.appendChild(div);
 }
 
@@ -1077,6 +1118,19 @@ function collectData() {
       data.notions.push({ terme: inputs[0].value, definition: inputs[1] ? inputs[1].value : '' });
     }
   });
+  // Carte mentale
+  data.carte_mentale = { centre: document.getElementById('mindmap_center').value, branches: [] };
+  document.querySelectorAll('#mindmap-branches .mindmap-branch').forEach(branch => {
+    const title = branch.querySelector('.mindmap-branch-title');
+    const keywords = branch.querySelector('.mindmap-branch-keywords');
+    const titre = title ? title.value : '';
+    const motsCles = keywords
+      ? keywords.value.split(/\n+/).map(v => v.trim()).filter(Boolean)
+      : [];
+    if (titre.trim() || motsCles.length) {
+      data.carte_mentale.branches.push({ titre, mots_cles: motsCles });
+    }
+  });
   // Exemple
   data.exemple = {
     situation: document.getElementById('exemple_situation').value,
@@ -1191,6 +1245,12 @@ function fillForm(data) {
     document.getElementById('notions-tbody').innerHTML = '';
     data.notions.forEach(n => addNotion(n.terme, n.definition));
   }
+  // Carte mentale
+  const mindMap = normalizeMindMap(firstDefined(data.carte_mentale, data.carteMentale, data.mind_map, data.mindMap), data);
+  document.getElementById('mindmap_center').value = mindMap.centre || '';
+  document.getElementById('mindmap-branches').innerHTML = '';
+  mindMap.branches.forEach(branch => addMindMapBranch(branch.titre, branch.mots_cles));
+  if (!mindMap.branches.length) addMindMapBranch('', []);
   // Exemple
   if (data.exemple) {
     document.getElementById('exemple_situation').value = data.exemple.situation || '';
@@ -1636,6 +1696,60 @@ function normalizeExample(rawExample) {
   };
 }
 
+function buildFallbackMindMap(data) {
+  const src = ensureObject(data);
+  const entete = ensureObject(src.entete);
+  const resume = ensureObject(src.resume);
+  const notions = Array.isArray(src.notions) ? src.notions : [];
+  const centre = [ensureString(entete.code, ''), ensureString(entete.titre, '')].filter(Boolean).join(' — ');
+  const branches = [];
+
+  if (Array.isArray(resume.sections)) {
+    resume.sections.forEach(section => {
+      const current = ensureObject(section);
+      const titre = ensureString(current.titre, '');
+      const motsCles = splitSentences(ensureString(current.contenu, '')).slice(0, 3);
+      if (titre || motsCles.length) {
+        branches.push({ titre: titre || 'Idée clé', mots_cles: motsCles });
+      }
+    });
+  }
+
+  const notionTerms = notions.map(item => ensureString(item && item.terme, '')).filter(Boolean).slice(0, 6);
+  if (notionTerms.length) {
+    branches.push({ titre: 'Notions clés', mots_cles: notionTerms });
+  }
+
+  return {
+    centre,
+    branches: branches.slice(0, 6)
+  };
+}
+
+function normalizeMindMap(rawMindMap, fallbackData) {
+  const fallback = buildFallbackMindMap(fallbackData);
+  const src = ensureObject(rawMindMap);
+  const rawBranches = firstDefined(src.branches, src.nodes, src.noeuds, src.topics);
+  let branches = [];
+
+  if (Array.isArray(rawBranches)) {
+    branches = rawBranches.map(item => {
+      const branch = ensureObject(item);
+      return {
+        titre: ensureString(firstDefined(pick(branch, ['titre', 'title', 'label', 'nom', 'branche']), ''), ''),
+        mots_cles: ensureStringArray(firstDefined(branch.mots_cles, branch.motsCles, branch.keywords, branch.idees, branch['idées'], branch.points, branch.items))
+      };
+    }).filter(branch => branch.titre || branch.mots_cles.length);
+  }
+
+  if (!branches.length) branches = fallback.branches;
+
+  return {
+    centre: ensureString(firstDefined(src.centre, src.center, src.sujet, src.topic, src.idee_centrale, src['idée_centrale']), fallback.centre),
+    branches: branches.slice(0, 8)
+  };
+}
+
 function normalizeExerciseType(rawType, src) {
   const type = ensureString(rawType).toLowerCase();
   if (['qcm', 'mcq', 'multiple_choice', 'multiple choice', 'choices', 'choix'].includes(type)) return 'qcm';
@@ -1789,6 +1903,11 @@ function normalizeImportedData(rawData) {
     }));
   }
 
+  normalized.carte_mentale = normalizeMindMap(
+    firstDefined(data.carte_mentale, data.carteMentale, data.mind_map, data.mindMap),
+    normalized
+  );
+
   return normalized;
 }
 
@@ -1837,6 +1956,7 @@ function validateFicheData(rawData) {
   const notions = Array.isArray(data.notions) ? data.notions : [];
   const exercices = Array.isArray(data.exercices) ? data.exercices : [];
   const exemple = ensureObject(data.exemple);
+  const mindMap = normalizeMindMap(firstDefined(data.carte_mentale, data.carteMentale, data.mind_map, data.mindMap), data);
   const isThemeC = isThemeCModule(data, mod);
   const officialNotions = mod && Array.isArray(mod.notions) ? mod.notions : [];
   const officialObjectifs = mod && Array.isArray(mod.objectifs) ? mod.objectifs : [];
@@ -1919,6 +2039,27 @@ function validateFicheData(rawData) {
     errors.push(`Définitions encore vides pour : ${emptyDefinitions.join(', ')}.`);
   }
 
+  if (!mindMap.centre) {
+    warnings.push("Carte mentale : l'idée centrale n'est pas renseignée.");
+  }
+  if (!mindMap.branches.length) {
+    warnings.push("Carte mentale : aucune branche n'a été définie.");
+  } else {
+    if (mindMap.branches.length < 4 || mindMap.branches.length > 6) {
+      warnings.push(`Carte mentale : vise plutôt 4 à 6 branches courtes. Actuellement : ${mindMap.branches.length}.`);
+    }
+    mindMap.branches.forEach((branch, idx) => {
+      if (!ensureString(branch.titre, '')) {
+        warnings.push(`Carte mentale : la branche ${idx + 1} n'a pas de titre.`);
+      }
+      if (!Array.isArray(branch.mots_cles) || branch.mots_cles.length < 2) {
+        warnings.push(`Carte mentale : la branche "${ensureString(branch.titre, 'sans titre')}" devrait contenir au moins 2 mots-clés.`);
+      } else if (branch.mots_cles.length > 5) {
+        warnings.push(`Carte mentale : la branche "${ensureString(branch.titre, 'sans titre')}" contient beaucoup de mots-clés. Garde l'essentiel.`);
+      }
+    });
+  }
+
   if (!ensureString(exemple.situation, '')) {
     errors.push("L'exemple concret doit contenir une situation.");
   }
@@ -1943,8 +2084,8 @@ function validateFicheData(rawData) {
 
   const supportedExerciseTypes = ['qcm', 'vf', 'ouvert'];
   const exerciseCounts = { qcm: 0, vf: 0, ouvert: 0 };
-  if (exercices.length < 6 || exercices.length > 8) {
-    errors.push(`Les exercices doivent être au nombre de 6 à 8. Actuellement : ${exercices.length}.`);
+  if (exercices.length < 4 || exercices.length > 8) {
+    errors.push(`Les exercices doivent être au nombre de 4 à 8. Actuellement : ${exercices.length}.`);
   }
   exercices.forEach((ex, idx) => {
     const question = ensureString(ex && ex.question, '');
@@ -1985,8 +2126,8 @@ function validateFicheData(rawData) {
     }
   });
 
-  if (exerciseCounts.qcm < 2 || exerciseCounts.vf < 2 || exerciseCounts.ouvert < 2) {
-    errors.push(`Les exercices doivent inclure au moins 2 QCM, 2 Vrai/Faux et 2 questions ouvertes. Actuellement : ${exerciseCounts.qcm} QCM, ${exerciseCounts.vf} Vrai/Faux, ${exerciseCounts.ouvert} ouvertes.`);
+  if (exerciseCounts.qcm < 2 || exerciseCounts.vf < 2) {
+    errors.push(`Les exercices doivent inclure au moins 2 QCM et 2 Vrai/Faux. Actuellement : ${exerciseCounts.qcm} QCM, ${exerciseCounts.vf} Vrai/Faux, ${exerciseCounts.ouvert} ouvertes.`);
   }
 
   if (level === 'CAP') {
@@ -2262,6 +2403,10 @@ function openPromptModal() {
   const mod = PROGRAMME[level].find(m => m.code === code);
   if (!mod) return;
 
+  const introBlock = level === 'CAP'
+    ? `IMPORTANT — ADAPTATION CAP ACCESSIBILITÉ : Ce contenu est destiné à des élèves de CAP, dont beaucoup sont en situation de handicap ou en difficulté scolaire. Tu dois IMPÉRATIVEMENT : utiliser des phrases TRÈS COURTES (10-15 mots maximum), un vocabulaire SIMPLE et CONCRET, éviter toute surcharge cognitive. Chaque section du résumé doit faire 2-3 phrases MAXIMUM. Les définitions doivent tenir en UNE SEULE phrase courte. Les exercices doivent rester simples et très guidés : 6 exercices exactement, répartis en 2 QCM, 2 Vrai/Faux et 2 questions ouvertes très courtes (1 à 2 lignes). L'exemple concret doit être TRÈS SIMPLE, proche du vécu quotidien des élèves. PRIORITÉ ABSOLUE : ces contraintes de forme ne doivent JAMAIS conduire à supprimer, remplacer, affaiblir ou déformer une notion officielle du programme. Si une tension apparaît entre accessibilité et fidélité au programme, conserve TOUJOURS le contenu officiel et simplifie uniquement la formulation.`
+    : `IMPORTANT — ADAPTATION PÉDAGOGIQUE : formule le contenu de manière claire, structurée et directement exploitable par les élèves, sans jamais modifier le contenu officiel du programme.`;
+
   // CAP-specific writing guidelines
   const capBlock = level === 'CAP' ? `
 CONSIGNES DE RÉDACTION — NIVEAU CAP (OBLIGATOIRES)
@@ -2274,11 +2419,12 @@ Règles de rédaction :
 3. VOCABULAIRE TECHNIQUE CONSERVÉ : garde TOUS les termes du programme (facteur interne, facteur externe, capital santé, prévention collective, etc.). Ne les remplace jamais par des synonymes plus simples. Ce sont ces termes que l'élève doit connaître pour le CCF.
 4. ORGANISATION VISUELLE : utilise des listes à puces ou des tirets plutôt que de longs paragraphes. Sépare clairement les idées.
 5. RÉSUMÉ PLUS CONCIS : 2 à 3 phrases par sous-section au lieu de 4 à 5. Chaque phrase apporte une information essentielle.
-6. DÉFINITIONS DES NOTIONS : chaque définition doit tenir en 1 à 2 phrases maximum. Ajoute un exemple concret court entre parenthèses quand c'est possible.
+6. DÉFINITIONS DES NOTIONS : chaque définition doit tenir en 1 phrase courte maximum. Ajoute si besoin un exemple très bref entre parenthèses, sans allonger inutilement la définition.
    Exemple : "Capital santé — état de santé global d'un individu à un moment donné. Il peut s'améliorer (activité physique, bonne alimentation) ou se dégrader (tabac, manque de sommeil)."
 7. TABLEAU DES EFFETS : un seul effet clair et concret par cellule, formulé en une phrase courte.
 8. EXEMPLE CONCRET : situation courte (4-5 lignes max), personnage simple (prénom, âge, métier). Pas de contexte familial ou social complexe. Le tableau des causes reste à 3 lignes minimum.
-9. EXERCICES : même exigence académique, mais consignes formulées de manière directe et sans ambiguïté. Privilégie les formulations positives ("Quel est..." plutôt que "Lequel n'est pas..."). Évite les doubles négations.
+9. EXERCICES : même exigence académique, mais consignes formulées de manière directe et sans ambiguïté. Privilégie les formulations positives ("Quel est..." plutôt que "Lequel n'est pas..."). Évite les doubles négations. Pour garantir un import sans erreur, produis EXACTEMENT 6 exercices : 2 QCM, 2 Vrai/Faux et 2 questions ouvertes très brèves (1 à 2 lignes de réponse maximum).
+10. CARTE MENTALE : vise 4 à 6 branches courtes. Chaque branche doit reprendre les mots-clés essentiels du cours, sans phrase longue ni contenu inventé. Tu peux regrouper les notions dans la carte mentale pour rester lisible, MAIS cela ne doit jamais supprimer les notions officielles dans la fiche elle-même.
 ` : '';
 
   const profile = MODULE_PROFILES[level] && MODULE_PROFILES[level][code];
@@ -2289,7 +2435,7 @@ PROFIL SPÉCIFIQUE DU MODULE
 - Outils à intégrer s'ils apparaissent dans les PDF joints : ${profile.tools_if_present.length ? profile.tools_if_present.join(', ') : 'aucun en particulier'}
 - Éléments à NE PAS inventer (si absents des PDF fournis) : ${profile.forbidden_inventions.length ? profile.forbidden_inventions.join(', ') : 'aucune restriction spécifique'}
 - Type d'exemple concret attendu : ${profile.example_focus}
-- Types d'exercices à privilégier : ${profile.exercise_mix.join(', ')}
+- Types d'exercices à privilégier dans l'esprit pédagogique du module (à convertir uniquement en qcm, vf ou ouvert dans le gabarit JSON) : ${profile.exercise_mix.join(', ')}
 
 RÈGLE IMPORTANTE : Si les PDF joints mentionnent explicitement un outil ou une démarche nommée (PAD, ITaMaMi, 5M, QQOQCP, hiérarchie des mesures, chaîne de transmission, etc.), cet outil devient OBLIGATOIRE dans la fiche. Il doit apparaître dans le résumé, les notions, l'exemple concret et au moins un exercice. Ne jamais inventer un outil absent des documents.
 ` : '';
@@ -2313,6 +2459,16 @@ RÈGLE IMPORTANTE : Si les PDF joints mentionnent explicitement un outil ou une 
     "mesures": ["mesure 1", "mesure 2", "..."]
   },
   "notions": [${mod.notions.map(n => `{"terme": "${n.terme}", "definition": "..."}`).join(',\n    ')}],
+  "carte_mentale": {
+    "centre": "${code} — ${mod.titre}",
+    "branches": [
+      {"titre": "${secTitles[0]}", "mots_cles": ["...", "..."]},
+      {"titre": "${secTitles[1]}", "mots_cles": ["...", "..."]},
+      {"titre": "${secTitles[2]}", "mots_cles": ["...", "..."]},
+      {"titre": "${secTitles[3]}", "mots_cles": ["...", "..."]},
+      {"titre": "Notions clés", "mots_cles": ["...", "..."]}
+    ]
+  },
   "exemple": {
     "situation": "Description réaliste d'une situation-problème en lien avec le module...",
     "probleme": "Formulation claire du problème identifié...",
@@ -2328,8 +2484,8 @@ RÈGLE IMPORTANTE : Si les PDF joints mentionnent explicitement un outil ou une 
     {"objectif": "objectif lié", "question": "...", "type": "qcm", "options": ["A", "B", "C", "D"], "reponse": 2, "correction": "Explication..."},
     {"objectif": "objectif lié", "question": "...", "type": "vf", "reponse": "vrai", "correction": "Explication..."},
     {"objectif": "objectif lié", "question": "...", "type": "vf", "reponse": "faux", "correction": "Explication..."},
-    {"objectif": "objectif lié", "question": "...", "type": "ouvert", "lignes": 2, "correction": "Réponse attendue..."},
-    {"objectif": "objectif lié", "question": "...", "type": "ouvert", "lignes": 3, "correction": "Réponse attendue..."}
+    {"objectif": "objectif lié", "question": "...", "type": "ouvert", "lignes": 1, "correction": "Réponse attendue..."},
+    {"objectif": "objectif lié", "question": "...", "type": "ouvert", "lignes": 2, "correction": "Réponse attendue..."}
   ],
   "qrcodes": {
     "qr1": {"label": "Réviser ce module en ligne", "url": "https://mapse.fr/index.html#${getUrlPrefix(level)}-${code.toLowerCase()}"},
@@ -2339,9 +2495,9 @@ RÈGLE IMPORTANTE : Si les PDF joints mentionnent explicitement un outil ou une 
 
   const prompt = `Tu es un assistant pédagogique spécialisé en PSE (Prévention Santé Environnement) pour le niveau ${level}.
 
-IMPORTANT — ADAPTATION CAP ACCESSIBILITÉ : Ce contenu est destiné à des élèves de CAP, dont beaucoup sont en situation de handicap ou en difficulté scolaire. Tu dois IMPÉRATIVEMENT : utiliser des phrases TRÈS COURTES (10-15 mots maximum), un vocabulaire SIMPLE et CONCRET, éviter toute surcharge cognitive. Chaque section du résumé doit faire 2-3 phrases MAXIMUM. Les définitions doivent tenir en UNE SEULE phrase courte. Les exercices doivent être SIMPLES : principalement des QCM et Vrai/Faux. Maximum 4-5 exercices. Pas de questions ouvertes complexes (maximum 1 question ouverte de 2 lignes). L'exemple concret doit être TRÈS SIMPLE, proche du vécu quotidien des élèves.
+${introBlock}
 
-MISSION : Générer le contenu complet d'une fiche résumé pour le module ${code} — ${mod.titre}.
+MISSION : Générer le contenu complet d'une fiche résumé accompagnée de sa carte mentale pour le module ${code} — ${mod.titre}.
 
 CADRE OFFICIEL DU PROGRAMME (Eduscol) :
 - Thématique : ${mod.thematique}
@@ -2355,14 +2511,24 @@ CONSIGNES STRICTES :
 1. Respecter EXACTEMENT le cadre du programme officiel. Ne pas ajouter de contenu hors programme.
 2. Tu dois t'appuyer EXCLUSIVEMENT sur le contenu du livre scolaire fourni ci-dessous pour rédiger le résumé, l'exemple concret et les exercices. Ne complète PAS avec des informations extérieures ou inventées. Si le livre ne fournit pas assez d'information sur un point, indique-le par "[À compléter par l'enseignant]".
 3. Les objectifs doivent rester ceux du programme (ne pas les modifier).
-4. Les notions clés doivent TOUTES avoir une définition claire, concise et accessible à un élève de ${level}. Les définitions doivent être tirées du livre scolaire fourni.
+4. Les notions clés doivent TOUTES être conservées et TOUTES avoir une définition claire, concise et accessible à un élève de ${level}. Les définitions doivent être tirées du livre scolaire fourni.
+   - Aucune notion officielle du programme ne doit être supprimée, fusionnée, remplacée ou reformulée au point de changer son sens.
+   - Si le programme contient beaucoup de notions, conserve-les toutes dans "notions" et adapte seulement la longueur de rédaction.
 5. Le résumé doit comporter 4 sous-sections avec ces titres EXACTS :
    - ${secTitles[0]}
    - ${secTitles[1]}
    - ${secTitles[2]}
    - ${secTitles[3]}
 6. Le tableau des effets doit distinguer : Santé / Professionnel / Social (3 items chacun).
-7. IMPORTANT — Les mesures de prévention doivent être HIÉRARCHISÉES selon le type de module :
+7. La carte mentale doit être strictement cohérente avec le résumé et les notions clés :
+   - centre = le module étudié
+   - 4 à 6 branches courtes maximum
+   - chaque branche = un titre + 2 à 4 mots-clés très courts
+   - une branche peut s'appeler "Notions clés"
+   - aucun concept nouveau ne doit apparaître dans la carte mentale si ce concept n'est pas déjà présent dans le texte source ou dans la fiche
+   - pas de phrases longues dans "mots_cles"
+   - la carte mentale peut regrouper des notions pour rester lisible, mais elle ne remplace jamais la liste officielle des notions ni leurs définitions
+8. IMPORTANT — Les mesures de prévention doivent être HIÉRARCHISÉES selon le type de module :
    ${mod.thematique.startsWith('C') ? `** MODULE THÉMATIQUE C (milieu professionnel) : classer les mesures du PLUS EFFICACE au MOINS EFFICACE selon la hiérarchie officielle :
    Niveau 1 (★★★ plus efficace) : SUPPRIMER ou RÉDUIRE le danger à la source (prévention intrinsèque). Ex : remplacement d'un produit dangereux, automatisation, suppression du risque.
    Niveau 2a (★★☆) : PROTECTION COLLECTIVE. Ex : ventilation, carter de protection, garde-corps, aspiration à la source.
@@ -2374,21 +2540,26 @@ CONSIGNES STRICTES :
    - PRÉVENTION COLLECTIVE : actions menées par la société, l'école, l'État (campagnes, lois, structures d'aide, réglementation).
    Dans le champ "mesures", formule chaque mesure en commençant par sa catégorie : "[Individuelle] ..." ou "[Collective] ...".`}
    Formuler chaque mesure en 1 phrase courte et concrète.
-8. L'exemple concret DOIT suivre la démarche de résolution de problème en 5 étapes :
+9. L'exemple concret DOIT suivre la démarche de résolution de problème en 5 étapes :
    - SITUATION : scénario réaliste impliquant un jeune en formation
    - PROBLÈME IDENTIFIÉ : formulation claire
    - ANALYSE DES CAUSES : tableau Observation ↔ Apport théorique (min 3 lignes)
    - EFFETS CONSTATÉS : sur la santé, le travail, la vie sociale
    - SOLUTIONS PROPOSÉES : mesures concrètes (min 3)
-9. Les exercices (4 à 5 exercices) doivent :
+10. Les exercices doivent respecter STRICTEMENT cette structure :
+   - exactement 6 exercices au total
+   - exercices 1 et 2 = type "qcm"
+   - exercices 3 et 4 = type "vf"
+   - exercices 5 et 6 = type "ouvert"
+   - les 2 questions ouvertes doivent rester très courtes, avec 1 à 2 lignes de réponse attendue
+11. Les exercices doivent aussi :
    - RÈGLE ABSOLUE : chaque exercice doit être INTÉGRALEMENT répondable par un élève qui n'a sous les yeux QUE la fiche résumé (sections 1 à 4 ci-dessus : Définition/Contexte, Repères essentiels, Effets et conséquences, Mesures de prévention + le tableau des effets + les notions clés). Ne pose AUCUNE question dont la réponse nécessite des informations absentes du résumé.
    - Couvrir les objectifs du programme
-   - Inclure au moins 2 QCM, 2 Vrai/Faux
-   - Maximum 1 question ouverte, de 2 lignes maximum
+   - Ne jamais conduire à supprimer une notion officielle du résumé ou des définitions pour "faire tenir" le nombre d'exercices
    - Les QCM doivent avoir des options courtes et claires
-   - Varier les types (QCM, Vrai/Faux, Question ouverte)
+   - Utiliser uniquement les types suivants dans le JSON : "qcm", "vf", "ouvert"
    - Avoir une correction détaillée qui cite le passage précis du résumé où se trouve la réponse
-10. Le contenu doit être adapté au niveau ${level} : langage accessible, exemples concrets.
+12. Le contenu doit être adapté au niveau ${level} : langage accessible, exemples concrets.
 
 CONTENU DU LIVRE SCOLAIRE (SOURCE UNIQUE — NE PAS COMPLÉTER AVEC D'AUTRES SOURCES) :
 Tu dois utiliser UNIQUEMENT le contenu ci-dessous pour rédiger la fiche. Ne cherche pas d'informations ailleurs. Tout le contenu pédagogique (résumé, définitions, exemple, exercices) doit provenir de ce texte.
@@ -2405,6 +2576,9 @@ CONSIGNES TECHNIQUES POUR L'IMPORT :
 - N'utilise pas de retour à la ligne brut à l'intérieur d'une valeur JSON.
 - Pour les QCM, "reponse" doit être l'index numérique de la bonne option en commençant à 0.
 - Pour les Vrai/Faux, "reponse" doit valoir exactement "vrai" ou "faux".
+- Dans "carte_mentale", chaque branche doit contenir exactement les clés "titre" et "mots_cles".
+- Le tableau "exercices" doit contenir exactement 6 objets.
+- Les objets 1 et 2 doivent être de type "qcm", les objets 3 et 4 de type "vf", les objets 5 et 6 de type "ouvert".
 
 FORMAT DE SORTIE : JSON STRICT
 - Pas de balises markdown autour du JSON (pas de \`\`\`json)
@@ -2427,6 +2601,11 @@ IMPORTANT TECHNIQUE :
 - Pour un vrai/faux, "reponse" doit être exactement "vrai" ou "faux".
 - Les champs "contenu" des sections du résumé doivent faire 2-3 phrases COURTES (10-15 mots par phrase maximum).
 - Les définitions des notions doivent faire 1 phrase COURTE et SIMPLE (max 15 mots).
+- La carte mentale doit contenir 4 à 6 branches courtes et rester strictement cohérente avec la fiche.
+- PRIORITÉ ABSOLUE : le respect du programme officiel passe avant toute contrainte de style ou de concision. Ne supprime jamais une notion officielle pour raccourcir.
+- COMPTE les exercices avant de répondre : il doit y en avoir exactement 6.
+- CONTRÔLE la répartition avant de répondre : 2 "qcm", 2 "vf", 2 "ouvert".
+- Si ce comptage n'est pas exact, corrige intégralement le tableau "exercices" avant l'envoi.
 - Vérifie que le JSON est valide avant de répondre.
 - Si ta réponse n'est pas un JSON valide, corrige-la avant l'envoi et renvoie uniquement la version finale valide.`;
 
@@ -2478,6 +2657,7 @@ function renderPreview() {
   const data = collectData();
   const area = document.getElementById('preview-area');
   const e = data.entete;
+  const mindMap = normalizeMindMap(data.carte_mentale, data);
   const colorMode = document.querySelector('input[name="colormode"]:checked').value;
   const isColor = colorMode === 'color';
 
@@ -2572,6 +2752,58 @@ function renderPreview() {
       html += `<div style="font-size:12pt;">${esc(n.definition)}</div>`;
       html += `</div>`;
     });
+    html += `</div>`;
+  }
+  if (mindMap.centre || mindMap.branches.length) {
+    const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
+    const branchBgs = ['#E8F5E9', '#E3F2FD', '#F3E5F5', '#FFF3E0', '#FFEBEE', '#E0F2F1'];
+    html += `<div class="pv-section-title" style="color:${c('#27AE60','#000')};margin-top:14px;">CARTE MENTALE EXPRESS</div>`;
+    const nb = mindMap.branches.length || 1;
+    const svgW = 700, svgH = 420;
+    const cx = svgW / 2, cy = svgH / 2;
+    const radiusBranch = 155;
+    const radiusKw = 235;
+    html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow:hidden;">`;
+    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:sans-serif;">`;
+    // Draw branch lines and nodes
+    mindMap.branches.forEach((branch, idx) => {
+      const angle = -Math.PI/2 + (idx / nb) * 2 * Math.PI;
+      const bx = cx + radiusBranch * Math.cos(angle);
+      const by = cy + radiusBranch * Math.sin(angle);
+      const col = isColor ? branchColors[idx % branchColors.length] : '#666';
+      const bgCol = isColor ? branchBgs[idx % branchBgs.length] : '#F0F0F0';
+      // Curved line from center to branch
+      const cpx = cx + (bx - cx) * 0.5 - (by - cy) * 0.15;
+      const cpy = cy + (by - cy) * 0.5 + (bx - cx) * 0.15;
+      html += `<path d="M${cx},${cy} Q${cpx},${cpy} ${bx},${by}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" opacity="0.6"/>`;
+      // Branch bubble
+      const titleText = esc(branch.titre || ('Branche ' + (idx + 1)));
+      const tw = Math.max(80, Math.min(titleText.length * 6 + 24, 140));
+      html += `<rect x="${bx - tw/2}" y="${by - 16}" width="${tw}" height="32" rx="16" fill="${bgCol}" stroke="${col}" stroke-width="2.5"/>`;
+      html += `<text x="${bx}" y="${by + 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${col}">${titleText}</text>`;
+      // Keywords
+      if (branch.mots_cles && branch.mots_cles.length) {
+        const kwPerLine = Math.min(branch.mots_cles.length, 3);
+        branch.mots_cles.forEach((mot, ki) => {
+          const kwAngle = angle + (ki - (branch.mots_cles.length - 1) / 2) * 0.18;
+          const kwx = cx + radiusKw * Math.cos(kwAngle);
+          const kwy = cy + radiusKw * Math.sin(kwAngle);
+          // Small line from branch to keyword
+          html += `<line x1="${bx}" y1="${by}" x2="${kwx}" y2="${kwy}" stroke="${col}" stroke-width="1" opacity="0.3"/>`;
+          // Keyword pill
+          const kwText = esc(mot);
+          const kwW = Math.max(50, Math.min(kwText.length * 5.5 + 16, 120));
+          html += `<rect x="${kwx - kwW/2}" y="${kwy - 10}" width="${kwW}" height="20" rx="10" fill="white" stroke="${col}" stroke-width="1"/>`;
+          html += `<text x="${kwx}" y="${kwy + 4}" text-anchor="middle" font-size="7.5" fill="#333">${kwText}</text>`;
+        });
+      }
+    });
+    // Center node (drawn last to be on top)
+    const centerText = esc(mindMap.centre || 'Module');
+    const centerW = Math.max(100, Math.min(centerText.length * 7 + 30, 200));
+    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="28" fill="${isColor ? '#1B4F72' : '#555'}" stroke="${isColor ? '#0D3452' : '#333'}" stroke-width="3"/>`;
+    html += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" font-weight="700" fill="white">${centerText}</text>`;
+    html += `</svg>`;
     html += `</div>`;
   }
   html += `</div>`; // end page 1
