@@ -458,9 +458,10 @@ body {
     <!-- SECTION 5: CARTE MENTALE -->
     <div class="section">
       <div class="section-header" style="background:var(--green);"><span>Section 5 — Carte mentale</span></div>
-        <div style="display:flex;gap:8px;margin:8px 0;">
+        <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;">
           <button class="btn-purple" onclick="openMindMapPromptModal()" style="font-size:0.8rem;">🧠 Prompt IA Carte Mentale</button>
           <button class="btn-secondary" onclick="importMindMapJSON()" style="font-size:0.8rem;">📥 Importer JSON Carte Mentale</button>
+          <button class="btn-primary" onclick="exportMindMapPNG()" style="font-size:0.8rem;">🖼️ Exporter en PNG (paysage)</button>
         </div>
       <div class="section-body">
         <label>Idée centrale</label>
@@ -2676,29 +2677,43 @@ function openMindMapPromptModal() {
   });
   const resumeContext = sections.length ? '\n\nCONTENU DU RÉSUMÉ DÉJÀ RÉDIGÉ :\n' + sections.join('\n\n') : '';
 
+  const thematique = mod ? mod.thematique : '';
+  const finalite = mod ? mod.finalite : '';
+
   const prompt = `Tu es un expert en cartes mentales pédagogiques pour l'enseignement de la PSE (Prévention Santé Environnement), niveau ${level}.
 
-MISSION : Générer une carte mentale structurée en JSON pour le module ${moduleName}.
+MISSION : Générer une carte mentale complète et structurée en JSON pour le module suivant.
 
-OBJECTIFS DU MODULE :
+MODULE : ${moduleName}
+THÉMATIQUE : ${thematique}
+FINALITÉ : ${finalite}
+
+OBJECTIFS DU PROGRAMME :
 ${objectifs}
 
-NOTIONS CLÉS : ${notions}
+NOTIONS CLÉS DU PROGRAMME (TOUTES doivent apparaître dans la carte) :
+${notions}
 ${resumeContext}
 
 RÈGLES DE CONSTRUCTION :
-1. Le CENTRE de la carte = le titre du module
+1. Le CENTRE de la carte = le code et le titre du module (ex: "A1 — Le système de santé")
 2. Créer 4 à 6 BRANCHES PRINCIPALES correspondant aux grands thèmes du module
 3. Chaque branche principale doit avoir 2 à 4 SOUS-BRANCHES
-4. Chaque sous-branche peut avoir des MOTS-CLÉS (2-4 mots-clés courts)
-5. Les sous-branches peuvent elles-mêmes avoir des sous-branches si nécessaire
-6. Utiliser des mots COURTS et SIMPLES (pas de phrases)
-7. Couvrir TOUS les objectifs et TOUTES les notions clés du programme
-8. Adapter au niveau ${level} : vocabulaire accessible
+4. Chaque sous-branche contient des MOTS-CLÉS courts (1-4 mots, max 5 mots-clés par sous-branche)
+5. Les sous-branches peuvent elles-mêmes avoir des sous-branches si le contenu le justifie
+6. OBLIGATION : chaque NOTION CLÉ du programme doit apparaître au moins une fois dans une branche, sous-branche ou mot-clé
+7. Utiliser des mots COURTS et SIMPLES (pas de phrases complètes)
+8. Adapter au niveau ${level} : vocabulaire accessible, concret, proche du vécu des élèves
+
+STYLE DE LA CARTE :
+- Les branches principales = grands thèmes (ex: "Définition", "Causes", "Effets", "Prévention")
+- Les sous-branches = sous-thèmes précis
+- Les mots-clés = termes essentiels à retenir
+- Couvrir l'intégralité du programme : objectifs + notions clés
 
 FORMAT JSON STRICT :
 {
-  "centre": "Titre du module",
+  "centre": "${moduleName}",
   "branches": [
     {
       "titre": "Branche principale 1",
@@ -2717,25 +2732,17 @@ FORMAT JSON STRICT :
           ]
         }
       ]
-    },
-    {
-      "titre": "Branche principale 2",
-      "sous_branches": [
-        {
-          "titre": "Sous-branche 2.1",
-          "mots_cles": ["mot1", "mot2"]
-        }
-      ]
     }
   ]
 }
 
 IMPORTANT :
-- Réponds UNIQUEMENT avec le JSON, sans texte avant/après
-- Chaque branche DOIT avoir soit "sous_branches", soit "mots_cles", soit les deux
-- Les mots-clés doivent être courts (1-4 mots maximum)
-- GARDE TOUS LES ACCENTS
-- Couvre l'intégralité du programme du module`;
+- Réponds UNIQUEMENT avec le JSON valide, sans texte avant/après
+- Pas de balises markdown
+- Chaque branche DOIT avoir "sous_branches" et/ou "mots_cles"
+- Les mots-clés : 1 à 4 mots maximum chacun
+- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)
+- Vérifie que CHAQUE notion clé du programme apparaît quelque part dans la carte`;
 
   document.getElementById('mindmapPromptText').value = prompt;
   document.getElementById('mindmapPromptModal').classList.add('active');
@@ -2771,6 +2778,49 @@ function importMindMapJSON() {
   } catch(e) {
     alert('Erreur JSON : ' + e.message);
   }
+}
+
+function exportMindMapPNG() {
+  // Find the SVG in the preview
+  const previewArea = document.getElementById('preview-area');
+  if (!previewArea) { alert('Générez d\'abord un aperçu.'); return; }
+  const svgEl = previewArea.querySelector('svg');
+  if (!svgEl) { alert('Aucune carte mentale à exporter. Vérifiez que la Section 5 est remplie et que l\'aperçu est généré.'); return; }
+
+  // Clone SVG and set explicit dimensions for high-res export
+  const clone = svgEl.cloneNode(true);
+  const exportW = 2400; // High res for printing
+  const exportH = Math.round(exportW * 500 / 900);
+  clone.setAttribute('width', exportW);
+  clone.setAttribute('height', exportH);
+  clone.style.width = exportW + 'px';
+  clone.style.height = exportH + 'px';
+
+  const svgData = new XMLSerializer().serializeToString(clone);
+  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+
+  const img = new Image();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = exportW;
+    canvas.height = exportH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, exportW, exportH);
+    ctx.drawImage(img, 0, 0, exportW, exportH);
+    URL.revokeObjectURL(url);
+
+    canvas.toBlob(function(blob) {
+      const a = document.createElement('a');
+      const mod = document.getElementById('moduleSelect').value || 'module';
+      a.download = 'carte_mentale_' + mod + '.png';
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, 'image/png');
+  };
+  img.src = url;
 }
 
 function addMindMapBranchRecursive(branchData, depth) {
@@ -2957,94 +3007,79 @@ function renderPreview() {
   }
   if (mindMap.centre || mindMap.branches.length) {
     const branchColors = ['#27AE60', '#2980B9', '#8E44AD', '#E67E22', '#E74C3C', '#16A085'];
-    const branchBgs = ['#E8F5E9', '#E3F2FD', '#F3E5F5', '#FFF3E0', '#FFEBEE', '#E0F2F1'];
     html += `<div class="pv-section-title" style="color:${c('#27AE60','#000')};margin-top:14px;">CARTE MENTALE</div>`;
 
-    // Collect recursive data
     const mmData = collectMindMapRecursive();
     const nb = mmData.branches.length || 1;
-
-    // Landscape SVG
-    const svgW = 900, svgH = 500;
+    const svgW = 1000, svgH = 560;
     const cx = svgW / 2, cy = svgH / 2;
 
     html += `<div style="display:flex;justify-content:center;margin:8px 0 10px 0;overflow-x:auto;">`;
-    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:'Segoe UI',sans-serif;">`;
+    html += `<svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;font-family:'Segoe UI',Calibri,sans-serif;" xmlns="http://www.w3.org/2000/svg">`;
+    html += `<rect width="${svgW}" height="${svgH}" fill="white" rx="0"/>`;
 
-    // Background
-    html += `<rect width="${svgW}" height="${svgH}" fill="${isColor ? '#fafbfc' : '#fff'}" rx="12"/>`;
-
-    // Draw branches — split left and right
     const leftBranches = mmData.branches.slice(0, Math.ceil(nb / 2));
     const rightBranches = mmData.branches.slice(Math.ceil(nb / 2));
 
-    function drawBranch(branch, bx, by, idx, side) {
-      const col = isColor ? branchColors[idx % branchColors.length] : '#666';
-      const bgCol = isColor ? branchBgs[idx % branchBgs.length] : '#F0F0F0';
+    function drawCleanBranch(branch, bx, by, idx, side) {
+      const col = isColor ? branchColors[idx % branchColors.length] : '#555';
       const dir = side === 'left' ? -1 : 1;
+      const anchor = side === 'left' ? 'end' : 'start';
 
-      // Thick curved line from center to branch
-      const midX = cx + dir * 80;
-      html += `<path d="M${cx},${cy} C${midX},${cy} ${midX},${by} ${bx},${by}" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity="0.7"/>`;
+      // Thick organic curve from center to branch
+      const cp1x = cx + dir * 60, cp1y = cy;
+      const cp2x = cx + dir * 100, cp2y = by;
+      html += `<path d="M${cx},${cy} C${cp1x},${cp1y} ${cp2x},${cp2y} ${bx},${by}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" opacity="0.5"/>`;
 
-      // Branch bubble
-      const tw = Math.max(90, Math.min(branch.titre.length * 7 + 28, 160));
-      const bxOff = side === 'left' ? bx - tw : bx;
-      html += `<rect x="${bxOff}" y="${by - 16}" width="${tw}" height="32" rx="16" fill="${bgCol}" stroke="${col}" stroke-width="2.5"/>`;
-      const textX = side === 'left' ? bx - tw/2 : bx + tw/2;
-      html += `<text x="${textX}" y="${by + 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${col}">${esc(branch.titre)}</text>`;
+      // Branch title — just bold text, no background
+      html += `<text x="${bx}" y="${by + 5}" text-anchor="${anchor}" font-size="14" font-weight="800" fill="${col}">${esc(branch.titre)}</text>`;
 
-      // Sub-branches or keywords
+      // Collect items
       const items = [];
-      if (branch.sous_branches && branch.sous_branches.length) {
-        branch.sous_branches.forEach(sb => items.push(sb));
-      }
-      if (branch.mots_cles && branch.mots_cles.length) {
-        branch.mots_cles.forEach(kw => items.push({ titre: kw, _isKw: true }));
-      }
+      if (branch.sous_branches && branch.sous_branches.length) branch.sous_branches.forEach(sb => items.push(sb));
+      if (branch.mots_cles && branch.mots_cles.length) branch.mots_cles.forEach(kw => items.push({ titre: kw.replace(/^[►>•\-\s]+/, ''), _isKw: true }));
 
       if (items.length) {
-        const subSpacing = Math.min(28, 120 / items.length);
+        const subSpacing = Math.min(30, 140 / items.length);
         const startY = by - (items.length - 1) * subSpacing / 2;
-        const subX = side === 'left' ? bx - tw - 30 : bx + tw + 30;
+        const subX = bx + dir * 120;
 
         items.forEach((item, si) => {
           const subY = startY + si * subSpacing;
-          const lineStartX = side === 'left' ? bxOff : bx + tw;
 
-          // Thinner line to sub-branch
-          html += `<line x1="${lineStartX}" y1="${by}" x2="${subX}" y2="${subY}" stroke="${col}" stroke-width="${item._isKw ? 1 : 2}" opacity="0.4"/>`;
+          // Medium line branch -> sub-branch
+          html += `<path d="M${bx},${by} Q${bx + dir * 40},${by} ${subX},${subY}" fill="none" stroke="${col}" stroke-width="${item._isKw ? 1.5 : 2.5}" stroke-linecap="round" opacity="0.35"/>`;
 
           if (item._isKw) {
-            // Simple keyword pill
-            const kwText = esc(item.titre.replace(/^[►>•\-\s]+/, ''));
-            const kwW = Math.max(40, Math.min(kwText.length * 5.5 + 14, 110));
-            const kwXOff = side === 'left' ? subX - kwW : subX;
-            html += `<rect x="${kwXOff}" y="${subY - 9}" width="${kwW}" height="18" rx="9" fill="white" stroke="${col}" stroke-width="1"/>`;
-            const kwTextX = side === 'left' ? subX - kwW/2 : subX + kwW/2;
-            html += `<text x="${kwTextX}" y="${subY + 4}" text-anchor="middle" font-size="7" fill="#333">${kwText}</text>`;
+            // Keyword — small text only, no background
+            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="10" fill="#666">${esc(item.titre)}</text>`;
           } else {
-            // Sub-branch bubble
-            const sbText = esc(item.titre);
-            const sbW = Math.max(70, Math.min(sbText.length * 6 + 20, 130));
-            const sbXOff = side === 'left' ? subX - sbW : subX;
-            html += `<rect x="${sbXOff}" y="${subY - 12}" width="${sbW}" height="24" rx="12" fill="white" stroke="${col}" stroke-width="1.5"/>`;
-            const sbTextX = side === 'left' ? subX - sbW/2 : subX + sbW/2;
-            html += `<text x="${sbTextX}" y="${subY + 4}" text-anchor="middle" font-size="8" font-weight="600" fill="${col}">${sbText}</text>`;
+            // Sub-branch title — medium text, no background
+            html += `<text x="${subX}" y="${subY + 4}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="${col}">${esc(item.titre)}</text>`;
 
             // Sub-branch keywords
-            if (item.mots_cles && item.mots_cles.length) {
-              const kwX2 = side === 'left' ? subX - sbW - 20 : subX + sbW + 20;
-              item.mots_cles.forEach((kw, ki) => {
-                const kwY2 = subY + (ki - (item.mots_cles.length-1)/2) * 14;
-                const lineX = side === 'left' ? sbXOff : subX + sbW;
-                html += `<line x1="${lineX}" y1="${subY}" x2="${kwX2}" y2="${kwY2}" stroke="${col}" stroke-width="0.8" opacity="0.3"/>`;
-                const kwText2 = esc(kw.replace(/^[►>•\-\s]+/, ''));
-                const kwW2 = Math.max(35, Math.min(kwText2.length * 5 + 12, 90));
-                const kw2XOff = side === 'left' ? kwX2 - kwW2 : kwX2;
-                html += `<rect x="${kw2XOff}" y="${kwY2 - 7}" width="${kwW2}" height="14" rx="7" fill="${bgCol}" stroke="${col}" stroke-width="0.5" opacity="0.8"/>`;
-                const kw2TextX = side === 'left' ? kwX2 - kwW2/2 : kwX2 + kwW2/2;
-                html += `<text x="${kw2TextX}" y="${kwY2 + 3}" text-anchor="middle" font-size="6.5" fill="#444">${kwText2}</text>`;
+            const subItems = [];
+            if (item.mots_cles) item.mots_cles.forEach(kw => subItems.push(kw.replace(/^[►>•\-\s]+/, '')));
+            if (item.sous_branches) item.sous_branches.forEach(ssb => {
+              subItems.push(ssb.titre);
+              if (ssb.mots_cles) ssb.mots_cles.forEach(kw => subItems.push('  ' + kw.replace(/^[►>•\-\s]+/, '')));
+            });
+
+            if (subItems.length) {
+              const kwX = subX + dir * 100;
+              const kwSpacing = Math.min(16, 60 / subItems.length);
+              const kwStartY = subY - (subItems.length - 1) * kwSpacing / 2;
+
+              subItems.forEach((kw, ki) => {
+                const kwY = kwStartY + ki * kwSpacing;
+                const isIndented = kw.startsWith('  ');
+                const kwText = esc(kw.trim());
+                const kwFinalX = isIndented ? kwX + dir * 10 : kwX;
+
+                // Thin line
+                html += `<line x1="${subX}" y1="${subY}" x2="${kwFinalX}" y2="${kwY}" stroke="${col}" stroke-width="0.8" opacity="0.2"/>`;
+                // Small text only
+                html += `<text x="${kwFinalX}" y="${kwY + 3}" text-anchor="${anchor}" font-size="${isIndented ? 8 : 9}" fill="${isIndented ? '#888' : '#555'}" ${isIndented ? '' : 'font-weight="500"'}>${kwText}</text>`;
               });
             }
           }
@@ -3052,27 +3087,23 @@ function renderPreview() {
       }
     }
 
-    // Draw left branches
+    // Left branches
     leftBranches.forEach((branch, idx) => {
       const spacing = svgH / (leftBranches.length + 1);
-      const by = spacing * (idx + 1);
-      const bx = cx - 140;
-      drawBranch(branch, bx, by, idx, 'left');
+      drawCleanBranch(branch, cx - 160, spacing * (idx + 1), idx, 'left');
     });
 
-    // Draw right branches
+    // Right branches
     rightBranches.forEach((branch, idx) => {
       const spacing = svgH / (rightBranches.length + 1);
-      const by = spacing * (idx + 1);
-      const bx = cx + 140;
-      drawBranch(branch, bx, by, idx + leftBranches.length, 'right');
+      drawCleanBranch(branch, cx + 160, spacing * (idx + 1), idx + leftBranches.length, 'right');
     });
 
-    // Center node (on top)
+    // Center node (on top) — the ONLY filled shape
     const centerText = esc(mmData.centre || 'Module');
-    const centerW = Math.max(120, Math.min(centerText.length * 8 + 40, 220));
-    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="32" fill="${isColor ? '#1B4F72' : '#555'}" stroke="${isColor ? '#0D3452' : '#333'}" stroke-width="3"/>`;
-    html += `<text x="${cx}" y="${cy + 1}" text-anchor="middle" font-size="12" font-weight="800" fill="white">${centerText}</text>`;
+    const centerW = Math.max(130, Math.min(centerText.length * 8.5 + 40, 240));
+    html += `<ellipse cx="${cx}" cy="${cy}" rx="${centerW/2}" ry="34" fill="${isColor ? '#1B4F72' : '#444'}" stroke="${isColor ? '#0D3452' : '#222'}" stroke-width="3"/>`;
+    html += `<text x="${cx}" y="${cy + 1}" text-anchor="middle" font-size="13" font-weight="800" fill="white">${centerText}</text>`;
 
     html += `</svg></div>`;
   }
