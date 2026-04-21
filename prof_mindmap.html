@@ -197,6 +197,8 @@
             document.getElementById('qr-code').style.display = 'block';
             document.getElementById('qr-label').style.display = 'block';
             setupListeners();
+        } else {
+            window.newSession();
         }
 
         function createIdeaCard(id, text, student, hasLike) {
@@ -287,14 +289,14 @@
         window.editNodeText = (n) => { const t=prompt("Modifier:", n.innerText); if(t){ saveState(); n.innerText=t; saveState(); updateFirebaseContext(t); }};
 
         function selectNode(el) { document.querySelectorAll('.node').forEach(n=>n.classList.remove('selected')); if(el){ el.classList.add('selected'); updateFirebaseContext(el.innerText); } else { updateFirebaseContext("Général"); } sn=el; updateToolbar(); }
-        function createNode(t, p) { saveState(); const d=document.createElement('div'); const pl=parseInt(p.classList[1].split('-')[1]); const l=Math.min(pl+1,3); const id='n-'+Date.now(); const x=parseFloat(p.style.left), y=parseFloat(p.style.top); const a=Math.random()*6.28, dist=[250,200,150,100][l]||100; d.className=`node level-${l}`; d.innerText=t; d.style.left=(x+Math.cos(a)*dist)+'px'; d.style.top=(y+Math.sin(a)*dist)+'px'; d.dataset.id=id; d.dataset.parentId=p.dataset.id||'root'; ind(d); d.ondblclick=function(){window.editNodeText(this)}; d.onclick=(e)=>{e.stopPropagation();selectNode(div)}; mc.appendChild(d); createConnectionLine(p,d); saveState(); return d; }
+        function createNode(t, p) { saveState(); const d=document.createElement('div'); const pl=parseInt(p.classList[1].split('-')[1]); const l=Math.min(pl+1,3); const id='n-'+Date.now(); const x=parseFloat(p.style.left), y=parseFloat(p.style.top); const a=Math.random()*6.28, dist=[250,200,150,100][l]||100; d.className=`node level-${l}`; d.innerText=t; d.style.left=(x+Math.cos(a)*dist)+'px'; d.style.top=(y+Math.sin(a)*dist)+'px'; d.dataset.id=id; d.dataset.parentId=p.dataset.id||'root'; ind(d); d.ondblclick=function(){window.editNodeText(this)}; d.onclick=(e)=>{e.stopPropagation();selectNode(d)}; mc.appendChild(d); createConnectionLine(p,d); saveState(); return d; }
         function createConnectionLine(p,c){ const s=document.getElementById('connections'), l=document.createElementNS('http://www.w3.org/2000/svg','line'); const lev=parseInt(c.classList[1].split('-')[1]); const cols=['#facc15','#60a5fa','#a78bfa','#34d399']; l.setAttribute('stroke',cols[lev]||'#fff'); l.setAttribute('stroke-width',Math.max(1,4-lev)); l.setAttribute('stroke-opacity',0.6); l.dataset.from=p.dataset.id||'root'; l.dataset.to=c.dataset.id; s.appendChild(l); updateLinePos(l,p,c); }
         function updateLinePos(l,e1,e2){ l.setAttribute('x1',e1.style.left); l.setAttribute('y1',e1.style.top); l.setAttribute('x2',e2.style.left); l.setAttribute('y2',e2.style.top); }
         function updateAllLines(){ const ns=Array.from(document.querySelectorAll('.node')), m={}; ns.forEach(n=>m[n.dataset.id||'root']=n); document.querySelectorAll('line').forEach(l=>{ const n1=m[l.dataset.from], n2=m[l.dataset.to]; if(n1&&n2)updateLinePos(l,n1,n2); else l.remove(); }); }
         function deleteRecursive(n){ Array.from(document.querySelectorAll(`.node[data-parent-id="${n.dataset.id}"]`)).forEach(deleteRecursive); n.remove(); }
         function saveState(){ const d=[]; document.querySelectorAll('.node').forEach(n=>{ d.push({id:n.dataset.id||'root',text:n.innerText,level:parseInt(n.classList[1].split('-')[1]),left:n.style.left,top:n.style.top,parentId:n.dataset.parentId||null}); }); if(hs.length>20)hs.shift(); hs.push(JSON.stringify(d)); updateToolbar(); }
         function rebuildMap(data){ document.getElementById('connections').innerHTML=''; document.querySelectorAll('.node').forEach(n=>n.remove()); const m={}; data.forEach(d=>{ const div=document.createElement('div'); div.className=`node level-${d.level}`; if(d.id==='root')div.classList.add('selected'); div.innerText=d.text; div.style.left=d.left; div.style.top=d.top; div.dataset.id=d.id; div.dataset.parentId=d.parentId; div.id=d.id==='root'?'node-root':''; ind(div); div.ondblclick=function(){window.editNodeText(this)}; div.onclick=(e)=>{e.stopPropagation();selectNode(div)}; mc.appendChild(div); m[d.id]=div; }); data.forEach(d=>{ if(d.parentId&&m[d.parentId]&&m[d.id]) createConnectionLine(m[d.parentId],m[d.id]); }); sn=m['root']||document.getElementById('node-root'); updateToolbar(); }
-        function updateToolbar(){ const has=!!sn; document.getElementById('btn-undo').disabled=hs.length<=1; document.getElementById('btn-add').disabled=!has; document.getElementById('btn-del').disabled=!has||sn.id==='node-root'; document.getElementById('btn-cut').disabled=!has||sn.id==='node-root'; document.getElementById('btn-paste').disabled=!has||!clipboardNode; }
+        function updateToolbar(){ const has=!!sn; document.getElementById('btn-undo').disabled=hs.length<=1; document.getElementById('btn-add').disabled=!has; document.getElementById('btn-del').disabled=!has||sn.id==='node-root'; document.getElementById('btn-cut').disabled=!has||sn.id==='node-root'; document.getElementById('btn-paste').disabled=!has||!cn; }
     </script>
 </body>
 </html>
