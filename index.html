@@ -3646,16 +3646,24 @@ QN80,Wael HWORI</pre>
 Thème : ${sp_session.theme || "à déduire du contenu"}
 Public : ${sp_session.audience || "parents"} — langage clair, sans jargon.
 
-CONTRAINTES :
+CONTRAINTES PÉDAGOGIQUES :
 - Bienveillant, pas de jugement parental.
 - Explications courtes (2 phrases max), basées sur le document.
 - Si le document ne couvre pas un point, dis-le, n'invente pas.
 - Anonymat total (aucune référence à un parent en particulier).
 
-GÉNÈRE UNIQUEMENT CES BLOCS :
+CONTENU À GÉNÉRER :
 ${blocks.join("\n")}
 
-FORMAT DE SORTIE — uniquement ce JSON, sans markdown, sans \`\`\` :
+⚠️ FORMAT DE SORTIE OBLIGATOIRE — RÈGLES STRICTES :
+1. Réponds UNIQUEMENT par un objet JSON valide. AUCUN texte avant ou après.
+2. PAS de markdown, PAS de \`\`\`json, PAS de \`\`\`, PAS de "Voici…".
+3. Utilise UNIQUEMENT des guillemets droits ASCII " (pas " ni " ni « »).
+4. PAS de virgule finale (trailing comma) après le dernier élément d'un tableau ou objet.
+5. Tous les caractères accentués sont autorisés à l'intérieur des chaînes.
+6. Le JSON doit être parsable directement par JSON.parse() en JavaScript.
+
+STRUCTURE EXACTE DE TA RÉPONSE :
 {
 ${aiMods.map(m => `  "${m.id}": [ … ]`).join(",\n")}
 }
@@ -3677,19 +3685,22 @@ ${sp_session.source}
     let data;
     try {
       let cleaned = raw;
-      // 1) enlève les fences markdown ```json … ``` et backticks isolés
-      cleaned = cleaned.replace(/```(?:json)?/gi, "").replace(/`/g, "").trim();
-      // 2) normalise les guillemets typographiques en guillemets droits
+      // 1) BOM + fences markdown + backticks isolés
+      cleaned = cleaned.replace(/^﻿/, "").replace(/```(?:json)?/gi, "").replace(/`/g, "").trim();
+      // 2) normalise guillemets typographiques, apostrophes, tirets, espaces insécables
       cleaned = cleaned
-        .replace(/[“”„‟″‶]/g, '"')   // " " „ ‟ ″ ‶
-        .replace(/[‘’‚‛′‵]/g, "'")   // ' ' ‚ ‛ ′ ‵
-        .replace(/[«»]/g, '"')                            // « »
-        .replace(/[–—]/g, "-");                           // – —
-      // 3) extrait le 1er objet JSON (du 1er { au dernier })
+        .replace(/[“”„‟″‶]/g, '"')
+        .replace(/[‘’‚‛′‵]/g, "'")
+        .replace(/[«»]/g, '"')
+        .replace(/[–—]/g, "-")
+        .replace(/ /g, " ");
+      // 3) extrait le 1er objet JSON
       const start = cleaned.indexOf("{");
       const end = cleaned.lastIndexOf("}");
       if (start === -1 || end === -1 || end <= start) throw new Error("Aucun objet JSON détecté.");
       cleaned = cleaned.slice(start, end + 1);
+      // 4) supprime les virgules finales (trailing commas) avant ] ou }
+      cleaned = cleaned.replace(/,(\s*[\]}])/g, "$1");
       data = JSON.parse(cleaned);
     } catch(e) { toast("JSON invalide : " + e.message); return; }
     let count = 0;
