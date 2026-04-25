@@ -877,6 +877,8 @@
           <a href="prof_quiz.html" class="btn btn-yellow">🎯 Quiz Live <span class="badge-role role-prof">Prof</span></a>
           <a href="wall_quiz.html" class="btn btn-yellow">🎯 Quiz Live <span class="badge-role role-wall">Écran</span></a>
           <a href="editeur_quiz.html" class="btn btn-yellow">📝 Éditeur de Quiz <span class="badge-role role-prof">Prof</span></a>
+          <a href="jeux-live/animateur.html" class="btn btn-blue-outline" style="background:linear-gradient(135deg,#2563eb,#0f766e);color:white;border:none;">🎲 Party Live <span class="badge-role role-prof">QR</span></a>
+          <a href="jeux-live/bibliotheque.html" class="btn btn-yellow">📚 Bibliothèque Party Live <span class="badge-role role-prof">Prof</span></a>
           <a href="../PSE/eleve_roue.html" class="btn btn-yellow">🎯 Roue Émotions <span class="badge-role role-eleve">Élèves</span></a>
           <a href="prof_roue.html" class="btn btn-yellow">🎯 Roue Émotions <span class="badge-role role-prof">Prof</span></a>
           <a href="../PSE/eleve_proust.html" class="btn btn-yellow">💭 Proust <span class="badge-role role-eleve">Élèves</span></a>
@@ -1056,8 +1058,15 @@
             <!-- 3. Source -->
             <div style="background:white; border-radius:10px; padding:16px; margin-bottom:14px;">
               <h4 style="margin:0 0 8px; color:#db2777;">3. Source pédagogique</h4>
-              <p style="font-size:0.8rem; color:#64748b; margin:0 0 10px;">Colle ton cours, ta fiche, des notes. L'IA s'en sert pour générer les questions et explications.</p>
-              <textarea id="sp-source" placeholder="Colle ici le cours, la fiche de prévention, l'article…" style="width:100%; min-height:120px; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-family:inherit;"></textarea>
+              <p style="font-size:0.8rem; color:#64748b; margin:0 0 10px;">Deux options : <b>(A)</b> colle le texte directement, ou <b>(B)</b> importe un fichier <b>PDF / Word / TXT</b> — l'IA s'en sert pour générer les questions.</p>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
+                <label style="background:#db2777; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; display:inline-block;">
+                  📁 Importer un fichier
+                  <input type="file" id="sp-file" accept=".pdf,.txt,.md,.doc,.docx" style="display:none;" onchange="sp_handleFile(event)">
+                </label>
+                <span id="sp-file-info" style="font-size:0.85rem; color:#475569;"></span>
+              </div>
+              <textarea id="sp-source" placeholder="Colle ici le cours, la fiche de prévention, l'article…  (ou utilise « 📁 Importer un fichier » ci-dessus)" style="width:100%; min-height:120px; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-family:inherit;"></textarea>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
                 <div>
                   <label style="font-size:0.8rem; font-weight:bold; color:#475569;">Nb questions (Quiz / Vrai-Faux)</label>
@@ -3736,6 +3745,57 @@ ${sp_session.source}
     sp_session = c;
     window.sp_save();
     sp_renderEditor();
+  };
+
+  // ====== IMPORT FICHIER (PDF / DOCX / TXT) ======
+  function sp_loadScript(url){
+    return new Promise((res, rej) => {
+      if (document.querySelector(`script[src="${url}"]`)) return res();
+      const s = document.createElement("script");
+      s.src = url; s.onload = res; s.onerror = () => rej(new Error("Échec chargement " + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  window.sp_handleFile = async function(ev){
+    const file = ev.target.files[0]; if (!file) return;
+    const info = document.getElementById("sp-file-info");
+    info.textContent = "⏳ Lecture de " + file.name + "…";
+    try {
+      const name = file.name.toLowerCase();
+      let text = "";
+      if (name.endsWith(".txt") || name.endsWith(".md")) {
+        text = await file.text();
+      } else if (name.endsWith(".pdf")) {
+        await sp_loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        const buf = await file.arrayBuffer();
+        const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+        const parts = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          parts.push(content.items.map(it => it.str).join(" "));
+        }
+        text = parts.join("\n\n");
+      } else if (name.endsWith(".docx")) {
+        await sp_loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+        const buf = await file.arrayBuffer();
+        const result = await window.mammoth.extractRawText({ arrayBuffer: buf });
+        text = result.value;
+      } else if (name.endsWith(".doc")) {
+        info.textContent = "❌ Format .doc non supporté. Enregistre en .docx ou colle le texte.";
+        return;
+      } else {
+        info.textContent = "❌ Format non reconnu.";
+        return;
+      }
+      document.getElementById("sp-source").value = text.trim();
+      sp_sync();
+      info.textContent = "✅ " + file.name + " — " + text.length + " caractères importés";
+    } catch(e) {
+      info.textContent = "❌ Erreur : " + e.message;
+    }
   };
 
   window.sp_export = function(){
