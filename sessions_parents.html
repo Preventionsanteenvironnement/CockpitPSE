@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sessions Parents — Cockpit PSE</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9; min-height: 100vh;
+  }
+  .app { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: rgba(0,0,0,0.3); padding: 20px; border-right: 1px solid #334155;
+    overflow-y: auto; max-height: 100vh;
+  }
+  .sidebar h1 { font-size: 18px; margin: 0 0 4px; }
+  .sidebar .sub { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+  .btn {
+    display: inline-block; padding: 10px 16px; border-radius: 8px; border: none;
+    font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s;
+  }
+  .btn-primary { background: linear-gradient(90deg, #db2777, #ec4899); color: white; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(219,39,119,0.4); }
+  .btn-secondary { background: #334155; color: white; }
+  .btn-secondary:hover { background: #475569; }
+  .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+  .btn-ghost:hover { background: #1e293b; }
+  .btn-danger { background: #7f1d1d; color: white; }
+  .btn-block { display: block; width: 100%; }
+  .main { padding: 30px 40px; max-width: 1100px; }
+  .main h2 { font-size: 26px; margin: 0 0 20px; }
+  .card {
+    background: rgba(255,255,255,0.04); border: 1px solid #334155;
+    border-radius: 14px; padding: 24px; margin-bottom: 20px;
+  }
+  .card h3 { margin: 0 0 14px; font-size: 18px; color: #f1f5f9; }
+  label { display: block; font-size: 13px; color: #cbd5e1; margin: 12px 0 6px; font-weight: 500; }
+  input[type="text"], input[type="date"], input[type="number"], input[type="password"], select, textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #475569;
+    background: #0f172a; color: #f1f5f9; font-size: 14px; font-family: inherit;
+  }
+  textarea { min-height: 140px; resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid #ec4899; border-color: #ec4899; }
+  .modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .module-card {
+    border: 2px solid #334155; border-radius: 10px; padding: 14px; cursor: pointer;
+    background: rgba(0,0,0,0.2); transition: all 0.15s; position: relative;
+  }
+  .module-card:hover { border-color: #64748b; }
+  .module-card.checked { border-color: #ec4899; background: rgba(236,72,153,0.08); }
+  .module-card .emoji { font-size: 28px; }
+  .module-card .name { font-weight: 600; margin: 4px 0; font-size: 15px; }
+  .module-card .desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
+  .module-card .check {
+    position: absolute; top: 10px; right: 10px; width: 20px; height: 20px;
+    border-radius: 50%; border: 2px solid #475569; background: transparent;
+  }
+  .module-card.checked .check { background: #ec4899; border-color: #ec4899; }
+  .module-card.checked .check::after { content: "✓"; color: white; font-size: 13px; display: block; text-align: center; line-height: 16px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pill { display: inline-block; padding: 4px 10px; background: #334155; border-radius: 12px; font-size: 12px; margin-right: 6px; }
+  .lib-item {
+    padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 8px;
+    margin-bottom: 8px; cursor: pointer; border: 1px solid transparent;
+  }
+  .lib-item:hover { border-color: #ec4899; }
+  .lib-item .title { font-weight: 600; font-size: 14px; }
+  .lib-item .meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .toast {
+    position: fixed; bottom: 30px; right: 30px; background: #059669; color: white;
+    padding: 14px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transform: translateX(400px); transition: transform 0.3s; z-index: 1000;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.error { background: #dc2626; }
+  .question-edit {
+    background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 10px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .question-edit .q-num { color: #ec4899; font-weight: 600; font-size: 13px; }
+  .question-edit input, .question-edit textarea { margin-top: 6px; }
+  .question-edit .options { display: grid; gap: 6px; margin-top: 8px; }
+  .question-edit .opt-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+  .question-edit .correct-mark {
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid #475569;
+    cursor: pointer; background: transparent; flex-shrink: 0;
+  }
+  .question-edit .correct-mark.is-correct { background: #10b981; border-color: #10b981; }
+  .question-edit .correct-mark.is-correct::after { content: "✓"; color: white; display: block; text-align: center; line-height: 20px; font-weight: bold; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; }
+  .badge-poll { background: #3b82f6; color: white; }
+  .badge-quiz { background: #f59e0b; color: white; }
+  .badge-survey { background: #8b5cf6; color: white; }
+  .empty { text-align: center; color: #64748b; padding: 30px; font-size: 13px; }
+  details summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: #cbd5e1; }
+  details summary:hover { color: #ec4899; }
+  .step-pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    background: #1e293b; border-radius: 20px; font-size: 12px; margin: 4px 4px 4px 0;
+    border: 1px solid #334155;
+  }
+  .small { font-size: 12px; color: #94a3b8; }
+  hr { border: 0; border-top: 1px solid #334155; margin: 20px 0; }
+  .nav-back { color: #94a3b8; text-decoration: none; font-size: 13px; }
+  .nav-back:hover { color: #ec4899; }
+  code { background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <h1>📡 Sessions Parents</h1>
+    <p class="sub">Cockpit PSE · Animation</p>
+
+    <button class="btn btn-primary btn-block" onclick="newSession()">+ Nouvelle session</button>
+
+    <hr>
+
+    <h3 style="font-size:14px; color:#cbd5e1; margin:10px 0;">📚 Bibliothèque</h3>
+    <div id="library-list"></div>
+
+    <hr>
+
+    <h3 style="font-size:14px; color:#cbd5e1; margin:10px 0;">🗂 Historique</h3>
+    <div id="history-list"></div>
+
+    <hr>
+    <a href="index.html" class="nav-back">← Retour Cockpit</a>
+  </aside>
+
+  <main class="main" id="main">
+    <!-- View injected here -->
+  </main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========= STORAGE =========
+const STORAGE_KEY = "cockpit_sessions_parents_v1";
+const HISTORY_KEY = "cockpit_sessions_parents_history_v1";
+
+function loadLib() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+function saveLib(arr) { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+function loadHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; } }
+function saveHistory(arr) { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr)); }
+
+// ========= MODULES CATALOG =========
+const MODULES = [
+  { id: "meteo",       emoji: "🌤️", name: "Météo des émotions",        desc: "6 émojis géants. Brise-glace en 30s. Sans rien à écrire.", default: true,  aiGen: false },
+  { id: "nuage",       emoji: "☁️",  name: "Nuage de mots",              desc: "1 mot envoyé par chacun, nuage en direct.",               default: true,  aiGen: true  },
+  { id: "photo",       emoji: "🖼️", name: "Photolangage",                desc: "Grille d'images, chacun choisit la sienne.",              default: false, aiGen: false },
+  { id: "echelle",     emoji: "📏",  name: "Échelle d'accord (1-5)",     desc: "Affirmations à positionner sur une échelle.",             default: false, aiGen: true  },
+  { id: "vraifaux",    emoji: "✅",  name: "Vrai / Faux",                 desc: "Idées reçues à valider/invalider, avec explication.",     default: false, aiGen: true  },
+  { id: "quiz",        emoji: "🏆",  name: "Quiz pédagogique",            desc: "QCM avec bonne réponse + explication simplifiée.",        default: true,  aiGen: true  },
+  { id: "dilemmes",    emoji: "🎯",  name: "Dilemmes parents",            desc: "Situations concrètes, plusieurs choix, débat ouvert.",    default: false, aiGen: true  },
+  { id: "ouverte",     emoji: "💬",  name: "Question ouverte",            desc: "Témoignage anonyme, affichage en mur.",                   default: true,  aiGen: true  },
+  { id: "muranonyme",  emoji: "❓",  name: "Mur de questions parents",    desc: "Les parents posent leurs questions, les autres ❤️ celles à traiter.", default: false, aiGen: false },
+  { id: "bilan",       emoji: "🏁",  name: "Bilan + météo finale",        desc: "Synthèse, météo de fin, mot de gratitude.",               default: true,  aiGen: false }
+];
+
+// ========= STATE =========
+let session = null; // current edited session
+
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function uid() { return "s_" + Date.now() + "_" + Math.random().toString(36).slice(2,7); }
+
+function blankSession() {
+  return {
+    id: uid(),
+    title: "",
+    date: todayISO(),
+    theme: "",
+    audience: "Parents",
+    modules: Object.fromEntries(MODULES.map(m => [m.id, { enabled: m.default, timing: 30, items: [] }])),
+    source: "",
+    nbQuestions: 10,
+    autoMode: false,
+    apiKey: "",
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+}
+
+// ========= TOAST =========
+function toast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show" + (type==="error"?" error":"");
+  setTimeout(() => t.className = "toast" + (type==="error"?" error":""), 2800);
+}
+
+// ========= RENDER : SIDEBAR =========
+function renderSidebar() {
+  const lib = loadLib();
+  const hist = loadHistory();
+
+  const libEl = document.getElementById("library-list");
+  if (lib.length === 0) {
+    libEl.innerHTML = '<div class="empty">Aucune session sauvegardée.</div>';
+  } else {
+    libEl.innerHTML = lib.map(s => `
+      <div class="lib-item" onclick="loadSession('${s.id}')">
+        <div class="title">${escapeHtml(s.title || "Sans titre")}</div>
+        <div class="meta">${s.theme ? '🏷️ ' + escapeHtml(s.theme) + ' · ' : ''}${formatDate(s.date)}</div>
+      </div>
+    `).join("");
+  }
+
+  const histEl = document.getElementById("history-list");
+  if (hist.length === 0) {
+    histEl.innerHTML = '<div class="empty">Pas encore de session lancée.</div>';
+  } else {
+    histEl.innerHTML = hist.slice(0, 10).map(h => `
+      <div class="lib-item">
+        <div class="title">${escapeHtml(h.title)}</div>
+        <div class="meta">${formatDate(h.date)} · 👥 ${h.participants||0}</div>
+      </div>
+    `).join("");
+  }
+}
+
+function formatDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]); }
+
+// ========= RENDER : MAIN VIEW =========
+function newSession() {
+  session = blankSession();
+  renderEditor();
+}
+function loadSession(id) {
+  const lib = loadLib();
+  const s = lib.find(x => x.id === id);
+  if (!s) return;
+  // ensure all modules exist (for forward compat)
+  MODULES.forEach(m => { if (!s.modules[m.id]) s.modules[m.id] = { enabled: false, timing: 30, items: [] }; });
+  session = JSON.parse(JSON.stringify(s));
+  renderEditor();
+}
+
+function renderEditor() {
+  if (!session) {
+    document.getElementById("main").innerHTML = `
+      <h2>👋 Bienvenue</h2>
+      <div class="card">
+        <p>Crée une nouvelle session ou reprends-en une dans la bibliothèque.</p>
+        <button class="btn btn-primary" onclick="newSession()">+ Nouvelle session</button>
+      </div>
+      <div class="card">
+        <h3>💡 Comment ça marche</h3>
+        <ol style="line-height:1.8;">
+          <li><b>Configure</b> : titre, date, thème, audience.</li>
+          <li><b>Coche les modules</b> que tu veux dans la séquence.</li>
+          <li><b>Colle ton cours</b> ou tes notes comme source.</li>
+          <li><b>Génère</b> les questions avec l'IA (copier-coller dans Claude/ChatGPT).</li>
+          <li><b>Édite</b> ce qui ne te plaît pas, sauvegarde.</li>
+          <li><b>Lance</b> la soirée le jour J. <span class="small">(V2 à venir)</span></li>
+        </ol>
+      </div>
+    `;
+    return;
+  }
+
+  const m = session.modules;
+  const enabledModules = MODULES.filter(x => m[x.id]?.enabled);
+
+  document.getElementById("main").innerHTML = `
+    <h2>${session.title ? "📝 " + escapeHtml(session.title) : "📝 Nouvelle session"}</h2>
+
+    <!-- BLOC 1 : INFOS -->
+    <div class="card">
+      <h3>1. Informations générales</h3>
+      <div class="row">
+        <div>
+          <label>Titre de la session</label>
+          <input type="text" id="f-title" value="${escapeHtml(session.title)}" placeholder="ex: Soirée Écrans 28 avril">
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="f-date" value="${session.date}">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Thème</label>
+          <input type="text" id="f-theme" value="${escapeHtml(session.theme)}" placeholder="ex: Écrans, Sommeil, Addictions, Alimentation, Communication ado…" list="themes-list">
+          <datalist id="themes-list">
+            <option value="Sommeil">
+            <option value="Écrans / Réseaux sociaux">
+            <option value="Addictions">
+            <option value="Alimentation">
+            <option value="Communication ado-parent">
+            <option value="Santé mentale / Harcèlement">
+            <option value="Décrochage scolaire">
+            <option value="Orientation">
+          </datalist>
+        </div>
+        <div>
+          <label>Audience</label>
+          <input type="text" id="f-audience" value="${escapeHtml(session.audience)}" placeholder="ex: Parents 2nde Bac Pro">
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOC 2 : MODULES -->
+    <div class="card">
+      <h3>2. Modules de la séquence</h3>
+      <p class="small">Coche ce que tu veux dans la séance. Tu peux glisser pour réordonner (V2). L'ordre actuel : ${enabledModules.length === 0 ? '<i>aucun module sélectionné</i>' : enabledModules.map(x => `<span class="step-pill">${x.emoji} ${x.name}</span>`).join("")}</p>
+      <div class="modules-grid">
+        ${MODULES.map(mod => `
+          <div class="module-card ${m[mod.id].enabled ? 'checked' : ''}" onclick="toggleModule('${mod.id}')">
+            <div class="check"></div>
+            <div class="emoji">${mod.emoji}</div>
+            <div class="name">${mod.name}</div>
+            <div class="desc">${mod.desc}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <!-- BLOC 3 : SOURCE -->
+    <div class="card">
+      <h3>3. Source pédagogique</h3>
+      <p class="small">Colle ton cours, ta fiche, tes notes ou un article. L'IA va s'appuyer dessus pour générer le contenu (questions, explications, dilemmes).</p>
+      <textarea id="f-source" placeholder="Colle ici le cours, la fiche de prévention, l'article, les notes…">${escapeHtml(session.source)}</textarea>
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Nombre de questions cible (Quiz / Vrai-Faux)</label>
+          <input type="number" id="f-nbq" value="${session.nbQuestions}" min="3" max="30">
+        </div>
+        <div>
+          <label>Mode de progression</label>
+          <select id="f-auto">
+            <option value="false" ${!session.autoMode?'selected':''}>Manuel (tu cliques pour avancer)</option>
+            <option value="true" ${session.autoMode?'selected':''}>Auto (timer entre les étapes)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOC 4 : GÉNÉRATION IA -->
+    <div class="card">
+      <h3>4. Génération IA</h3>
+      <p class="small">L'IA va générer <b>uniquement les modules cochés qui en ont besoin</b> (Quiz, Vrai-Faux, Dilemmes, Échelle, Question ouverte, Nuage). Tu pourras tout éditer après.</p>
+
+      <details>
+        <summary>🔑 Mode direct (avec clé API Anthropic — optionnel)</summary>
+        <label>Clé API Claude (sk-ant-…)</label>
+        <input type="password" id="f-apikey" value="${escapeHtml(session.apiKey)}" placeholder="sk-ant-…">
+        <p class="small">Stockée localement dans ton navigateur seulement. Si vide, mode copier-coller.</p>
+        <button class="btn btn-primary" onclick="generateDirect()" style="margin-top:8px;">⚡ Générer directement</button>
+      </details>
+
+      <hr>
+
+      <p style="margin:8px 0;"><b>Mode copier-coller</b> (recommandé, marche partout)</p>
+      <button class="btn btn-secondary" onclick="copyPrompt()">📋 Copier le prompt IA</button>
+      <p class="small" style="margin-top:8px;">→ Colle dans Claude / ChatGPT → copie le JSON retourné → colle ci-dessous → <b>Importer</b>.</p>
+
+      <label>Réponse IA (JSON)</label>
+      <textarea id="f-aijson" placeholder='Colle ici le JSON renvoyé par l&apos;IA…'></textarea>
+      <button class="btn btn-primary" onclick="importAIJson()" style="margin-top:8px;">📥 Importer la génération IA</button>
+    </div>
+
+    <!-- BLOC 5 : APERÇU & EDITION DU CONTENU GENERE -->
+    ${renderContentPreview()}
+
+    <!-- BLOC 6 : ACTIONS -->
+    <div class="card">
+      <button class="btn btn-primary" onclick="saveSession()">💾 Enregistrer la session</button>
+      <button class="btn btn-secondary" onclick="exportSession()">📤 Exporter (JSON)</button>
+      <button class="btn btn-ghost" onclick="duplicateSession()">📑 Dupliquer</button>
+      <button class="btn btn-danger" onclick="deleteSession()" style="float:right;">🗑️ Supprimer</button>
+      <hr>
+      <button class="btn btn-primary btn-block" onclick="launchSession()" style="font-size:16px; padding:14px;">🚀 Lancer la session (V2 — bientôt)</button>
+    </div>
+  `;
+
+  // bind live updates
+  ["f-title","f-date","f-theme","f-audience","f-source","f-nbq","f-auto","f-apikey"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", () => syncForm());
+    el.addEventListener("change", () => syncForm());
+  });
+}
+
+function syncForm() {
+  if (!session) return;
+  session.title    = document.getElementById("f-title")?.value || "";
+  session.date     = document.getElementById("f-date")?.value || todayISO();
+  session.theme    = document.getElementById("f-theme")?.value || "";
+  session.audience = document.getElementById("f-audience")?.value || "";
+  session.source   = document.getElementById("f-source")?.value || "";
+  session.nbQuestions = parseInt(document.getElementById("f-nbq")?.value || "10", 10);
+  session.autoMode = (document.getElementById("f-auto")?.value === "true");
+  session.apiKey   = document.getElementById("f-apikey")?.value || "";
+  session.updatedAt = Date.now();
+}
+
+function toggleModule(id) {
+  if (!session) return;
+  syncForm();
+  session.modules[id].enabled = !session.modules[id].enabled;
+  renderEditor();
+}
+
+function renderContentPreview() {
+  if (!session) return "";
+  const enabledAi = MODULES.filter(m => session.modules[m.id].enabled && m.aiGen);
+  const hasContent = enabledAi.some(m => (session.modules[m.id].items || []).length > 0);
+  if (!hasContent) return `
+    <div class="card">
+      <h3>5. Aperçu du contenu</h3>
+      <div class="empty">Pas encore de contenu généré. Utilise le bloc 4 pour générer avec l'IA.</div>
+    </div>
+  `;
+
+  return `
+    <div class="card">
+      <h3>5. Contenu généré (éditable)</h3>
+      ${enabledAi.map(mod => {
+        const items = session.modules[mod.id].items || [];
+        if (items.length === 0) return "";
+        return `
+          <details open style="margin-bottom:14px;">
+            <summary>${mod.emoji} ${mod.name} <span class="small">(${items.length})</span></summary>
+            <div style="margin-top:10px;">
+              ${items.map((it, i) => renderItem(mod.id, it, i)).join("")}
+              <button class="btn btn-ghost" onclick="addItem('${mod.id}')">+ Ajouter</button>
+            </div>
+          </details>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderItem(modId, it, i) {
+  if (modId === "quiz" || modId === "vraifaux") {
+    return `
+      <div class="question-edit">
+        <div class="q-num">Question ${i+1}</div>
+        <input type="text" value="${escapeHtml(it.question||'')}" oninput="updateItem('${modId}',${i},'question',this.value)" placeholder="Question…">
+        <div class="options">
+          ${(it.options||[]).map((opt,j)=>`
+            <div class="opt-row">
+              <button class="correct-mark ${it.correct===j?'is-correct':''}" onclick="setCorrect('${modId}',${i},${j})" title="Marquer comme bonne réponse"></button>
+              <input type="text" value="${escapeHtml(opt)}" oninput="updateOption('${modId}',${i},${j},this.value)">
+              <button class="btn btn-ghost" onclick="removeOption('${modId}',${i},${j})">×</button>
+            </div>
+          `).join("")}
+          <button class="btn btn-ghost" onclick="addOption('${modId}',${i})">+ Option</button>
+        </div>
+        <label>Explication pédagogique (simple, 2 phrases max)</label>
+        <textarea oninput="updateItem('${modId}',${i},'explanation',this.value)" placeholder="Pourquoi cette réponse…">${escapeHtml(it.explanation||'')}</textarea>
+        <button class="btn btn-ghost" onclick="removeItem('${modId}',${i})" style="margin-top:8px;">🗑️ Supprimer</button>
+      </div>
+    `;
+  }
+  if (modId === "dilemmes") {
+    return `
+      <div class="question-edit">
+        <div class="q-num">Dilemme ${i+1}</div>
+        <textarea oninput="updateItem('${modId}',${i},'situation',this.value)" placeholder="Situation concrète…">${escapeHtml(it.situation||'')}</textarea>
+        <div class="options">
+          ${(it.options||[]).map((opt,j)=>`
+            <div class="opt-row">
+              <span style="width:24px; text-align:center;">${String.fromCharCode(65+j)}</span>
+              <input type="text" value="${escapeHtml(opt)}" oninput="updateOption('${modId}',${i},${j},this.value)">
+              <button class="btn btn-ghost" onclick="removeOption('${modId}',${i},${j})">×</button>
+            </div>
+          `).join("")}
+          <button class="btn btn-ghost" onclick="addOption('${modId}',${i})">+ Option</button>
+        </div>
+        <label>Pistes de débat / repère</label>
+        <textarea oninput="updateItem('${modId}',${i},'guidance',this.value)" placeholder="Ce que tu peux apporter après le vote…">${escapeHtml(it.guidance||'')}</textarea>
+        <button class="btn btn-ghost" onclick="removeItem('${modId}',${i})" style="margin-top:8px;">🗑️ Supprimer</button>
+      </div>
+    `;
+  }
+  if (modId === "echelle") {
+    return `
+      <div class="question-edit">
+        <div class="q-num">Affirmation ${i+1}</div>
+        <input type="text" value="${escapeHtml(it.statement||'')}" oninput="updateItem('${modId}',${i},'statement',this.value)" placeholder="Affirmation à positionner sur 1-5…">
+        <button class="btn btn-ghost" onclick="removeItem('${modId}',${i})" style="margin-top:8px;">🗑️ Supprimer</button>
+      </div>
+    `;
+  }
+  if (modId === "ouverte" || modId === "nuage") {
+    return `
+      <div class="question-edit">
+        <div class="q-num">${modId==="nuage" ? "Amorce" : "Question ouverte"} ${i+1}</div>
+        <input type="text" value="${escapeHtml(it.prompt||'')}" oninput="updateItem('${modId}',${i},'prompt',this.value)" placeholder="${modId==='nuage'?'En 1 mot…':'Votre témoignage…'}">
+        <button class="btn btn-ghost" onclick="removeItem('${modId}',${i})" style="margin-top:8px;">🗑️ Supprimer</button>
+      </div>
+    `;
+  }
+  return "";
+}
+
+// ========= ITEM EDITION =========
+function updateItem(modId, i, field, val) { session.modules[modId].items[i][field] = val; session.updatedAt = Date.now(); }
+function updateOption(modId, i, j, val)   { session.modules[modId].items[i].options[j] = val; session.updatedAt = Date.now(); }
+function setCorrect(modId, i, j)          { session.modules[modId].items[i].correct = j; session.updatedAt = Date.now(); renderEditor(); }
+function addOption(modId, i)              { session.modules[modId].items[i].options.push(""); renderEditor(); }
+function removeOption(modId, i, j)        { session.modules[modId].items[i].options.splice(j,1); renderEditor(); }
+function removeItem(modId, i)             { session.modules[modId].items.splice(i,1); renderEditor(); }
+function addItem(modId) {
+  const blank = {
+    quiz:     () => ({ question:"", options:["","",""], correct:0, explanation:"" }),
+    vraifaux: () => ({ question:"", options:["Vrai","Faux"], correct:0, explanation:"" }),
+    dilemmes: () => ({ situation:"", options:["","",""], guidance:"" }),
+    echelle:  () => ({ statement:"" }),
+    ouverte:  () => ({ prompt:"" }),
+    nuage:    () => ({ prompt:"" })
+  }[modId];
+  if (!blank) return;
+  session.modules[modId].items.push(blank());
+  renderEditor();
+}
+
+// ========= AI PROMPT GENERATION =========
+function buildPrompt() {
+  syncForm();
+  const enabledAi = MODULES.filter(m => session.modules[m.id].enabled && m.aiGen);
+  if (enabledAi.length === 0) { toast("Coche au moins un module IA (Quiz, Dilemmes…).", "error"); return null; }
+  if (!session.source.trim()) { toast("Colle d'abord ton cours en bloc 3.", "error"); return null; }
+
+  const themePart = session.theme ? `Thème : ${session.theme}` : `Thème : à déduire du contenu`;
+  const audiencePart = `Public : ${session.audience || "parents d'élèves"} (langage clair, pas de jargon)`;
+
+  const blocks = [];
+  if (enabledAi.find(m => m.id === "quiz"))     blocks.push(`- "quiz" : ${session.nbQuestions} questions QCM. Format : { "question": str, "options": [str,str,str,(str)], "correct": index_int, "explanation": "explication simple en 2 phrases max, ton bienveillant" }`);
+  if (enabledAi.find(m => m.id === "vraifaux")) blocks.push(`- "vraifaux" : 8 affirmations Vrai/Faux pour casser les idées reçues. Format : { "question": "affirmation", "options": ["Vrai","Faux"], "correct": index_int, "explanation": "..." }`);
+  if (enabledAi.find(m => m.id === "dilemmes")) blocks.push(`- "dilemmes" : 4 mises en situation parents-ado, sans bonne réponse. Format : { "situation": "scène concrète au présent", "options": [3 ou 4 réactions plausibles], "guidance": "ce que l'animateur peut apporter pour éclairer le débat" }`);
+  if (enabledAi.find(m => m.id === "echelle"))  blocks.push(`- "echelle" : 6 affirmations à positionner de 1 (pas du tout d'accord) à 5 (tout à fait d'accord). Format : { "statement": "affirmation au "je"" }`);
+  if (enabledAi.find(m => m.id === "ouverte"))  blocks.push(`- "ouverte" : 3 questions ouvertes anonymes pour récolter des témoignages parents. Format : { "prompt": "question chaleureuse, invitation à partager" }`);
+  if (enabledAi.find(m => m.id === "nuage"))    blocks.push(`- "nuage" : 2 amorces "en 1 mot" pour nuage de mots. Format : { "prompt": "En un mot, …" }`);
+
+  return `Tu es un expert en animation de soirées-parents en lycée pro (PSE). Génère le contenu d'une session interactive à partir du document ci-dessous.
+
+${themePart}
+${audiencePart}
+
+CONTRAINTES :
+- Langage simple, accessible, bienveillant, jamais infantilisant.
+- Aucun jugement sur les pratiques parentales.
+- Explications courtes (2 phrases max), basées sur le document fourni.
+- Si le document ne couvre pas un point, dis-le, n'invente pas.
+- Anonymat total (ne fais référence à aucun parent en particulier).
+
+GÉNÈRE UNIQUEMENT CES BLOCS (clé exacte du JSON) :
+${blocks.join("\n")}
+
+FORMAT DE SORTIE — uniquement ce JSON, rien d'autre, pas de markdown, pas de \`\`\` :
+{
+${enabledAi.map(m => `  "${m.id}": [ … ]`).join(",\n")}
+}
+
+DOCUMENT SOURCE :
+"""
+${session.source}
+"""`;
+}
+
+function copyPrompt() {
+  const p = buildPrompt(); if (!p) return;
+  navigator.clipboard.writeText(p).then(() => toast("✅ Prompt copié — colle-le dans Claude/ChatGPT"));
+}
+
+function importAIJson() {
+  const raw = document.getElementById("f-aijson").value.trim();
+  if (!raw) { toast("Colle d'abord le JSON IA.", "error"); return; }
+  let data;
+  try {
+    // tolerate ```json fences
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    data = JSON.parse(cleaned);
+  } catch (e) { toast("JSON invalide : " + e.message, "error"); return; }
+
+  let count = 0;
+  Object.keys(data).forEach(key => {
+    if (session.modules[key] && Array.isArray(data[key])) {
+      session.modules[key].items = data[key];
+      count += data[key].length;
+    }
+  });
+  session.updatedAt = Date.now();
+  toast(`✅ ${count} éléments importés`);
+  renderEditor();
+}
+
+async function generateDirect() {
+  const p = buildPrompt(); if (!p) return;
+  const key = session.apiKey?.trim();
+  if (!key) { toast("Renseigne ta clé API ou utilise le mode copier-coller.", "error"); return; }
+  toast("⏳ Génération en cours…");
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: p }]
+      })
+    });
+    if (!r.ok) { toast("Erreur API : " + r.status, "error"); return; }
+    const json = await r.json();
+    const txt = json.content?.[0]?.text || "";
+    document.getElementById("f-aijson").value = txt;
+    importAIJson();
+  } catch (e) { toast("Erreur : " + e.message, "error"); }
+}
+
+// ========= ACTIONS =========
+function saveSession() {
+  syncForm();
+  if (!session.title.trim()) { toast("Donne un titre à la session.", "error"); return; }
+  const lib = loadLib();
+  const idx = lib.findIndex(s => s.id === session.id);
+  if (idx >= 0) lib[idx] = session; else lib.unshift(session);
+  saveLib(lib);
+  renderSidebar();
+  toast("💾 Session enregistrée");
+}
+
+function deleteSession() {
+  if (!confirm("Supprimer définitivement cette session ?")) return;
+  const lib = loadLib().filter(s => s.id !== session.id);
+  saveLib(lib);
+  session = null;
+  renderSidebar(); renderEditor();
+  toast("Session supprimée");
+}
+
+function duplicateSession() {
+  syncForm();
+  const copy = JSON.parse(JSON.stringify(session));
+  copy.id = uid();
+  copy.title = (session.title || "Sans titre") + " (copie)";
+  copy.createdAt = Date.now();
+  session = copy;
+  saveSession();
+  renderEditor();
+}
+
+function exportSession() {
+  syncForm();
+  const blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = (session.title || "session") + ".json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function launchSession() {
+  syncForm();
+  saveSession();
+  // V2 placeholder
+  const enabledModules = MODULES.filter(x => session.modules[x.id].enabled);
+  alert("🚀 Mode projection — V2 à venir.\n\nSéquence prête :\n" + enabledModules.map((m,i) => `${i+1}. ${m.emoji} ${m.name}`).join("\n") + `\n\nLa session est enregistrée. Le mode projection live (QR code, vote parents anonymes, écran géant animé, bilan) sera la prochaine livraison.`);
+}
+
+// ========= INIT =========
+renderSidebar();
+renderEditor();
+</script>
+</body>
+</html>
