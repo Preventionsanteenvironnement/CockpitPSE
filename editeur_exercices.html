@@ -425,6 +425,7 @@
                         <option value="duerp_mini">📋 Mission DUERP 2</option>
                         <option value="duer_mission_directeur">📋 Mission DUERP — Directeur</option>
                         <option value="pictogramme">⚠️ Pictogrammes de securite</option>
+                        <option value="legende_image">🖼️ Legender une image</option>
                         <option value="analyse_copie">📝 Analyse de copie (competences)</option>
                         <option value="itamami">🔬 Analyse ITaMaMi</option>
                         <option value="parcours_risques_inrs">🏭 Parcours Risques Professionnels INRS</option>
@@ -765,6 +766,43 @@
                 <div class="form-group" style="margin-top:10px;">
                     <label style="color:#a78bfa;">💡 Explication (optionnel)</label>
                     <textarea class="form-textarea" id="pad-explication" rows="2" placeholder="Explication pedagogique : pourquoi ces elements forment la chaine PAD..."></textarea>
+                </div>
+            </div>
+
+            <!-- LEGENDE IMAGE (image a legender avec zones masquees) -->
+            <div class="content-type-section" id="ct-legende_image">
+                <div style="background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);padding:12px;border-radius:10px;margin-bottom:12px;font-size:0.85rem;line-height:1.55;color:#cbd5e1;">
+                    📁 <strong style="color:#fff;">Ou deposer l'image ?</strong><br>
+                    Place ton fichier image dans le dossier GitHub <code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;">PSE/images_legendes/</code><br>
+                    Nom court, sans espaces ni accents, en minuscules (ex: <code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;">digestion_aliments.jpg</code>).<br>
+                    Tape ensuite ci-dessous le chemin <code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;">images_legendes/nom-du-fichier.jpg</code>.
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Titre</label>
+                    <input type="text" class="form-input" id="leg-titre" placeholder="Legender le systeme digestif">
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Situation / consigne pedagogique (optionnel, max 500 car.)</label>
+                    <textarea class="form-textarea" id="leg-situation" rows="2" maxlength="500" placeholder="Place chaque etiquette sur le bon organe du schema..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Chemin de l'image (ex: images_legendes/digestion.jpg)</label>
+                    <div style="display:flex;gap:8px;align-items:stretch;">
+                        <input type="text" class="form-input" id="leg-image" placeholder="images_legendes/digestion.jpg" oninput="legImagePreviewLoad()" style="flex:1;">
+                        <button type="button" class="btn-secondary" onclick="legImagePreviewLoad()" style="padding:8px 14px; border-radius:8px; background:#334155; color:#fff; border:1px solid #475569; font-weight:700; cursor:pointer;">Tester</button>
+                    </div>
+                    <small id="leg-image-status" style="color:#94a3b8;font-size:0.72rem;display:block;margin-top:4px;">Tape le chemin puis clique sur Tester.</small>
+                </div>
+                <label style="font-size:0.75rem;color:#f59e0b;text-transform:uppercase;letter-spacing:.5px;font-weight:700;display:block;margin-bottom:6px;margin-top:12px;">🖼️ Clique sur l'image pour placer une zone a legender</label>
+                <div id="leg-image-container" style="position:relative;max-width:100%;border:1px solid #334155;border-radius:8px;overflow:hidden;background:#0f172a;min-height:80px;user-select:none;cursor:crosshair;" onclick="legImageClick(event)">
+                    <img id="leg-image-preview" style="display:block;width:100%;height:auto;pointer-events:none;-webkit-user-drag:none;" alt="">
+                </div>
+                <small style="color:#94a3b8;font-size:0.72rem;display:block;margin-top:4px;">Astuce : clique a l'endroit du mot a masquer. Tu pourras ajuster la taille ensuite.</small>
+                <div id="leg-zones-list" style="display:grid;gap:10px;margin-top:14px;"></div>
+                <button type="button" class="btn-add-row" onclick="legAddZoneManual()" style="margin-top:8px;">+ Ajouter une zone a la main</button>
+                <div class="form-group" style="margin-top:10px;">
+                    <label style="color:#a78bfa;">💡 Explication (optionnel)</label>
+                    <textarea class="form-textarea" id="leg-explication" rows="2" placeholder="Explication pedagogique..."></textarea>
                 </div>
             </div>
 
@@ -1690,7 +1728,8 @@
         clic_deposer: '🖱️ Clic & Deposer',
         calcul_guide: '🧮 Calcul guide',
         reperage_clique: '🔍 Reperage & clic',
-        comparaison: '⚖️ Comparaison'
+        comparaison: '⚖️ Comparaison',
+        legende_image: '🖼️ Legender image'
     };
 
     // ========== CLASS PILLS ==========
@@ -2435,6 +2474,27 @@
             const padExpl = document.getElementById('pad-explication').value.trim();
             if (padExpl) padObj.explication = padExpl;
             return padObj;
+        } else if (type === 'legende_image') {
+            const legObj = {
+                type: 'legende_image',
+                titre: (document.getElementById('leg-titre').value || '').trim(),
+                situation: (document.getElementById('leg-situation').value || '').trim(),
+                image: (document.getElementById('leg-image').value || '').trim(),
+                zones: (window.__legZones || []).map(function(z){
+                    return {
+                        x: Math.round(z.x*100)/100,
+                        y: Math.round(z.y*100)/100,
+                        w: Math.round(z.w*100)/100,
+                        h: Math.round(z.h*100)/100,
+                        bonne: (z.bonne||'').trim(),
+                        distracteurs: (z.distracteurs||[]).map(function(s){return (s||'').trim();}).filter(Boolean)
+                    };
+                })
+            };
+            const legExpl = (document.getElementById('leg-explication').value || '').trim();
+            if (legExpl) legObj.explication = legExpl;
+            if (!legObj.situation) delete legObj.situation;
+            return legObj;
         } else if (type === 'itamami') {
             const itaObj = {
                 titre: document.getElementById('ita-titre').value.trim(),
@@ -3492,6 +3552,20 @@
             document.getElementById('pad-dommage').value = contenu.dommage || '';
             document.getElementById('pad-dist-dommage').value = toArray(contenu.distracteurs_dommage).join(' | ');
             document.getElementById('pad-explication').value = contenu.explication || '';
+        } else if (type === 'legende_image') {
+            document.getElementById('leg-titre').value = contenu.titre || '';
+            document.getElementById('leg-situation').value = contenu.situation || '';
+            document.getElementById('leg-image').value = contenu.image || '';
+            document.getElementById('leg-explication').value = contenu.explication || '';
+            window.__legZones = (contenu.zones || []).map(function(z){
+                return {
+                    x: +z.x||0, y: +z.y||0, w: +z.w||10, h: +z.h||5,
+                    bonne: z.bonne || '',
+                    distracteurs: Array.isArray(z.distracteurs) ? z.distracteurs.slice() : []
+                };
+            });
+            if (typeof legImagePreviewLoad === 'function') legImagePreviewLoad();
+            if (typeof legRenderZones === 'function') legRenderZones();
         } else if (type === 'itamami') {
             function toArrayIta(v) { if (Array.isArray(v)) return v; if (typeof v === 'string') return v.split(/[|,]/).map(function(s){return s.trim();}).filter(Boolean); return []; }
             document.getElementById('ita-titre').value = contenu.titre || '';
@@ -4429,6 +4503,27 @@
                 return;
             }
         }
+        // === VALIDATION LEGENDE_IMAGE ===
+        if (type === 'legende_image') {
+            const c = contenu;
+            const errors = [];
+            if (!c.titre) errors.push('Le titre est obligatoire');
+            if (!c.image) errors.push("Le chemin de l'image est obligatoire");
+            if (!Array.isArray(c.zones) || c.zones.length < 1) errors.push('Ajoute au moins 1 zone a legender');
+            (c.zones || []).forEach(function(z, i){
+                const n = i + 1;
+                if (!z.bonne) errors.push('Zone ' + n + ' : la bonne reponse est obligatoire');
+                if (!Array.isArray(z.distracteurs) || z.distracteurs.length < 1) errors.push('Zone ' + n + ' : au moins 1 distracteur');
+                if (z.distracteurs && z.distracteurs.length > 5) errors.push('Zone ' + n + ' : maximum 5 distracteurs');
+                (z.distracteurs || []).forEach(function(d, di){
+                    if (d && z.bonne && d.toLowerCase() === z.bonne.toLowerCase()) {
+                        errors.push('Zone ' + n + ' : distracteur ' + (di+1) + ' identique a la bonne reponse');
+                    }
+                });
+                if (z.w <= 0 || z.h <= 0) errors.push('Zone ' + n + ' : dimensions invalides');
+            });
+            if (errors.length > 0) { showToast('⚠️ ' + errors[0]); return; }
+        }
         // === VALIDATION PREVENTION ===
         if (type === 'prevention') {
             const c = contenu;
@@ -4990,6 +5085,7 @@
         pictogramme: 'Génère un exercice sur les pictogrammes de sécurité pour le module PSE [MODULE] en JSON.\n\nIMPORTANT : Les images sont déjà intégrées dans l\'application. Tu n\'as PAS besoin de mettre les chemins d\'images dans le JSON. Le système lie automatiquement chaque pictogramme à son image via son ID.\n\n=== 6 CATÉGORIES DISPONIBLES (81 pictogrammes) ===\n\nOBLIGATION (12) - Rond bleu :\nOB01: Port des gants obligatoire (OBLIGATION-gants.jpg)\nOB02: Port du casque obligatoire (OBLIGATION-casque.jpg)\nOB03: Chaussures de sécurité obligatoires (OBLIGATION-chaussures.jpg)\nOB04: Lunettes de protection obligatoires (OBLIGATION-lunettes.jpg)\nOB05: Visière de protection obligatoire (OBLIGATION-visiere.jpg)\nOB06: Casque antibruit obligatoire (OBLIGATION-casque-antibruit.jpg)\nOB07: Protection des voies respiratoires obligatoire (OBLIGATION-protection-voies-espiratoires.jpg)\nOB08: Combinaison de protection obligatoire (OBLIGATION-combinaison.jpg)\nOB09: Harnais de sécurité obligatoire (OBLIGATION-harnais.jpg)\nOB10: Obligation générale (OBLIGATION-general.jpg)\nOB11: Consulter la notice obligatoire (OBLIGATION-consulter-notice.jpg)\nOB12: Passage obligatoire pour piétons (OBLIGATION-pieton.jpg)\n\nINTERDICTION (8) - Rond rouge barré :\nIN01: Interdiction de fumer (INTERDIT-fumer.jpg)\nIN02: Flamme nue interdite (INTERDIT-flamme.jpg)\nIN03: Accès interdit (INTERDIT-entrer.jpg)\nIN04: Défense de toucher (INTERDIT-toucher.jpg)\nIN05: Eau interdite sur ce matériel (INTERDIT-seau-eau.jpg)\nIN06: Interdit aux piétons (INTERDIT-pietons.jpg)\nIN07: Interdit aux chariots (INTERDIT-chariot.jpg)\nIN08: Interdiction de boire et manger (INTERDIT-boire.jpg)\n\nDANGER (20) - Triangle jaune :\nDA01: Danger électrique (DANGER-electricite.jpg)\nDA02: Danger de chute (DANGER-chute.jpg)\nDA03: Danger de trébuchement (DANGER-trebuchement.jpg)\nDA04: Danger général (DANGER-general.jpg)\nDA05: Produit inflammable (DANGER-produit-inflammable.jpg)\nDA06: Produit explosif (DANGER-produit-explosif.jpg)\nDA07: Produit toxique (DANGER-produit-toxique.jpg)\nDA08: Produit nocif / irritant (DANGER-produit-nocif.jpg)\nDA09: Produit corrosif (DANGER-produit-corrosif.jpg)\nDA10: Produit comburant (DANGER-comburant.jpg)\nDA11: Atmosphère explosive (DANGER-atmosphere-explosive.jpg)\nDA12: Risque biologique (DANGER-risque-biologique.jpg)\nDA13: Danger radioactif (DANGER-radioactivite.jpg)\nDA14: Radiations non ionisantes (DANGER-radiations-non-ionisantes.jpg)\nDA15: Danger laser (DANGER-laser.jpg)\nDA16: Charge suspendue (DANGER-charge-suspendue.jpg)\nDA17: Danger chariot (DANGER-chariot.jpg)\nDA18: Champ magnétique (DANGER-champ-magnetique.jpg)\nDA19: Danger froid / gel (DANGER-froid-gel.jpg)\nDA20: Bande de signalisation (DANGER-bande-signalisation.jpg)\n\nINCENDIE (14) - Carré rouge :\nIC01: Extincteur (INCENDIE-extincteur.jpg)\nIC02: Alarme incendie (INCENDIE-alarme.jpg)\nIC03: Lance à incendie (INCENDIE-lance.jpg)\nIC04: Échelle incendie (INCENDIE-echelle.jpg)\nIC05: Équipement incendie (INCENDIE-equipement.jpg)\nIC06: Téléphone urgence incendie (INCENDIE-telephone.jpg)\nIC07-IC14: Flèches directionnelles incendie\n\nSECOURS (18) - Carré vert :\nSE01: Sortie de secours vers la droite (SECOURS-sortie-vers-droite.jpg)\nSE02: Sortie de secours vers la gauche (SECOURS-sortie-vers-gauche.jpg)\nSE03: Point de rassemblement (SECOURS-point-rassemblement.jpg)\nSE04: Défibrillateur (SECOURS-defibrillateur.jpg)\nSE05: Premiers secours (SECOURS-croix.jpg)\nSE06: Civière (SECOURS-civiere.jpg)\nSE07: Douche de sécurité (SECOURS-douche-securite.jpg)\nSE08: Douche oculaire (SECOURS-douche-oeil.jpg)\nSE09: Téléphone urgence secours (SECOURS-telephone-urgence.jpg)\nSE10: Refuge temporaire évacuation (SECOURS-refuge-temporaire-evacuation.jpg)\nSE11-SE18: Flèches directionnelles secours\n\nSGH - PRODUITS CHIMIQUES (9) - Losange rouge :\nSG01: Bombe explosante (SGH01_BombeExplosant.jpg)\nSG02: Flamme (SGH02_Flamme.jpg)\nSG03: Flamme sur cercle (SGH03_FlammeSurCercle.jpg)\nSG04: Bouteille de gaz (SGH04_BouteilleGaz.jpg)\nSG05: Corrosion (SGH05_Corrosion.jpg)\nSG06: Tête de mort (SGH06_TeteDeMort.jpg)\nSG07: Point d\'exclamation (SGH07_PointExclamation.jpg)\nSG08: Danger pour la santé (SGH08_DangerSante.jpg)\nSG09: Environnement (SGH09_Environnement.jpg)\n\n=== 6 MODES D\'EXERCICE ===\n\nMODE 1 - quiz_image : On montre l\'image, l\'élève choisit le bon nom parmi 4\nMODE 2 - nom_vers_image : On donne le nom, l\'élève choisit la bonne image parmi 4\nMODE 3 - categoriser : L\'élève trie les pictogrammes dans les bonnes catégories\nMODE 4 - memory : Retrouver les paires image/nom (jeu de mémoire)\nMODE 5 - speed : Identifier un maximum de pictogrammes en 60 secondes\nMODE 6 - escape_game : Série d\'épreuves enchaînées à résoudre pour avancer\n\n=== FORMATS JSON PAR MODE ===\n\nPour les modes 1 à 5 (quiz_image, nom_vers_image, categoriser, memory, speed) :\n{\n  "consigne": "Identifie les pictogrammes de sécurité",\n  "mode": "quiz_image",\n  "nb": 8,\n  "categories": ["obligation", "interdiction", "danger", "incendie", "secours", "sgh"],\n  "explication": "Explication pédagogique (optionnel)"\n}\n\nPour le mode escape_game :\n{\n  "consigne": "Escape Game : Mission Sécurité !",\n  "mode": "escape_game",\n  "categories": ["obligation", "danger", "incendie", "sgh"],\n  "epreuves": [\n    {\n      "titre": "Épreuve 1 : Identification",\n      "type": "quiz_image",\n      "description": "Identifie ces pictogrammes pour obtenir le code",\n      "pictos": ["OB01", "DA03", "IC01", "SG06"]\n    },\n    {\n      "titre": "Épreuve 2 : Classement",\n      "type": "categoriser",\n      "description": "Trie ces pictogrammes pour déverrouiller la porte",\n      "pictos": ["OB02", "DA01", "IC02", "SE03", "SG02", "IN01"]\n    },\n    {\n      "titre": "Épreuve 3 : Memory",\n      "type": "memory",\n      "description": "Retrouve les paires pour obtenir la clé finale",\n      "pictos": ["DA05", "DA07", "SG05", "SG08", "IN02", "OB04"]\n    }\n  ],\n  "explication": "Les pictogrammes de sécurité sont essentiels pour prévenir les risques professionnels."\n}\n\nRÈGLES :\n- nb entre 4 et 81\n- categories : au moins 1 catégorie parmi obligation, interdiction, danger, incendie, secours, sgh\n- Pour memory, nb recommandé 6 à 10\n- Pour speed, nb recommandé 15 à 30\n- Pour escape_game : 3 à 5 épreuves, chaque épreuve a un type (quiz_image, nom_vers_image, categoriser, memory) et une liste de pictos (IDs)\n- Les IDs des pictos doivent correspondre à ceux listés ci-dessus (OB01, DA03, SG06, etc.)\n- Vocabulaire CAP/Bac Pro\n- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)',
         analyse_copie: 'Génère un exercice "Analyse de copie" pour le module PSE [MODULE] en JSON.\n\nCONCEPT : L\'élève devient correcteur d\'une copie d\'examen PSE. Il doit analyser chaque réponse d\'un élève fictif et évaluer 7 critères.\n\n=== COMPÉTENCES ÉVALUABLES ===\nC2 — Appliquer une démarche d\'analyse (identifier, analyser, repérer)\nC3 — Expliquer un phénomène (expliquer, décrire, définir)\nC4 — Proposer une solution (proposer, suggérer, recommander)\nC5 — Argumenter un choix (argumenter, justifier, comparer)\nC6 — Communiquer à l\'écrit (communiquer, rédiger, présenter)\n\n=== VERBES D\'ACTION ===\nidentifier, expliquer, proposer, argumenter, communiquer, appliquer\n\n=== 4 CRITÈRES C6 (pour les items où compétence = C6) ===\n1. Vocabulaire adapté (0 = inadapté, 1 = partiellement adapté, 2 = adapté)\n2. Syntaxe claire et correcte (0 = incompréhensible, 1 = partiellement claire, 2 = claire)\n3. Argumentation structurée (0 = absente, 1 = partiellement structurée, 2 = structurée)\n4. Mise en forme / présentation (0 = absente, 1 = partiellement soignée, 2 = soignée)\n\n=== FORMAT JSON ===\n{\n  "consigne": "Analyse cette copie d\'examen PSE et évalue chaque réponse",\n  "contexte": "Description du contexte de l\'examen (situation professionnelle, consignes...)",\n  "items": [\n    {\n      "question_examen": "La question posée à l\'élève lors de l\'examen",\n      "reponse_eleve": "La réponse écrite par l\'élève fictif (peut être bonne, partielle ou mauvaise)",\n      "verbes_proposes": ["identifier", "expliquer", "proposer", "argumenter"],\n      "attendus": {\n        "verbe": "identifier",\n        "competence": "C2",\n        "validee": "oui",\n        "niveau": 3,\n        "justification_mots_cles": ["danger", "électrique", "risque"],\n        "justification_modele": "C\'est C2 car je dois repérer et nommer le danger principal présent dans la situation",\n        "c6": { "actif": false },\n        "amelioration_mots_cles": ["préciser", "source", "conséquence"]\n      },\n      "explications": {\n        "resume": "Tu as bien identifié le danger mais il manque la source exacte.",\n        "attendu_pedagogique": "Le verbe identifier demande de repérer et nommer clairement un élément précis dans la situation.",\n        "pourquoi_valide_ou_non": "La réponse est acceptable car l\'élève a bien repéré le danger, même si la formulation manque de précision.",\n        "exemple_reponse_amelioree": "Le danger principal est le risque électrique lié aux câbles dénudés.",\n        "exemple_reponse_excellente": "Le danger identifié dans cette situation est le risque électrique causé par les câbles dénudés à proximité du poste de travail.",\n        "erreurs_frequentes": ["Confondre danger et risque", "Répondre par un dommage au lieu du danger", "Réponse trop vague sans nommer le danger"]\n      }\n    },\n    {\n      "question_examen": "Rédige un compte-rendu des mesures de prévention",\n      "reponse_eleve": "faut mettre des gants et faire attention aux fils",\n      "verbes_proposes": ["communiquer", "rédiger", "expliquer", "argumenter"],\n      "attendus": {\n        "verbe": "communiquer",\n        "competence": "C6",\n        "validee": "oui",\n        "niveau": 2,\n        "justification_mots_cles": ["communication", "rédaction", "écrit"],\n        "justification_modele": "C\'est C6 car la question demande de rédiger un compte-rendu, ce qui relève de la communication écrite",\n        "c6": {\n          "actif": true,\n          "criteres": [1, 1, 0, 0]\n        },\n        "amelioration_mots_cles": ["syntaxe", "vocabulaire", "structure", "présentation"]\n      },\n      "explications": {\n        "resume": "Le contenu est partiellement correct mais la forme écrite est insuffisante.",\n        "attendu_pedagogique": "Le verbe communiquer demande de produire un écrit structuré, avec un vocabulaire professionnel adapté.",\n        "pourquoi_valide_ou_non": "La réponse mentionne des mesures mais la formulation est trop familière et manque de structure.",\n        "exemple_reponse_amelioree": "Les mesures de prévention recommandées sont le port de gants isolants et la vérification de l\'état des câbles.",\n        "erreurs_frequentes": ["Utiliser un langage familier", "Oublier la structure du compte-rendu", "Ne pas utiliser le vocabulaire professionnel"],\n        "explication_c6": {\n          "vocabulaire": "Le terme \'fils\' devrait être remplacé par \'câbles électriques\' ou \'conducteurs\'.",\n          "syntaxe": "La phrase commence sans majuscule et manque de sujet. Écrire des phrases complètes.",\n          "argumentation": "Aucune justification des mesures proposées. Expliquer POURQUOI ces mesures.",\n          "presentation": "Pas de mise en forme : il faudrait des puces ou un tableau pour lister les mesures."\n        },\n        "exemple_reformulation": "Dans un compte-rendu professionnel, je structure mes idées avec des phrases complètes et un vocabulaire technique adapté."\n      }\n    }\n  ],\n  "explication": "Explication pédagogique globale (optionnel)"\n}\n\n=== RÈGLES CRUCIALES ===\n1. 3 à 6 items par exercice\n2. Varier les compétences : au moins 3 compétences différentes, dont obligatoirement 1 item C6\n3. verbes_proposes : 4 verbes dont 1 seul est la bonne réponse\n4. validee : "oui" ou "non" (la réponse de l\'élève est-elle acceptable ?)\n5. niveau : 1 (insuffisant), 2 (fragile), 3 (satisfaisant), 4 (excellent) — seulement si validee="oui"\n6. justification_mots_cles : 2-4 mots-clés que l\'élève-correcteur doit mentionner pour justifier son évaluation\n7. c6.actif : true UNIQUEMENT si compétence = "C6"\n8. c6.criteres : tableau de 4 valeurs (0, 1 ou 2) correspondant aux 4 critères C6\n9. amelioration_mots_cles : 2-4 mots-clés que l\'élève-correcteur doit mentionner comme pistes d\'amélioration\n10. Les réponses de l\'élève fictif doivent être RÉALISTES (certaines bonnes, certaines médiocres, certaines mauvaises)\n11. Vocabulaire adapté CAP/Bac Pro\n12. Les questions d\'examen doivent être en lien avec des situations professionnelles\n13. justification_modele (OBLIGATOIRE) : phrase modèle montrant comment l\'élève-correcteur devrait justifier son choix de compétence. Commence par "C\'est CX car..."\n14. explications (OBLIGATOIRE pour chaque item) : objet contenant les champs suivants :\n    - resume (OBLIGATOIRE) : phrase courte résumant le feedback, visible directement sans ouvrir le détail\n    - attendu_pedagogique (OBLIGATOIRE) : explication de ce que le verbe d\'action demande concrètement\n    - pourquoi_valide_ou_non (OBLIGATOIRE) : explication de pourquoi la réponse est jugée acceptable ou non\n    - exemple_reponse_amelioree (OBLIGATOIRE) : comment l\'élève aurait pu mieux formuler sa réponse\n    - exemple_reponse_excellente (OPTIONNEL) : la réponse parfaite attendue, complète et exemplaire\n    - erreurs_frequentes (OBLIGATOIRE) : tableau de 2-4 erreurs typiques des élèves sur ce type de question\n15. Pour les items C6 uniquement, ajouter dans explications :\n    - explication_c6 : objet avec 4 clés (vocabulaire, syntaxe, argumentation, présentation) donnant un feedback texte pour chaque critère\n    - exemple_reformulation : phrase montrant comment reformuler correctement\n16. Le résumé doit être une phrase courte (max 15 mots) qui accroche l\'élève\n17. Les explications doivent être bienveillantes et constructives, adaptées à des élèves de CAP/Bac Pro\n18. Chaque explication doit être spécifique à la question et à la réponse de l\'élève (pas de texte générique)\n- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)',
         scenario: 'Génère un exercice Scénario interactif pour le module PSE [MODULE] en JSON.\n\nFormat STRICT :\n{\n  "titre": "Scénario - [situation]",\n  "etapes": [\n    {\n      "id": "debut",\n      "texte": "Description de la situation initiale...",\n      "choix": [\n        { "label": "Choix A (bon)", "suite": "etape2", "correct": true },\n        { "label": "Choix B (mauvais)", "suite": "bad1", "correct": false, "feedback": "Explication courte" }\n      ]\n    },\n    {\n      "id": "etape2",\n      "texte": "Suite de la situation...",\n      "choix": [\n        { "label": "Bon choix", "suite": "fin", "correct": true },\n        { "label": "Mauvais choix", "suite": "bad2", "correct": false, "feedback": "..." }\n      ]\n    },\n    { "id": "fin", "texte": "Bravo ! Vous avez géré la situation correctement.", "choix": [] },\n    { "id": "bad1", "texte": "Cette approche n\'est pas adaptée car [explication détaillée]. Vous pouvez réessayer.", "choix": [{ "label": "Réessayer", "suite": "debut", "correct": false }] },\n    { "id": "bad2", "texte": "Ce n\'est pas la bonne réaction car [explication]. Réessayez.", "choix": [{ "label": "Réessayer", "suite": "etape2", "correct": false }] }\n  ]\n}\n\nRÈGLES OBLIGATOIRES :\n- 4 à 8 étapes\n- Première étape id = "debut"\n- SEULE la fin réelle du scénario (bravo, réussite) a choix: []\n- Les étapes d\'erreur (bad*) NE DOIVENT PAS avoir choix: [] ! Elles doivent contenir au moins 1 choix de reprise :\n  { "label": "Réessayer", "suite": "etape_precedente", "correct": false }\n- Les explications d\'erreur doivent être dans le champ texte de l\'étape bad (pas seulement dans feedback)\n- Le feedback des mauvais choix n\'est visible que brièvement : mettre l\'essentiel dans texte de l\'étape bad\n- Chaque choix.suite pointe vers un id existant\n- Pas de boucles infinies (max 30 étapes parcourues)\n- 2-3 choix par étape\n- correct: true/false pour le scoring\n- feedback obligatoire pour les mauvais choix\n- Situation réaliste et professionnelle\n- Vocabulaire CAP/Bac Pro\n- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)',
+        legende_image: 'Génère un exercice "Légender une image" pour le module PSE [MODULE] en JSON.\n\nCONTEXTE : l\'élève doit placer le bon mot sur chaque zone masquée d\'une image (schéma anatomique, poste de travail, pictogrammes, etc.). Toi tu ne vois PAS l\'image — tu proposes UNIQUEMENT les mots à faire légender et leurs distracteurs. L\'enseignant ajoutera l\'image et cliquera sur chaque zone pour placer les rectangles de masquage.\n\nFormat STRICT :\n{\n  "type": "legende_image",\n  "titre": "Légender - [thème]",\n  "situation": "Consigne pédagogique courte (optionnel, 1-2 phrases)",\n  "image": "",\n  "zones": [\n    { "bonne": "Œsophage", "distracteurs": ["Trachée", "Pharynx", "Larynx"] },\n    { "bonne": "Estomac",  "distracteurs": ["Foie", "Pancréas", "Vésicule"] }\n  ],\n  "explication": "Explication pédagogique (optionnel)"\n}\n\nRÈGLES :\n- 4 à 10 zones à légender\n- Chaque zone = 1 bonne réponse + 3 distracteurs (tableau JSON)\n- Les distracteurs du même univers/thème que la bonne réponse, jamais identiques à elle\n- Chaque libellé max 80 caractères, concis (1-3 mots de préférence)\n- "image" = "" (chaîne vide) — ne devine pas de chemin d\'image, l\'enseignant le remplira\n- Les coordonnées (x,y,w,h) ne sont PAS générées ici — elles seront placées par l\'enseignant dans l\'éditeur en cliquant sur l\'image\n- Vocabulaire adapté CAP/Bac Pro\n- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)\n- RÉPONDS UNIQUEMENT avec le JSON valide, aucun texte avant/après, pas de ```',
         itamami: 'Génère un exercice "Analyse ITaMaMi" pour le module PSE [MODULE] en JSON.\nL\'élève lit une situation professionnelle puis doit identifier les déterminants dans 4 catégories ITaMaMi, ainsi que les effets sur le salarié et l\'entreprise.\n\nITaMaMi = Individu / Tâche / Matériel / Milieu\n- Individu : facteurs liés à la personne (âge, fatigue, expérience, formation, état de santé, ancienneté, stress, handicap...)\n- Tâche : facteurs liés à l\'activité de travail (gestes répétitifs, postures contraignantes, cadence, port de charges, travail en hauteur...)\n- Matériel : facteurs liés aux outils et équipements (machines, outils, EPI, état du matériel, véhicules, produits chimiques...)\n- Milieu : facteurs liés à l\'environnement de travail (bruit, température, éclairage, aération, sol glissant, espace de travail, poussière...)\n\nFormat STRICT :\n{\n  "titre": "ITaMaMi - [métier/situation]",\n  "situation": "..." (3-5 phrases réalistes, max 500 caractères, avec des indices clairs pour chaque catégorie),\n  "individu": "..." (max 120 car),\n  "distracteurs_individu": ["dist1", "dist2", "dist3"],\n  "tache": "..." (max 120 car),\n  "distracteurs_tache": ["dist1", "dist2", "dist3"],\n  "materiel": "..." (max 120 car),\n  "distracteurs_materiel": ["dist1", "dist2", "dist3"],\n  "milieu": "..." (max 120 car),\n  "distracteurs_milieu": ["dist1", "dist2", "dist3"],\n  "effet_salarie": "..." (max 120 car),\n  "distracteurs_effet_salarie": ["dist1", "dist2", "dist3"],\n  "effet_entreprise": "..." (max 120 car),\n  "distracteurs_effet_entreprise": ["dist1", "dist2", "dist3"]\n}\n\nRÈGLES CRUCIALES :\n- La situation DOIT contenir des indices exploitables pour chaque catégorie ITaMaMi\n- Exactement 3 distracteurs par champ (tableaux JSON, pas de CSV)\n- Les distracteurs doivent être des déterminants RÉELS mais de la MAUVAISE catégorie\n  Ex: pour "Individu", un distracteur peut être "Sol glissant" (qui est un facteur Milieu, pas Individu)\n- Chaque distracteur max 80 caractères\n- Les effets sur le salarié = conséquences sur sa santé (TMS, stress, blessure, fatigue, maladie pro...)\n- Les effets sur l\'entreprise = conséquences organisationnelles (absentéisme, turnover, coût AT/MP, baisse productivité, sanctions...)\n- Les distracteurs d\'effets salariés doivent être des effets ENTREPRISE et vice-versa\n- Vocabulaire simple adapté à des élèves de CAP/Bac Pro\n- Situations réalistes issues de vrais métiers\n- GARDE TOUS LES ACCENTS (é, è, à, ç, etc.)\n- Ajoute un champ "explication" (optionnel) avec une explication pédagogique montrant comment les 4 déterminants interagissent dans cette situation.'
     };
 
@@ -5414,6 +5510,8 @@ Important:
         if (src.exposition && src.declencheur && src.gravite) return 'estimation_risque';
         if (src.distracteurs_individu) return 'itamami';
         if (src.distracteurs_danger) return 'pad';
+        if (src.type === 'legende_image') return 'legende_image';
+        if (Array.isArray(src.zones) && src.zones[0] && (src.zones[0].bonne !== undefined) && src.image && typeof src.image === 'string') return 'legende_image';
         if (Array.isArray(src.items) && src.items.length > 0) {
             var acFirst = src.items[0] || {};
             var hasLegacyAnalyse = !!(acFirst.attendus && (acFirst.attendus.verbe || acFirst.attendus.competence || acFirst.question_examen));
@@ -6074,6 +6172,227 @@ Important:
         t.style.display = 'block';
         setTimeout(() => { t.style.display = 'none'; }, duration || 2500);
     }
+
+    // ========== LEGENDE_IMAGE : edition interactive ==========
+    window.__legZones = window.__legZones || [];
+
+    function legImagePreviewLoad() {
+        const pathEl = document.getElementById('leg-image');
+        const img = document.getElementById('leg-image-preview');
+        const status = document.getElementById('leg-image-status');
+        const raw = (pathEl.value || '').trim();
+        if (!raw) {
+            img.src = '';
+            status.textContent = 'Tape le chemin puis clique sur Tester.';
+            status.style.color = '#94a3b8';
+            return;
+        }
+        // L'editeur est dans CockpitPSE/ et les images dans PSE/images_legendes/
+        // On resout le chemin en prefixant "../PSE/" si l'utilisateur tape "images_legendes/..."
+        var src;
+        if (/^https?:\/\//i.test(raw)) src = raw;
+        else if (raw.startsWith('../')) src = raw;
+        else if (raw.startsWith('PSE/')) src = '../' + raw;
+        else src = '../PSE/' + raw.replace(/^\//, '');
+        img.onload = function() {
+            status.textContent = '✅ Image chargee (' + img.naturalWidth + ' × ' + img.naturalHeight + ' px).';
+            status.style.color = '#6ee7b7';
+            legRenderZones();
+        };
+        img.onerror = function() {
+            status.innerHTML = '❌ Image introuvable. Verifie le chemin et le nom (sans accents, sans espaces).';
+            status.style.color = '#fca5a5';
+        };
+        img.src = src + '?t=' + Date.now();
+    }
+
+    function legImageClick(ev) {
+        const container = document.getElementById('leg-image-container');
+        const img = document.getElementById('leg-image-preview');
+        if (!img.src || !img.naturalWidth) {
+            showToast('⚠️ Charge d\'abord une image (bouton Tester).');
+            return;
+        }
+        // coordonnees en % par rapport au container
+        const rect = container.getBoundingClientRect();
+        const xPct = ((ev.clientX - rect.left) / rect.width) * 100;
+        const yPct = ((ev.clientY - rect.top)  / rect.height) * 100;
+        // ne pas cliquer sur un overlay zone existant
+        if (ev.target && ev.target.classList && ev.target.classList.contains('leg-zone-overlay')) return;
+        // taille par defaut
+        const defaultW = 14, defaultH = 6;
+        window.__legZones.push({
+            x: Math.max(0, xPct - defaultW/2),
+            y: Math.max(0, yPct - defaultH/2),
+            w: defaultW, h: defaultH,
+            bonne: '',
+            distracteurs: ['', '', '']
+        });
+        legRenderZones();
+    }
+
+    function legAddZoneManual() {
+        window.__legZones.push({ x: 40, y: 40, w: 15, h: 7, bonne: '', distracteurs: ['', '', ''] });
+        legRenderZones();
+    }
+
+    function legDeleteZone(i) {
+        window.__legZones.splice(i, 1);
+        legRenderZones();
+    }
+
+    function legUpdateZone(i, field, value) {
+        if (!window.__legZones[i]) return;
+        if (field.startsWith('dist_')) {
+            const di = parseInt(field.split('_')[1], 10);
+            window.__legZones[i].distracteurs[di] = value;
+        } else if (['x','y','w','h'].indexOf(field) !== -1) {
+            window.__legZones[i][field] = Math.max(0, parseFloat(value) || 0);
+            legRenderZones();
+            return;
+        } else {
+            window.__legZones[i][field] = value;
+        }
+    }
+
+    function legCopyPromptForDistracteurs(i) {
+        const z = window.__legZones[i];
+        if (!z || !z.bonne) { showToast('⚠️ Tape d\'abord la bonne reponse.'); return; }
+        const prompt = 'Propose 3 distracteurs pedagogiques pour un exercice PSE de legende d\'image.\n' +
+            'Bonne reponse : "' + z.bonne + '"\n' +
+            'Theme/contexte : ' + (document.getElementById('leg-titre').value || '(non precise)') + '\n' +
+            'Exigences :\n- Exactement 3 distracteurs\n- Meme univers/theme que la bonne reponse\n- Tous differents entre eux et differents de la bonne reponse\n- Max 80 caracteres chacun\n- Reponds UNIQUEMENT au format JSON : { "distracteurs": ["d1","d2","d3"] }\n- Aucun texte autour, pas de markdown';
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(prompt).then(function(){
+                showToast('📋 Prompt copie. Colle-le dans ChatGPT, puis colle les distracteurs dans les champs.');
+            }, function(){ legFallbackCopy(prompt); });
+        } else {
+            legFallbackCopy(prompt);
+        }
+    }
+    function legFallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast('📋 Prompt copie.'); } catch(e){ showToast('Copie impossible.'); }
+        document.body.removeChild(ta);
+    }
+
+    function legRenderZones() {
+        // 1) Rendu des overlays sur l'image
+        const container = document.getElementById('leg-image-container');
+        container.querySelectorAll('.leg-zone-overlay').forEach(function(el){ el.remove(); });
+        (window.__legZones || []).forEach(function(z, i){
+            const d = document.createElement('div');
+            d.className = 'leg-zone-overlay';
+            d.style.cssText = 'position:absolute; left:' + z.x + '%; top:' + z.y + '%; width:' + z.w + '%; height:' + z.h + '%; border:2px solid #f97316; background:rgba(249,115,22,.35); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff; font-size:0.75rem; pointer-events:auto; cursor:move; user-select:none;';
+            d.textContent = (i+1) + (z.bonne ? ' · ' + z.bonne : '');
+            d.title = 'Zone #' + (i+1) + ' — glisse pour deplacer';
+            // Drag
+            d.onmousedown = function(e){ e.preventDefault(); e.stopPropagation(); legStartDrag(e, i, 'move'); };
+            d.ontouchstart = function(e){ e.preventDefault(); e.stopPropagation(); const t=e.touches[0]; legStartDrag({clientX:t.clientX,clientY:t.clientY,target:d}, i, 'move'); };
+            // petite poignee redimensionnement en bas-droite
+            const h = document.createElement('span');
+            h.style.cssText = 'position:absolute;right:-2px;bottom:-2px;width:14px;height:14px;background:#fff;border:2px solid #f97316;border-radius:3px;cursor:nwse-resize;';
+            h.onmousedown = function(e){ e.preventDefault(); e.stopPropagation(); legStartDrag(e, i, 'resize'); };
+            h.ontouchstart = function(e){ e.preventDefault(); e.stopPropagation(); const t=e.touches[0]; legStartDrag({clientX:t.clientX,clientY:t.clientY}, i, 'resize'); };
+            d.appendChild(h);
+            container.appendChild(d);
+        });
+        // 2) Rendu de la liste des zones en dessous
+        const list = document.getElementById('leg-zones-list');
+        list.innerHTML = '';
+        (window.__legZones || []).forEach(function(z, i){
+            const row = document.createElement('div');
+            row.style.cssText = 'background:rgba(15,23,42,.6); border:1px solid #334155; border-radius:10px; padding:10px;';
+            row.innerHTML =
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                  '<strong style="color:#f97316;">Zone ' + (i+1) + '</strong>' +
+                  '<button type="button" onclick="legDeleteZone(' + i + ')" style="background:#7f1d1d;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;">Supprimer</button>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.7rem;">Bonne reponse</label><input type="text" class="form-input" data-i="' + i + '" data-f="bonne" maxlength="80"></div>' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.7rem;">Distracteur 1</label><input type="text" class="form-input" data-i="' + i + '" data-f="dist_0" maxlength="80"></div>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.7rem;">Distracteur 2</label><input type="text" class="form-input" data-i="' + i + '" data-f="dist_1" maxlength="80"></div>' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.7rem;">Distracteur 3</label><input type="text" class="form-input" data-i="' + i + '" data-f="dist_2" maxlength="80"></div>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;">' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.65rem;">x (%)</label><input type="number" step="0.1" class="form-input" data-i="' + i + '" data-f="x"></div>' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.65rem;">y (%)</label><input type="number" step="0.1" class="form-input" data-i="' + i + '" data-f="y"></div>' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.65rem;">largeur (%)</label><input type="number" step="0.1" class="form-input" data-i="' + i + '" data-f="w"></div>' +
+                  '<div class="form-group" style="margin:0;"><label style="font-size:.65rem;">hauteur (%)</label><input type="number" step="0.1" class="form-input" data-i="' + i + '" data-f="h"></div>' +
+                '</div>' +
+                '<button type="button" onclick="legCopyPromptForDistracteurs(' + i + ')" style="background:#1e40af;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;">🤖 Suggerer 3 distracteurs avec l\'IA</button>';
+            list.appendChild(row);
+            // remplir les valeurs
+            row.querySelector('[data-f="bonne"]').value = z.bonne || '';
+            row.querySelector('[data-f="dist_0"]').value = (z.distracteurs && z.distracteurs[0]) || '';
+            row.querySelector('[data-f="dist_1"]').value = (z.distracteurs && z.distracteurs[1]) || '';
+            row.querySelector('[data-f="dist_2"]').value = (z.distracteurs && z.distracteurs[2]) || '';
+            row.querySelector('[data-f="x"]').value = z.x;
+            row.querySelector('[data-f="y"]').value = z.y;
+            row.querySelector('[data-f="w"]').value = z.w;
+            row.querySelector('[data-f="h"]').value = z.h;
+            row.querySelectorAll('input[data-f]').forEach(function(inp){
+                inp.addEventListener('input', function(){ legUpdateZone(parseInt(this.dataset.i,10), this.dataset.f, this.value); });
+            });
+        });
+    }
+
+    // Drag & resize pour les zones
+    var __legDrag = null;
+    function legStartDrag(e, i, mode) {
+        const container = document.getElementById('leg-image-container');
+        const rect = container.getBoundingClientRect();
+        __legDrag = {
+            i: i, mode: mode,
+            startX: e.clientX, startY: e.clientY,
+            startZone: Object.assign({}, window.__legZones[i]),
+            rect: rect
+        };
+        document.addEventListener('mousemove', legDoDrag);
+        document.addEventListener('mouseup', legEndDrag);
+        document.addEventListener('touchmove', legDoDragTouch, {passive:false});
+        document.addEventListener('touchend', legEndDrag);
+    }
+    function legDoDrag(e) {
+        if (!__legDrag) return;
+        const dxPct = ((e.clientX - __legDrag.startX) / __legDrag.rect.width) * 100;
+        const dyPct = ((e.clientY - __legDrag.startY) / __legDrag.rect.height) * 100;
+        const z = window.__legZones[__legDrag.i];
+        if (__legDrag.mode === 'move') {
+            z.x = Math.max(0, Math.min(100 - z.w, __legDrag.startZone.x + dxPct));
+            z.y = Math.max(0, Math.min(100 - z.h, __legDrag.startZone.y + dyPct));
+        } else if (__legDrag.mode === 'resize') {
+            z.w = Math.max(2, Math.min(100 - z.x, __legDrag.startZone.w + dxPct));
+            z.h = Math.max(2, Math.min(100 - z.y, __legDrag.startZone.h + dyPct));
+        }
+        legRenderZones();
+    }
+    function legDoDragTouch(e) { if (e.touches[0]) { e.preventDefault(); legDoDrag({clientX:e.touches[0].clientX, clientY:e.touches[0].clientY}); } }
+    function legEndDrag() {
+        __legDrag = null;
+        document.removeEventListener('mousemove', legDoDrag);
+        document.removeEventListener('mouseup', legEndDrag);
+        document.removeEventListener('touchmove', legDoDragTouch);
+        document.removeEventListener('touchend', legEndDrag);
+    }
+
+    // Reset quand on change de type
+    (function(){
+        const origOnTypeChange = window.onTypeChange;
+        if (typeof origOnTypeChange === 'function') {
+            window.onTypeChange = function() {
+                origOnTypeChange.apply(this, arguments);
+                if (document.getElementById('exo-type').value === 'legende_image') {
+                    legImagePreviewLoad();
+                    legRenderZones();
+                }
+            };
+        }
+    })();
 </script>
 </body>
 </html>
