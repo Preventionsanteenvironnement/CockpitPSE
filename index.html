@@ -3673,10 +3673,16 @@ ${sp_session.source}
 
   window.sp_importJson = function(){
     const raw = document.getElementById("sp-aijson").value.trim();
-    if (!raw) { toast("Colle d'abord le JSON IA."); return; }
+    if (!raw) { toast("Colle d'abord la réponse de l'IA."); return; }
     let data;
     try {
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+      // 1) enlève les fences markdown ```json … ```
+      let cleaned = raw.replace(/```(?:json)?/gi, "").trim();
+      // 2) extrait le 1er objet JSON (du 1er { au } correspondant)
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end === -1 || end <= start) throw new Error("Aucun objet JSON détecté dans la réponse.");
+      cleaned = cleaned.slice(start, end + 1);
       data = JSON.parse(cleaned);
     } catch(e) { toast("JSON invalide : " + e.message); return; }
     let count = 0;
