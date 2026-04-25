@@ -3676,12 +3676,19 @@ ${sp_session.source}
     if (!raw) { toast("Colle d'abord la réponse de l'IA."); return; }
     let data;
     try {
-      // 1) enlève les fences markdown ```json … ```
-      let cleaned = raw.replace(/```(?:json)?/gi, "").trim();
-      // 2) extrait le 1er objet JSON (du 1er { au } correspondant)
+      let cleaned = raw;
+      // 1) enlève les fences markdown ```json … ``` et backticks isolés
+      cleaned = cleaned.replace(/```(?:json)?/gi, "").replace(/`/g, "").trim();
+      // 2) normalise les guillemets typographiques en guillemets droits
+      cleaned = cleaned
+        .replace(/[“”„‟″‶]/g, '"')   // " " „ ‟ ″ ‶
+        .replace(/[‘’‚‛′‵]/g, "'")   // ' ' ‚ ‛ ′ ‵
+        .replace(/[«»]/g, '"')                            // « »
+        .replace(/[–—]/g, "-");                           // – —
+      // 3) extrait le 1er objet JSON (du 1er { au dernier })
       const start = cleaned.indexOf("{");
       const end = cleaned.lastIndexOf("}");
-      if (start === -1 || end === -1 || end <= start) throw new Error("Aucun objet JSON détecté dans la réponse.");
+      if (start === -1 || end === -1 || end <= start) throw new Error("Aucun objet JSON détecté.");
       cleaned = cleaned.slice(start, end + 1);
       data = JSON.parse(cleaned);
     } catch(e) { toast("JSON invalide : " + e.message); return; }
