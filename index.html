@@ -1047,9 +1047,20 @@
                   </datalist>
                 </div>
                 <div>
-                  <label style="font-size:0.8rem; font-weight:bold; color:#475569;">Audience</label>
+                  <label style="font-size:0.8rem; font-weight:bold; color:#475569;">Audience (libre)</label>
                   <input type="text" id="sp-audience" placeholder="ex: Parents 2nde, élèves CAP, classe de 1re…" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
                 </div>
+              </div>
+              <div style="margin-top:10px;">
+                <label style="font-size:0.8rem; font-weight:bold; color:#475569;">Public cible (adapte le ton de l'IA et les listes par défaut)</label>
+                <select id="sp-publicType" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+                  <option value="mixte">👥 Mixte / Tout public</option>
+                  <option value="parents">👨‍👩‍👧 Parents</option>
+                  <option value="eleves_cap">🎓 Élèves CAP</option>
+                  <option value="eleves_bacpro">🎓 Élèves Bac Pro</option>
+                  <option value="classe">🏫 Classe entière (collège/lycée)</option>
+                  <option value="equipe">👩‍🏫 Équipe pédagogique</option>
+                </select>
               </div>
             </div>
 
@@ -3424,8 +3435,19 @@ QN80,Wael HWORI</pre>
     { id:"dilemmes",   emoji:"🎯",  name:"Dilemmes / situations",    desc:"Situations concrètes, plusieurs choix, débat.",         aiGen:true,  def:false },
     { id:"ouverte",    emoji:"💬",  name:"Question ouverte",         desc:"Réponse anonyme, mur en direct.",                       aiGen:true,  def:true },
     { id:"muranonyme", emoji:"❓",  name:"Mur de questions",         desc:"Les participants posent leurs questions, anonymement.", aiGen:false, def:false },
+    { id:"valeurs",    emoji:"🎯",  name:"Roue des valeurs (CPS C1.3)", desc:"Chacun coche ses 5 valeurs prioritaires. Roue collective.", aiGen:false, def:false },
+    { id:"thermo",     emoji:"🌡️", name:"Thermomètre émotionnel (CPS C2)", desc:"Curseur 0-10 sur l'intensité d'une émotion face à une situation.", aiGen:true,  def:false },
+    { id:"empathie",   emoji:"💞",  name:"Reformulation empathique (CPS S1.2)", desc:"Une phrase déclencheuse, chacun propose une reformulation. Mur + modèle.", aiGen:true,  def:false },
+    { id:"feedback",   emoji:"⚡",  name:"Speed-feedback de classe", desc:"3 questions express anonymes : compris / pas compris / aimé.", aiGen:false, def:false },
     { id:"bilan",      emoji:"🏁",  name:"Bilan + météo finale",     desc:"Synthèse, météo de fin, mot de gratitude.",             aiGen:false, def:true }
   ];
+
+  // Listes de valeurs proposées (cochables — éditables)
+  const SP_VALEURS_DEFAUT = {
+    parents: ["écoute","autorité","confiance","autonomie","respect","joie","sécurité","transmission","exemplarité","dialogue","fermeté","tendresse","justice","liberté","présence"],
+    eleves:  ["liberté","amitié","respect","justice","famille","réussite","fun","calme","sécurité","loyauté","honnêteté","créativité","autonomie","reconnaissance","solidarité"],
+    mixte:   ["respect","confiance","autonomie","justice","écoute","solidarité","liberté","sécurité","honnêteté","reconnaissance","tendresse","calme","réussite","exemplarité","dialogue"]
+  };
 
   let sp_session = null;
 
@@ -3445,10 +3467,19 @@ QN80,Wael HWORI</pre>
   function blank(){
     return {
       id: uid(), title:"", date: todayISO(), theme:"", audience:"Participants",
+      publicType: "mixte", // parents | eleves_cap | eleves_bacpro | classe | mixte | equipe
       modules: Object.fromEntries(SP_MODULES.map(m => [m.id, { enabled: m.def, items: [] }])),
       source:"", nbQuestions:10, autoMode:false, apiKey:"",
       createdAt: Date.now(), updatedAt: Date.now()
     };
+  }
+  function publicLabel(p){
+    return ({parents:"Parents", eleves_cap:"Élèves CAP", eleves_bacpro:"Élèves Bac Pro", classe:"Classe entière", mixte:"Mixte / Tout public", equipe:"Équipe pédagogique"})[p] || "Tout public";
+  }
+  function publicValeursKey(p){
+    if (p === "parents") return "parents";
+    if (p === "eleves_cap" || p === "eleves_bacpro" || p === "classe") return "eleves";
+    return "mixte";
   }
 
   // ====== TOGGLE PANNEAU ======
@@ -3497,13 +3528,14 @@ QN80,Wael HWORI</pre>
     document.getElementById("sp-date").value = sp_session.date;
     document.getElementById("sp-theme").value = sp_session.theme;
     document.getElementById("sp-audience").value = sp_session.audience;
+    if (document.getElementById("sp-publicType")) document.getElementById("sp-publicType").value = sp_session.publicType || "mixte";
     document.getElementById("sp-source").value = sp_session.source;
     document.getElementById("sp-nbq").value = sp_session.nbQuestions;
     document.getElementById("sp-auto").value = String(sp_session.autoMode);
     document.getElementById("sp-apikey").value = sp_session.apiKey;
     sp_renderModules();
     sp_renderPreview();
-    ["sp-title","sp-date","sp-theme","sp-audience","sp-source","sp-nbq","sp-auto","sp-apikey"].forEach(id => {
+    ["sp-title","sp-date","sp-theme","sp-audience","sp-publicType","sp-source","sp-nbq","sp-auto","sp-apikey"].forEach(id => {
       const e = document.getElementById(id);
       e.oninput = e.onchange = () => { sp_sync(); window.sp_scheduleAutoSave && window.sp_scheduleAutoSave(); };
     });
@@ -3515,6 +3547,7 @@ QN80,Wael HWORI</pre>
     sp_session.date = document.getElementById("sp-date").value || todayISO();
     sp_session.theme = document.getElementById("sp-theme").value;
     sp_session.audience = document.getElementById("sp-audience").value;
+    sp_session.publicType = document.getElementById("sp-publicType")?.value || "mixte";
     sp_session.source = document.getElementById("sp-source").value;
     sp_session.nbQuestions = parseInt(document.getElementById("sp-nbq").value || "10", 10);
     sp_session.autoMode = document.getElementById("sp-auto").value === "true";
@@ -3551,7 +3584,9 @@ QN80,Wael HWORI</pre>
   // ====== APERÇU CONTENU ======
   function sp_renderPreview(){
     const el = document.getElementById("sp-preview");
-    const aiMods = SP_MODULES.filter(m => m.aiGen && sp_session.modules[m.id].enabled);
+    // Inclut les modules à items éditables (IA ou manuels comme valeurs/feedback)
+    const editableIds = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback"];
+    const aiMods = SP_MODULES.filter(m => editableIds.includes(m.id) && sp_session.modules[m.id].enabled);
     const has = aiMods.some(m => (sp_session.modules[m.id].items||[]).length > 0);
     if (!has) {
       const addButtons = aiMods.map(m => `
@@ -3625,6 +3660,45 @@ QN80,Wael HWORI</pre>
         ${del}
       </div>`;
     }
+    if (modId === "thermo") {
+      return `<div style="background:#f8fafc; border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">Thermomètre ${i+1}</div>
+        ${tex(it.situation, 'situation', 'Situation : « Quand …, mon agacement est à… »')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Émotion ciblée</label>
+        ${inp(it.emotion, 'emotion')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Lecture / repère après vote</label>
+        ${tex(it.guidance, 'guidance', 'Ce que les résultats peuvent éclairer')}
+        ${del}
+      </div>`;
+    }
+    if (modId === "empathie") {
+      return `<div style="background:#f8fafc; border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">Phrase déclencheuse ${i+1}</div>
+        ${tex(it.trigger, 'trigger', 'Ex : « T\'es vraiment lourd ! »')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Contexte (qui parle à qui)</label>
+        ${inp(it.context, 'context')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Reformulation modèle (CPS S1.2)</label>
+        ${tex(it.model, 'model', 'Reformulation empathique : accueil, reflet, validation')}
+        ${del}
+      </div>`;
+    }
+    if (modId === "valeurs") {
+      const list = (it.options || []).join(", ");
+      return `<div style="background:#f8fafc; border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">Roue des valeurs — Question ${i+1}</div>
+        ${inp(it.prompt, 'prompt')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Liste de valeurs à proposer (séparées par virgule, 12-18 idéal)</label>
+        <textarea oninput="sp_upd('${modId}',${i},'options',this.value.split(',').map(s=>s.trim()).filter(Boolean))" style="width:100%; min-height:60px; padding:6px; border-radius:4px; border:1px solid #cbd5e1; margin-top:4px; font-family:inherit; font-size:0.85rem;">${esc(list)}</textarea>
+        ${del}
+      </div>`;
+    }
+    if (modId === "feedback") {
+      return `<div style="background:#f8fafc; border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">Question rapide ${i+1}</div>
+        ${inp(it.prompt, 'prompt')}
+        ${del}
+      </div>`;
+    }
     return "";
   }
 
@@ -3636,13 +3710,18 @@ QN80,Wael HWORI</pre>
   window.sp_rmOpt = function(mod, i, j){ sp_session.modules[mod].items[i].options.splice(j,1); sp_renderPreview(); _autosave(); };
   window.sp_rmItem = function(mod, i){ sp_session.modules[mod].items.splice(i,1); sp_renderPreview(); _autosave(); };
   window.sp_addItem = function(mod){
+    const valeursDef = SP_VALEURS_DEFAUT[publicValeursKey(sp_session.publicType||"mixte")];
     const blanks = {
       quiz:     ()=>({question:"",options:["","",""],correct:0,explanation:""}),
       vraifaux: ()=>({question:"",options:["Vrai","Faux"],correct:0,explanation:""}),
       dilemmes: ()=>({situation:"",options:["","",""],guidance:""}),
       echelle:  ()=>({statement:""}),
       ouverte:  ()=>({prompt:""}),
-      nuage:    ()=>({prompt:""})
+      nuage:    ()=>({prompt:""}),
+      thermo:   ()=>({situation:"",emotion:"agacement",guidance:""}),
+      empathie: ()=>({trigger:"",context:"",model:""}),
+      valeurs:  ()=>({prompt:"Choisis les 5 valeurs qui te parlent le plus aujourd'hui",options:[...valeursDef]}),
+      feedback: ()=>({prompt:""})
     };
     if (!blanks[mod]) return;
     sp_session.modules[mod].items.push(blanks[mod]());
@@ -3664,11 +3743,14 @@ QN80,Wael HWORI</pre>
     if (aiMods.find(m=>m.id==="echelle"))  blocks.push(`- "echelle" : 6 affirmations à positionner sur 1-5. Format : { "statement": "affirmation au je" }`);
     if (aiMods.find(m=>m.id==="ouverte"))  blocks.push(`- "ouverte" : 3 questions ouvertes anonymes. Format : { "prompt": "question chaleureuse" }`);
     if (aiMods.find(m=>m.id==="nuage"))    blocks.push(`- "nuage" : 2 amorces "en 1 mot". Format : { "prompt": "En un mot, …" }`);
+    if (aiMods.find(m=>m.id==="thermo"))   blocks.push(`- "thermo" : 4 situations à charger émotionnellement, adaptées au public. Format : { "situation": "Quand …, mon [émotion] est à...", "emotion": "agacement|tristesse|peur|joie|honte|fierté", "guidance": "ce que ces résultats peuvent apporter (1 phrase)" }`);
+    if (aiMods.find(m=>m.id==="empathie")) blocks.push(`- "empathie" : 4 phrases déclencheuses (style oral, situation conflictuelle adaptée au public). Format : { "trigger": "phrase entendue", "context": "qui parle à qui (1 phrase)", "model": "reformulation empathique modèle (selon référentiel CPS S1.2 — accueil, reflet, validation, sans solution imposée)" }`);
 
     return `Tu es un expert en animation de sessions interactives en lycée pro (PSE). Génère le contenu d'une activité à partir du document ci-dessous.
 
 Thème : ${sp_session.theme || "à déduire du contenu"}
-Public : ${sp_session.audience || "participants"} — langage clair, sans jargon.
+Public cible : ${publicLabel(sp_session.publicType)} (${sp_session.audience || "—"})
+Niveau de langage : ${sp_session.publicType === "parents" || sp_session.publicType === "equipe" ? "adulte, sans jargon" : "lycéen / accessible, exemples ancrés dans la vie scolaire et amicale"}.
 
 CONTRAINTES PÉDAGOGIQUES :
 - Bienveillant, sans jugement.

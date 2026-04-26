@@ -222,7 +222,7 @@ async function init() {
 // === HELPERS ===
 function getEnabledModules() {
   if (!cafe || !cafe.modules) return [];
-  const order = ["meteo","nuage","photo","echelle","vraifaux","quiz","dilemmes","ouverte","muranonyme","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","feedback","bilan"];
   return order.filter(id => cafe.modules[id]?.enabled);
 }
 function curMod() { const e = getEnabledModules(); return e[cafe.state.moduleIndex] || null; }
@@ -255,6 +255,10 @@ function render() {
   if (mod === "echelle")    return renderEchelle();
   if (mod === "ouverte")    return renderOuverte();
   if (mod === "muranonyme") return renderMurAnonyme();
+  if (mod === "valeurs")    return renderValeurs();
+  if (mod === "thermo")     return renderThermo();
+  if (mod === "empathie")   return renderEmpathie();
+  if (mod === "feedback")   return renderFeedback();
   if (mod === "photo")      return renderPlaceholder("🖼️ Photolangage", "À configurer dans le Cockpit");
   if (mod === "bilan")      return renderBilan();
   renderPlaceholder(mod, "Module en construction");
@@ -275,7 +279,7 @@ function renderTopbar() {
   document.getElementById("b-prev").style.display  = (cafe.state.phase === "running") ? "inline-block" : "none";
   document.getElementById("b-next").style.display  = (cafe.state.phase === "running") ? "inline-block" : "none";
   const mod = curMod();
-  const showReveal = (cafe.state.phase === "running") && (mod === "quiz" || mod === "vraifaux") && !cafe.state.revealed;
+  const showReveal = (cafe.state.phase === "running") && ["quiz","vraifaux","thermo","empathie","dilemmes"].includes(mod) && !cafe.state.revealed;
   document.getElementById("b-reveal").style.display = showReveal ? "inline-block" : "none";
 
   document.getElementById("b-auto-lbl").textContent = cafe.state.autoMode ? "Auto ON" : "Auto OFF";
@@ -545,6 +549,110 @@ function renderBilan() {
   `;
 }
 
+function renderValeurs() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  // chaque vote = tableau de valeurs choisies
+  const counts = {};
+  itemVotes.forEach(v => {
+    const arr = Array.isArray(v.value) ? v.value : [];
+    arr.forEach(val => { const k = String(val).trim(); if(k) counts[k] = (counts[k]||0)+1; });
+  });
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+  const max = sorted[0]?.[1] || 1;
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question">🎯 ${escapeHtml(it.prompt || "Tes valeurs prioritaires")}</div>
+      <div class="cloud" style="max-width:1300px;">
+        ${sorted.length === 0 ? '<div style="color:#94a3b8; font-size:24px;">En attente des choix…</div>' : sorted.map(([w,c]) => {
+          const size = 18 + Math.round((c/max)*42);
+          const intensity = 0.4 + (c/max) * 0.6;
+          return `<div class="word" style="font-size:${size}px; background:rgba(251,191,36,${intensity.toFixed(2)}); color:#0f172a;">${escapeHtml(w)} <sub style="font-size:14px; opacity:0.7;">×${c}</sub></div>`;
+        }).join("")}
+      </div>
+      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} participant${itemVotes.length>1?"s":""} · CPS C1.3 — Valeurs personnelles</div>
+    </div>
+  `;
+}
+
+function renderThermo() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  // bins 0..10
+  const bins = Array(11).fill(0);
+  let sum = 0, n = 0;
+  itemVotes.forEach(v => {
+    const x = parseInt(v.value);
+    if (Number.isFinite(x) && x >= 0 && x <= 10) { bins[x]++; sum += x; n++; }
+  });
+  const avg = n ? (sum/n).toFixed(1) : "—";
+  const max = Math.max(...bins, 1);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question small">🌡️ ${escapeHtml(it.situation || "")}</div>
+      <div style="display:flex; align-items:flex-end; gap:6px; max-width:1100px; margin:0 auto; height:240px;">
+        ${bins.map((c, i) => {
+          const h = (c/max)*100;
+          const color = i<=3 ? "#10b981" : i<=6 ? "#fbbf24" : i<=8 ? "#f97316" : "#ef4444";
+          return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;">
+            <div style="font-size:14px; font-weight:800; color:${color}; margin-bottom:4px;">${c||""}</div>
+            <div style="width:100%; height:${h}%; background:${color}; border-radius:8px 8px 0 0; min-height:${c?6:0}px; transition:height 0.6s;"></div>
+            <div style="font-size:18px; font-weight:800; color:#fff; margin-top:6px;">${i}</div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div style="display:flex; justify-content:space-between; max-width:1100px; margin:8px auto 0; color:#94a3b8; font-size:13px;"><span>0 — pas du tout</span><span>10 — au maximum</span></div>
+      <div style="text-align:center; margin-top:20px; font-size:24px; color:#fbbf24; font-weight:800;">Moyenne : ${avg}/10 · ${n} réponse${n>1?"s":""}</div>
+      ${cafe.state.revealed && it.guidance ? `<div class="explain">💡 ${escapeHtml(it.guidance)}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderEmpathie() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  stage.innerHTML = `
+    <div class="module ${cafe.state.revealed?'reveal':''}">
+      <div class="question small">💞 « ${escapeHtml(it.trigger || "")} »</div>
+      ${it.context ? `<div style="text-align:center; color:#c4b5fd; font-size:18px; margin-bottom:20px;">${escapeHtml(it.context)}</div>` : ''}
+      <div class="wall">
+        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:20px; grid-column:1/-1; text-align:center;">En attente des reformulations…</div>' : ''}
+        ${itemVotes.slice().reverse().map(v => {
+          const p = participants.find(pp => pp.id === v.participantId);
+          return `<div class="post">${escapeHtml(v.value || "")}<div class="who">${p ? (p.avatar+" "+escapeHtml(p.surnom||"")) : "Anonyme"}</div></div>`;
+        }).join("")}
+      </div>
+      ${cafe.state.revealed && it.model ? `<div class="explain"><b>Modèle CPS S1.2 :</b> « ${escapeHtml(it.model)} »</div>` : ''}
+    </div>
+  `;
+}
+
+function renderFeedback() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question small">⚡ ${escapeHtml(it.prompt || "")}</div>
+      <div class="wall">
+        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:18px; grid-column:1/-1; text-align:center;">En attente des retours…</div>' : ''}
+        ${itemVotes.slice().reverse().map(v => `<div class="post">${escapeHtml(v.value || "")}</div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderPlaceholder(title, msg) {
   document.getElementById("stage").innerHTML = `<div class="module"><div class="question">${title}</div><div style="text-align:center; font-size:20px; color:#c4b5fd;">${msg}</div></div>`;
 }
@@ -586,9 +694,9 @@ window.goNext = async function() {
   clearAuto();
   const mod = curMod();
   const items = curItems();
-  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage"].includes(mod);
-  // Pour quiz/vraifaux : si pas révélé, révéler d'abord
-  if ((mod === "quiz" || mod === "vraifaux") && !cafe.state.revealed) {
+  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback"].includes(mod);
+  // Pour quiz/vraifaux/thermo/empathie/dilemmes : si pas révélé, révéler d'abord
+  if (["quiz","vraifaux","thermo","empathie","dilemmes"].includes(mod) && !cafe.state.revealed) {
     await updateDoc(cafeRef, { "state.revealed": true });
     scheduleAuto();
     return;
