@@ -164,6 +164,7 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const PUBLIC_BASE = "https://preventionsanteenvironnement.github.io/CockpitPSE/";
 
 const params = new URLSearchParams(location.search);
 const cafeId = params.get("id");
@@ -281,7 +282,11 @@ function renderTopbar() {
 
 function renderLobby() {
   const stage = document.getElementById("stage");
-  const joinUrl = location.origin + location.pathname.replace(/cafe_live\.html$/, "cafe_join.html") + "?id=" + cafeId;
+  const localHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname) || /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
+  const base = location.protocol === "file:" || localHost ? PUBLIC_BASE : new URL("./", location.href).href;
+  const join = new URL("cafe_join.html", base);
+  join.searchParams.set("id", cafeId);
+  const joinUrl = join.href;
   const qrSrc = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=" + encodeURIComponent(joinUrl);
   stage.innerHTML = `
     <div class="lobby">
