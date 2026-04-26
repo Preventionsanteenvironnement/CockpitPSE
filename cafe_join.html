@@ -233,7 +233,7 @@ function renderEnded() {
 }
 
 function getEnabledModules() {
-  const order = ["meteo","nuage","photo","echelle","vraifaux","quiz","dilemmes","ouverte","muranonyme","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","feedback","bilan"];
   return order.filter(id => cafe.modules?.[id]?.enabled);
 }
 function curMod() { return getEnabledModules()[cafe.state.moduleIndex] || null; }
@@ -423,6 +423,126 @@ async function renderModule() {
     `;
     window.__send = () => {
       const v = document.getElementById("tw").value.trim();
+      if (!v) { setVoteStatus("Écris une réponse avant d'envoyer.", true); return; }
+      sendVote(v);
+    };
+    return;
+  }
+
+  if (mod === "valeurs") {
+    if (!it) return;
+    let chosen = [];
+    const max = 5;
+    function refresh(){
+      document.querySelectorAll(".val-card").forEach(c => {
+        const v = c.dataset.v;
+        const idx = chosen.indexOf(v);
+        c.classList.toggle("sel", idx >= 0);
+        const num = c.querySelector(".val-num");
+        if (num) num.textContent = idx >= 0 ? (idx+1) : "";
+      });
+      const go = document.getElementById("val-go");
+      go.disabled = chosen.length === 0;
+      go.textContent = chosen.length === 0 ? "Choisis au moins 1 valeur" : `Envoyer mes ${chosen.length} valeur${chosen.length>1?"s":""}`;
+      document.getElementById("val-count").textContent = `${chosen.length}/${max} choisies`;
+    }
+    const vals = it.options || [];
+    root.innerHTML = `
+      <h1>🎯 Mes valeurs</h1>
+      <div class="sub">${escapeHtml(it.prompt || "Choisis tes valeurs prioritaires (max 5)")}</div>
+      <div class="card">
+        <div id="val-count" style="text-align:center; color:#fbbf24; font-weight:800; margin-bottom:10px;">0/${max} choisies</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          ${vals.map((v, j) => `
+            <button class="val-card" data-v="${escapeHtml(v)}" onclick="window.__pickVal(${j})" style="position:relative; padding:14px 8px; background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.2); border-radius:12px; color:white; font-size:16px; font-weight:700; cursor:pointer; ${voted?'opacity:0.6;':''}" ${voted?'disabled':''}>
+              ${escapeHtml(v)}
+              <span class="val-num" style="position:absolute; top:6px; right:8px; background:#ec4899; color:white; min-width:22px; height:22px; border-radius:50%; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center;"></span>
+            </button>
+          `).join("")}
+        </div>
+        <button class="btn btn-pri" id="val-go" disabled onclick="window.__sendVal()" style="margin-top:14px;">Choisis au moins 1 valeur</button>
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Valeurs envoyées</div>' : ''}
+      </div>
+      <style>.val-card.sel { border-color:#ec4899 !important; background:rgba(236,72,153,0.25) !important; }</style>
+    `;
+    window.__pickVal = (j) => {
+      if (voted) return;
+      const v = vals[j];
+      const idx = chosen.indexOf(v);
+      if (idx >= 0) chosen.splice(idx, 1);
+      else if (chosen.length < max) chosen.push(v);
+      refresh();
+    };
+    window.__sendVal = () => { if (chosen.length) sendVote(chosen); };
+    refresh();
+    return;
+  }
+
+  if (mod === "thermo") {
+    if (!it) return;
+    let val = 5;
+    root.innerHTML = `
+      <h1>🌡️ Thermomètre</h1>
+      <div class="card">
+        <div class="question" style="font-size:18px;">${escapeHtml(it.situation || "")}</div>
+        <div style="display:flex; align-items:center; gap:14px; margin-top:10px;">
+          <span style="font-size:14px; color:#94a3b8;">0</span>
+          <input type="range" id="thr" min="0" max="10" value="5" ${voted?'disabled':''} style="flex:1; height:8px; accent-color:#fbbf24;">
+          <span style="font-size:14px; color:#94a3b8;">10</span>
+        </div>
+        <div style="text-align:center; margin-top:14px;">
+          <span id="thr-v" style="font-size:64px; font-weight:800; color:#fbbf24;">5</span>
+          <span style="font-size:24px; color:#94a3b8;">/10</span>
+        </div>
+        <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__sendThr()">Envoyer mon ressenti</button>
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Envoyé</div>' : ''}
+      </div>
+    `;
+    const slider = document.getElementById("thr");
+    const vEl = document.getElementById("thr-v");
+    slider.oninput = () => { val = parseInt(slider.value); vEl.textContent = val; };
+    window.__sendThr = () => sendVote(val);
+    return;
+  }
+
+  if (mod === "empathie") {
+    if (!it) return;
+    root.innerHTML = `
+      <h1>💞 Reformulation</h1>
+      <div class="card">
+        <div class="sub" style="text-align:left; color:#fbbf24; font-weight:700;">${escapeHtml(it.context || "")}</div>
+        <div class="question" style="font-size:20px; padding:14px; background:rgba(239,68,68,0.15); border-left:4px solid #ef4444; border-radius:8px; text-align:left;">« ${escapeHtml(it.trigger || "")} »</div>
+        <div style="margin-top:14px; font-size:14px; color:#cbd5e1;">Et toi, comment tu reformulerais ça avec empathie ? (accueil, écoute, sans jugement)</div>
+        <textarea id="emp" maxlength="300" placeholder="Ta reformulation empathique…" ${voted?'disabled':''}></textarea>
+        <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__sendEmp()">Envoyer ma reformulation</button>
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Envoyée</div>' : ''}
+      </div>
+    `;
+    window.__sendEmp = () => {
+      const v = document.getElementById("emp").value.trim();
+      if (!v) { setVoteStatus("Écris ta reformulation avant d'envoyer.", true); return; }
+      sendVote(v);
+    };
+    return;
+  }
+
+  if (mod === "feedback") {
+    if (!it) return;
+    root.innerHTML = `
+      <h1>⚡ Feedback express</h1>
+      <div class="card">
+        <div class="question" style="font-size:18px;">${escapeHtml(it.prompt || "")}</div>
+        <textarea id="fb" maxlength="200" placeholder="Réponse rapide…" ${voted?'disabled':''}></textarea>
+        <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__sendFb()">Envoyer</button>
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Merci</div>' : ''}
+      </div>
+    `;
+    window.__sendFb = () => {
+      const v = document.getElementById("fb").value.trim();
       if (!v) { setVoteStatus("Écris une réponse avant d'envoyer.", true); return; }
       sendVote(v);
     };
