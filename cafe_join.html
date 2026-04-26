@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>☕ Rejoindre le Café Parents</title>
+<title>☕ Rejoindre l'activité</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -73,6 +73,8 @@
 
   .ok { padding: 20px; background: rgba(16,185,129,0.15); border: 2px solid #10b981; border-radius: 12px; text-align: center; font-size: 18px; }
   .err { padding: 20px; background: rgba(220,38,38,0.2); border: 2px solid #dc2626; border-radius: 12px; text-align: center; }
+  .mini-btn { padding: 8px 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: white; font-weight: 700; cursor: pointer; }
+  .send-status { min-height: 24px; margin-top: 10px; text-align: center; color: #c4b5fd; font-size: 14px; }
   .footer { text-align: center; font-size: 11px; color: #64748b; margin-top: auto; padding-top: 20px; }
 </style>
 </head>
@@ -103,6 +105,11 @@ const cafeId = params.get("id");
 const root = document.getElementById("root");
 
 const AVATARS = ["🦊","🐢","🦉","🐼","🐨","🦁","🦄","🐧","🦕","🐙","🐝","🦋"];
+const PSEUDOS = [
+  "Participant bleu", "Participant soleil", "Participant zen", "Participant éclair",
+  "Participant sourire", "Participant étoile", "Participant calme", "Participant curieux",
+  "Participant libre", "Participant vivant", "Participant focus", "Participant tempo"
+];
 
 let cafe = null;
 let myId = localStorage.getItem("cafe_pid_" + cafeId) || null;
@@ -122,7 +129,7 @@ async function start() {
 
   const snap = await getDoc(cafeRef);
   if (!snap.exists()) {
-    root.innerHTML = `<div class="card err">❌ Café introuvable. Vérifie le code.</div>`;
+    root.innerHTML = `<div class="card err">❌ Activité introuvable. Vérifie le code.</div>`;
     return;
   }
   cafe = snap.data();
@@ -139,6 +146,14 @@ async function start() {
 }
 
 function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]); }
+function randomPseudo() { return PSEUDOS[Math.floor(Math.random() * PSEUDOS.length)] + "-" + Math.floor(10 + Math.random() * 90); }
+function statusHtml() { return `<div class="send-status" id="vote-status"></div>`; }
+function setVoteStatus(msg, isError) {
+  const el = document.getElementById("vote-status");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.color = isError ? "#fecaca" : "#c4b5fd";
+}
 
 function render() {
   if (!cafe) return;
@@ -149,15 +164,18 @@ function render() {
 }
 
 function renderJoin() {
-  let surnom = "";
+  let surnom = randomPseudo();
   let avatar = AVATARS[Math.floor(Math.random()*AVATARS.length)];
   root.innerHTML = `
-    <h1>☕ ${escapeHtml(cafe.title || "Café Parents")}</h1>
+    <h1>☕ ${escapeHtml(cafe.title || "Activité interactive")}</h1>
     <div class="sub">${escapeHtml(cafe.theme || "")}</div>
-    <div class="anon">🔒 Aucune donnée personnelle. Choisis un surnom et un avatar.</div>
+    <div class="anon">🔒 Pseudo automatique. Aucune donnée personnelle demandée.</div>
     <div class="card">
-      <label>Ton surnom (libre)</label>
-      <input type="text" id="f-surnom" maxlength="20" placeholder="ex: Papa de Léa, Maman007, Lulu…" value="">
+      <label>Ton pseudo</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="f-surnom" maxlength="28" value="${escapeHtml(surnom)}" readonly>
+        <button class="mini-btn" type="button" onclick="window.__newPseudo()">Changer</button>
+      </div>
       <label>Choisis un avatar</label>
       <div class="avatars" id="f-avatars">
         ${AVATARS.map(a => `<button data-a="${a}" onclick="window.__pickAv('${a}')" class="${a===avatar?'sel':''}">${a}</button>`).join("")}
@@ -169,15 +187,23 @@ function renderJoin() {
     avatar = a;
     document.querySelectorAll(".avatars button").forEach(b => b.classList.toggle("sel", b.dataset.a === a));
   };
+  window.__newPseudo = () => {
+    surnom = randomPseudo();
+    document.getElementById("f-surnom").value = surnom;
+  };
   window.__doJoin = async () => {
-    const s = document.getElementById("f-surnom").value.trim();
-    if (!s) { alert("Choisis un surnom (peut être un pseudo)."); return; }
+    const s = document.getElementById("f-surnom").value.trim() || randomPseudo();
     const btn = document.getElementById("f-go"); btn.disabled = true; btn.textContent = "⏳ Connexion…";
-    const ref = await addDoc(partsRef, { surnom: s, avatar, joinedAt: serverTimestamp() });
-    myId = ref.id;
-    myProfile = { surnom: s, avatar };
-    localStorage.setItem("cafe_pid_" + cafeId, myId);
-    render();
+    try {
+      const ref = await addDoc(partsRef, { surnom: s, avatar, joinedAt: serverTimestamp() });
+      myId = ref.id;
+      myProfile = { surnom: s, avatar };
+      localStorage.setItem("cafe_pid_" + cafeId, myId);
+      render();
+    } catch(e) {
+      btn.disabled = false; btn.textContent = "🚀 Rejoindre";
+      alert("Connexion impossible pour le moment. Vérifie le réseau puis réessaie.");
+    }
   };
 }
 
@@ -191,14 +217,14 @@ function renderLobby() {
     <div class="card wait">
       <div class="spin">⏳</div>
       <h2 style="margin-top:14px; font-size:22px;">En attente du démarrage…</h2>
-      <div class="sub" style="margin-top:10px;">L'animateur va lancer le café dans un instant.</div>
+      <div class="sub" style="margin-top:10px;">L'animateur va lancer l'activité dans un instant.</div>
     </div>
   `;
 }
 
 function renderEnded() {
   root.innerHTML = `
-    <h1>🏁 Café terminé</h1>
+    <h1>🏁 Activité terminée</h1>
     <div class="card ok">
       Merci pour ta participation, <b>${escapeHtml(myProfile.surnom)}</b> ${myProfile.avatar} !<br><br>
       Tu peux fermer cette page.
@@ -225,11 +251,20 @@ function markVoted() {
 function clearVotedNext() { /* nothing */ }
 
 async function sendVote(value) {
-  await addDoc(votesRef, {
-    participantId: myId, moduleId: curMod(), itemIndex: cafe.state.itemIndex, value, createdAt: serverTimestamp()
-  });
-  markVoted();
-  render();
+  if (window.__sendingVote) return;
+  window.__sendingVote = true;
+  setVoteStatus("⏳ Envoi en cours…");
+  try {
+    await addDoc(votesRef, {
+      participantId: myId, moduleId: curMod(), itemIndex: cafe.state.itemIndex, value, createdAt: serverTimestamp()
+    });
+    markVoted();
+    window.__sendingVote = false;
+    render();
+  } catch(e) {
+    window.__sendingVote = false;
+    setVoteStatus("❌ Envoi impossible. Vérifie le réseau puis réessaie.", true);
+  }
 }
 
 async function renderModule() {
@@ -250,6 +285,7 @@ async function renderModule() {
         <div class="meteo-pad">
           ${emojis.map((em, j) => `<button ${voted?'disabled':''} onclick="window.__v(${j})"><span class="em">${em.e}</span>${em.lbl}</button>`).join("")}
         </div>
+        ${statusHtml()}
         ${voted ? '<div class="ok" style="margin-top:14px;">✅ Vote enregistré</div>' : ''}
       </div>
     `;
@@ -266,6 +302,7 @@ async function renderModule() {
         ${(it.options||[]).map((opt, j) => `
           <button class="opt-btn ${voted?'voted':''}" data-color="${j}" ${voted?'disabled':''} onclick="window.__v(${j})">${escapeHtml(opt)}</button>
         `).join("")}
+        ${statusHtml()}
         ${voted ? '<div class="ok" style="margin-top:10px;">✅ Réponse envoyée — résultat à l\'écran</div>' : ''}
       </div>
     `;
@@ -282,6 +319,7 @@ async function renderModule() {
         ${(it.options||[]).map((opt, j) => `
           <button class="opt-btn ${voted?'voted':''}" data-color="${j}" ${voted?'disabled':''} onclick="window.__v(${j})"><b>${String.fromCharCode(65+j)}.</b> ${escapeHtml(opt)}</button>
         `).join("")}
+        ${statusHtml()}
         ${voted ? '<div class="ok" style="margin-top:10px;">✅ Avis enregistré</div>' : ''}
       </div>
     `;
@@ -301,6 +339,7 @@ async function renderModule() {
         </div>
         <div class="scale-labels"><span>Pas du tout</span><span>Tout à fait</span></div>
         <button class="btn btn-pri" id="sp-go" disabled onclick="window.__send()">Envoyer</button>
+        ${statusHtml()}
         ${voted ? '<div class="ok" style="margin-top:10px;">✅ Réponse envoyée</div>' : ''}
       </div>
     `;
@@ -319,33 +358,36 @@ async function renderModule() {
       <h1>☁️ En 1 mot</h1>
       <div class="card">
         <div class="question" style="font-size:18px;">${escapeHtml(it.prompt)}</div>
-        <input type="text" id="nw" maxlength="30" placeholder="Un seul mot…" ${voted?'disabled':''}>
+        <input type="text" id="nw" maxlength="30" placeholder="Un seul mot…" ${voted?'disabled':''} onkeydown="if(event.key==='Enter') window.__send()">
         <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__send()">Envoyer mon mot</button>
+        ${statusHtml()}
         ${voted ? '<div class="ok" style="margin-top:10px;">✅ Mot envoyé</div>' : ''}
       </div>
     `;
     window.__send = () => {
       const v = document.getElementById("nw").value.trim();
-      if (!v) return;
+      if (!v) { setVoteStatus("Écris un mot avant d'envoyer.", true); return; }
       sendVote(v);
     };
+    setTimeout(() => document.getElementById("nw")?.focus(), 80);
     return;
   }
 
   if (mod === "ouverte") {
     if (!it) return;
     root.innerHTML = `
-      <h1>💬 Témoignage</h1>
+      <h1>💬 Question ouverte</h1>
       <div class="card">
         <div class="question" style="font-size:18px;">${escapeHtml(it.prompt)}</div>
-        <textarea id="tw" maxlength="500" placeholder="Écris ton témoignage… (anonyme)" ${voted?'disabled':''}></textarea>
+        <textarea id="tw" maxlength="500" placeholder="Écris ta réponse… (anonyme)" ${voted?'disabled':''}></textarea>
         <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__send()">Envoyer</button>
-        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Témoignage envoyé</div>' : ''}
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Réponse envoyée</div>' : ''}
       </div>
     `;
     window.__send = () => {
       const v = document.getElementById("tw").value.trim();
-      if (!v) return;
+      if (!v) { setVoteStatus("Écris une réponse avant d'envoyer.", true); return; }
       sendVote(v);
     };
     return;
@@ -358,16 +400,22 @@ async function renderModule() {
         <div class="sub">Pose ta question — elle apparaîtra anonymement au mur.</div>
         <textarea id="qw" maxlength="300" placeholder="Ta question…"></textarea>
         <button class="btn btn-pri" onclick="window.__send()">Envoyer ma question</button>
+        ${statusHtml()}
       </div>
     `;
     window.__send = async () => {
       const v = document.getElementById("qw").value.trim();
-      if (!v) return;
-      await addDoc(votesRef, {
-        participantId: myId, moduleId: "muranonyme", itemIndex: 0, value: v, createdAt: serverTimestamp()
-      });
-      document.getElementById("qw").value = "";
-      alert("✅ Envoyée");
+      if (!v) { setVoteStatus("Écris une question avant d'envoyer.", true); return; }
+      setVoteStatus("⏳ Envoi en cours…");
+      try {
+        await addDoc(votesRef, {
+          participantId: myId, moduleId: "muranonyme", itemIndex: 0, value: v, createdAt: serverTimestamp()
+        });
+        document.getElementById("qw").value = "";
+        setVoteStatus("✅ Question envoyée.");
+      } catch(e) {
+        setVoteStatus("❌ Envoi impossible. Vérifie le réseau puis réessaie.", true);
+      }
     };
     return;
   }

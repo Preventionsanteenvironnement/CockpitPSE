@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>☕ Café Parents — Écran Géant</title>
+<title>☕ Activité interactive — Écran Géant</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -126,7 +126,7 @@
 
 <div class="topbar">
   <div>
-    <h1 id="t-title">☕ Café Parents</h1>
+    <h1 id="t-title">☕ Activité interactive</h1>
     <div class="meta" id="t-meta">Chargement…</div>
   </div>
   <div class="progress-dots" id="t-dots"></div>
@@ -177,7 +177,7 @@ let countdownInterval = null;
 
 if (!cafeId) {
   document.getElementById("err").style.display = "block";
-  document.getElementById("err").textContent = "❌ Aucun ID de café fourni. Lance le café depuis le Cockpit.";
+  document.getElementById("err").textContent = "❌ Aucun ID d'activité fourni. Lance l'activité depuis le Cockpit.";
 } else {
   cafeRef = doc(db, "cafes", cafeId);
   partsRef = collection(db, "cafes", cafeId, "participants");
@@ -186,11 +186,11 @@ if (!cafeId) {
 }
 
 async function init() {
-  // 1) Charge le café
+  // 1) Charge l'activité
   const snap = await getDoc(cafeRef);
   if (!snap.exists()) {
     document.getElementById("err").style.display = "block";
-    document.getElementById("err").textContent = "❌ Café introuvable. Vérifie l'ID.";
+    document.getElementById("err").textContent = "❌ Activité introuvable. Vérifie l'ID.";
     return;
   }
   cafe = snap.data();
@@ -201,7 +201,7 @@ async function init() {
     await updateDoc(cafeRef, { state: cafe.state });
   }
 
-  document.getElementById("t-title").textContent = "☕ " + (cafe.title || "Café Parents");
+  document.getElementById("t-title").textContent = "☕ " + (cafe.title || "Activité interactive");
   document.getElementById("t-meta").textContent = (cafe.theme ? cafe.theme + " · " : "") + (cafe.audience || "");
 
   // 3) Listeners temps réel
@@ -297,11 +297,11 @@ function renderLobby() {
         <div class="url">${joinUrl}</div>
       </div>
       <div class="lobby-info">
-        <h2>${escapeHtml(cafe.title || "Café Parents")}</h2>
+        <h2>${escapeHtml(cafe.title || "Activité interactive")}</h2>
         <div class="theme">${escapeHtml(cafe.theme || "")}</div>
         <div class="step1">
           1️⃣ <b>Scannez</b> le QR code avec votre téléphone<br>
-          2️⃣ Choisissez un <b>surnom + un avatar</b><br>
+          2️⃣ Un <b>pseudo automatique</b> est proposé, choisissez votre avatar<br>
           3️⃣ On démarre dès que tout le monde est là 👇
         </div>
         <div class="anon">🔒 Anonyme — aucun nom de famille demandé</div>
@@ -310,7 +310,7 @@ function renderLobby() {
     <div class="participants-strip" id="pstrip"></div>
   `;
   const strip = document.getElementById("pstrip");
-  strip.innerHTML = `<div class="pchip"><span class="pcount">${participants.length}</span> ${participants.length > 1 ? "parents connectés" : "parent connecté"}</div>` +
+  strip.innerHTML = `<div class="pchip"><span class="pcount">${participants.length}</span> ${participants.length > 1 ? "participants connectés" : "participant connecté"}</div>` +
     participants.slice(-30).map(p => `<div class="pchip">${p.avatar || "👤"} ${escapeHtml(p.surnom || "")}</div>`).join("");
 }
 
@@ -419,7 +419,7 @@ function renderMeteo() {
           return `<div class="meteo-card"><div class="em">${em.e}</div><div class="lbl">${em.lbl}</div><div class="cnt">${c}</div></div>`;
         }).join("")}
       </div>
-      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} parents ont répondu</div>
+      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} participant${itemVotes.length>1?"s":""} ont répondu</div>
     </div>
   `;
   // animation bulles
@@ -466,9 +466,9 @@ function renderOuverte() {
   const itemVotes = votesFor(mod, cafe.state.itemIndex);
   stage.innerHTML = `
     <div class="module">
-      <div class="question small">💬 ${escapeHtml(it?.prompt || "Votre témoignage")}</div>
+      <div class="question small">💬 ${escapeHtml(it?.prompt || "Votre réponse")}</div>
       <div class="wall">
-        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:20px; grid-column:1/-1; text-align:center;">En attente des témoignages…</div>' : ''}
+        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:20px; grid-column:1/-1; text-align:center;">En attente des réponses…</div>' : ''}
         ${itemVotes.slice().reverse().map(v => {
           const p = participants.find(pp => pp.id === v.participantId);
           return `<div class="post">${escapeHtml(v.value || "")}<div class="who">${p ? (p.avatar+" "+escapeHtml(p.surnom||"")) : "Anonyme"}</div></div>`;
@@ -513,10 +513,10 @@ function renderBilan() {
   stage.innerHTML = `
     <div class="bilan">
       <h2>🏁 Merci à tous !</h2>
-      <div class="stat"><div class="n">${totalParticipants}</div><div class="l">parents présents</div></div>
+      <div class="stat"><div class="n">${totalParticipants}</div><div class="l">participants présents</div></div>
       <div class="stat"><div class="n">${totalVotes}</div><div class="l">votes & réponses</div></div>
       ${successRate !== null ? `<div class="stat"><div class="n">${successRate}%</div><div class="l">de bonnes réponses</div></div>` : ""}
-      <div class="merci">Vos avis et témoignages nourrissent l'accompagnement de vos enfants. 💛</div>
+      <div class="merci">Merci pour vos réponses et vos échanges.</div>
       <div style="margin-top:30px;"><button class="btn btn-pri" onclick="exportRecap()" style="font-size:16px; padding:14px 24px;">📥 Télécharger le récap</button></div>
     </div>
   `;
@@ -586,7 +586,7 @@ window.toggleAuto = async function() {
 };
 
 window.endCafe = async function() {
-  if (!confirm("Terminer le café et afficher le bilan ?")) return;
+  if (!confirm("Terminer l'activité et afficher le bilan ?")) return;
   clearAuto();
   await updateDoc(cafeRef, { "state.phase": "ended" });
 };
@@ -623,7 +623,7 @@ function clearAuto() {
 // === EXPORT RECAP ===
 window.exportRecap = function() {
   const lines = [];
-  lines.push(`# Café Parents — ${cafe.title}`);
+  lines.push(`# Activité interactive — ${cafe.title}`);
   lines.push(`Date : ${cafe.date} · Thème : ${cafe.theme || "—"}`);
   lines.push(`Participants : ${participants.length} · Votes : ${votes.length}`);
   lines.push("");
