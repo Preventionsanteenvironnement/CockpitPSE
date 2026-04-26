@@ -239,13 +239,13 @@ function getEnabledModules() {
 function curMod() { return getEnabledModules()[cafe.state.moduleIndex] || null; }
 function curItem() { const m = curMod(); return cafe.modules[m]?.items?.[cafe.state.itemIndex] || null; }
 
+function curRunId() { return (cafe?.state?.runId) || "0"; }
 async function hasVoted() {
-  // local check via state stored
-  const key = "cafe_voted_" + cafeId + "_" + cafe.state.moduleIndex + "_" + cafe.state.itemIndex;
+  const key = "cafe_voted_" + cafeId + "_" + curRunId() + "_" + cafe.state.moduleIndex + "_" + cafe.state.itemIndex;
   return localStorage.getItem(key) === "1";
 }
 function markVoted() {
-  const key = "cafe_voted_" + cafeId + "_" + cafe.state.moduleIndex + "_" + cafe.state.itemIndex;
+  const key = "cafe_voted_" + cafeId + "_" + curRunId() + "_" + cafe.state.moduleIndex + "_" + cafe.state.itemIndex;
   localStorage.setItem(key, "1");
 }
 function clearVotedNext() { /* nothing */ }
@@ -274,22 +274,58 @@ async function renderModule() {
   const voted = await hasVoted();
 
   if (mod === "meteo") {
-    const emojis = [
-      { e: "😄", lbl: "Super" }, { e: "🙂", lbl: "Ça va" }, { e: "😐", lbl: "Mitigé" },
-      { e: "😟", lbl: "Inquiet" }, { e: "😴", lbl: "Fatigué" }, { e: "😤", lbl: "Tendu" }
+    const FAMILIES = [
+      { id:"joie",      e:"😄", lbl:"Joie",       color:"#fbbf24", nuances:["bonheur","sérénité","enthousiasme","fierté","soulagement"] },
+      { id:"tristesse", e:"😢", lbl:"Tristesse",  color:"#3b82f6", nuances:["mélancolie","déception","nostalgie","abattu","vulnérable"] },
+      { id:"colere",    e:"😠", lbl:"Colère",     color:"#ef4444", nuances:["frustré","énervé","agacé","tendu","exaspéré"] },
+      { id:"peur",      e:"😨", lbl:"Peur",       color:"#8b5cf6", nuances:["inquiet","anxieux","stressé","méfiant","dépassé"] },
+      { id:"surprise",  e:"😲", lbl:"Surprise",   color:"#10b981", nuances:["étonné","intrigué","perplexe","ébahi","curieux"] }
     ];
-    root.innerHTML = `
-      <h1>🌤️ Météo</h1>
-      <div class="sub">Comment vous sentez-vous ce soir ?</div>
-      <div class="card">
-        <div class="meteo-pad">
-          ${emojis.map((em, j) => `<button ${voted?'disabled':''} onclick="window.__v(${j})"><span class="em">${em.e}</span>${em.lbl}</button>`).join("")}
+    if (voted) {
+      root.innerHTML = `
+        <h1>🌈 Météo des émotions</h1>
+        <div class="card"><div class="ok">✅ Émotion partagée — merci !</div></div>
+      `;
+      return;
+    }
+    let chosenFam = null;
+    function renderStep1(){
+      root.innerHTML = `
+        <h1>🌈 Météo des émotions</h1>
+        <div class="sub">Quelle famille d'émotion correspond le mieux à ce que tu ressens ?</div>
+        <div class="card">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            ${FAMILIES.map(f => `
+              <button onclick="window.__pickFam('${f.id}')" style="padding:18px 8px; background:rgba(255,255,255,0.08); border:2px solid ${f.color}; border-radius:14px; color:white; cursor:pointer;">
+                <div style="font-size:48px;">${f.e}</div>
+                <div style="font-weight:800; font-size:18px; margin-top:6px; color:${f.color};">${f.lbl}</div>
+              </button>
+            `).join("")}
+          </div>
+          ${statusHtml()}
         </div>
-        ${statusHtml()}
-        ${voted ? '<div class="ok" style="margin-top:14px;">✅ Vote enregistré</div>' : ''}
-      </div>
-    `;
-    window.__v = (j) => sendVote(j);
+      `;
+    }
+    function renderStep2(){
+      const f = FAMILIES.find(x => x.id === chosenFam);
+      root.innerHTML = `
+        <h1 style="color:${f.color};">${f.e} ${f.lbl}</h1>
+        <div class="sub">Choisis la nuance la plus juste</div>
+        <div class="card">
+          <div style="display:grid; gap:8px;">
+            ${f.nuances.map(n => `
+              <button onclick="window.__pickNuance('${n}')" style="padding:16px; background:rgba(255,255,255,0.08); border:2px solid ${f.color}; border-radius:12px; color:white; font-size:18px; font-weight:700; cursor:pointer; text-align:center;">${n}</button>
+            `).join("")}
+          </div>
+          <button class="mini-btn" style="margin-top:12px; width:100%;" onclick="window.__back()">← Changer de famille</button>
+          ${statusHtml()}
+        </div>
+      `;
+    }
+    window.__pickFam = (id) => { chosenFam = id; renderStep2(); };
+    window.__back = () => { chosenFam = null; renderStep1(); };
+    window.__pickNuance = (n) => { sendVote(chosenFam + ":" + n); };
+    renderStep1();
     return;
   }
 
