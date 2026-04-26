@@ -222,7 +222,7 @@ async function init() {
 // === HELPERS ===
 function getEnabledModules() {
   if (!cafe || !cafe.modules) return [];
-  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","feedback","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","feedback","bilan"];
   return order.filter(id => cafe.modules[id]?.enabled);
 }
 function curMod() { const e = getEnabledModules(); return e[cafe.state.moduleIndex] || null; }
@@ -259,6 +259,7 @@ function render() {
   if (mod === "thermo")     return renderThermo();
   if (mod === "empathie")   return renderEmpathie();
   if (mod === "feedback")   return renderFeedback();
+  if (mod === "frise")      return renderFrise();
   if (mod === "photo")      return renderPlaceholder("🖼️ Photolangage", "À configurer dans le Cockpit");
   if (mod === "bilan")      return renderBilan();
   renderPlaceholder(mod, "Module en construction");
@@ -653,6 +654,132 @@ function renderFeedback() {
   `;
 }
 
+// === FRISE DU SOMMEIL — visualisation des cycles ===
+const SLEEP_CYCLES = [
+  // Chaque cycle = phases [legerA, profond, legerB, paradoxal] en minutes (~90 min total)
+  [15, 35, 30, 10],
+  [15, 30, 25, 20],
+  [15, 20, 25, 30],
+  [15, 10, 20, 45],
+  [15, 5,  20, 50],
+  [15, 0,  20, 55]
+];
+const PHASE_COLOR = { leger: "#93c5fd", profond: "#6d28d9", paradoxal: "#fb923c" };
+
+function nightPhases(durationMin) {
+  const out = []; let elapsed = 0;
+  for (let k = 0; k < SLEEP_CYCLES.length && elapsed < durationMin; k++) {
+    const [l1, prof, l2, para] = SLEEP_CYCLES[k];
+    const segs = [["leger",l1],["profond",prof],["leger",l2],["paradoxal",para]];
+    for (const [type, dur] of segs) {
+      if (elapsed >= durationMin) break;
+      const m = Math.min(dur, durationMin - elapsed);
+      if (m > 0) out.push({ type, minutes: m, start: elapsed });
+      elapsed += m;
+    }
+  }
+  return out;
+}
+
+function renderFrise() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  const wake = it.wake || 7;
+  const ideal = it.ideal || 22;
+  // Plage d'affichage : 21h à 04h (= 21h à 28h en heures décalées)
+  const startH = 21, endH = wake + 24; // ex 7+24=31
+  const totalMin = (endH - startH) * 60;
+
+  // Compute phases per vote
+  const rows = itemVotes.slice(-12).map(v => {
+    const bedH = parseFloat(v.value);
+    if (!Number.isFinite(bedH)) return null;
+    const bedMin = (bedH < 12 ? bedH + 24 : bedH) * 60; // si bedH < 12 (ex 1h, 2h matin), on ajoute 24
+    // Si bedH dans [21..23.99] => bedH*60. Si bedH dans [0..6] => (bedH+24)*60
+    const bedMinFromStart = (bedH >= 21 ? bedH - 21 : bedH + 3) * 60;
+    const sleepMin = (endH - startH) * 60 - bedMinFromStart;
+    const phases = nightPhases(sleepMin);
+    const profondMin = phases.filter(p => p.type === "profond").reduce((s,p) => s+p.minutes, 0);
+    const paraMin = phases.filter(p => p.type === "paradoxal").reduce((s,p) => s+p.minutes, 0);
+    const p = participants.find(pp => pp.id === v.participantId);
+    return { bedH, bedMinFromStart, phases, profondMin, paraMin, sleepMin, parti: p };
+  }).filter(Boolean);
+
+  // Stats globales
+  const allVotes = itemVotes.map(v => parseFloat(v.value)).filter(Number.isFinite);
+  const avgBed = allVotes.length ? (allVotes.reduce((s,x)=>s+x,0) / allVotes.length) : ideal;
+  const allPhases = allVotes.map(bedH => {
+    const startMin = (bedH >= 21 ? bedH - 21 : bedH + 3) * 60;
+    return nightPhases(totalMin - startMin);
+  });
+  const avgProfond = allPhases.length ? Math.round(allPhases.map(ph => ph.filter(p=>p.type==="profond").reduce((s,p)=>s+p.minutes,0)).reduce((s,x)=>s+x,0) / allPhases.length) : 0;
+  const avgPara = allPhases.length ? Math.round(allPhases.map(ph => ph.filter(p=>p.type==="paradoxal").reduce((s,p)=>s+p.minutes,0)).reduce((s,x)=>s+x,0) / allPhases.length) : 0;
+  const refPhases = nightPhases(totalMin - (ideal - 21) * 60);
+  const refProfond = refPhases.filter(p=>p.type==="profond").reduce((s,p)=>s+p.minutes,0);
+  const refPara = refPhases.filter(p=>p.type==="paradoxal").reduce((s,p)=>s+p.minutes,0);
+  const lossProfond = Math.max(0, refProfond - avgProfond);
+  const lossPara = Math.max(0, refPara - avgPara);
+
+  function fmtH(h) {
+    const hr = Math.floor(h) % 24;
+    const mn = Math.round((h - Math.floor(h)) * 60);
+    return String(hr).padStart(2,"0") + ":" + String(mn).padStart(2,"0");
+  }
+
+  // Timeline ticks
+  const ticksHtml = [];
+  for (let h = startH; h <= endH; h++) {
+    const left = ((h - startH) / (endH - startH)) * 100;
+    ticksHtml.push(`<div style="position:absolute; left:${left}%; top:0; bottom:0; border-left:1px dashed rgba(255,255,255,0.15);"><div style="position:absolute; top:-22px; transform:translateX(-50%); font-size:13px; color:#94a3b8;">${(h%24).toString().padStart(2,"0")}h</div></div>`);
+  }
+
+  stage.innerHTML = `
+    <div class="module" style="max-width:1500px;">
+      <div class="question small">🌙 ${escapeHtml(it.prompt || "")}</div>
+      <div style="display:grid; grid-template-columns:1fr 320px; gap:24px;">
+        <div>
+          <div style="position:relative; margin:30px 0 12px; height:14px;">${ticksHtml.join("")}</div>
+          <div style="display:flex; flex-direction:column; gap:6px; max-height:55vh; overflow-y:auto;">
+            ${rows.length === 0 ? '<div style="color:#94a3b8; text-align:center; padding:30px;">En attente des réponses…</div>' : rows.map(r => {
+              const left = (r.bedMinFromStart / totalMin) * 100;
+              const widthPct = (r.sleepMin / totalMin) * 100;
+              const segments = r.phases.map(ph => {
+                const w = (ph.minutes / r.sleepMin) * 100;
+                return `<div style="width:${w}%; background:${PHASE_COLOR[ph.type]}; height:100%;"></div>`;
+              }).join("");
+              return `<div style="position:relative; height:30px;">
+                <div style="position:absolute; left:${left}%; width:${widthPct}%; height:100%; display:flex; border-radius:4px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.3);">${segments}</div>
+                <div style="position:absolute; left:${left}%; transform:translateX(-100%); top:6px; padding-right:6px; font-size:12px; color:#fbbf24; font-weight:700; white-space:nowrap;">${fmtH(r.bedH)} ${r.parti ? r.parti.avatar : "👤"}</div>
+              </div>`;
+            }).join("")}
+          </div>
+          <div style="display:flex; gap:18px; margin-top:14px; font-size:13px; color:#cbd5e1;">
+            <span><span style="display:inline-block; width:14px; height:14px; background:${PHASE_COLOR.leger}; border-radius:3px; vertical-align:middle;"></span> Sommeil léger</span>
+            <span><span style="display:inline-block; width:14px; height:14px; background:${PHASE_COLOR.profond}; border-radius:3px; vertical-align:middle;"></span> Profond (récup PHYSIQUE)</span>
+            <span><span style="display:inline-block; width:14px; height:14px; background:${PHASE_COLOR.paradoxal}; border-radius:3px; vertical-align:middle;"></span> Paradoxal (récup MENTALE)</span>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:18px;">
+          <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">Référence (coucher ${ideal}h)</div>
+          <div style="font-size:14px; color:#cbd5e1; margin-top:4px;">Profond : <b style="color:${PHASE_COLOR.profond};">${refProfond} min</b><br>Paradoxal : <b style="color:${PHASE_COLOR.paradoxal};">${refPara} min</b></div>
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,0.15); margin:14px 0;">
+          <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">Moyenne du groupe</div>
+          <div style="font-size:14px; color:#fff; margin-top:4px;">Coucher moyen : <b>${fmtH(avgBed)}</b><br>Profond : <b style="color:${PHASE_COLOR.profond};">${avgProfond} min</b><br>Paradoxal : <b style="color:${PHASE_COLOR.paradoxal};">${avgPara} min</b></div>
+          ${lossProfond + lossPara > 0 ? `<div style="background:rgba(239,68,68,0.15); border:2px solid #dc2626; border-radius:10px; padding:12px; margin-top:14px;">
+            <div style="font-size:12px; color:#fca5a5; text-transform:uppercase; letter-spacing:1px;">Perte par nuit</div>
+            <div style="font-size:28px; font-weight:800; color:#fca5a5; margin:6px 0;">-${lossProfond + lossPara} min</div>
+            <div style="font-size:12px; color:#cbd5e1;">soit <b>-${Math.round((lossProfond+lossPara)*7/60*10)/10}h</b> par semaine de récupération en moins.</div>
+          </div>` : ''}
+          <div style="font-size:11px; color:#94a3b8; margin-top:14px; line-height:1.4;">📊 ${itemVotes.length} réponse${itemVotes.length>1?"s":""}. Modèle simplifié : 90 min/cycle, sommeil profond plus dense en début de nuit, paradoxal en fin de nuit.</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderPlaceholder(title, msg) {
   document.getElementById("stage").innerHTML = `<div class="module"><div class="question">${title}</div><div style="text-align:center; font-size:20px; color:#c4b5fd;">${msg}</div></div>`;
 }
@@ -694,7 +821,7 @@ window.goNext = async function() {
   clearAuto();
   const mod = curMod();
   const items = curItems();
-  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback"].includes(mod);
+  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback","frise"].includes(mod);
   // Pour quiz/vraifaux/thermo/empathie/dilemmes : si pas révélé, révéler d'abord
   if (["quiz","vraifaux","thermo","empathie","dilemmes"].includes(mod) && !cafe.state.revealed) {
     await updateDoc(cafeRef, { "state.revealed": true });
