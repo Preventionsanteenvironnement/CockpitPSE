@@ -1,13 +1,13 @@
 import { $, escapeHtml } from "./utils.js";
 import { getParty } from "./storage-service.js";
 import { getRoundInstruction, getRoundTitle, labelType, isSecretGame } from "./game-types.js";
-import { bootSync, joinParty, listenParty, submitResponse, submitVote, currentItem } from "./party-service.js";
+import { bootSync, joinPartyOnline, listenParty, submitResponse, submitVote, currentItem } from "./party-service.js";
 
 let party = null;
 let player = null;
 let unlisten = null;
 
-bootSync();
+const syncReady = bootSync();
 
 function init() {
   const params = new URLSearchParams(location.search);
@@ -20,10 +20,11 @@ function init() {
   }
 }
 
-function join() {
+async function join() {
   try {
+    await syncReady;
     const code = $("#partyInput").value.trim().toUpperCase();
-    player = joinParty(code, $("#pseudoInput").value);
+    player = await joinPartyOnline(code, $("#pseudoInput").value);
     $("#joinCard").style.display = "none";
     $("#playerCard").style.display = "";
     if (unlisten) unlisten();
