@@ -3413,6 +3413,7 @@ QN80,Wael HWORI</pre>
 <script>
 (function(){
   const SP_KEY = "cockpit_soirees_parents_v1";
+  const SP_PUBLIC_BASE = "https://preventionsanteenvironnement.github.io/CockpitPSE/";
   const SP_MODULES = [
     { id:"meteo",      emoji:"🌤️", name:"Météo des émotions",     desc:"6 émojis géants. Brise-glace 30s, sans rien à écrire.", aiGen:false, def:true },
     { id:"nuage",      emoji:"☁️",  name:"Nuage de mots",           desc:"1 mot envoyé par chacun, nuage en direct.",             aiGen:true,  def:true },
@@ -3435,6 +3436,11 @@ QN80,Wael HWORI</pre>
   function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]); }
   function fmt(iso){ if(!iso) return ""; const d=new Date(iso); return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}); }
   function toast(msg){ if (typeof showToast === "function") return showToast(msg); alert(msg); }
+  function sp_publicPage(path){
+    const localHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname) || /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
+    const base = location.protocol === "file:" || localHost ? SP_PUBLIC_BASE : new URL("./", location.href).href;
+    return new URL(path, base);
+  }
 
   function blank(){
     return {
@@ -3548,7 +3554,12 @@ QN80,Wael HWORI</pre>
     const aiMods = SP_MODULES.filter(m => m.aiGen && sp_session.modules[m.id].enabled);
     const has = aiMods.some(m => (sp_session.modules[m.id].items||[]).length > 0);
     if (!has) {
-      el.innerHTML = '<h4 style="margin:0 0 8px; color:#db2777;">5. Aperçu du contenu</h4><div style="text-align:center; color:#94a3b8; padding:20px; font-size:0.85rem;">Pas encore de contenu. Génère avec l\'IA en bloc 4.</div>';
+      const addButtons = aiMods.map(m => `
+        <button onclick="sp_addItem('${m.id}')" style="background:#f1f5f9; border:1px dashed #cbd5e1; padding:6px 12px; border-radius:6px; cursor:pointer; color:#64748b; font-size:0.85rem; margin:4px;">
+          + Ajouter ${m.emoji} ${m.name}
+        </button>
+      `).join("");
+      el.innerHTML = `<h4 style="margin:0 0 8px; color:#db2777;">5. Aperçu du contenu</h4><div style="text-align:center; color:#94a3b8; padding:20px; font-size:0.85rem;">Pas encore de contenu. Génère avec l'IA en bloc 4 ou ajoute les premiers éléments à la main.<div style="margin-top:12px;">${addButtons}</div></div>`;
       return;
     }
     el.innerHTML = '<h4 style="margin:0 0 12px; color:#db2777;">5. Contenu généré (éditable)</h4>' + aiMods.map(m => {
@@ -3822,6 +3833,12 @@ ${sp_session.source}
     if (!sp_session.title.trim()) { toast("Donne un titre à l'événement avant de lancer."); return; }
     const enabled = SP_MODULES.filter(m => sp_session.modules[m.id].enabled);
     if (enabled.length === 0) { toast("Coche au moins un module."); return; }
+    const emptyGenerated = enabled.filter(m => m.aiGen && (sp_session.modules[m.id].items || []).length === 0);
+    if (emptyGenerated.length > 0) {
+      toast("Ajoute ou génère du contenu pour : " + emptyGenerated.map(m => m.name).join(", "));
+      sp_setSaveState("⚠️ Contenu manquant : " + emptyGenerated.map(m => m.name).join(", "), "#dc2626");
+      return;
+    }
     if (!window.SP_FB || !window.SP_FB.saveCafe) { toast("⏳ Connexion Firebase en cours, réessaie dans 2 secondes."); return; }
     sp_setSaveState("☁️ Préparation du café en ligne…", "#3b82f6");
     try {
@@ -3829,8 +3846,9 @@ ${sp_session.source}
       sp_session.state = { phase: "lobby", moduleIndex: 0, itemIndex: 0, revealed: false, autoMode: !!sp_session.autoMode, moduleTiming: 30 };
       sp_doSave(true);
       await window.SP_FB.saveCafe(sp_session);
-      const url = "cafe_live.html?id=" + encodeURIComponent(sp_session.id);
-      window.open(url, "_blank");
+      const url = sp_publicPage("cafe_live.html");
+      url.searchParams.set("id", sp_session.id);
+      window.open(url.href, "_blank");
       sp_setSaveState("🚀 Café lancé ! L'écran géant s'ouvre.", "#10b981");
     } catch(e) {
       sp_setSaveState("❌ Erreur : " + e.message, "#dc2626");
