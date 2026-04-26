@@ -136,6 +136,7 @@
     <button class="btn btn-pri" id="b-reveal" onclick="reveal()" style="display:none;">👀 Révéler</button>
     <button class="btn btn-sec" id="b-start" onclick="startCafe()" style="display:none;">🚀 Démarrer</button>
     <button class="btn btn-sec" onclick="toggleAuto()">⏱ <span id="b-auto-lbl">Auto OFF</span></button>
+    <button class="btn btn-sec" onclick="resetCafe()" title="Effacer participants + votes et redémarrer">🔄 Réinitialiser</button>
     <button class="btn btn-warn" onclick="endCafe()">⏹ Fin</button>
   </div>
 </div>
@@ -150,7 +151,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot,
+  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   collection, addDoc, query, orderBy, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
@@ -402,30 +403,52 @@ function renderEchelle() {
 
 function renderMeteo() {
   const stage = document.getElementById("stage");
-  const items = curItems();
   const mod = curMod();
-  // météo n'a pas d'items générés, on utilise un set d'émojis fixe
-  const emojis = [
-    { e: "😄", lbl: "Super" }, { e: "🙂", lbl: "Ça va" }, { e: "😐", lbl: "Mitigé" },
-    { e: "😟", lbl: "Inquiet" }, { e: "😴", lbl: "Fatigué" }, { e: "😤", lbl: "Tendu" }
+  const FAMILIES = [
+    { id:"joie",      e:"😄", lbl:"Joie",      color:"#fbbf24" },
+    { id:"tristesse", e:"😢", lbl:"Tristesse", color:"#3b82f6" },
+    { id:"colere",    e:"😠", lbl:"Colère",    color:"#ef4444" },
+    { id:"peur",      e:"😨", lbl:"Peur",      color:"#8b5cf6" },
+    { id:"surprise",  e:"😲", lbl:"Surprise",  color:"#10b981" }
   ];
   const itemVotes = votesFor(mod, 0);
+  // chaque vote a la forme "famille:nuance"
+  const famCounts = {}; const nuanceCounts = {};
+  itemVotes.forEach(v => {
+    const [fam, nu] = String(v.value||"").split(":");
+    if (!fam) return;
+    famCounts[fam] = (famCounts[fam]||0) + 1;
+    if (nu) {
+      nuanceCounts[fam] = nuanceCounts[fam] || {};
+      nuanceCounts[fam][nu] = (nuanceCounts[fam][nu]||0) + 1;
+    }
+  });
   stage.innerHTML = `
     <div class="module">
-      <div class="question">🌤️ Comment vous sentez-vous ce soir ?</div>
-      <div class="meteo-grid">
-        ${emojis.map((em, j) => {
-          const c = itemVotes.filter(v => v.value === j).length;
-          return `<div class="meteo-card"><div class="em">${em.e}</div><div class="lbl">${em.lbl}</div><div class="cnt">${c}</div></div>`;
+      <div class="question">🌈 La météo des émotions</div>
+      <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:18px; max-width:1300px; margin:0 auto;">
+        ${FAMILIES.map(f => {
+          const c = famCounts[f.id] || 0;
+          const top = Object.entries(nuanceCounts[f.id]||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
+          return `
+            <div style="background:rgba(255,255,255,0.05); border:3px solid ${f.color}; border-radius:18px; padding:22px 14px; text-align:center;">
+              <div style="font-size:64px;">${f.e}</div>
+              <div style="font-size:22px; font-weight:800; color:${f.color}; margin-top:6px;">${f.lbl}</div>
+              <div style="font-size:42px; font-weight:800; color:#fff; margin-top:8px;">${c}</div>
+              <div style="margin-top:10px; min-height:80px;">
+                ${top.map(([n,k]) => `<div style="font-size:14px; color:#e2e8f0; padding:3px 0;">${escapeHtml(n)} <span style="color:${f.color}; font-weight:800;">×${k}</span></div>`).join("") || '<div style="font-size:13px; color:#64748b; font-style:italic;">en attente…</div>'}
+              </div>
+            </div>`;
         }).join("")}
       </div>
-      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} participant${itemVotes.length>1?"s":""} ont répondu</div>
+      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} émotion${itemVotes.length>1?"s":""} partagée${itemVotes.length>1?"s":""} · 5 émotions primaires + nuances</div>
     </div>
   `;
-  // animation bulles
   const newVotes = itemVotes.slice(-3);
   newVotes.forEach((v, i) => {
-    setTimeout(() => spawnBubble(emojis[v.value]?.e || "💬"), i * 200);
+    const [fam] = String(v.value||"").split(":");
+    const f = FAMILIES.find(x => x.id === fam);
+    setTimeout(() => spawnBubble(f?.e || "💬"), i * 200);
   });
 }
 
@@ -528,8 +551,35 @@ function renderPlaceholder(title, msg) {
 
 // === CONTROLS ===
 window.startCafe = async function() {
-  await updateDoc(cafeRef, { "state.phase": "running", "state.moduleIndex": 0, "state.itemIndex": 0, "state.revealed": false });
+  // Génère un runId à chaque démarrage si absent (sépare les votes / les états "déjà voté" des parents)
+  const runId = (cafe.state && cafe.state.runId) || ("r_" + Date.now().toString(36));
+  await updateDoc(cafeRef, {
+    "state.phase": "running",
+    "state.moduleIndex": 0,
+    "state.itemIndex": 0,
+    "state.revealed": false,
+    "state.runId": runId,
+    "state.startedAt": new Date().toISOString()
+  });
   scheduleAuto();
+};
+
+window.resetCafe = async function() {
+  if (!confirm("🔄 Réinitialiser : effacer participants + votes et générer une nouvelle session.\n\nLes parents devront re-scanner le QR code et re-rejoindre.\n\nContinuer ?")) return;
+  // Supprime sous-collections
+  const partSnap = await getDocs(partsRef);
+  for (const d of partSnap.docs) { await deleteDoc(d.ref); }
+  const voteSnap = await getDocs(votesRef);
+  for (const d of voteSnap.docs) { await deleteDoc(d.ref); }
+  // Nouveau runId + retour au lobby
+  await updateDoc(cafeRef, {
+    "state.phase": "lobby",
+    "state.moduleIndex": 0,
+    "state.itemIndex": 0,
+    "state.revealed": false,
+    "state.runId": "r_" + Date.now().toString(36)
+  });
+  alert("✅ Session réinitialisée. Parents : re-scannez le QR code.");
 };
 
 window.goNext = async function() {
