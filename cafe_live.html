@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☕ Café Parents — Écran Géant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #581c87 100%);
+    color: #f1f5f9; display: flex; flex-direction: column;
+  }
+  /* TOP BAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 100;
+  }
+  .topbar h1 { font-size: 18px; font-weight: 700; }
+  .topbar .meta { font-size: 13px; color: #a78bfa; }
+  .ctrl { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    padding: 8px 14px; border: none; border-radius: 8px; font-weight: 600;
+    cursor: pointer; font-size: 13px; transition: all 0.2s;
+  }
+  .btn-pri { background: linear-gradient(90deg, #ec4899, #f97316); color: white; }
+  .btn-pri:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(236,72,153,0.4); }
+  .btn-sec { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+  .btn-sec:hover { background: rgba(255,255,255,0.2); }
+  .btn-warn { background: #dc2626; color: white; }
+  /* STAGE */
+  .stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 30px; overflow: hidden; position: relative; }
+
+  /* LOBBY */
+  .lobby { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; width: 100%; max-width: 1400px; align-items: center; }
+  .qr-card { background: white; border-radius: 24px; padding: 30px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .qr-card img { width: 100%; max-width: 360px; height: auto; }
+  .qr-card .url { color: #1e293b; font-size: 14px; margin-top: 10px; word-break: break-all; }
+  .qr-card .code { font-size: 32px; font-weight: 800; color: #db2777; letter-spacing: 4px; margin-top: 8px; }
+  .qr-card .label { color: #64748b; font-size: 13px; }
+  .lobby-info h2 { font-size: 56px; font-weight: 800; line-height: 1.1; margin-bottom: 20px; background: linear-gradient(90deg, #fbbf24, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .lobby-info .theme { font-size: 24px; color: #c4b5fd; margin-bottom: 30px; }
+  .lobby-info .step1 { font-size: 22px; color: #f1f5f9; line-height: 1.6; }
+  .lobby-info .step1 b { color: #fbbf24; }
+  .anon { display: inline-block; padding: 8px 18px; background: rgba(16,185,129,0.2); color: #6ee7b7; border-radius: 20px; font-size: 16px; margin-top: 16px; }
+  .participants-strip {
+    position: absolute; bottom: 20px; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 0 30px;
+  }
+  .pchip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; font-size: 16px; font-weight: 600; animation: pop 0.4s ease-out; }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .pcount { font-size: 28px; font-weight: 800; color: #fbbf24; }
+
+  /* MODULE COMMON */
+  .module { width: 100%; max-width: 1400px; }
+  .question { font-size: 56px; font-weight: 800; line-height: 1.2; text-align: center; margin-bottom: 40px; }
+  .question.small { font-size: 40px; }
+  .options { display: grid; gap: 16px; max-width: 1100px; margin: 0 auto; }
+  .options.cols2 { grid-template-columns: 1fr 1fr; }
+  .options.cols4 { grid-template-columns: 1fr 1fr; }
+  .opt {
+    padding: 30px; border-radius: 16px; font-size: 28px; font-weight: 700; text-align: center;
+    background: rgba(255,255,255,0.08); border: 3px solid rgba(255,255,255,0.15); position: relative;
+    transition: all 0.4s; min-height: 100px; display: flex; align-items: center; justify-content: center;
+  }
+  .opt[data-color="0"] { border-color: #ef4444; background: rgba(239,68,68,0.15); }
+  .opt[data-color="1"] { border-color: #3b82f6; background: rgba(59,130,246,0.15); }
+  .opt[data-color="2"] { border-color: #10b981; background: rgba(16,185,129,0.15); }
+  .opt[data-color="3"] { border-color: #f59e0b; background: rgba(245,158,11,0.15); }
+  .opt[data-color="4"] { border-color: #8b5cf6; background: rgba(139,92,246,0.15); }
+  .opt .bar { position: absolute; bottom: 0; left: 0; height: 8px; background: white; border-radius: 0 0 13px 13px; transition: width 0.6s; width: 0; }
+  .opt .pct { position: absolute; top: 8px; right: 14px; font-size: 18px; font-weight: 800; opacity: 0; transition: opacity 0.4s; }
+  .reveal .opt .pct { opacity: 1; }
+  .reveal .opt.correct { box-shadow: 0 0 40px rgba(16,185,129,0.6); border-color: #10b981; background: rgba(16,185,129,0.25); transform: scale(1.05); }
+  .reveal .opt.correct::after { content: "✓"; position: absolute; top: 8px; left: 14px; font-size: 30px; color: #10b981; font-weight: 800; }
+  .reveal .opt.wrong { opacity: 0.45; }
+  .explain { margin-top: 30px; padding: 24px; background: rgba(16,185,129,0.15); border: 2px solid #10b981; border-radius: 16px; font-size: 24px; line-height: 1.5; max-width: 1100px; margin-left: auto; margin-right: auto; animation: slideUp 0.5s; }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* METEO */
+  .meteo-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
+  .meteo-card { background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.2); border-radius: 16px; padding: 24px; text-align: center; }
+  .meteo-card .em { font-size: 80px; }
+  .meteo-card .lbl { font-size: 18px; color: #c4b5fd; margin-top: 8px; }
+  .meteo-card .cnt { font-size: 36px; font-weight: 800; color: #fbbf24; margin-top: 8px; }
+  .bubbles { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+  .bubble { position: absolute; font-size: 60px; animation: floatUp 6s linear forwards; }
+  @keyframes floatUp { from { bottom: -100px; opacity: 1; } to { bottom: 110%; opacity: 0; } }
+
+  /* NUAGE */
+  .cloud { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: center; padding: 40px; max-width: 1200px; margin: 0 auto; }
+  .word { padding: 14px 24px; background: rgba(255,255,255,0.1); border-radius: 30px; font-weight: 700; animation: pop 0.5s; }
+
+  /* OUVERTE / MUR */
+  .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; max-width: 1400px; margin: 0 auto; max-height: 70vh; overflow-y: auto; padding: 10px; }
+  .post { background: rgba(255,255,255,0.08); border-left: 4px solid #ec4899; padding: 16px; border-radius: 8px; font-size: 18px; line-height: 1.4; animation: pop 0.4s; }
+  .post .who { font-size: 13px; color: #a78bfa; margin-top: 6px; }
+
+  /* ECHELLE */
+  .echelle { max-width: 1100px; margin: 0 auto; }
+  .echelle .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 30px; }
+  .echelle .lvl { background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 20px; text-align: center; }
+  .echelle .lvl .n { font-size: 40px; font-weight: 800; color: #fbbf24; }
+  .echelle .lvl .c { font-size: 28px; font-weight: 700; color: #fff; margin-top: 8px; }
+  .echelle .lvl .lbl { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+
+  /* BILAN */
+  .bilan { text-align: center; max-width: 1100px; margin: 0 auto; }
+  .bilan h2 { font-size: 64px; margin-bottom: 30px; background: linear-gradient(90deg, #fbbf24, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .bilan .stat { display: inline-block; margin: 20px; padding: 30px 50px; background: rgba(255,255,255,0.08); border-radius: 20px; min-width: 200px; }
+  .bilan .stat .n { font-size: 64px; font-weight: 800; color: #fbbf24; }
+  .bilan .stat .l { font-size: 18px; color: #c4b5fd; }
+  .bilan .merci { font-size: 32px; margin-top: 40px; color: #f1f5f9; }
+
+  /* COUNTDOWN */
+  .countdown { position: fixed; top: 80px; right: 30px; background: rgba(220,38,38,0.9); color: white; font-size: 32px; font-weight: 800; padding: 12px 24px; border-radius: 12px; z-index: 200; }
+  .progress-dots { display: flex; gap: 4px; }
+  .progress-dots .d { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+  .progress-dots .d.done { background: #10b981; }
+  .progress-dots .d.cur { background: #fbbf24; transform: scale(1.5); }
+
+  .err { padding: 30px; background: rgba(220,38,38,0.2); border: 2px solid #dc2626; border-radius: 12px; text-align: center; font-size: 18px; max-width: 600px; margin: 50px auto; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1 id="t-title">☕ Café Parents</h1>
+    <div class="meta" id="t-meta">Chargement…</div>
+  </div>
+  <div class="progress-dots" id="t-dots"></div>
+  <div class="ctrl">
+    <button class="btn btn-sec" id="b-prev" onclick="goPrev()">← Préc.</button>
+    <button class="btn btn-pri" id="b-next" onclick="goNext()">Suivant →</button>
+    <button class="btn btn-pri" id="b-reveal" onclick="reveal()" style="display:none;">👀 Révéler</button>
+    <button class="btn btn-sec" id="b-start" onclick="startCafe()" style="display:none;">🚀 Démarrer</button>
+    <button class="btn btn-sec" onclick="toggleAuto()">⏱ <span id="b-auto-lbl">Auto OFF</span></button>
+    <button class="btn btn-warn" onclick="endCafe()">⏹ Fin</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="err" id="err" style="display:none;"></div>
+</div>
+
+<div class="bubbles" id="bubbles"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot,
+  collection, addDoc, query, orderBy, serverTimestamp, getDocs
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+  authDomain: "devoirs-pse.firebaseapp.com",
+  projectId: "devoirs-pse",
+  storageBucket: "devoirs-pse.appspot.com",
+  messagingSenderId: "614730413904",
+  appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const cafeId = params.get("id");
+let cafe = null;
+let participants = [];
+let votes = [];
+let cafeRef, partsRef, votesRef;
+let autoTimer = null;
+let countdownInterval = null;
+
+if (!cafeId) {
+  document.getElementById("err").style.display = "block";
+  document.getElementById("err").textContent = "❌ Aucun ID de café fourni. Lance le café depuis le Cockpit.";
+} else {
+  cafeRef = doc(db, "cafes", cafeId);
+  partsRef = collection(db, "cafes", cafeId, "participants");
+  votesRef = collection(db, "cafes", cafeId, "votes");
+  init();
+}
+
+async function init() {
+  // 1) Charge le café
+  const snap = await getDoc(cafeRef);
+  if (!snap.exists()) {
+    document.getElementById("err").style.display = "block";
+    document.getElementById("err").textContent = "❌ Café introuvable. Vérifie l'ID.";
+    return;
+  }
+  cafe = snap.data();
+
+  // 2) Init state si absent
+  if (!cafe.state) {
+    cafe.state = { phase: "lobby", moduleIndex: 0, itemIndex: 0, revealed: false, autoMode: cafe.autoMode || false, moduleTiming: 30 };
+    await updateDoc(cafeRef, { state: cafe.state });
+  }
+
+  document.getElementById("t-title").textContent = "☕ " + (cafe.title || "Café Parents");
+  document.getElementById("t-meta").textContent = (cafe.theme ? cafe.theme + " · " : "") + (cafe.audience || "");
+
+  // 3) Listeners temps réel
+  onSnapshot(cafeRef, s => { cafe = s.data(); render(); });
+  onSnapshot(query(partsRef, orderBy("joinedAt", "asc")), s => {
+    participants = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  });
+  onSnapshot(votesRef, s => {
+    votes = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  });
+
+  render();
+}
+
+// === HELPERS ===
+function getEnabledModules() {
+  if (!cafe || !cafe.modules) return [];
+  const order = ["meteo","nuage","photo","echelle","vraifaux","quiz","dilemmes","ouverte","muranonyme","bilan"];
+  return order.filter(id => cafe.modules[id]?.enabled);
+}
+function curMod() { const e = getEnabledModules(); return e[cafe.state.moduleIndex] || null; }
+function curItems() {
+  const m = curMod(); if (!m) return [];
+  return cafe.modules[m]?.items || [];
+}
+function curItem() { return curItems()[cafe.state.itemIndex] || null; }
+function votesFor(modId, idx) {
+  return votes.filter(v => v.moduleId === modId && v.itemIndex === idx);
+}
+function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]); }
+
+// === RENDER ===
+function render() {
+  if (!cafe) return;
+  renderTopbar();
+  const stage = document.getElementById("stage");
+  const phase = cafe.state.phase;
+
+  if (phase === "lobby") return renderLobby();
+  if (phase === "ended") return renderBilan();
+
+  const mod = curMod();
+  if (!mod) { renderBilan(); return; }
+  if (mod === "meteo")      return renderMeteo();
+  if (mod === "nuage")      return renderNuage();
+  if (mod === "quiz" || mod === "vraifaux") return renderQuizLike();
+  if (mod === "dilemmes")   return renderDilemme();
+  if (mod === "echelle")    return renderEchelle();
+  if (mod === "ouverte")    return renderOuverte();
+  if (mod === "muranonyme") return renderMurAnonyme();
+  if (mod === "photo")      return renderPlaceholder("🖼️ Photolangage", "À configurer dans le Cockpit");
+  if (mod === "bilan")      return renderBilan();
+  renderPlaceholder(mod, "Module en construction");
+}
+
+function renderTopbar() {
+  const enabled = getEnabledModules();
+  const dots = document.getElementById("t-dots");
+  dots.innerHTML = enabled.map((m, i) => {
+    let cls = "d";
+    if (cafe.state.phase === "lobby") cls += "";
+    else if (i < cafe.state.moduleIndex) cls += " done";
+    else if (i === cafe.state.moduleIndex) cls += " cur";
+    return `<div class="${cls}" title="${m}"></div>`;
+  }).join("");
+
+  document.getElementById("b-start").style.display = (cafe.state.phase === "lobby") ? "inline-block" : "none";
+  document.getElementById("b-prev").style.display  = (cafe.state.phase === "running") ? "inline-block" : "none";
+  document.getElementById("b-next").style.display  = (cafe.state.phase === "running") ? "inline-block" : "none";
+  const mod = curMod();
+  const showReveal = (cafe.state.phase === "running") && (mod === "quiz" || mod === "vraifaux") && !cafe.state.revealed;
+  document.getElementById("b-reveal").style.display = showReveal ? "inline-block" : "none";
+
+  document.getElementById("b-auto-lbl").textContent = cafe.state.autoMode ? "Auto ON" : "Auto OFF";
+}
+
+function renderLobby() {
+  const stage = document.getElementById("stage");
+  const joinUrl = location.origin + location.pathname.replace(/cafe_live\.html$/, "cafe_join.html") + "?id=" + cafeId;
+  const qrSrc = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=" + encodeURIComponent(joinUrl);
+  stage.innerHTML = `
+    <div class="lobby">
+      <div class="qr-card">
+        <img src="${qrSrc}" alt="QR code">
+        <div class="label">Scanne pour rejoindre</div>
+        <div class="code">${cafeId.slice(-6).toUpperCase()}</div>
+        <div class="url">${joinUrl}</div>
+      </div>
+      <div class="lobby-info">
+        <h2>${escapeHtml(cafe.title || "Café Parents")}</h2>
+        <div class="theme">${escapeHtml(cafe.theme || "")}</div>
+        <div class="step1">
+          1️⃣ <b>Scannez</b> le QR code avec votre téléphone<br>
+          2️⃣ Choisissez un <b>surnom + un avatar</b><br>
+          3️⃣ On démarre dès que tout le monde est là 👇
+        </div>
+        <div class="anon">🔒 Anonyme — aucun nom de famille demandé</div>
+      </div>
+    </div>
+    <div class="participants-strip" id="pstrip"></div>
+  `;
+  const strip = document.getElementById("pstrip");
+  strip.innerHTML = `<div class="pchip"><span class="pcount">${participants.length}</span> ${participants.length > 1 ? "parents connectés" : "parent connecté"}</div>` +
+    participants.slice(-30).map(p => `<div class="pchip">${p.avatar || "👤"} ${escapeHtml(p.surnom || "")}</div>`).join("");
+}
+
+function renderQuizLike() {
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const stage = document.getElementById("stage");
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  const total = itemVotes.length || 1;
+  const counts = {};
+  (it.options||[]).forEach((_, j) => counts[j] = itemVotes.filter(v => v.value === j).length);
+  const cls = cafe.state.revealed ? "module reveal" : "module";
+  const colsClass = (it.options||[]).length === 2 ? "cols2" : "cols4";
+  stage.innerHTML = `
+    <div class="${cls}">
+      <div class="question">${escapeHtml(it.question || "")}</div>
+      <div class="options ${colsClass}">
+        ${(it.options||[]).map((opt, j) => {
+          const c = counts[j] || 0;
+          const pct = Math.round((c/total)*100);
+          const isCorrect = it.correct === j;
+          const klass = cafe.state.revealed ? (isCorrect ? "opt correct" : "opt wrong") : "opt";
+          return `
+            <div class="${klass}" data-color="${j}">
+              <span>${escapeHtml(opt)}</span>
+              <div class="pct">${pct}% (${c})</div>
+              <div class="bar" style="width:${pct}%; background:${isCorrect?'#10b981':'#fff'};"></div>
+            </div>`;
+        }).join("")}
+      </div>
+      ${cafe.state.revealed && it.explanation ? `<div class="explain">💡 ${escapeHtml(it.explanation)}</div>` : `<div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} ${itemVotes.length>1?"votes":"vote"} reçus · Question ${cafe.state.itemIndex+1}/${curItems().length}</div>`}
+    </div>
+  `;
+}
+
+function renderDilemme() {
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const stage = document.getElementById("stage");
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  const total = itemVotes.length || 1;
+  const counts = {};
+  (it.options||[]).forEach((_, j) => counts[j] = itemVotes.filter(v => v.value === j).length);
+  stage.innerHTML = `
+    <div class="module ${cafe.state.revealed?'reveal':''}">
+      <div class="question small">🎯 ${escapeHtml(it.situation || "")}</div>
+      <div class="options cols4">
+        ${(it.options||[]).map((opt, j) => {
+          const c = counts[j] || 0;
+          const pct = Math.round((c/total)*100);
+          return `
+            <div class="opt" data-color="${j}">
+              <span><b>${String.fromCharCode(65+j)}.</b> ${escapeHtml(opt)}</span>
+              <div class="pct">${pct}% (${c})</div>
+              <div class="bar" style="width:${pct}%; background:#fff;"></div>
+            </div>`;
+        }).join("")}
+      </div>
+      ${cafe.state.revealed && it.guidance ? `<div class="explain">🗣️ ${escapeHtml(it.guidance)}</div>` : `<div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} avis exprimés · Pas de bonne réponse, place au débat</div>`}
+    </div>
+  `;
+}
+
+function renderEchelle() {
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const stage = document.getElementById("stage");
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  const total = itemVotes.length || 1;
+  const counts = [1,2,3,4,5].map(n => itemVotes.filter(v => v.value === n).length);
+  const labels = ["Pas du tout", "Plutôt non", "Mitigé", "Plutôt oui", "Tout à fait"];
+  stage.innerHTML = `
+    <div class="echelle">
+      <div class="question">📏 ${escapeHtml(it.statement || "")}</div>
+      <div class="scale">
+        ${[1,2,3,4,5].map((n,i) => {
+          const c = counts[i];
+          const pct = Math.round((c/total)*100);
+          return `<div class="lvl"><div class="n">${n}</div><div class="c">${c}</div><div class="lbl">${labels[i]}</div><div style="height:6px; background:rgba(255,255,255,0.1); border-radius:3px; margin-top:8px;"><div style="height:100%; background:#fbbf24; border-radius:3px; width:${pct}%; transition:width 0.6s;"></div></div></div>`;
+        }).join("")}
+      </div>
+      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} réponses · Affirmation ${cafe.state.itemIndex+1}/${curItems().length}</div>
+    </div>
+  `;
+}
+
+function renderMeteo() {
+  const stage = document.getElementById("stage");
+  const items = curItems();
+  const mod = curMod();
+  // météo n'a pas d'items générés, on utilise un set d'émojis fixe
+  const emojis = [
+    { e: "😄", lbl: "Super" }, { e: "🙂", lbl: "Ça va" }, { e: "😐", lbl: "Mitigé" },
+    { e: "😟", lbl: "Inquiet" }, { e: "😴", lbl: "Fatigué" }, { e: "😤", lbl: "Tendu" }
+  ];
+  const itemVotes = votesFor(mod, 0);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question">🌤️ Comment vous sentez-vous ce soir ?</div>
+      <div class="meteo-grid">
+        ${emojis.map((em, j) => {
+          const c = itemVotes.filter(v => v.value === j).length;
+          return `<div class="meteo-card"><div class="em">${em.e}</div><div class="lbl">${em.lbl}</div><div class="cnt">${c}</div></div>`;
+        }).join("")}
+      </div>
+      <div style="text-align:center; margin-top:30px; font-size:20px; color:#c4b5fd;">📊 ${itemVotes.length} parents ont répondu</div>
+    </div>
+  `;
+  // animation bulles
+  const newVotes = itemVotes.slice(-3);
+  newVotes.forEach((v, i) => {
+    setTimeout(() => spawnBubble(emojis[v.value]?.e || "💬"), i * 200);
+  });
+}
+
+function spawnBubble(emoji) {
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = emoji;
+  b.style.left = (Math.random() * 90 + 5) + "%";
+  document.getElementById("bubbles").appendChild(b);
+  setTimeout(() => b.remove(), 6000);
+}
+
+function renderNuage() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  const counts = {};
+  itemVotes.forEach(v => { const w = String(v.value||"").trim().toLowerCase(); if(w) counts[w] = (counts[w]||0)+1; });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question">☁️ ${escapeHtml(it?.prompt || "En 1 mot…")}</div>
+      <div class="cloud">
+        ${sorted.map(([w, c]) => {
+          const size = Math.min(20 + c*8, 80);
+          return `<div class="word" style="font-size:${size}px;">${escapeHtml(w)}<sub style="font-size:14px; opacity:0.6; margin-left:6px;">×${c}</sub></div>`;
+        }).join("") || '<div style="color:#94a3b8; font-size:24px;">En attente des réponses…</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderOuverte() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question small">💬 ${escapeHtml(it?.prompt || "Votre témoignage")}</div>
+      <div class="wall">
+        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:20px; grid-column:1/-1; text-align:center;">En attente des témoignages…</div>' : ''}
+        ${itemVotes.slice().reverse().map(v => {
+          const p = participants.find(pp => pp.id === v.participantId);
+          return `<div class="post">${escapeHtml(v.value || "")}<div class="who">${p ? (p.avatar+" "+escapeHtml(p.surnom||"")) : "Anonyme"}</div></div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderMurAnonyme() {
+  const stage = document.getElementById("stage");
+  const mod = curMod();
+  const itemVotes = votesFor(mod, 0);
+  stage.innerHTML = `
+    <div class="module">
+      <div class="question small">❓ Vos questions au mur</div>
+      <div class="wall">
+        ${itemVotes.length === 0 ? '<div style="color:#94a3b8; font-size:20px; grid-column:1/-1; text-align:center;">Posez vos questions sur votre téléphone…</div>' : ''}
+        ${itemVotes.slice().reverse().map(v => `<div class="post">${escapeHtml(v.value || "")}</div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderBilan() {
+  const stage = document.getElementById("stage");
+  const totalParticipants = participants.length;
+  const totalVotes = votes.length;
+  // calcul taux de réussite quiz/vraifaux
+  let goodVotes = 0, totalQuizVotes = 0;
+  const enabled = getEnabledModules();
+  enabled.forEach(m => {
+    if (m === "quiz" || m === "vraifaux") {
+      (cafe.modules[m].items || []).forEach((it, i) => {
+        const vs = votesFor(m, i);
+        totalQuizVotes += vs.length;
+        goodVotes += vs.filter(v => v.value === it.correct).length;
+      });
+    }
+  });
+  const successRate = totalQuizVotes ? Math.round((goodVotes/totalQuizVotes)*100) : null;
+  stage.innerHTML = `
+    <div class="bilan">
+      <h2>🏁 Merci à tous !</h2>
+      <div class="stat"><div class="n">${totalParticipants}</div><div class="l">parents présents</div></div>
+      <div class="stat"><div class="n">${totalVotes}</div><div class="l">votes & réponses</div></div>
+      ${successRate !== null ? `<div class="stat"><div class="n">${successRate}%</div><div class="l">de bonnes réponses</div></div>` : ""}
+      <div class="merci">Vos avis et témoignages nourrissent l'accompagnement de vos enfants. 💛</div>
+      <div style="margin-top:30px;"><button class="btn btn-pri" onclick="exportRecap()" style="font-size:16px; padding:14px 24px;">📥 Télécharger le récap</button></div>
+    </div>
+  `;
+}
+
+function renderPlaceholder(title, msg) {
+  document.getElementById("stage").innerHTML = `<div class="module"><div class="question">${title}</div><div style="text-align:center; font-size:20px; color:#c4b5fd;">${msg}</div></div>`;
+}
+
+// === CONTROLS ===
+window.startCafe = async function() {
+  await updateDoc(cafeRef, { "state.phase": "running", "state.moduleIndex": 0, "state.itemIndex": 0, "state.revealed": false });
+  scheduleAuto();
+};
+
+window.goNext = async function() {
+  clearAuto();
+  const mod = curMod();
+  const items = curItems();
+  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage"].includes(mod);
+  // Pour quiz/vraifaux : si pas révélé, révéler d'abord
+  if ((mod === "quiz" || mod === "vraifaux") && !cafe.state.revealed) {
+    await updateDoc(cafeRef, { "state.revealed": true });
+    scheduleAuto();
+    return;
+  }
+  // Item suivant ?
+  if (isMultiItem && cafe.state.itemIndex + 1 < items.length) {
+    await updateDoc(cafeRef, { "state.itemIndex": cafe.state.itemIndex + 1, "state.revealed": false });
+    scheduleAuto();
+    return;
+  }
+  // Module suivant
+  const enabled = getEnabledModules();
+  if (cafe.state.moduleIndex + 1 < enabled.length) {
+    await updateDoc(cafeRef, { "state.moduleIndex": cafe.state.moduleIndex + 1, "state.itemIndex": 0, "state.revealed": false });
+    scheduleAuto();
+    return;
+  }
+  // Fin
+  await updateDoc(cafeRef, { "state.phase": "ended" });
+  clearAuto();
+};
+
+window.goPrev = async function() {
+  clearAuto();
+  if (cafe.state.itemIndex > 0) {
+    await updateDoc(cafeRef, { "state.itemIndex": cafe.state.itemIndex - 1, "state.revealed": false });
+    return;
+  }
+  if (cafe.state.moduleIndex > 0) {
+    const enabled = getEnabledModules();
+    const prevMod = enabled[cafe.state.moduleIndex - 1];
+    const prevItems = cafe.modules[prevMod]?.items || [];
+    await updateDoc(cafeRef, { "state.moduleIndex": cafe.state.moduleIndex - 1, "state.itemIndex": Math.max(0, prevItems.length - 1), "state.revealed": false });
+  }
+};
+
+window.reveal = async function() {
+  await updateDoc(cafeRef, { "state.revealed": true });
+};
+
+window.toggleAuto = async function() {
+  const newVal = !cafe.state.autoMode;
+  await updateDoc(cafeRef, { "state.autoMode": newVal });
+  if (newVal) scheduleAuto(); else clearAuto();
+};
+
+window.endCafe = async function() {
+  if (!confirm("Terminer le café et afficher le bilan ?")) return;
+  clearAuto();
+  await updateDoc(cafeRef, { "state.phase": "ended" });
+};
+
+function scheduleAuto() {
+  clearAuto();
+  if (!cafe.state.autoMode || cafe.state.phase !== "running") return;
+  const mod = curMod();
+  let delay = 30; // sec
+  if (mod === "quiz" || mod === "vraifaux") delay = cafe.state.revealed ? 15 : 30;
+  else if (mod === "meteo" || mod === "nuage") delay = 25;
+  else if (mod === "ouverte" || mod === "muranonyme") delay = 60;
+  else if (mod === "dilemmes") delay = cafe.state.revealed ? 20 : 40;
+  else if (mod === "echelle") delay = 25;
+  // Countdown UI
+  let remaining = delay;
+  let cd = document.getElementById("countdown");
+  if (!cd) { cd = document.createElement("div"); cd.id = "countdown"; cd.className = "countdown"; document.body.appendChild(cd); }
+  cd.textContent = remaining + "s";
+  countdownInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) { cd.remove(); clearInterval(countdownInterval); }
+    else cd.textContent = remaining + "s";
+  }, 1000);
+  autoTimer = setTimeout(() => { goNext(); }, delay * 1000);
+}
+function clearAuto() {
+  if (autoTimer) clearTimeout(autoTimer);
+  if (countdownInterval) clearInterval(countdownInterval);
+  const cd = document.getElementById("countdown"); if (cd) cd.remove();
+  autoTimer = null; countdownInterval = null;
+}
+
+// === EXPORT RECAP ===
+window.exportRecap = function() {
+  const lines = [];
+  lines.push(`# Café Parents — ${cafe.title}`);
+  lines.push(`Date : ${cafe.date} · Thème : ${cafe.theme || "—"}`);
+  lines.push(`Participants : ${participants.length} · Votes : ${votes.length}`);
+  lines.push("");
+  getEnabledModules().forEach(m => {
+    const items = cafe.modules[m].items || [];
+    lines.push(`## ${m}`);
+    if (m === "quiz" || m === "vraifaux") {
+      items.forEach((it, i) => {
+        const vs = votesFor(m, i);
+        const ok = vs.filter(v => v.value === it.correct).length;
+        const pct = vs.length ? Math.round(ok/vs.length*100) : 0;
+        lines.push(`- Q${i+1} : ${it.question} — ${pct}% (${ok}/${vs.length})`);
+      });
+    } else if (m === "ouverte" || m === "muranonyme") {
+      items.forEach((it, i) => {
+        const vs = votesFor(m, i);
+        lines.push(`- ${it.prompt || "Question"} :`);
+        vs.forEach(v => lines.push(`  • ${v.value}`));
+      });
+    } else if (m === "nuage") {
+      items.forEach((it, i) => {
+        const vs = votesFor(m, i);
+        lines.push(`- ${it.prompt} : ${vs.map(v=>v.value).join(", ")}`);
+      });
+    } else if (m === "echelle") {
+      items.forEach((it, i) => {
+        const vs = votesFor(m, i);
+        const avg = vs.length ? (vs.reduce((s,v)=>s+v.value,0)/vs.length).toFixed(1) : "—";
+        lines.push(`- ${it.statement} : moyenne ${avg}/5 (${vs.length} réponses)`);
+      });
+    } else if (m === "dilemmes") {
+      items.forEach((it, i) => {
+        const vs = votesFor(m, i);
+        lines.push(`- ${it.situation} (${vs.length} avis)`);
+      });
+    }
+    lines.push("");
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = "cafe_" + (cafe.title||"recap").replace(/\s+/g,"_") + ".txt"; a.click();
+  URL.revokeObjectURL(url);
+};
+</script>
+
+</body>
+</html>
