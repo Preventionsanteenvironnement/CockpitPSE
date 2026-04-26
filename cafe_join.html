@@ -233,7 +233,7 @@ function renderEnded() {
 }
 
 function getEnabledModules() {
-  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","feedback","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","feedback","bilan"];
   return order.filter(id => cafe.modules?.[id]?.enabled);
 }
 function curMod() { return getEnabledModules()[cafe.state.moduleIndex] || null; }
@@ -526,6 +526,47 @@ async function renderModule() {
       if (!v) { setVoteStatus("Écris ta reformulation avant d'envoyer.", true); return; }
       sendVote(v);
     };
+    return;
+  }
+
+  if (mod === "frise") {
+    if (!it) return;
+    // 21h → 03h matin (= 21..27 heures décalées). Step 0.25 = 15 min
+    let val = 22;
+    function fmt(h) {
+      const hr = Math.floor(h) % 24;
+      const mn = Math.round((h - Math.floor(h)) * 60);
+      return String(hr).padStart(2,"0") + "h" + String(mn).padStart(2,"0");
+    }
+    root.innerHTML = `
+      <h1>🌙 Heure de coucher</h1>
+      <div class="card">
+        <div class="question" style="font-size:18px;">${escapeHtml(it.prompt || "À quelle heure votre ado se couche-t-il ?")}</div>
+        <div style="display:flex; align-items:center; gap:14px; margin-top:18px;">
+          <span style="font-size:14px; color:#94a3b8;">21h</span>
+          <input type="range" id="frs" min="21" max="27" step="0.25" value="22" ${voted?'disabled':''} style="flex:1; height:8px; accent-color:#a78bfa;">
+          <span style="font-size:14px; color:#94a3b8;">03h</span>
+        </div>
+        <div style="text-align:center; margin-top:18px;">
+          <span id="frs-v" style="font-size:64px; font-weight:800; color:#a78bfa;">22h00</span>
+        </div>
+        <div id="frs-info" style="text-align:center; font-size:14px; color:#cbd5e1; margin-top:6px;">≈ 9h de sommeil avant le réveil 7h</div>
+        <button class="btn btn-pri" ${voted?'disabled':''} onclick="window.__sendFrs()">Envoyer</button>
+        ${statusHtml()}
+        ${voted ? '<div class="ok" style="margin-top:10px;">✅ Envoyé — regarde l\'écran 👀</div>' : ''}
+      </div>
+    `;
+    const slider = document.getElementById("frs");
+    const vEl = document.getElementById("frs-v");
+    const info = document.getElementById("frs-info");
+    const wake = it.wake || 7;
+    slider.oninput = () => {
+      val = parseFloat(slider.value);
+      vEl.textContent = fmt(val);
+      const sleepH = (wake + 24 - val);
+      info.textContent = `≈ ${(Math.round(sleepH*10)/10)}h de sommeil avant le réveil ${wake}h`;
+    };
+    window.__sendFrs = () => sendVote(val);
     return;
   }
 

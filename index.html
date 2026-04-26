@@ -1017,6 +1017,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h4 style="margin:0; color:#0f172a;">📚 Mes Cafés / Ateliers</h4>
               <button onclick="sp_newSession()" style="background:#db2777; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">+ Nouvel événement</button>
+              <button onclick="sp_loadTemplate('sommeil')" style="background:#1e1b4b; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; margin-left:6px;">💤 Template Sommeil Parents</button>
             </div>
             <div id="sp-library" style="margin-top:12px;"></div>
           </div>
@@ -3439,6 +3440,7 @@ QN80,Wael HWORI</pre>
     { id:"thermo",     emoji:"🌡️", name:"Thermomètre émotionnel (CPS C2)", desc:"Curseur 0-10 sur l'intensité d'une émotion face à une situation.", aiGen:true,  def:false },
     { id:"empathie",   emoji:"💞",  name:"Reformulation empathique (CPS S1.2)", desc:"Une phrase déclencheuse, chacun propose une reformulation. Mur + modèle.", aiGen:true,  def:false },
     { id:"feedback",   emoji:"⚡",  name:"Speed-feedback de classe", desc:"3 questions express anonymes : compris / pas compris / aimé.", aiGen:false, def:false },
+    { id:"frise",      emoji:"🌙",  name:"Frise du sommeil (CPS C2/PSE A2)", desc:"Curseur heure de coucher. Frise des cycles affichée live. Bluffant pour parler sommeil.", aiGen:false, def:false },
     { id:"bilan",      emoji:"🏁",  name:"Bilan + météo finale",     desc:"Synthèse, météo de fin, mot de gratitude.",             aiGen:false, def:true }
   ];
 
@@ -3512,6 +3514,89 @@ QN80,Wael HWORI</pre>
   }
 
   window.sp_newSession = function(){ sp_session = blank(); sp_renderEditor(); };
+
+  // ====== TEMPLATES PRÊTS À L'EMPLOI ======
+  window.sp_loadTemplate = function(name){
+    if (!confirm("Charger le template « " + name + " » ? Cela créera un nouvel événement pré-rempli.")) return;
+    const s = blank();
+    if (name === "sommeil") {
+      s.title = "Atelier Sommeil — Parents " + new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"short" });
+      s.theme = "Sommeil";
+      s.audience = "Parents";
+      s.publicType = "parents";
+      s.autoMode = false;
+      // active uniquement les bons modules
+      Object.keys(s.modules).forEach(k => s.modules[k].enabled = false);
+      const enabled = ["meteo","thermo","quiz","frise","ouverte","feedback","bilan"];
+      enabled.forEach(k => { if (s.modules[k]) s.modules[k].enabled = true; });
+
+      // Thermomètre : 2 questions sur le sommeil de l'ado
+      s.modules.thermo.items = [
+        { situation: "Combien d'heures dort votre ado en semaine ? (estimation)", emotion: "durée (0=0h, 10=10h+)", guidance: "Recommandation ado : 8h30 à 10h. En dessous de 7h, fatigue chronique et baisse des apprentissages." },
+        { situation: "À quel point êtes-vous inquiet(e) de sa qualité de sommeil ?", emotion: "inquiétude", guidance: "L'inquiétude collective est un point de départ pour échanger des solutions concrètes." }
+      ];
+
+      // Quiz : 6 questions clés issues de la science du sommeil
+      s.modules.quiz.items = [
+        {
+          question: "Combien de temps dure environ un cycle de sommeil ?",
+          options: ["30 minutes", "60 minutes", "90 minutes", "2 heures"],
+          correct: 2,
+          explanation: "Un cycle dure environ 90 minutes. Une nuit complète = 4 à 6 cycles enchaînés."
+        },
+        {
+          question: "Quelle phase du sommeil permet la récupération PHYSIQUE ?",
+          options: ["Endormissement", "Sommeil léger", "Sommeil profond", "Sommeil paradoxal"],
+          correct: 2,
+          explanation: "Le sommeil profond (2e moitié du cycle) répare le corps : muscles, immunité, hormone de croissance."
+        },
+        {
+          question: "Quelle phase consolide la mémoire et les apprentissages ?",
+          options: ["Sommeil léger", "Sommeil profond", "Sommeil paradoxal (REM)", "Aucune"],
+          correct: 2,
+          explanation: "Le sommeil paradoxal (où l'on rêve) consolide la mémoire et régule les émotions. Crucial pour les ados qui apprennent."
+        },
+        {
+          question: "Le sommeil profond est plus présent…",
+          options: ["En début de nuit", "Au milieu", "En fin de nuit", "Réparti partout"],
+          correct: 0,
+          explanation: "Les premiers cycles de la nuit sont riches en sommeil profond. Se coucher tard = perdre directement de la récup physique."
+        },
+        {
+          question: "Rattraper le sommeil le week-end, ça marche ?",
+          options: ["Oui complètement", "Partiellement seulement", "Non, ça dérègle l'horloge", "Aucun effet"],
+          correct: 2,
+          explanation: "Dormir 12h le samedi décale l'horloge interne (jet-lag social) et rend le réveil du lundi pire. La régularité prime."
+        },
+        {
+          question: "Combien d'heures un ado de 15-18 ans devrait-il dormir ?",
+          options: ["6 à 7h", "7 à 8h", "8h30 à 10h", "Plus de 10h"],
+          correct: 2,
+          explanation: "À cet âge, le besoin réel est 8h30-10h. Le cerveau termine sa maturation, le sommeil paradoxal est essentiel."
+        }
+      ];
+
+      // Frise du sommeil : 1 visualisation interactive
+      s.modules.frise.items = [
+        { prompt: "À quelle heure votre ado se couche-t-il en semaine ?", wake: 7, ideal: 22 }
+      ];
+
+      // Question ouverte : témoignage
+      s.modules.ouverte.items = [
+        { prompt: "Quel est votre plus grand défi sommeil avec votre ado ?" },
+        { prompt: "Qu'avez-vous appris ce soir qui change votre regard ?" }
+      ];
+
+      // Engagement final
+      s.modules.feedback.items = [
+        { prompt: "Une chose concrète que vous allez essayer cette semaine pour le sommeil de votre ado ?" }
+      ];
+    }
+    sp_session = s;
+    sp_doSave(true);
+    sp_renderEditor();
+    toast("✅ Template « " + name + " » chargé. Vérifie, ajuste, lance !");
+  };
   window.sp_load = function(id){
     const s = loadAll().find(x => x.id === id); if (!s) return;
     SP_MODULES.forEach(m => { if (!s.modules[m.id]) s.modules[m.id] = { enabled:false, items:[] }; });
@@ -3699,6 +3784,23 @@ QN80,Wael HWORI</pre>
         ${del}
       </div>`;
     }
+    if (modId === "frise") {
+      return `<div style="background:#f8fafc; border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">🌙 Frise du sommeil ${i+1}</div>
+        ${inp(it.prompt, 'prompt')}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+          <div>
+            <label style="font-size:0.75rem; color:#475569;">Heure idéale de coucher (référence)</label>
+            <input type="number" min="20" max="24" step="0.5" value="${it.ideal||22}" oninput="sp_upd('${modId}',${i},'ideal',parseFloat(this.value))" style="width:100%; padding:6px; border-radius:4px; border:1px solid #cbd5e1;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:#475569;">Heure de réveil</label>
+            <input type="number" min="5" max="10" step="0.5" value="${it.wake||7}" oninput="sp_upd('${modId}',${i},'wake',parseFloat(this.value))" style="width:100%; padding:6px; border-radius:4px; border:1px solid #cbd5e1;">
+          </div>
+        </div>
+        ${del}
+      </div>`;
+    }
     return "";
   }
 
@@ -3721,7 +3823,8 @@ QN80,Wael HWORI</pre>
       thermo:   ()=>({situation:"",emotion:"agacement",guidance:""}),
       empathie: ()=>({trigger:"",context:"",model:""}),
       valeurs:  ()=>({prompt:"Choisis les 5 valeurs qui te parlent le plus aujourd'hui",options:[...valeursDef]}),
-      feedback: ()=>({prompt:""})
+      feedback: ()=>({prompt:""}),
+      frise:    ()=>({prompt:"À quelle heure votre ado se couche-t-il en semaine ?", wake:7, ideal:22})
     };
     if (!blanks[mod]) return;
     sp_session.modules[mod].items.push(blanks[mod]());
