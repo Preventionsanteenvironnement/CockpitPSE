@@ -20,21 +20,17 @@ Mini-plateforme de jeux multijoueurs pour GitHub Pages.
 
 1. Creer un projet Firebase.
 2. Activer Firestore.
-3. Ouvrir `assets/js/firebase-config.js`.
-4. Remplacer `null` par la configuration web Firebase. Le fichier `firebase-config.example.js` donne le modele.
+3. Verifier `assets/js/firebase-config.js`, deja renseigne avec la configuration web du cockpit.
+4. Publier les regles Firestore qui autorisent `party_live_parties/{partyId}`.
 5. Publier.
 
-Structure Firestore prevue :
+Structure Firestore utilisee :
 
 ```text
-parties/{partyId}
-parties/{partyId}/players
-parties/{partyId}/responses
-parties/{partyId}/votes
-parties/{partyId}/history
+party_live_parties/{partyId}
 ```
 
-La V1 synchronise le document `parties/{partyId}` complet quand Firebase est present. Les sous-collections sont documentees pour une evolution plus fine si le volume augmente.
+La V1 synchronise le document complet de la partie dans `party_live_parties/{partyId}` quand Firebase est present. Les regles Firestore doivent autoriser `read, write` sur cette collection pour permettre aux telephones de rejoindre par QR code.
 
 ## Structure JSON
 

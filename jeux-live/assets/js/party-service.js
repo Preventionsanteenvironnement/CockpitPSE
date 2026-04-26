@@ -2,7 +2,7 @@ import { PARTY_STATES } from "./app-config.js";
 import { getParty, saveParty } from "./storage-service.js";
 import { partyCode, uid } from "./utils.js";
 import { getItems, getDuration } from "./game-types.js";
-import { savePartyRemote, listenPartyRemote, initFirebase } from "./firebase-service.js";
+import { savePartyRemote, listenPartyRemote, initFirebase, getPartyRemote } from "./firebase-service.js";
 
 let firebaseEnabled = false;
 
@@ -75,6 +75,26 @@ export function listenParty(id, callback) {
 export function joinParty(partyId, pseudo) {
   const party = getParty(String(partyId || "").toUpperCase());
   if (!party) throw new Error("Partie introuvable");
+  return addPlayerToParty(party, pseudo);
+}
+
+export async function joinPartyOnline(partyId, pseudo) {
+  const code = String(partyId || "").toUpperCase();
+  let party = getParty(code);
+  if (!party && firebaseEnabled) {
+    try {
+      party = await getPartyRemote(code);
+    } catch (error) {
+      console.warn("Party Live: lecture Firebase impossible.", error);
+      throw new Error("Connexion live indisponible. Verifiez les regles Firebase.");
+    }
+    if (party) saveParty(party);
+  }
+  if (!party) throw new Error("Partie introuvable");
+  return addPlayerToParty(party, pseudo);
+}
+
+function addPlayerToParty(party, pseudo) {
   if (!pseudo || !pseudo.trim()) throw new Error("Choisis un pseudo");
   const clean = pseudo.trim().slice(0, 28);
   const exists = Object.values(party.players || {}).find((player) => player.name.toLowerCase() === clean.toLowerCase());
