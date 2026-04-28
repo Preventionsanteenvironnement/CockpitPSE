@@ -1025,6 +1025,26 @@
 
         <div id="sp-panel" style="display:none; margin-top:20px;">
 
+          <!-- 📌 QR Code permanent -->
+          <div style="background:linear-gradient(135deg, #0f172a, #1e1b4b); color:white; border-radius:12px; padding:16px; margin-bottom:16px; display:grid; grid-template-columns:160px 1fr; gap:18px; align-items:center;">
+            <div style="background:white; padding:8px; border-radius:8px; text-align:center;">
+              <img id="sp-perma-qr" alt="QR permanent" style="width:140px; height:140px; display:block;">
+            </div>
+            <div>
+              <div style="font-weight:800; font-size:1.05rem; color:#fbbf24;">📌 Mon QR Code permanent</div>
+              <div style="font-size:0.85rem; color:#cbd5e1; margin:6px 0 10px;">
+                Ce QR code redirige <b>toujours vers le dernier atelier que tu lances</b>. Imprime-le, projette-le, distribue-le — pas besoin d'en générer un nouveau à chaque fois.
+              </div>
+              <div id="sp-perma-active" style="font-size:0.85rem; color:#a78bfa; margin-bottom:8px;">Aucune session active.</div>
+              <input type="text" id="sp-perma-url" readonly style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid #334155; background:rgba(0,0,0,0.3); color:#fff; font-size:0.8rem;">
+              <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+                <button onclick="sp_copyPermaUrl()" style="background:#fbbf24; color:#0f172a; border:none; padding:6px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">📋 Copier l'URL</button>
+                <button onclick="sp_openPermaQR()" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">🖼️ Ouvrir QR en grand (à imprimer)</button>
+                <button onclick="sp_clearActive()" style="background:transparent; color:#fca5a5; border:1px solid #dc2626; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">⏹ Désactiver</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Sous-bibliothèque Activités -->
           <div style="background:white; border-radius:10px; padding:14px; margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3505,6 +3525,69 @@ QN80,REDACTED</pre>
     return "mixte";
   }
 
+  // ====== JETON PROF + QR PERMANENT ======
+  function sp_getProfToken(){
+    let t = localStorage.getItem("cockpit_prof_token");
+    if (!t) {
+      t = "p_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+      localStorage.setItem("cockpit_prof_token", t);
+    }
+    return t;
+  }
+  function sp_permaJoinUrl(){
+    const token = sp_getProfToken();
+    const base = location.origin + location.pathname.replace(/index\.html$/, "").replace(/\/+$/, "/");
+    return base + "cafe_join.html?prof=" + encodeURIComponent(token);
+  }
+  function sp_renderPermaQR(){
+    const url = sp_permaJoinUrl();
+    const img = document.getElementById("sp-perma-qr");
+    const inp = document.getElementById("sp-perma-url");
+    if (img) img.src = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=" + encodeURIComponent(url);
+    if (inp) inp.value = url;
+    sp_refreshActiveLabel();
+  }
+  function sp_refreshActiveLabel(){
+    const lbl = document.getElementById("sp-perma-active"); if (!lbl) return;
+    const id = localStorage.getItem("cockpit_prof_active_id");
+    const title = localStorage.getItem("cockpit_prof_active_title");
+    if (id && title) lbl.innerHTML = `🟢 Actif : <b>${esc(title)}</b>`;
+    else lbl.textContent = "⚪ Aucune session active. Clique « 🚀 LANCER » sur un atelier pour activer le QR.";
+  }
+  window.sp_copyPermaUrl = function(){
+    const u = sp_permaJoinUrl();
+    navigator.clipboard.writeText(u).then(() => toast("📋 URL copiée"));
+  };
+  window.sp_openPermaQR = function(){
+    const url = sp_permaJoinUrl();
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>QR Permanent — Cockpit PSE</title><style>body{font-family:system-ui,sans-serif; background:#0f172a; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:40px; margin:0;} h1{font-size:32px; color:#fbbf24; margin-bottom:8px;} p{color:#cbd5e1; margin:6px 0;} img{margin:20px 0; background:white; padding:20px; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.5);} .url{font-size:14px; color:#94a3b8; word-break:break-all; max-width:600px; text-align:center;} .print{margin-top:20px; padding:10px 20px; background:#fbbf24; color:#0f172a; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;} @media print { body{background:white; color:black;} .print{display:none;} h1{color:black;} p{color:#333;} }</style></head><body><h1>📌 Café / Atelier interactif</h1><p>Scannez ce QR code pour rejoindre la session en cours</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=15&data=${encodeURIComponent(url)}" alt="QR" width="500"><div class="url">${url}</div><button class="print" onclick="window.print()">🖨️ Imprimer</button></body></html>`);
+    w.document.close();
+  };
+  window.sp_clearActive = async function(){
+    if (!confirm("Désactiver le QR permanent ? Les parents qui scannent verront un message 'Aucune session active'.")) return;
+    if (window.SP_FB && window.SP_FB.clearActiveForProf) {
+      try { await window.SP_FB.clearActiveForProf(sp_getProfToken()); } catch(e) {}
+    }
+    localStorage.removeItem("cockpit_prof_active_id");
+    localStorage.removeItem("cockpit_prof_active_title");
+    sp_refreshActiveLabel();
+    toast("⏹ QR permanent désactivé");
+  };
+  window.sp_setActive = async function(silent){
+    if (!sp_session) return;
+    if (!window.SP_FB || !window.SP_FB.setActiveForProf) return;
+    try {
+      await window.SP_FB.setActiveForProf(sp_getProfToken(), sp_session.id);
+      localStorage.setItem("cockpit_prof_active_id", sp_session.id);
+      localStorage.setItem("cockpit_prof_active_title", sp_session.title || "Sans titre");
+      sp_refreshActiveLabel();
+      if (!silent) toast("📌 Cette session est maintenant l'atelier actif du QR permanent");
+    } catch(e) {
+      if (!silent) toast("⚠️ Impossible d'activer : " + e.message);
+    }
+  };
+
   // ====== TOGGLE PANNEAU ======
   window.sp_togglePanel = function(){
     const p = document.getElementById("sp-panel");
@@ -3512,7 +3595,7 @@ QN80,REDACTED</pre>
     const open = p.style.display === "none";
     p.style.display = open ? "block" : "none";
     b.textContent = open ? "▲ Fermer" : "▼ Ouvrir";
-    if (open) sp_renderLibrary();
+    if (open) { sp_renderLibrary(); sp_renderPermaQR(); }
   };
 
   // ====== BIBLIOTHEQUE ======
@@ -4052,10 +4135,12 @@ ${sp_session.source}
       sp_session.state = { phase: "lobby", moduleIndex: 0, itemIndex: 0, revealed: false, autoMode: !!sp_session.autoMode, moduleTiming: 30, runId: "r_" + Date.now().toString(36) };
       sp_doSave(true);
       await window.SP_FB.saveCafe(sp_session);
+      // Active automatiquement cette session pour le QR permanent
+      await window.sp_setActive(true);
       const url = sp_publicPage("cafe_live.html");
       url.searchParams.set("id", sp_session.id);
       window.open(url.href, "_blank");
-      sp_setSaveState("🚀 Activité lancée ! L'écran géant s'ouvre.", "#10b981");
+      sp_setSaveState("🚀 Activité lancée ! L'écran géant s'ouvre. Le QR permanent pointe maintenant vers cette session.", "#10b981");
     } catch(e) {
       sp_setSaveState("❌ Erreur : " + e.message, "#dc2626");
       toast("❌ " + e.message);
@@ -4153,6 +4238,14 @@ ${sp_session.source}
     },
     deleteCafe: async function(id) {
       await deleteDoc(doc(db, "cafes", id));
+    },
+    setActiveForProf: async function(token, cafeId) {
+      const ref = doc(db, "profActive", token);
+      await setDoc(ref, { activeId: cafeId, serverUpdatedAt: serverTimestamp() }, { merge: true });
+    },
+    clearActiveForProf: async function(token) {
+      const ref = doc(db, "profActive", token);
+      await setDoc(ref, { activeId: null, serverUpdatedAt: serverTimestamp() }, { merge: true });
     }
   };
 

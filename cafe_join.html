@@ -101,7 +101,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const params = new URLSearchParams(location.search);
-const cafeId = params.get("id");
+let cafeId = params.get("id");
+const profToken = params.get("prof");
 const root = document.getElementById("root");
 
 const AVATARS = ["🦊","🐢","🦉","🐼","🐨","🦁","🦄","🐧","🦕","🐙","🐝","🦋"];
@@ -116,10 +117,37 @@ let myId = localStorage.getItem("cafe_pid_" + cafeId) || null;
 let myProfile = null;
 let cafeRef, partsRef, votesRef;
 
-if (!cafeId) {
-  root.innerHTML = `<div class="card err">❌ Lien invalide. Demande à l'animateur le bon QR code.</div>`;
-} else {
+if (cafeId) {
   start();
+} else if (profToken) {
+  // QR permanent — on résout vers la session active du prof
+  resolvePermanent();
+} else {
+  root.innerHTML = `<div class="card err">❌ Lien invalide. Demande à l'animateur le bon QR code.</div>`;
+}
+
+async function resolvePermanent() {
+  root.innerHTML = `<div class="card wait"><div class="spin">⏳</div><div style="margin-top:14px; font-size:18px;">Connexion à la session…</div></div>`;
+  try {
+    const ref = doc(db, "profActive", profToken);
+    const snap = await getDoc(ref);
+    const activeId = snap.exists() ? snap.data().activeId : null;
+    if (!activeId) {
+      root.innerHTML = `<div class="card err">⏸ Aucune session active pour le moment.<br><br><span style="font-size:14px; color:#cbd5e1;">L'animateur n'a pas encore lancé d'atelier. Reste sur cette page — la connexion se fera automatiquement dès que ce sera prêt.</span></div>`;
+      // Live listen for activation
+      onSnapshot(ref, s => {
+        const id = s.exists() ? s.data().activeId : null;
+        if (id) { cafeId = id; location.search = "?id=" + encodeURIComponent(id); }
+      });
+      return;
+    }
+    cafeId = activeId;
+    // Update URL to ?id= for clean state and reload-friendly
+    history.replaceState(null, "", "?id=" + encodeURIComponent(activeId));
+    start();
+  } catch(e) {
+    root.innerHTML = `<div class="card err">❌ Erreur de connexion : ${e.message}</div>`;
+  }
 }
 
 async function start() {
