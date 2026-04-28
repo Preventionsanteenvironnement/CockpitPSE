@@ -1039,7 +1039,9 @@
               <input type="text" id="sp-perma-url" readonly style="width:100%; padding:6px 8px; border-radius:6px; border:1px solid #334155; background:rgba(0,0,0,0.3); color:#fff; font-size:0.8rem;">
               <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
                 <button onclick="sp_copyPermaUrl()" style="background:#fbbf24; color:#0f172a; border:none; padding:6px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">📋 Copier l'URL</button>
-                <button onclick="sp_openPermaQR()" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">🖼️ Ouvrir QR en grand (à imprimer)</button>
+                <button onclick="sp_openPermaQR()" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">🖼️ Aperçu</button>
+                <button onclick="sp_downloadQR('1')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:bold;">💾 Télécharger 1 grand QR (HTML)</button>
+                <button onclick="sp_downloadQR('4')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:bold;">💾 Télécharger 4 mini QR (HTML)</button>
                 <button onclick="sp_clearActive()" style="background:transparent; color:#fca5a5; border:1px solid #dc2626; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">⏹ Désactiver</button>
               </div>
             </div>
@@ -3558,6 +3560,72 @@ QN80,REDACTED</pre>
     const u = sp_permaJoinUrl();
     navigator.clipboard.writeText(u).then(() => toast("📋 URL copiée"));
   };
+  // Télécharge la fiche QR en .html offline (QR encodés en base64 pour fonctionner sans Internet)
+  async function sp_qrToDataURL(url, size){
+    const r = await fetch("https://api.qrserver.com/v1/create-qr-code/?size=" + size + "&margin=15&data=" + encodeURIComponent(url));
+    const blob = await r.blob();
+    return new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+  }
+  window.sp_downloadQR = async function(format){
+    const url = sp_permaJoinUrl();
+    toast("⏳ Préparation de la fiche…");
+    try {
+      const dataUrl = await sp_qrToDataURL(url, format === "1" ? "800x800" : "400x400");
+      const html = sp_buildQRSheetHTML(url, dataUrl, format);
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "Fiche_QR_Atelier_" + (format === "1" ? "GrandQR" : "4MiniQR") + ".html";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+      toast("✅ Fichier téléchargé. Ouvre-le dans ton navigateur pour l'imprimer.");
+    } catch(e) {
+      toast("❌ " + e.message);
+    }
+  };
+
+  function sp_buildQRSheetHTML(url, dataUrl, format){
+    const head = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche QR — Activité interactive</title><style>
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a}
+.tb{position:fixed;top:0;left:0;right:0;background:#0f172a;color:white;padding:12px 20px;display:flex;gap:10px;align-items:center;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.tb h1{font-size:16px;flex:1}.tb button{padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;background:#fbbf24;color:#0f172a}
+.page{padding:70px 20px 40px;display:flex;justify-content:center}
+.s1{width:210mm;min-height:297mm;background:white;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:25mm 20mm;display:flex;flex-direction:column;align-items:center}
+.s1 .h{text-align:center;margin-bottom:12mm}.s1 h2{font-size:30pt;color:#0f172a;margin-bottom:4mm;font-weight:800}.s1 .sub{font-size:13pt;color:#64748b}
+.s1 .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8mm;width:100%;margin-bottom:12mm}
+.s1 .step{text-align:center;padding:6mm 4mm;background:#f8fafc;border-radius:8px;border-top:4px solid #ec4899}
+.s1 .n{display:inline-block;width:32pt;height:32pt;line-height:32pt;background:#ec4899;color:white;border-radius:50%;font-size:16pt;font-weight:800;margin-bottom:4mm}
+.s1 .ic{font-size:28pt;margin-bottom:2mm}.s1 .tx{font-size:12pt;color:#1e293b;line-height:1.4}
+.s1 .qr{padding:8mm;border:2px solid #e2e8f0;border-radius:12px}.s1 .qr img{width:100mm;height:100mm;display:block}
+.s1 .ft{margin-top:8mm;text-align:center;font-size:10pt;color:#94a3b8}
+.s1 .bd{display:inline-block;padding:4pt 12pt;background:#d1fae5;color:#065f46;border-radius:12pt;font-size:10pt;font-weight:600;margin-top:4mm}
+.s4{width:210mm;height:297mm;background:white;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:8mm;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4mm}
+.s4 .c{border:1.5px dashed #cbd5e1;padding:6mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between}
+.s4 h3{font-size:14pt;color:#0f172a;text-align:center;font-weight:800}
+.s4 .ms{font-size:9pt;color:#475569;text-align:left;line-height:1.5;align-self:stretch;padding:0 4mm}.s4 .ms b{color:#ec4899}
+.s4 img{width:55mm;height:55mm}.s4 .mf{font-size:8pt;color:#94a3b8;text-align:center}
+@media print{@page{size:A4;margin:0}body{background:white}.tb{display:none}.page{padding:0}.s1,.s4{box-shadow:none}}
+</style></head><body>
+<div class="tb"><h1>📌 Fiche d'invitation — prête à imprimer</h1><button onclick="window.print()">🖨️ Imprimer</button></div>
+<div class="page">`;
+    let body = "";
+    if (format === "1") {
+      body = `<div class="s1">
+  <div class="h"><h2>Rejoignez l'activité interactive</h2><div class="sub">Scannez le QR code avec votre téléphone — c'est tout</div></div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div class="ic">📱</div><div class="tx">Ouvrez l'<b>appareil photo</b> de votre téléphone</div></div>
+    <div class="step"><div class="n">2</div><div class="ic">🎯</div><div class="tx">Visez le <b>QR code</b> ci-dessous</div></div>
+    <div class="step"><div class="n">3</div><div class="ic">✋</div><div class="tx">Touchez la <b>notification</b> qui apparaît</div></div>
+  </div>
+  <div class="qr"><img src="${dataUrl}" alt="QR"></div>
+  <div class="ft"><div class="bd">🔒 Anonyme — aucun nom demandé</div><div style="margin-top:4mm;font-size:9pt;">${url}</div></div>
+</div>`;
+    } else {
+      body = `<div class="s4">${[1,2,3,4].map(()=>`<div class="c"><h3>Rejoignez l'activité</h3><img src="${dataUrl}" alt="QR"><div class="ms"><b>1.</b> Ouvrez l'appareil photo<br><b>2.</b> Visez ce QR code<br><b>3.</b> Touchez la notification</div><div class="mf">🔒 Anonyme</div></div>`).join("")}</div>`;
+    }
+    return head + body + `</div></body></html>`;
+  }
+
   window.sp_openPermaQR = function(){
     const url = sp_permaJoinUrl();
     const qrLarge = "https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=15&data=" + encodeURIComponent(url);
