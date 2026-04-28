@@ -3560,8 +3560,107 @@ QN80,REDACTED</pre>
   };
   window.sp_openPermaQR = function(){
     const url = sp_permaJoinUrl();
+    const qrLarge = "https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=15&data=" + encodeURIComponent(url);
+    const qrMini  = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=" + encodeURIComponent(url);
     const w = window.open("", "_blank");
-    w.document.write(`<!DOCTYPE html><html><head><title>QR Permanent — Cockpit PSE</title><style>body{font-family:system-ui,sans-serif; background:#0f172a; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:40px; margin:0;} h1{font-size:32px; color:#fbbf24; margin-bottom:8px;} p{color:#cbd5e1; margin:6px 0;} img{margin:20px 0; background:white; padding:20px; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.5);} .url{font-size:14px; color:#94a3b8; word-break:break-all; max-width:600px; text-align:center;} .print{margin-top:20px; padding:10px 20px; background:#fbbf24; color:#0f172a; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;} @media print { body{background:white; color:black;} .print{display:none;} h1{color:black;} p{color:#333;} }</style></head><body><h1>📌 Café / Atelier interactif</h1><p>Scannez ce QR code pour rejoindre la session en cours</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=15&data=${encodeURIComponent(url)}" alt="QR" width="500"><div class="url">${url}</div><button class="print" onclick="window.print()">🖨️ Imprimer</button></body></html>`);
+    w.document.write(`<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><title>Fiche QR — Activité interactive</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #0f172a; }
+  .toolbar { position: fixed; top: 0; left: 0; right: 0; background: #0f172a; color: white; padding: 12px 20px; display: flex; gap: 10px; align-items: center; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .toolbar h1 { font-size: 16px; flex: 1; }
+  .toolbar button { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .toolbar .btn-pri { background: #fbbf24; color: #0f172a; }
+  .toolbar .btn-sec { background: #334155; color: white; }
+  .toolbar .btn-sec.active { background: #fbbf24; color: #0f172a; }
+  .page { padding: 70px 20px 40px; display: flex; justify-content: center; }
+
+  /* Format A4 — un grand QR */
+  .sheet-1 { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 25mm 20mm; display: flex; flex-direction: column; align-items: center; }
+  .sheet-1 .header { text-align: center; margin-bottom: 12mm; }
+  .sheet-1 h2 { font-size: 30pt; color: #0f172a; margin-bottom: 4mm; font-weight: 800; }
+  .sheet-1 .subtitle { font-size: 13pt; color: #64748b; }
+  .sheet-1 .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8mm; width: 100%; margin-bottom: 12mm; }
+  .sheet-1 .step { text-align: center; padding: 6mm 4mm; background: #f8fafc; border-radius: 8px; border-top: 4px solid #ec4899; }
+  .sheet-1 .step .n { display: inline-block; width: 32pt; height: 32pt; line-height: 32pt; background: #ec4899; color: white; border-radius: 50%; font-size: 16pt; font-weight: 800; margin-bottom: 4mm; }
+  .sheet-1 .step .icon { font-size: 28pt; margin-bottom: 2mm; }
+  .sheet-1 .step .txt { font-size: 12pt; color: #1e293b; line-height: 1.4; }
+  .sheet-1 .qr { padding: 8mm; border: 2px solid #e2e8f0; border-radius: 12px; }
+  .sheet-1 .qr img { width: 100mm; height: 100mm; display: block; }
+  .sheet-1 .footer { margin-top: 8mm; text-align: center; font-size: 10pt; color: #94a3b8; }
+  .sheet-1 .badge { display: inline-block; padding: 4pt 12pt; background: #d1fae5; color: #065f46; border-radius: 12pt; font-size: 10pt; font-weight: 600; margin-top: 4mm; }
+
+  /* Format 4 par page */
+  .sheet-4 { width: 210mm; height: 297mm; background: white; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 8mm; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 4mm; }
+  .sheet-4 .card { border: 1.5px dashed #cbd5e1; padding: 6mm; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+  .sheet-4 .card h3 { font-size: 14pt; color: #0f172a; text-align: center; font-weight: 800; }
+  .sheet-4 .card .ministeps { font-size: 9pt; color: #475569; text-align: left; line-height: 1.5; align-self: stretch; padding: 0 4mm; }
+  .sheet-4 .card .ministeps b { color: #ec4899; }
+  .sheet-4 .card img { width: 55mm; height: 55mm; }
+  .sheet-4 .card .mini-foot { font-size: 8pt; color: #94a3b8; text-align: center; }
+
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { background: white; }
+    .toolbar { display: none; }
+    .page { padding: 0; }
+    .sheet-1, .sheet-4 { box-shadow: none; }
+  }
+</style>
+</head><body>
+<div class="toolbar">
+  <h1>📌 Fiche d'invitation à imprimer</h1>
+  <button id="b1" class="btn-sec active" onclick="show('1')">📄 1 grand QR (A4)</button>
+  <button id="b4" class="btn-sec" onclick="show('4')">📑 4 mini fiches (à découper)</button>
+  <button class="btn-pri" onclick="window.print()">🖨️ Imprimer</button>
+</div>
+
+<div id="page1" class="page">
+  <div class="sheet-1">
+    <div class="header">
+      <h2>Rejoignez l'activité interactive</h2>
+      <div class="subtitle">Scannez le QR code avec votre téléphone — c'est tout</div>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div class="icon">📱</div><div class="txt">Ouvrez l'<b>appareil photo</b> de votre téléphone</div></div>
+      <div class="step"><div class="n">2</div><div class="icon">🎯</div><div class="txt">Visez le <b>QR code</b> ci-dessous</div></div>
+      <div class="step"><div class="n">3</div><div class="icon">✋</div><div class="txt">Touchez la <b>notification</b> qui apparaît</div></div>
+    </div>
+    <div class="qr"><img src="${qrLarge}" alt="QR"></div>
+    <div class="footer">
+      <div class="badge">🔒 Anonyme — aucun nom demandé</div>
+      <div style="margin-top:4mm; font-size:9pt;">${url}</div>
+    </div>
+  </div>
+</div>
+
+<div id="page4" class="page" style="display:none;">
+  <div class="sheet-4">
+    ${[1,2,3,4].map(()=>`
+      <div class="card">
+        <h3>Rejoignez l'activité</h3>
+        <img src="${qrMini}" alt="QR">
+        <div class="ministeps">
+          <b>1.</b> Ouvrez l'appareil photo<br>
+          <b>2.</b> Visez ce QR code<br>
+          <b>3.</b> Touchez la notification
+        </div>
+        <div class="mini-foot">🔒 Anonyme</div>
+      </div>
+    `).join("")}
+  </div>
+</div>
+
+<script>
+  function show(v){
+    document.getElementById("page1").style.display = v==="1" ? "flex" : "none";
+    document.getElementById("page4").style.display = v==="4" ? "flex" : "none";
+    document.getElementById("b1").classList.toggle("active", v==="1");
+    document.getElementById("b4").classList.toggle("active", v==="4");
+  }
+</script>
+</body></html>`);
     w.document.close();
   };
   window.sp_clearActive = async function(){
