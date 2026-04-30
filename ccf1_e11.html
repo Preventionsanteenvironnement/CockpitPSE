@@ -1912,9 +1912,13 @@ function recomputePhaseNote(phase) {
   if (!card) return;
   var pos = card.querySelectorAll('.chip-positive.chip-active').length;
   var imp = card.querySelectorAll('.chip-improve.chip-active').length;
-  // Si rien n'est cliqué : on laisse la note manuelle telle quelle
-  if (pos === 0 && imp === 0) return;
-  // Formule : on part du milieu (max/2), chaque chip positif +0.5, chaque chip négatif -0.5
+  // Si toutes les chips sont désactivées : on remet la note à vide (saisie manuelle possible)
+  if (pos === 0 && imp === 0) {
+    input.value = '';
+    if (typeof onNoteChange === 'function') onNoteChange(phase);
+    return;
+  }
+  // Formule : départ au milieu (max/2), +0.5 par chip verte, -0.5 par chip orange
   var note = max / 2 + (pos - imp) * 0.5;
   note = Math.max(0, Math.min(max, note));
   note = Math.round(note * 2) / 2;
@@ -1926,17 +1930,43 @@ function addChip(el) {
   var container = el.parentElement;
   var targetId = container.dataset.target;
   var textarea = document.getElementById(targetId);
+  var chipText = (el.textContent || "").trim();
   // Toggle l'état actif de la chip
   var isActive = el.dataset.active === "true";
   el.dataset.active = isActive ? "false" : "true";
   el.classList.toggle("chip-active", !isActive);
-  // Reconstruit le texte du textarea à partir des chips actives de ce container
-  var texts = [];
-  container.querySelectorAll('.chip').forEach(function(c){
-    if (c.dataset.active === "true") texts.push(c.textContent.trim());
-  });
-  textarea.value = texts.join(". ") + (texts.length > 0 ? "." : "");
-  // Recalcule la note de la phase (déduite via le .phase-card parent)
+  // Ajout / retrait DU SEUL texte de cette chip (préserve le texte manuel et les autres chips actives)
+  var current = textarea.value || "";
+  if (!isActive) {
+    // Activation : on ajoute la phrase à la fin si pas déjà présente
+    if (current.toLowerCase().indexOf(chipText.toLowerCase()) === -1) {
+      var sep = "";
+      if (current.length > 0 && !current.match(/[\.\!\?]\s*$/)) sep = ". ";
+      else if (current.length > 0) sep = " ";
+      textarea.value = current + sep + chipText + ".";
+    }
+  } else {
+    // Désactivation : on cherche et retire le texte de la chip + ses séparateurs
+    var patterns = [
+      ". " + chipText + ".",
+      ". " + chipText,
+      chipText + ". ",
+      chipText + ".",
+      chipText
+    ];
+    var lower = current.toLowerCase();
+    for (var i = 0; i < patterns.length; i++) {
+      var pl = patterns[i].toLowerCase();
+      var idx = lower.indexOf(pl);
+      if (idx !== -1) {
+        current = current.substring(0, idx) + current.substring(idx + patterns[i].length);
+        break;
+      }
+    }
+    current = current.replace(/\s{2,}/g, ' ').replace(/^[\s\.]+/, '').trim();
+    textarea.value = current;
+  }
+  // Recalcule la note de la phase (le .phase-card parent contient l'input notePhaseN)
   var phaseCard = el.closest('.phase-card');
   if (phaseCard) {
     var noteInput = phaseCard.querySelector('input[id^="notePhase"]');
