@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" href="data:,">
 <title>CCF1 — Evaluation E1.1</title>
 <style>
 /* ============= CSS VARIABLES ============= */
@@ -145,6 +146,11 @@ h3 { font-size: 1em; color: var(--primary-light); margin-bottom: 6px; }
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 6px;
 }
+.student-item {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
 .student-btn {
   display: flex;
   align-items: center;
@@ -161,6 +167,19 @@ h3 { font-size: 1em; color: var(--primary-light); margin-bottom: 6px; }
   min-height: 48px;
 }
 .student-btn.active { border-color: var(--primary); background: #eaf2f8; }
+.delete-student-btn {
+  width: 42px;
+  min-height: 48px;
+  border: 2px solid #f2c7c3;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 1.05em;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.delete-student-btn:hover { background: #fadbd8; border-color: var(--danger); }
 .student-btn .dot {
   width: 12px; height: 12px;
   border-radius: 50%;
@@ -375,6 +394,9 @@ h3 { font-size: 1em; color: var(--primary-light); margin-bottom: 6px; }
 .chip-positive:hover { background: #c8e6c9; }
 .chip-improve { background: #fff3e0; color: #e65100; border-color: #ffcc80; }
 .chip-improve:hover { background: #ffe0b2; }
+.chip.chip-active { transform: scale(1.04); font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.chip-positive.chip-active { background: #2e7d32 !important; color: white !important; border-color: #1b5e20 !important; }
+.chip-improve.chip-active { background: #e65100 !important; color: white !important; border-color: #bf360c !important; }
 .chip-oral { background: #e3f2fd; color: #1565c0; border-color: #90caf9; }
 .chip-oral:hover { background: #bbdefb; }
 .chip-special { background: #f3e5f5; color: #7b1fa2; border-color: #ce93d8; }
@@ -931,11 +953,7 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
         <div class="eval-group" data-phase="1" data-ind="2"></div>
       </div>
       <div class="indicator-desc" data-desc="p1i2">Vari&eacute;t&eacute; des documents, sources clairement identifi&eacute;es (auteur, date, origine)</div>
-      <div class="indicator-row">
-        <span class="indicator-label">Clart&eacute; de l'expression orale <span class="indicator-info" onclick="toggleDesc(this)">i</span></span>
-        <div class="eval-group" data-phase="1" data-ind="3"></div>
-      </div>
-      <div class="indicator-desc" data-desc="p1i3">Le propos est compr&eacute;hensible, id&eacute;es formul&eacute;es clairement, vocabulaire adapt&eacute;</div>
+
       <div style="margin-top:8px;">
         <div class="chip-container" data-target="obs1">
           <span class="chip-group-label">Points forts</span>
@@ -1072,11 +1090,7 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
         <div class="eval-group" data-phase="3" data-ind="2"></div>
       </div>
       <div class="indicator-desc" data-desc="p3i2">Connaissance du territoire : localisation, caract&eacute;ristiques, &eacute;volutions</div>
-      <div class="indicator-row">
-        <span class="indicator-label">Capacit&eacute; &agrave; prendre en compte d'autres points de vue <span class="indicator-info" onclick="toggleDesc(this)">i</span></span>
-        <div class="eval-group" data-phase="3" data-ind="3"></div>
-      </div>
-      <div class="indicator-desc" data-desc="p3i3">&Eacute;coute attentive, r&eacute;ponses adapt&eacute;es, capacit&eacute; &agrave; rebondir</div>
+
       <div style="margin-top:8px;">
         <div class="chip-container" data-target="obs3">
           <span class="chip-group-label">Points forts</span>
@@ -1293,11 +1307,12 @@ var DEFAULT_CLASSES = {
 var CLASSES = JSON.parse(JSON.stringify(DEFAULT_CLASSES));
 
 var PHASE_MAX = [5, 6, 6, 3];
-var PHASE_IND_COUNT = [4, 4, 4, 2];
+var PHASE_IND_COUNT = [3, 4, 3, 2];
 
 var STORAGE_KEY_DATA = 'ccf1_e11_v2';
 var STORAGE_KEY_SETTINGS = 'ccf1_e11_v2_settings';
 var STORAGE_KEY_CLASSES = 'ccf1_e11_v2_classes';
+var STORAGE_KEY_JSON_BACKUP_NEEDED = 'ccf1_e11_v2_json_backup_needed';
 
 var currentClass = 'C2JP';
 var currentStudent = null;
@@ -1376,6 +1391,25 @@ function loadClassesFromStorage() {
 
 function saveClassesToStorage() {
   storageSet(STORAGE_KEY_CLASSES, JSON.stringify(CLASSES));
+  markJsonBackupNeeded();
+}
+
+function markJsonBackupNeeded() {
+  storageSet(STORAGE_KEY_JSON_BACKUP_NEEDED, '1');
+}
+
+function markJsonBackupDone() {
+  storageSet(STORAGE_KEY_JSON_BACKUP_NEEDED, '0');
+}
+
+function hasJsonBackupNeeded() {
+  return storageGet(STORAGE_KEY_JSON_BACKUP_NEEDED) === '1';
+}
+
+function hasWorkToBackup() {
+  var dataKeys = Object.keys(allData || {});
+  var classesChanged = JSON.stringify(CLASSES) !== JSON.stringify(DEFAULT_CLASSES);
+  return dataKeys.length > 0 || classesChanged;
 }
 
 // ============= DATA STORAGE =============
@@ -1401,6 +1435,7 @@ function saveToStorage() {
     data: allData
   };
   storageSet(STORAGE_KEY_DATA, JSON.stringify(wrapper));
+  markJsonBackupNeeded();
 }
 
 function getStudentKey(cls, name) {
@@ -1416,9 +1451,9 @@ function getStudentData(cls, name) {
       status: 'todo',
       date: new Date().toISOString().slice(0,10),
       indicators: {
-        1: [null, null, null, null],
+        1: [null, null, null],
         2: [null, null, null, null],
-        3: [null, null, null, null],
+        3: [null, null, null],
         4: [null, null]
       },
       notes: { 1: null, 2: null, 3: null, 4: null },
@@ -1461,6 +1496,9 @@ function renderStudents() {
   grid.innerHTML = '';
   CLASSES[currentClass].forEach(function(name) {
     var data = getStudentData(currentClass, name);
+    var item = document.createElement('div');
+    item.className = 'student-item';
+
     var btn = document.createElement('button');
     btn.className = 'student-btn' + (currentStudent === name ? ' active' : '');
     // Use textContent for user data safety
@@ -1471,7 +1509,23 @@ function renderStudents() {
     nameSpan.textContent = name;
     btn.appendChild(nameSpan);
     btn.onclick = function() { selectStudent(name); };
-    grid.appendChild(btn);
+    item.appendChild(btn);
+
+    if (isAddedStudent(currentClass, name)) {
+      var delBtn = document.createElement('button');
+      delBtn.className = 'delete-student-btn';
+      delBtn.type = 'button';
+      delBtn.title = 'Supprimer cet élève ajouté';
+      delBtn.setAttribute('aria-label', 'Supprimer ' + name);
+      delBtn.textContent = '\u00d7';
+      delBtn.onclick = function(e) {
+        e.stopPropagation();
+        deleteAddedStudent(currentClass, name);
+      };
+      item.appendChild(delBtn);
+    }
+
+    grid.appendChild(item);
   });
   // Add student button
   var addBtn = document.createElement('button');
@@ -1479,6 +1533,10 @@ function renderStudents() {
   addBtn.textContent = '+ Ajouter un \u00e9l\u00e8ve';
   addBtn.onclick = function() { showAddStudentModal(); };
   grid.appendChild(addBtn);
+}
+
+function isAddedStudent(cls, name) {
+  return !DEFAULT_CLASSES[cls] || DEFAULT_CLASSES[cls].indexOf(name) === -1;
 }
 
 function selectStudent(name) {
@@ -1591,6 +1649,46 @@ function addNewStudent() {
   if (overlay) overlay.remove();
 }
 
+function deleteAddedStudent(cls, name) {
+  if (!isAddedStudent(cls, name)) {
+    alert('Seuls les élèves ajoutés manuellement peuvent être supprimés ici.');
+    return;
+  }
+
+  var key = getStudentKey(cls, name);
+  var data = allData[key];
+  var hasEvalData = data && (
+    data.status !== 'todo' ||
+    Object.values(data.notes || {}).some(function(v) { return v !== null && v !== undefined; }) ||
+    Object.values(data.observations || {}).some(function(v) { return v && String(v).trim() !== ''; }) ||
+    (data.appreciation && data.appreciation.trim() !== '') ||
+    (data.sigESC && data.sigESC.trim() !== '') ||
+    (data.sigHG && data.sigHG.trim() !== '')
+  );
+
+  var msg = 'Supprimer ' + name + ' de la classe ' + cls + ' ?';
+  if (hasEvalData) {
+    msg += '\n\nAttention : ses notes, observations, appréciations et signatures seront aussi supprimées.';
+  }
+  if (!confirm(msg)) return;
+  if (hasEvalData && !confirm('Confirmez la suppression définitive de ' + name + '.')) return;
+
+  CLASSES[cls] = CLASSES[cls].filter(function(studentName) {
+    return studentName !== name;
+  });
+  delete allData[key];
+  delete previousNotesBackup[key];
+
+  if (currentClass === cls && currentStudent === name) {
+    currentStudent = null;
+    showEvalContent(false);
+  }
+
+  saveClassesToStorage();
+  saveToStorage();
+  renderStudents();
+}
+
 // ============= EVAL BUTTONS (indicator visual aids) =============
 function initEvalButtons() {
   document.querySelectorAll('.eval-group').forEach(function(group) {
@@ -1696,6 +1794,9 @@ function loadStudentEval(data) {
   document.getElementById('sigESC').value = data.sigESC || '';
   document.getElementById('sigHG').value = data.sigHG || '';
 
+  // Synchronise l'état actif des chips avec le contenu des observations
+  syncChipsFromTextareas();
+
   updateTotal(data);
 }
 
@@ -1799,16 +1900,68 @@ function checkValidation() {
 }
 
 // ============= CHIP COMMENTS =============
+// === MAX par phase pour le calcul auto ===
+var PHASE_MAX = { 1: 5, 2: 6, 3: 6, 4: 3 };
+
+function recomputePhaseNote(phase) {
+  var max = PHASE_MAX[phase];
+  if (!max) return;
+  var input = document.getElementById('notePhase' + phase);
+  if (!input) return;
+  var card = input.closest('.phase-card');
+  if (!card) return;
+  var pos = card.querySelectorAll('.chip-positive.chip-active').length;
+  var imp = card.querySelectorAll('.chip-improve.chip-active').length;
+  // Si rien n'est cliqué : on laisse la note manuelle telle quelle
+  if (pos === 0 && imp === 0) return;
+  // Formule : on part du milieu (max/2), chaque chip positif +0.5, chaque chip négatif -0.5
+  var note = max / 2 + (pos - imp) * 0.5;
+  note = Math.max(0, Math.min(max, note));
+  note = Math.round(note * 2) / 2;
+  input.value = note;
+  if (typeof onNoteChange === 'function') onNoteChange(phase);
+}
+
 function addChip(el) {
   var container = el.parentElement;
   var targetId = container.dataset.target;
   var textarea = document.getElementById(targetId);
-  var text = el.textContent;
-  if (textarea.value && !textarea.value.endsWith(' ') && !textarea.value.endsWith('\n')) {
-    textarea.value += '. ';
+  // Toggle l'état actif de la chip
+  var isActive = el.dataset.active === "true";
+  el.dataset.active = isActive ? "false" : "true";
+  el.classList.toggle("chip-active", !isActive);
+  // Reconstruit le texte du textarea à partir des chips actives de ce container
+  var texts = [];
+  container.querySelectorAll('.chip').forEach(function(c){
+    if (c.dataset.active === "true") texts.push(c.textContent.trim());
+  });
+  textarea.value = texts.join(". ") + (texts.length > 0 ? "." : "");
+  // Recalcule la note de la phase (déduite via le .phase-card parent)
+  var phaseCard = el.closest('.phase-card');
+  if (phaseCard) {
+    var noteInput = phaseCard.querySelector('input[id^="notePhase"]');
+    if (noteInput) {
+      var phase = parseInt(noteInput.id.replace('notePhase',''));
+      if (Number.isFinite(phase)) recomputePhaseNote(phase);
+    }
   }
-  textarea.value += text;
   saveData();
+}
+
+// Synchronise l'état actif des chips avec le contenu actuel du textarea (utilisé après chargement d'un élève)
+function syncChipsFromTextareas() {
+  document.querySelectorAll('.chip-container').forEach(function(container){
+    var targetId = container.dataset.target;
+    var textarea = document.getElementById(targetId);
+    if (!textarea) return;
+    var content = (textarea.value || "").toLowerCase();
+    container.querySelectorAll('.chip').forEach(function(c){
+      var t = (c.textContent || "").trim().toLowerCase();
+      var active = !!t && content.indexOf(t) !== -1;
+      c.dataset.active = active ? "true" : "false";
+      c.classList.toggle("chip-active", active);
+    });
+  });
 }
 
 // ============= ABSENT =============
@@ -1878,7 +2031,7 @@ function resetStudent() {
   if (!confirm('Confirmez la réinitialisation de ' + name + '. Toutes les notes, observations et appréciations seront supprimées.')) return;
   // Clear all data
   data.status = 'todo';
-  data.indicators = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null] };
+  data.indicators = { 1: [null, null, null], 2: [null, null, null, null], 3: [null, null, null], 4: [null, null] };
   data.notes = { 1: null, 2: null, 3: null, 4: null };
   data.observations = { 1: '', 2: '', 3: '', 4: '' };
   data.appreciation = '';
@@ -1998,6 +2151,7 @@ function exportJSON() {
   a.download = 'CCF1_E11_data_' + dateStr + '.json';
   a.click();
   URL.revokeObjectURL(url);
+  markJsonBackupDone();
 }
 
 // ============= EXPORT JSON CLASSE =============
@@ -2009,9 +2163,9 @@ function buildStudentRecord(cls, name) {
   }
   total = Math.round(total * 2) / 2;
   var indLabels = {
-    1: ["Pertinence des informations presentees","Mise en relation et critique des documents","Diversite et identification des sources","Clarte de l'expression orale"],
+    1: ["Pertinence des informations presentees","Mise en relation et critique des documents","Diversite et identification des sources"],
     2: ["Faire partager ses idees","Justification personnelle du choix","Attitude dans l'echange","Implication personnelle"],
-    3: ["Prises de position citoyennes","Mobilisation de reperes historiques","Mobilisation de reperes geographiques","Capacite a prendre en compte d'autres points de vue"],
+    3: ["Prises de position citoyennes","Mobilisation de reperes historiques","Mobilisation de reperes geographiques"],
     4: ["Auto-evaluation critique","Argumentation et justification des choix"]
   };
   var phaseNames = {1:"Presentation du dossier",2:"Entretien sur le choix du sujet",3:"Discussion sur le theme",4:"Bilan et prise de position"};
@@ -2021,7 +2175,7 @@ function buildStudentRecord(cls, name) {
   for (var p = 1; p <= 4; p++) {
     var indicators = [];
     var inds = data.indicators[p] || [];
-    for (var i = 0; i < inds.length; i++) {
+    for (var i = 0; i < PHASE_IND_COUNT[p - 1]; i++) {
       indicators.push({
         label: indLabels[p][i],
         niveau: inds[i] !== null ? evalLabels[inds[i]] : null,
@@ -2106,6 +2260,113 @@ function importJSON() {
   document.getElementById('fileImport').click();
 }
 
+function cloneData(obj) {
+  return JSON.parse(JSON.stringify(obj || {}));
+}
+
+function recordToStudentData(record) {
+  var cls = record.classe || currentClass;
+  var indicators = {
+    1: [null, null, null],
+    2: [null, null, null, null],
+    3: [null, null, null],
+    4: [null, null]
+  };
+  var notes = { 1: null, 2: null, 3: null, 4: null };
+  var observations = { 1: '', 2: '', 3: '', 4: '' };
+
+  for (var p = 1; p <= 4; p++) {
+    var phase = record.phases && record.phases[p];
+    if (!phase) continue;
+    notes[p] = phase.note !== undefined ? phase.note : null;
+    observations[p] = phase.observations || '';
+    if (Array.isArray(phase.indicateurs)) {
+      for (var i = 0; i < indicators[p].length; i++) {
+        var ind = phase.indicateurs[i];
+        indicators[p][i] = ind && ind.valeur !== undefined ? ind.valeur : null;
+      }
+    }
+  }
+
+  return {
+    class: cls,
+    name: record.nom,
+    status: record.statut || 'todo',
+    date: record.date || new Date().toISOString().slice(0,10),
+    indicators: indicators,
+    notes: notes,
+    observations: observations,
+    appreciation: record.appreciation_generale || '',
+    sigESC: record.enseignant_esc || '',
+    sigHG: record.enseignant_hg || ''
+  };
+}
+
+function importClassArchive(imported) {
+  if (!imported.classe || !Array.isArray(imported.eleves)) {
+    alert('Erreur : archive de classe invalide.');
+    return null;
+  }
+
+  var mergedData = cloneData(allData);
+  var mergedClasses = cloneData(CLASSES);
+  mergedClasses[imported.classe] = [];
+
+  Object.keys(mergedData).forEach(function(key) {
+    if (key.indexOf(imported.classe + '::') === 0) delete mergedData[key];
+  });
+
+  for (var i = 0; i < imported.eleves.length; i++) {
+    var record = imported.eleves[i];
+    if (!record || !record.nom) {
+      alert('Erreur : élève invalide dans l\'archive de classe.');
+      return null;
+    }
+    record.classe = record.classe || imported.classe;
+    var data = recordToStudentData(record);
+    mergedClasses[imported.classe].push(data.name);
+    mergedData[getStudentKey(imported.classe, data.name)] = data;
+  }
+
+  return {
+    data: mergedData,
+    classes: mergedClasses,
+    settings: {
+      theme: imported.theme || settings.theme,
+      session: imported.session || settings.session,
+      etablissement: imported.etablissement || settings.etablissement
+    },
+    mode: 'classe'
+  };
+}
+
+function importStudentArchive(imported) {
+  if (!imported.eleve || !imported.eleve.nom) {
+    alert('Erreur : archive élève invalide.');
+    return null;
+  }
+
+  var mergedData = cloneData(allData);
+  var mergedClasses = cloneData(CLASSES);
+  var data = recordToStudentData(imported.eleve);
+  if (!mergedClasses[data.class]) mergedClasses[data.class] = [];
+  if (mergedClasses[data.class].indexOf(data.name) === -1) {
+    mergedClasses[data.class].push(data.name);
+  }
+  mergedData[getStudentKey(data.class, data.name)] = data;
+
+  return {
+    data: mergedData,
+    classes: mergedClasses,
+    settings: {
+      theme: imported.theme || settings.theme,
+      session: imported.session || settings.session,
+      etablissement: imported.etablissement || settings.etablissement
+    },
+    mode: 'élève'
+  };
+}
+
 function handleImport(event) {
   var file = event.target.files[0];
   if (!file) return;
@@ -2124,6 +2385,10 @@ function handleImport(event) {
       var importedData = null;
       var importedClasses = null;
       var importedSettings = null;
+      var importMode = 'global';
+      var importPlan = null;
+      var importedCountOverride = null;
+      var evaluatedCountOverride = null;
 
       // New format with data/classes keys
       if (imported.data && typeof imported.data === 'object' && imported.classes && typeof imported.classes === 'object') {
@@ -2139,6 +2404,26 @@ function handleImport(event) {
             return;
           }
         }
+      } else if (imported._type === 'classe') {
+        importPlan = importClassArchive(imported);
+        if (!importPlan) return;
+        importedData = importPlan.data;
+        importedClasses = importPlan.classes;
+        importedSettings = importPlan.settings;
+        importMode = importPlan.mode;
+        importedCountOverride = imported.eleves.length;
+        evaluatedCountOverride = imported.eleves.filter(function(record) {
+          return record.statut === 'done' || record.statut === 'absent';
+        }).length;
+      } else if (imported._type === 'eleve') {
+        importPlan = importStudentArchive(imported);
+        if (!importPlan) return;
+        importedData = importPlan.data;
+        importedClasses = importPlan.classes;
+        importedSettings = importPlan.settings;
+        importMode = importPlan.mode;
+        importedCountOverride = 1;
+        evaluatedCountOverride = (imported.eleve.statut === 'done' || imported.eleve.statut === 'absent') ? 1 : 0;
       } else {
         // Old format — just student data (object with string keys)
         importedData = imported;
@@ -2158,10 +2443,20 @@ function handleImport(event) {
         if (entry.status === 'done' || entry.status === 'absent') evaluatedCount++;
       }
 
-      var studentCount = dataKeys.filter(function(k) { return !k.startsWith('_'); }).length;
+      var studentCount = importedCountOverride !== null ?
+        importedCountOverride :
+        dataKeys.filter(function(k) { return !k.startsWith('_'); }).length;
+      if (evaluatedCountOverride !== null) evaluatedCount = evaluatedCountOverride;
 
       // ---- CONFIRMATION ----
-      var msg = studentCount + ' \u00e9l\u00e8ve(s) trouv\u00e9(s), ' + evaluatedCount + ' \u00e9valu\u00e9(s).\nRemplacer les donn\u00e9es actuelles ?';
+      var msg = studentCount + ' \u00e9l\u00e8ve(s) trouv\u00e9(s), ' + evaluatedCount + ' \u00e9valu\u00e9(s).';
+      if (importMode === 'classe') {
+        msg += '\nImporter cette classe et remplacer les données existantes de cette classe ?';
+      } else if (importMode === 'élève') {
+        msg += '\nImporter cet élève et remplacer ses données existantes si nécessaire ?';
+      } else {
+        msg += '\nRemplacer les données actuelles ?';
+      }
       if (!confirm(msg)) return;
 
       // ---- APPLY ----
@@ -2237,9 +2532,9 @@ function exportWord() {
     var inds = data.indicators[phase];
     var rows = '';
     var labels = {
-      1: ["Pertinence des informations pr\u00e9sent\u00e9es","Mise en relation et critique des documents","Diversit\u00e9 et identification des sources","Clart\u00e9 de l'expression orale"],
+      1: ["Pertinence des informations pr\u00e9sent\u00e9es","Mise en relation et critique des documents","Diversit\u00e9 et identification des sources"],
       2: ["Faire partager ses id\u00e9es","Justification personnelle du choix","Attitude dans l'\u00e9change : \u00e9coute et respect du cadre","Implication personnelle"],
-      3: ["Prises de position citoyennes","Mobilisation de rep\u00e8res historiques","Mobilisation de rep\u00e8res g\u00e9ographiques","Capacit\u00e9 \u00e0 prendre en compte d'autres points de vue"],
+      3: ["Prises de position citoyennes","Mobilisation de rep\u00e8res historiques","Mobilisation de rep\u00e8res g\u00e9ographiques"],
       4: ["Auto-\u00e9valuation critique","Argumentation et justification des choix"]
     };
     var objectives = {
@@ -2621,6 +2916,12 @@ function showClassSummary() {
   overlay.appendChild(content);
   document.body.appendChild(overlay);
 }
+
+window.addEventListener('beforeunload', function(e) {
+  if (!hasJsonBackupNeeded() && !hasWorkToBackup()) return;
+  e.preventDefault();
+  e.returnValue = 'Pensez à exporter le JSON global avant de fermer.';
+});
 
 // ============= INIT =============
 init();
