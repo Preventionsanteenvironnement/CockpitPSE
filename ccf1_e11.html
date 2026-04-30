@@ -1706,7 +1706,7 @@ function initEvalButtons() {
   });
 }
 
-// Set indicator value — visual aid only, does NOT auto-calculate note
+// Set indicator value — déclenche maintenant le recalcul auto de la note
 function setIndicator(phase, ind, val, group) {
   if (!currentStudent) return;
   var data = getStudentData(currentClass, currentStudent);
@@ -1716,6 +1716,7 @@ function setIndicator(phase, ind, val, group) {
     data.indicators[phase][ind] = val;
   }
   updateEvalButtons(group, data.indicators[phase][ind]);
+  if (typeof recomputePhaseNote === 'function') recomputePhaseNote(phase);
   saveData();
 }
 
@@ -1909,16 +1910,38 @@ function recomputePhaseNote(phase) {
   if (!input) return;
   var card = input.closest('.phase-card');
   if (!card) return;
+
+  // Contributions des indicateurs (boutons --, -, +, ++) lus depuis data
+  var indContrib = 0;
+  var indActive = false;
+  if (typeof currentStudent !== 'undefined' && currentStudent && typeof getStudentData === 'function') {
+    try {
+      var data = getStudentData(currentClass, currentStudent);
+      var inds = (data && data.indicators && data.indicators[phase]) || [];
+      var weights = [-1, -0.5, 0.5, 1]; // 0=--, 1=-, 2=+, 3=++
+      inds.forEach(function(v){
+        if (v === null || v === undefined) return;
+        indActive = true;
+        indContrib += (weights[v] || 0);
+      });
+    } catch(e) {}
+  }
+
+  // Contributions des chips (Points forts / À améliorer)
   var pos = card.querySelectorAll('.chip-positive.chip-active').length;
   var imp = card.querySelectorAll('.chip-improve.chip-active').length;
-  // Si toutes les chips sont désactivées : on remet la note à vide (saisie manuelle possible)
-  if (pos === 0 && imp === 0) {
+  var chipContrib = (pos - imp) * 0.5;
+  var chipActive = pos > 0 || imp > 0;
+
+  // Si rien n'est sélectionné nulle part : note blanche, saisie manuelle possible
+  if (!indActive && !chipActive) {
     input.value = '';
     if (typeof onNoteChange === 'function') onNoteChange(phase);
     return;
   }
-  // Formule : départ au milieu (max/2), +0.5 par chip verte, -0.5 par chip orange
-  var note = max / 2 + (pos - imp) * 0.5;
+
+  // Formule : départ au milieu (max/2) + contributions indicateurs + contributions chips
+  var note = max / 2 + indContrib + chipContrib;
   note = Math.max(0, Math.min(max, note));
   note = Math.round(note * 2) / 2;
   input.value = note;
