@@ -222,7 +222,7 @@ async function init() {
 // === HELPERS ===
 function getEnabledModules() {
   if (!cafe || !cafe.modules) return [];
-  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","feedback","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","mindmap","feedback","bilan"];
   return order.filter(id => cafe.modules[id]?.enabled);
 }
 function curMod() { const e = getEnabledModules(); return e[cafe.state.moduleIndex] || null; }
@@ -260,6 +260,7 @@ function render() {
   if (mod === "empathie")   return renderEmpathie();
   if (mod === "feedback")   return renderFeedback();
   if (mod === "frise")      return renderFrise();
+  if (mod === "mindmap")    return renderMindmap();
   if (mod === "photo")      return renderPlaceholder("🖼️ Photolangage", "À configurer dans le Cockpit");
   if (mod === "bilan")      return renderBilan();
   renderPlaceholder(mod, "Module en construction");
@@ -780,6 +781,101 @@ function renderFrise() {
   `;
 }
 
+// === CARTE MENTALE COLLABORATIVE ===
+function renderMindmap() {
+  const stage = document.getElementById("stage");
+  const it = curItem();
+  if (!it) { goNext(); return; }
+  const mod = curMod();
+  const itemVotes = votesFor(mod, cafe.state.itemIndex).filter(v => !v.deleted);
+  const branches = it.branches || [];
+
+  // Regroupe les contributions par branche
+  const byBranch = {};
+  branches.forEach((b, i) => byBranch[i] = []);
+  itemVotes.forEach(v => {
+    if (typeof v.value !== "object" || v.value === null) return;
+    const idx = parseInt(v.value.branchIndex);
+    const txt = String(v.value.text || "").trim();
+    if (!Number.isFinite(idx) || idx < 0 || idx >= branches.length || !txt) return;
+    byBranch[idx].push({ id: v.id, text: txt, parti: participants.find(p => p.id === v.participantId) });
+  });
+
+  // Layout : centre + branches en cercle
+  const N = branches.length || 1;
+  const centerX = 50, centerY = 50;
+  const branchRadius = 30; // % de l'écran
+  const positions = branches.map((_, i) => {
+    const angle = (i * 2 * Math.PI / N) - Math.PI/2;
+    return { x: centerX + branchRadius * Math.cos(angle), y: centerY + branchRadius * Math.sin(angle), angle };
+  });
+
+  // Construit SVG des connexions
+  let svgLines = "";
+  positions.forEach((p, i) => {
+    const b = branches[i];
+    svgLines += `<line x1="${centerX}%" y1="${centerY}%" x2="${p.x}%" y2="${p.y}%" stroke="${b.color}" stroke-width="3" opacity="0.6"/>`;
+  });
+
+  // Contributions par branche : sous-chips disposés en arc
+  const chipsHtml = positions.map((p, i) => {
+    const b = branches[i];
+    const seeds = (b.seeds || []).map(s => ({ id: "seed_"+i+"_"+s, text: s, parti: null, isSeed: true }));
+    const all = [...seeds, ...byBranch[i]];
+    const visible = all.slice(-12); // garde les 12 plus récents
+    const overflow = all.length - visible.length;
+    const counts = {};
+    all.forEach(c => { const k = c.text.toLowerCase(); counts[k] = (counts[k]||0) + 1; });
+
+    // Direction d'éclatement (vers l'extérieur)
+    const dx = p.x - centerX, dy = p.y - centerY;
+    const norm = Math.hypot(dx, dy) || 1;
+    const ux = dx/norm, uy = dy/norm;
+
+    const items = visible.map((c, k) => {
+      const offset = 4 + k * 2.6; // décalage progressif vers l'extérieur
+      const sideAngle = (k - visible.length/2) * 0.18; // arc
+      const cosA = Math.cos(sideAngle), sinA = Math.sin(sideAngle);
+      const ddx = ux * cosA - uy * sinA;
+      const ddy = ux * sinA + uy * cosA;
+      const cx = p.x + ddx * offset;
+      const cy = p.y + ddy * offset;
+      const freq = counts[c.text.toLowerCase()] || 1;
+      const fontSize = Math.min(13 + (freq-1)*2, 20);
+      const bg = c.isSeed ? `rgba(255,255,255,0.06)` : `${b.color}33`;
+      const border = c.isSeed ? `1px dashed ${b.color}80` : `2px solid ${b.color}`;
+      const delBtn = c.isSeed ? "" : `<span onclick="window.mmDelete('${c.id}')" style="cursor:pointer; opacity:0.4; margin-left:6px; font-size:11px;" title="Rejeter">✕</span>`;
+      return `<div style="position:absolute; left:${cx}%; top:${cy}%; transform:translate(-50%,-50%); padding:6px 12px; background:${bg}; border:${border}; border-radius:14px; font-size:${fontSize}px; font-weight:600; color:white; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; box-shadow:0 2px 8px rgba(0,0,0,0.3);">${escapeHtml(c.text)}${freq>1?` <sub style="opacity:0.7;">×${freq}</sub>`:""}${delBtn}</div>`;
+    }).join("");
+
+    return items + (overflow > 0 ? `<div style="position:absolute; left:${p.x + ux*32}%; top:${p.y + uy*32}%; transform:translate(-50%,-50%); padding:4px 10px; background:rgba(0,0,0,0.5); border-radius:10px; font-size:12px; color:#94a3b8;">+${overflow} autres</div>` : "");
+  }).join("");
+
+  // Titres des branches
+  const branchLabels = positions.map((p, i) => {
+    const b = branches[i];
+    const dx = p.x - centerX, dy = p.y - centerY;
+    const norm = Math.hypot(dx, dy) || 1;
+    return `<div style="position:absolute; left:${p.x}%; top:${p.y}%; transform:translate(-50%,-50%); padding:10px 18px; background:${b.color}; border-radius:14px; font-size:18px; font-weight:800; color:white; white-space:nowrap; box-shadow:0 4px 12px ${b.color}80; z-index:5;">${escapeHtml(b.label || "")}</div>`;
+  }).join("");
+
+  stage.innerHTML = `
+    <div class="module" style="max-width:1500px; height:100%; display:flex; flex-direction:column;">
+      <div style="text-align:center; font-size:18px; color:#c4b5fd; margin-bottom:6px;">🧠 Carte mentale collaborative · ${itemVotes.length} contribution${itemVotes.length>1?"s":""}</div>
+      <div style="position:relative; flex:1; min-height:600px;">
+        <svg style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;">${svgLines}</svg>
+        <div style="position:absolute; left:${centerX}%; top:${centerY}%; transform:translate(-50%,-50%); padding:18px 28px; background:linear-gradient(135deg, #fbbf24, #ec4899); border-radius:50%; min-width:180px; min-height:180px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; color:white; text-align:center; box-shadow:0 0 60px rgba(251,191,36,0.4); z-index:5;">${escapeHtml(it.center || "")}</div>
+        ${branchLabels}
+        ${chipsHtml}
+      </div>
+    </div>
+  `;
+}
+window.mmDelete = async function(voteId){
+  if (!confirm("Rejeter cette contribution ?")) return;
+  try { await updateDoc(doc(db, "cafes", cafeId, "votes", voteId), { deleted: true }); } catch(e) { alert(e.message); }
+};
+
 function renderPlaceholder(title, msg) {
   document.getElementById("stage").innerHTML = `<div class="module"><div class="question">${title}</div><div style="text-align:center; font-size:20px; color:#c4b5fd;">${msg}</div></div>`;
 }
@@ -821,7 +917,7 @@ window.goNext = async function() {
   clearAuto();
   const mod = curMod();
   const items = curItems();
-  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback","frise"].includes(mod);
+  const isMultiItem = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback","frise","mindmap"].includes(mod);
   // Pour quiz/vraifaux/thermo/empathie/dilemmes : si pas révélé, révéler d'abord
   if (["quiz","vraifaux","thermo","empathie","dilemmes"].includes(mod) && !cafe.state.revealed) {
     await updateDoc(cafeRef, { "state.revealed": true });

@@ -271,7 +271,7 @@ function renderEnded() {
 }
 
 function getEnabledModules() {
-  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","feedback","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","mindmap","feedback","bilan"];
   return order.filter(id => cafe.modules?.[id]?.enabled);
 }
 function curMod() { return getEnabledModules()[cafe.state.moduleIndex] || null; }
@@ -564,6 +564,59 @@ async function renderModule() {
       if (!v) { setVoteStatus("Écris ta reformulation avant d'envoyer.", true); return; }
       sendVote(v);
     };
+    return;
+  }
+
+  if (mod === "mindmap") {
+    if (!it) return;
+    const branches = it.branches || [];
+    let chosen = null;
+    function renderBranchPick(){
+      root.innerHTML = `
+        <h1>🧠 Carte mentale</h1>
+        <div class="sub">Centre : <b>${escapeHtml(it.center || "")}</b></div>
+        <div class="card">
+          <label>Choisis une branche, puis envoie ton idée</label>
+          <div style="display:grid; gap:8px; margin-top:8px;">
+            ${branches.map((b, j) => `
+              <button onclick="window.__pickBr(${j})" style="padding:14px; background:${b.color}; border:none; border-radius:12px; color:white; font-size:17px; font-weight:800; cursor:pointer; text-align:left;">${escapeHtml(b.label || ("Branche " + (j+1)))}</button>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+    function renderInput(){
+      const b = branches[chosen];
+      root.innerHTML = `
+        <h1 style="color:${b.color};">🧠 ${escapeHtml(b.label || "")}</h1>
+        <div class="sub">Idée à ajouter sous cette branche (max 60 caractères)</div>
+        <div class="card">
+          <input type="text" id="mm-text" maxlength="60" placeholder="Un mot ou une notion clé…" autofocus>
+          <button class="btn btn-pri" onclick="window.__sendMm()">Envoyer mon idée</button>
+          <button class="mini-btn" style="margin-top:10px; width:100%;" onclick="window.__backBr()">← Changer de branche</button>
+          ${statusHtml()}
+          <div class="ok" id="mm-ok" style="display:none; margin-top:10px;">✅ Envoyé. Tu peux en envoyer d'autres.</div>
+        </div>
+      `;
+      setTimeout(() => document.getElementById("mm-text")?.focus(), 80);
+    }
+    window.__pickBr = (j) => { chosen = j; renderInput(); };
+    window.__backBr = () => { chosen = null; renderBranchPick(); };
+    window.__sendMm = async () => {
+      const txt = document.getElementById("mm-text").value.trim();
+      if (!txt) { setVoteStatus("Écris quelque chose avant d'envoyer.", true); return; }
+      setVoteStatus("⏳ Envoi…");
+      try {
+        await addDoc(votesRef, {
+          participantId: myId, moduleId: "mindmap", itemIndex: cafe.state.itemIndex,
+          value: { branchIndex: chosen, text: txt }, createdAt: serverTimestamp()
+        });
+        document.getElementById("mm-text").value = "";
+        document.getElementById("mm-ok").style.display = "block";
+        setVoteStatus("");
+      } catch(e) { setVoteStatus("❌ Envoi impossible.", true); }
+    };
+    renderBranchPick();
     return;
   }
 
