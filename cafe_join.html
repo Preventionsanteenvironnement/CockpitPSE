@@ -271,7 +271,7 @@ function renderEnded() {
 }
 
 function getEnabledModules() {
-  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","mindmap","feedback","bilan"];
+  const order = ["meteo","nuage","photo","valeurs","thermo","echelle","vraifaux","quiz","dilemmes","empathie","ouverte","muranonyme","frise","mindmap","autoeval","feedback","bilan"];
   return order.filter(id => cafe.modules?.[id]?.enabled);
 }
 function curMod() { return getEnabledModules()[cafe.state.moduleIndex] || null; }
@@ -367,10 +367,51 @@ async function renderModule() {
     return;
   }
 
-  if (mod === "quiz" || mod === "vraifaux") {
+  if (mod === "autoeval") {
+    const items = (cafe.modules.autoeval?.items) || [];
+    // Phase bilan : itemIndex >= items.length
+    if (cafe.state.itemIndex >= items.length) {
+      // Calcule la fiche personnelle de remédiation
+      const myAnswers = items.map((it, qi) => {
+        const vs = votes.filter(v => v.moduleId === "autoeval" && v.itemIndex === qi && v.participantId === myId);
+        if (vs.length === 0) return null;
+        return { qi, ok: vs[0].value === it.correct, item: it };
+      });
+      const answered = myAnswers.filter(a => a !== null);
+      const score = answered.filter(a => a.ok).length;
+      const wrongs = answered.filter(a => !a.ok);
+      const rights = answered.filter(a => a.ok);
+      root.innerHTML = `
+        <h1>🎓 Mon bilan</h1>
+        <div class="card">
+          <div style="text-align:center; padding:14px; background:rgba(251,191,36,0.15); border-radius:12px; border:2px solid #fbbf24; margin-bottom:14px;">
+            <div style="font-size:14px; color:#fde68a;">Mon score</div>
+            <div style="font-size:46px; font-weight:800; color:#fbbf24;">${score}<span style="font-size:24px; color:#cbd5e1;"> / ${answered.length}</span></div>
+          </div>
+          ${rights.length > 0 ? `
+            <div style="margin-bottom:14px;">
+              <div style="font-weight:700; color:#10b981; font-size:15px; margin-bottom:8px;">✅ Notions maîtrisées</div>
+              ${rights.map(r => `<div style="padding:6px 10px; background:rgba(16,185,129,0.12); border-left:3px solid #10b981; border-radius:6px; margin-bottom:4px; font-size:14px;">${escapeHtml(r.item.notion || ("Question " + (r.qi+1)))}</div>`).join("")}
+            </div>` : ''}
+          ${wrongs.length > 0 ? `
+            <div>
+              <div style="font-weight:700; color:#ef4444; font-size:15px; margin-bottom:8px;">📚 À retravailler</div>
+              ${wrongs.map(w => `<div style="padding:8px 10px; background:rgba(239,68,68,0.12); border-left:3px solid #ef4444; border-radius:6px; margin-bottom:6px;">
+                <div style="font-weight:700; font-size:14px;">${escapeHtml(w.item.notion || ("Question " + (w.qi+1)))}</div>
+                ${w.item.remediation ? `<div style="font-size:13px; color:#cbd5e1; margin-top:2px;">📚 ${escapeHtml(w.item.remediation)}</div>` : ''}
+              </div>`).join("")}
+            </div>` : `<div class="ok">🎉 Bravo, tout est acquis !</div>`}
+        </div>
+      `;
+      return;
+    }
+    // Phase question : comme un quiz classique
+  }
+
+  if (mod === "quiz" || mod === "vraifaux" || mod === "autoeval") {
     if (!it) { root.innerHTML = `<div class="card wait"><div class="spin">⏳</div><div style="margin-top:14px;">En attente…</div></div>`; return; }
     root.innerHTML = `
-      <h1>${mod==='quiz'?'🏆 Quiz':'✅ Vrai / Faux'}</h1>
+      <h1>${mod==='quiz'?'🏆 Quiz':mod==='autoeval'?'🎓 Auto-évaluation':'✅ Vrai / Faux'}</h1>
       <div class="card">
         <div class="question">${escapeHtml(it.question)}</div>
         ${(it.options||[]).map((opt, j) => `

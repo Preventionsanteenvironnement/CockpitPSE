@@ -3474,6 +3474,7 @@ QN80,REDACTED</pre>
     { id:"feedback",   emoji:"⚡",  name:"Speed-feedback de classe", desc:"3 questions express anonymes : compris / pas compris / aimé.", aiGen:false, def:false },
     { id:"frise",      emoji:"🌙",  name:"Frise du sommeil (CPS C2/PSE A2)", desc:"Curseur heure de coucher. Frise des cycles affichée live. Bluffant pour parler sommeil.", aiGen:false, def:false },
     { id:"mindmap",    emoji:"🧠",  name:"Carte mentale collaborative", desc:"Centre + branches préparées par toi. Élèves enrichissent en direct. Modération 1 clic.", aiGen:true,  def:false },
+    { id:"autoeval",   emoji:"🎓",  name:"Auto-évaluation collective", desc:"Quiz + bilan détaillé : matrice élèves × notions, points à retravailler, fiche de remédiation perso.", aiGen:true,  def:false },
     { id:"bilan",      emoji:"🏁",  name:"Bilan + météo finale",     desc:"Synthèse, météo de fin, mot de gratitude.",             aiGen:false, def:true }
   ];
 
@@ -3934,7 +3935,7 @@ QN80,REDACTED</pre>
   function sp_renderPreview(){
     const el = document.getElementById("sp-preview");
     // Inclut les modules à items éditables (IA ou manuels comme valeurs/feedback)
-    const editableIds = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback","mindmap","frise"];
+    const editableIds = ["quiz","vraifaux","dilemmes","echelle","ouverte","nuage","thermo","empathie","valeurs","feedback","mindmap","frise","autoeval"];
     const aiMods = SP_MODULES.filter(m => editableIds.includes(m.id) && sp_session.modules[m.id].enabled);
     const has = aiMods.some(m => (sp_session.modules[m.id].items||[]).length > 0);
     if (!has) {
@@ -4048,6 +4049,29 @@ QN80,REDACTED</pre>
         ${del}
       </div>`;
     }
+    if (modId === "autoeval") {
+      return `<div class="question-edit">
+        <div class="q-num">🎓 Question ${i+1}</div>
+        ${inp(it.question, 'question')}
+        <div class="options">
+          ${(it.options||[]).map((opt,j)=>`
+            <div class="opt-row">
+              <button onclick="sp_setCorrect('${modId}',${i},${j})" style="width:24px; height:24px; border-radius:50%; border:2px solid ${it.correct===j?'#10b981':'#cbd5e1'}; background:${it.correct===j?'#10b981':'transparent'}; color:white; cursor:pointer;" title="Bonne réponse">${it.correct===j?'✓':''}</button>
+              <input type="text" value="${esc(opt)}" oninput="sp_updOpt('${modId}',${i},${j},this.value)">
+              <button onclick="sp_rmOpt('${modId}',${i},${j})" style="background:none; border:none; color:#dc2626; cursor:pointer;">×</button>
+            </div>
+          `).join("")}
+          <button onclick="sp_addOpt('${modId}',${i})" style="background:#f1f5f9; border:1px dashed #cbd5e1; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">+ Option</button>
+        </div>
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">📌 Notion / compétence ciblée (servira pour le bilan)</label>
+        ${inp(it.notion, 'notion')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Explication courte</label>
+        ${tex(it.explanation, 'explanation', '2 phrases max')}
+        <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">📚 Remédiation (où aller pour retravailler cette notion ?)</label>
+        ${inp(it.remediation, 'remediation')}
+        ${del}
+      </div>`;
+    }
     if (modId === "mindmap") {
       const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
       const branches = it.branches || [];
@@ -4109,6 +4133,7 @@ QN80,REDACTED</pre>
       valeurs:  ()=>({prompt:"Choisis les 5 valeurs qui te parlent le plus aujourd'hui",options:[...valeursDef]}),
       feedback: ()=>({prompt:""}),
       frise:    ()=>({prompt:"À quelle heure votre ado se couche-t-il en semaine ?", wake:7, ideal:22}),
+      autoeval: ()=>({question:"",options:["","",""],correct:0,explanation:"",notion:"",remediation:""}),
       mindmap:  ()=>({center:"Notion centrale", branches:[
         {label:"Idée 1", color:"#3b82f6", seeds:[]},
         {label:"Idée 2", color:"#10b981", seeds:[]},
@@ -4139,6 +4164,7 @@ QN80,REDACTED</pre>
     if (aiMods.find(m=>m.id==="thermo"))   blocks.push(`- "thermo" : 4 situations à charger émotionnellement, adaptées au public. Format : { "situation": "Quand …, mon [émotion] est à...", "emotion": "agacement|tristesse|peur|joie|honte|fierté", "guidance": "ce que ces résultats peuvent apporter (1 phrase)" }`);
     if (aiMods.find(m=>m.id==="empathie")) blocks.push(`- "empathie" : 4 phrases déclencheuses (style oral, situation conflictuelle adaptée au public). Format : { "trigger": "phrase entendue", "context": "qui parle à qui (1 phrase)", "model": "reformulation empathique modèle (selon référentiel CPS S1.2 — accueil, reflet, validation, sans solution imposée)" }`);
     if (aiMods.find(m=>m.id==="mindmap")) blocks.push(`- "mindmap" : 1 carte mentale de récapitulatif. Format : { "center": "concept central (max 4 mots)", "branches": [ 4 à 6 objets : { "label": "thème principal (max 3 mots)", "color": "code hex parmi #3b82f6, #10b981, #f59e0b, #ef4444, #8b5cf6, #ec4899" } ] }. PAS de sous-branches : ce sont les élèves qui les ajouteront en direct.`);
+    if (aiMods.find(m=>m.id==="autoeval")) blocks.push(`- "autoeval" : ${sp_session.nbQuestions} questions QCM d'auto-évaluation, chacune ciblant UNE notion clé du cours. Format : { "question": str, "options": [4 options], "correct": index_int, "explanation": "explication 2 phrases max", "notion": "nom court de la compétence ciblée (ex: 'Cycles du sommeil', 'Récup mentale')", "remediation": "où aller pour retravailler (ex: 'Relire fiche A2 §3', 'Refaire exercice 4')" }. Couvre des notions DIFFÉRENTES pour pouvoir identifier les points faibles ensuite.`);
 
     return `Tu es un expert en animation de sessions interactives en lycée pro (PSE). Génère le contenu d'une activité à partir du document ci-dessous.
 
