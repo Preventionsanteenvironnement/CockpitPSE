@@ -1078,6 +1078,15 @@
                   <option value="equipe">👩‍🏫 Équipe pédagogique</option>
                 </select>
               </div>
+              <div style="margin-top:10px; padding:10px; background:#f0f9ff; border-radius:6px; border-left:4px solid #0369a1;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:#0c4a6e; font-weight:bold;">
+                  <input type="checkbox" id="sp-autoNickname" style="width:18px; height:18px; cursor:pointer;">
+                  🎓 Pseudo automatique (recommandé pour les élèves)
+                </label>
+                <div style="font-size:0.75rem; color:#475569; margin-top:6px; line-height:1.4;">
+                  Si coché : les participants reçoivent un pseudo aléatoire neutre (ex. <b>« Renard47 »</b>, <b>« Loutre83 »</b>) — pas de saisie. Ils choisissent juste leur avatar emoji. Évite les pseudos blagueurs en classe.
+                </div>
+              </div>
             </div>
 
             <!-- 2. Modules -->
@@ -3493,6 +3502,7 @@ QN80,REDACTED</pre>
     return {
       id: uid(), title:"", date: todayISO(), theme:"", audience:"Participants",
       publicType: "mixte", // parents | eleves_cap | eleves_bacpro | classe | mixte | equipe
+      autoNickname: false, // si vrai, pseudo généré automatiquement (Renard47), avatar choisi librement
       modules: Object.fromEntries(SP_MODULES.map(m => [m.id, { enabled: m.def, items: [] }])),
       source:"", nbQuestions:10, autoMode:false, apiKey:"",
       createdAt: Date.now(), updatedAt: Date.now()
@@ -3865,13 +3875,14 @@ QN80,REDACTED</pre>
     document.getElementById("sp-theme").value = sp_session.theme;
     document.getElementById("sp-audience").value = sp_session.audience;
     if (document.getElementById("sp-publicType")) document.getElementById("sp-publicType").value = sp_session.publicType || "mixte";
+    if (document.getElementById("sp-autoNickname")) document.getElementById("sp-autoNickname").checked = !!sp_session.autoNickname;
     document.getElementById("sp-source").value = sp_session.source;
     document.getElementById("sp-nbq").value = sp_session.nbQuestions;
     document.getElementById("sp-auto").value = String(sp_session.autoMode);
     document.getElementById("sp-apikey").value = sp_session.apiKey;
     sp_renderModules();
     sp_renderPreview();
-    ["sp-title","sp-date","sp-theme","sp-audience","sp-publicType","sp-source","sp-nbq","sp-auto","sp-apikey"].forEach(id => {
+    ["sp-title","sp-date","sp-theme","sp-audience","sp-publicType","sp-autoNickname","sp-source","sp-nbq","sp-auto","sp-apikey"].forEach(id => {
       const e = document.getElementById(id);
       e.oninput = e.onchange = () => { sp_sync(); window.sp_scheduleAutoSave && window.sp_scheduleAutoSave(); };
     });
@@ -3884,6 +3895,7 @@ QN80,REDACTED</pre>
     sp_session.theme = document.getElementById("sp-theme").value;
     sp_session.audience = document.getElementById("sp-audience").value;
     sp_session.publicType = document.getElementById("sp-publicType")?.value || "mixte";
+    sp_session.autoNickname = !!document.getElementById("sp-autoNickname")?.checked;
     sp_session.source = document.getElementById("sp-source").value;
     sp_session.nbQuestions = parseInt(document.getElementById("sp-nbq").value || "10", 10);
     sp_session.autoMode = document.getElementById("sp-auto").value === "true";

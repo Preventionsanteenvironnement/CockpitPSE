@@ -105,7 +105,9 @@ let cafeId = params.get("id");
 const profToken = params.get("prof");
 const root = document.getElementById("root");
 
-const AVATARS = ["🦊","🐢","🦉","🐼","🐨","🦁","🦄","🐧","🦕","🐙","🐝","🦋"];
+const AVATARS = ["🦊","🐢","🦉","🐼","🐨","🦁","🦄","🐧","🦕","🐙","🐝","🦋","🐬","🦓","🦒","🐯","🐺","🐻","🐰","🐭","🐸","🦔","🦦","🦥","🦘","🦩","🦚","🦜","🐳","🦈"];
+const AUTO_NAMES = ["Renard","Chouette","Loup","Tigre","Panda","Aigle","Loutre","Hibou","Lynx","Faucon","Belette","Zèbre","Lapin","Ours","Cerf","Caméléon","Phoque","Otarie","Manchot","Toucan","Lézard","Étoile","Comète","Luciole","Saphir","Émeraude","Rubis","Topaze","Onyx","Cristal","Boréal","Astral","Polaire","Solaire","REDACTEDire"];
+function generateAutoPseudo(){ return AUTO_NAMES[Math.floor(Math.random()*AUTO_NAMES.length)] + Math.floor(10 + Math.random()*90); }
 const PSEUDOS = [
   "Participant bleu", "Participant soleil", "Participant zen", "Participant éclair",
   "Participant sourire", "Participant étoile", "Participant calme", "Participant curieux",
@@ -174,7 +176,7 @@ async function start() {
 }
 
 function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]); }
-function randomPseudo() { return PSEUDOS[Math.floor(Math.random() * PSEUDOS.length)] + "-" + Math.floor(10 + Math.random() * 90); }
+function randomPseudo() { return generateAutoPseudo(); }
 function statusHtml() { return `<div class="send-status" id="vote-status"></div>`; }
 function setVoteStatus(msg, isError) {
   const el = document.getElementById("vote-status");
@@ -192,19 +194,27 @@ function render() {
 }
 
 function renderJoin() {
+  const auto = !!cafe.autoNickname;
   let surnom = randomPseudo();
   let avatar = AVATARS[Math.floor(Math.random()*AVATARS.length)];
+  const inputBlock = auto
+    ? `<label>Ton pseudo (généré automatiquement)</label>
+       <div style="display:flex; gap:8px; align-items:center;">
+         <input type="text" id="f-surnom" maxlength="28" value="${escapeHtml(surnom)}" readonly style="font-weight:800; color:#fbbf24;">
+         <button class="mini-btn" type="button" onclick="window.__newPseudo()">🎲 Changer</button>
+       </div>`
+    : `<label>Ton pseudo (libre — ou laisse vide pour un pseudo aléatoire)</label>
+       <input type="text" id="f-surnom" maxlength="28" value="${escapeHtml(surnom)}" placeholder="ex: Papa de Léa, Maman007, ${escapeHtml(surnom)}…">`;
+  const anon = auto
+    ? `<div class="anon">🔒 Pseudo automatique imposé. Choisis ton avatar.</div>`
+    : `<div class="anon">🔒 Anonyme. Choisis un surnom et un avatar.</div>`;
   root.innerHTML = `
     <h1>☕ ${escapeHtml(cafe.title || "Activité interactive")}</h1>
     <div class="sub">${escapeHtml(cafe.theme || "")}</div>
-    <div class="anon">🔒 Pseudo automatique. Aucune donnée personnelle demandée.</div>
+    ${anon}
     <div class="card">
-      <label>Ton pseudo</label>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <input type="text" id="f-surnom" maxlength="28" value="${escapeHtml(surnom)}" readonly>
-        <button class="mini-btn" type="button" onclick="window.__newPseudo()">Changer</button>
-      </div>
-      <label>Choisis un avatar</label>
+      ${inputBlock}
+      <label>Choisis ton avatar</label>
       <div class="avatars" id="f-avatars">
         ${AVATARS.map(a => `<button data-a="${a}" onclick="window.__pickAv('${a}')" class="${a===avatar?'sel':''}">${a}</button>`).join("")}
       </div>
