@@ -4052,10 +4052,9 @@ QN80,REDACTED</pre>
       const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
       const branches = it.branches || [];
       const branchesHtml = branches.map((b, j) => `
-        <div style="display:grid; grid-template-columns:auto 1fr auto auto; gap:6px; align-items:center; padding:8px; background:white; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:6px;">
-          <input type="color" value="${b.color || '#3b82f6'}" oninput="(function(){ session.modules['mindmap'].items[${i}].branches[${j}].color = this.value; })()" onchange="sp_session.modules['mindmap'].items[${i}].branches[${j}].color = this.value; sp_renderPreview(); _autosave();" style="width:32px; height:28px; padding:0; border:none; cursor:pointer;">
+        <div style="display:grid; grid-template-columns:auto 1fr auto; gap:6px; align-items:center; padding:8px; background:white; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:6px;">
+          <input type="color" value="${b.color || '#3b82f6'}" onchange="sp_session.modules['mindmap'].items[${i}].branches[${j}].color = this.value; sp_renderPreview(); _autosave();" style="width:32px; height:28px; padding:0; border:none; cursor:pointer;">
           <input type="text" value="${esc(b.label||'')}" placeholder="Nom de la branche" oninput="sp_session.modules['mindmap'].items[${i}].branches[${j}].label = this.value; _autosave();" style="padding:6px; border-radius:4px; border:1px solid #cbd5e1;">
-          <input type="text" value="${esc((b.seeds||[]).join(', '))}" placeholder="Sous-branches d'amorce (optionnel, séparées par virgule)" oninput="sp_session.modules['mindmap'].items[${i}].branches[${j}].seeds = this.value.split(',').map(s=>s.trim()).filter(Boolean); _autosave();" style="padding:6px; border-radius:4px; border:1px solid #cbd5e1; min-width:200px;">
           <button onclick="(function(){ sp_session.modules['mindmap'].items[${i}].branches.splice(${j},1); sp_renderPreview(); _autosave(); })()" style="background:#fee2e2; color:#dc2626; border:none; padding:6px 10px; border-radius:4px; cursor:pointer;">×</button>
         </div>
       `).join("");
@@ -4063,9 +4062,9 @@ QN80,REDACTED</pre>
         <div style="font-weight:bold; color:#db2777; font-size:0.8rem;">🧠 Carte mentale ${i+1}</div>
         <label style="font-size:0.75rem; color:#475569; margin-top:6px; display:block;">Concept central (s'affiche au centre)</label>
         ${inp(it.center, 'center')}
-        <label style="font-size:0.75rem; color:#475569; margin-top:10px; display:block;">Branches principales (4 à 8 conseillées)</label>
+        <label style="font-size:0.75rem; color:#475569; margin-top:10px; display:block;">Branches principales (4 à 8 conseillées) — les élèves enrichissent autour</label>
         <div style="margin-top:6px;">${branchesHtml}</div>
-        <button onclick="(function(){ const list = sp_session.modules['mindmap'].items[${i}].branches; const c=['${COLORS.join("','")}'][list.length % 8]; list.push({label:'Nouvelle branche', color:c, seeds:[]}); sp_renderPreview(); _autosave(); })()" style="background:#f1f5f9; border:1px dashed #cbd5e1; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; margin-top:6px;">+ Ajouter une branche</button>
+        <button onclick="(function(){ const list = sp_session.modules['mindmap'].items[${i}].branches; const c=['${COLORS.join("','")}'][list.length % 8]; list.push({label:'Nouvelle branche', color:c}); sp_renderPreview(); _autosave(); })()" style="background:#f1f5f9; border:1px dashed #cbd5e1; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; margin-top:6px;">+ Ajouter une branche</button>
         ${del}
       </div>`;
     }
@@ -4139,7 +4138,7 @@ QN80,REDACTED</pre>
     if (aiMods.find(m=>m.id==="nuage"))    blocks.push(`- "nuage" : 2 amorces "en 1 mot". Format : { "prompt": "En un mot, …" }`);
     if (aiMods.find(m=>m.id==="thermo"))   blocks.push(`- "thermo" : 4 situations à charger émotionnellement, adaptées au public. Format : { "situation": "Quand …, mon [émotion] est à...", "emotion": "agacement|tristesse|peur|joie|honte|fierté", "guidance": "ce que ces résultats peuvent apporter (1 phrase)" }`);
     if (aiMods.find(m=>m.id==="empathie")) blocks.push(`- "empathie" : 4 phrases déclencheuses (style oral, situation conflictuelle adaptée au public). Format : { "trigger": "phrase entendue", "context": "qui parle à qui (1 phrase)", "model": "reformulation empathique modèle (selon référentiel CPS S1.2 — accueil, reflet, validation, sans solution imposée)" }`);
-    if (aiMods.find(m=>m.id==="mindmap")) blocks.push(`- "mindmap" : 1 carte mentale de récapitulatif du cours. Format : { "center": "concept central (max 4 mots)", "branches": [ 4 à 6 objets : { "label": "thème principal (max 3 mots)", "color": "code hex parmi #3b82f6, #10b981, #f59e0b, #ef4444, #8b5cf6, #ec4899", "seeds": [2 à 3 mots/notions clés liés à ce thème, présents dans le cours] } ] }`);
+    if (aiMods.find(m=>m.id==="mindmap")) blocks.push(`- "mindmap" : 1 carte mentale de récapitulatif. Format : { "center": "concept central (max 4 mots)", "branches": [ 4 à 6 objets : { "label": "thème principal (max 3 mots)", "color": "code hex parmi #3b82f6, #10b981, #f59e0b, #ef4444, #8b5cf6, #ec4899" } ] }. PAS de sous-branches : ce sont les élèves qui les ajouteront en direct.`);
 
     return `Tu es un expert en animation de sessions interactives en lycée pro (PSE). Génère le contenu d'une activité à partir du document ci-dessous.
 
