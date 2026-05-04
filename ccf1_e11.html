@@ -1796,7 +1796,7 @@ function initEvalButtons() {
   });
 }
 
-// Set indicator value — visual aid only, does NOT auto-calculate note
+// Set indicator value — recalculates the phase note from indicators only
 function setIndicator(phase, ind, val, group) {
   if (!currentStudent) return;
   var data = getStudentData(currentClass, currentStudent);
@@ -1806,6 +1806,7 @@ function setIndicator(phase, ind, val, group) {
     data.indicators[phase][ind] = val;
   }
   updateEvalButtons(group, data.indicators[phase][ind]);
+  recomputePhaseNoteFromIndicators(phase);
   saveData();
 }
 
@@ -1815,6 +1816,32 @@ function updateEvalButtons(group, selectedVal) {
     btn.className = 'eval-btn';
     if (v === selectedVal) btn.classList.add('sel-' + v);
   });
+}
+
+function recomputePhaseNoteFromIndicators(phase) {
+  if (!currentStudent) return;
+  var data = getStudentData(currentClass, currentStudent);
+  var indicators = data.indicators[phase] || [];
+  var selected = indicators.filter(function(v) {
+    return v !== null && v !== undefined;
+  });
+  var input = document.getElementById('notePhase' + phase);
+  if (!input) return;
+
+  if (selected.length === 0) {
+    input.value = '';
+    data.notes[phase] = null;
+  } else {
+    var max = PHASE_MAX[phase - 1];
+    var sum = selected.reduce(function(total, v) { return total + v; }, 0);
+    var averageLevel = sum / selected.length;
+    var note = (averageLevel / 3) * max;
+    note = clampNote(note, max);
+    input.value = note !== null ? note.toFixed(1) : '';
+    data.notes[phase] = note;
+  }
+
+  updateTotal(data);
 }
 
 // ============= NOTE INPUT HANDLING =============
