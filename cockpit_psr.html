@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🍱 Cockpit PSR Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, #f8fafc, #eef2ff);
+    color: #1f2937; min-height: 100vh;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  header.top {
+    display: flex; justify-content: space-between; align-items: center;
+    background: white; padding: 16px 24px; border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05); margin-bottom: 20px;
+  }
+  header.top h1 { margin: 0; font-size: 22px; }
+  header.top .sub { color: #6b7280; font-size: 13px; margin-top: 2px; }
+  header.top a.back { color: #4f46e5; text-decoration: none; font-weight: 600; }
+
+  /* LOGIN */
+  #login-overlay {
+    position: fixed; inset: 0; background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .login-card {
+    background: white; padding: 40px; border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.3); width: 360px; text-align: center;
+  }
+  .login-card h2 { margin: 0 0 8px; }
+  .login-card input {
+    width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px;
+    font-size: 16px; margin: 14px 0; text-transform: uppercase; letter-spacing: 2px;
+  }
+  .login-card button {
+    width: 100%; background: #4f46e5; color: white; border: 0; padding: 12px;
+    border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 15px;
+  }
+  .login-card .err { color: #dc2626; font-size: 13px; height: 18px; }
+
+  /* FILTRES */
+  .filtres {
+    background: white; padding: 16px; border-radius: 14px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  }
+  .filtres label { font-size: 12px; font-weight: 600; color: #6b7280; display: block; margin-bottom: 4px; }
+  .filtres select, .filtres input {
+    width: 100%; padding: 8px 10px; border: 1px solid #e5e7eb;
+    border-radius: 8px; font-size: 14px; font-family: inherit;
+  }
+
+  /* STATS */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .stat-card {
+    background: white; padding: 14px 18px; border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  }
+  .stat-card .label { font-size: 12px; color: #6b7280; }
+  .stat-card .val { font-size: 22px; font-weight: 700; color: #4f46e5; margin-top: 4px; }
+  .stat-card .sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+  /* TABLE */
+  .liste-eleves {
+    background: white; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+  th { background: #f9fafb; font-weight: 600; color: #374151; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  tr:hover td { background: #fafbff; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: #e0e7ff;
+    color: #4f46e5; display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .jalons { font-size: 16px; letter-spacing: 4px; }
+  .progress {
+    display: inline-block; width: 100px; height: 8px; background: #e5e7eb;
+    border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 6px;
+  }
+  .progress > div { height: 100%; background: #4f46e5; }
+  .badge {
+    display: inline-block; padding: 3px 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+  }
+  .b-exc { background: #dcfce7; color: #166534; }
+  .b-bon { background: #dbeafe; color: #1e40af; }
+  .b-moy { background: #fef3c7; color: #92400e; }
+  .b-fai { background: #fee2e2; color: #991b1b; }
+  .b-na { background: #f3f4f6; color: #6b7280; }
+  .btn {
+    background: #4f46e5; color: white; border: 0; padding: 6px 12px;
+    border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { background: #4338ca; }
+  .btn-sec { background: #f3f4f6; color: #374151; }
+  .btn-sec:hover { background: #e5e7eb; }
+  .btn-sm { padding: 4px 8px; font-size: 11px; }
+
+  /* MODAL */
+  #modal-detail {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-content {
+    background: white; width: 90%; max-width: 900px; max-height: 90vh;
+    border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+  .modal-close {
+    background: none; border: 0; font-size: 24px; cursor: pointer; color: #6b7280;
+  }
+  .eval-card {
+    border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .eval-card h4 { margin: 0 0 4px; font-size: 14px; }
+  .eval-meta { font-size: 11px; color: #6b7280; margin-bottom: 10px; }
+  .eval-edit { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; align-items: start; }
+  .eval-edit label { font-size: 12px; color: #374151; font-weight: 600; padding-top: 6px; }
+  .eval-edit input, .eval-edit textarea {
+    width: 100%; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+  }
+  .eval-edit textarea { min-height: 60px; resize: vertical; }
+  .eval-actions { margin-top: 10px; display: flex; gap: 8px; }
+  .save-ok { color: #166534; font-size: 11px; margin-left: 8px; }
+
+  pre.reponses {
+    background: #f9fafb; padding: 10px; border-radius: 6px; font-size: 11px;
+    max-height: 300px; overflow: auto; margin-top: 8px;
+  }
+  .empty { text-align: center; color: #9ca3af; padding: 40px; }
+  .modif-prof-tag {
+    display: inline-block; background: #fef3c7; color: #92400e;
+    padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-card">
+    <h2>🍱 Cockpit PSR</h2>
+    <p style="color:#6b7280;font-size:13px;margin:0">Espace enseignant</p>
+    <input id="login-code" placeholder="Code prof" autocomplete="off" />
+    <button id="login-btn">Entrer</button>
+    <div class="err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- COCKPIT -->
+<div id="cockpit" style="display:none">
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>🍱 Cockpit PSR Portfolio</h1>
+        <div class="sub">Suivi du Portfolio PSR : chef-d'œuvre + Ma formation PSR</div>
+      </div>
+      <a class="back" href="dashboard.html">← Tableau de bord</a>
+    </header>
+
+    <section class="filtres">
+      <div>
+        <label>Classe</label>
+        <select id="f-classe"></select>
+      </div>
+      <div>
+        <label>Type</label>
+        <select id="f-type">
+          <option value="">Tout</option>
+          <option value="chef_oeuvre">Chef-d'œuvre</option>
+          <option value="formation_psr">Ma formation PSR</option>
+        </select>
+      </div>
+      <div>
+        <label>Module</label>
+        <select id="f-module"><option value="">Tous</option></select>
+      </div>
+      <div>
+        <label>Recherche code</label>
+        <input id="f-search" placeholder="ex: AB12CD" />
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-sec" id="btn-import">📥 Importer JSON</button>
+        <input type="file" id="file-import" accept="application/json" style="display:none" />
+      </div>
+    </section>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="liste-eleves">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Code élève</th>
+            <th>Chef-d'œuvre</th>
+            <th>Formation PSR</th>
+            <th>Moyenne PSR</th>
+            <th>Dernière activité</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tb-eleves"></tbody>
+      </table>
+    </section>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-detail" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div>
+        <h3 id="m-titre" style="margin:0">—</h3>
+        <div id="m-sous" style="font-size:12px;color:#6b7280"></div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('modal-detail').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script src="data_eleves.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, getDocs, collection, collectionGroup, query, where
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+  authDomain: "devoirs-pse.firebaseapp.com",
+  projectId: "devoirs-pse",
+  storageBucket: "devoirs-pse.appspot.com",
+  messagingSenderId: "614730413904",
+  appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const JALONS_CO = ["comprendre", "equilibre", "eco_responsable", "etiquetage"];
+const TOTAL_FORMATION = 21;
+
+let ALL_EVALS = [];     // toutes les évals PSR (objets)
+let BY_ELEVE = new Map(); // eleveCode -> [evals]
+let MODULES = new Set();
+
+// ===== LOGIN =====
+document.getElementById('login-btn').addEventListener('click', tryLogin);
+document.getElementById('login-code').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+function tryLogin() {
+  const code = (document.getElementById('login-code').value || '').trim().toUpperCase();
+  const err = document.getElementById('login-err');
+  if (code !== "PROFPSE") {
+    err.textContent = "Code invalide";
+    return;
+  }
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('cockpit').style.display = 'block';
+  init();
+}
+
+// ===== INIT =====
+async function init() {
+  buildClasseFilter();
+  bindFilters();
+  document.getElementById('btn-import').addEventListener('click', () => document.getElementById('file-import').click());
+  document.getElementById('file-import').addEventListener('change', importJSON);
+
+  await loadAllEvals();
+  buildModuleFilter();
+  render();
+}
+
+function buildClasseFilter() {
+  const sel = document.getElementById('f-classe');
+  const classes = [...new Set(window.BDD_ELEVES.map(e => e.classe))].sort();
+  sel.innerHTML = '<option value="">Toutes les classes</option>' +
+    classes.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function buildModuleFilter() {
+  const sel = document.getElementById('f-module');
+  const mods = [...MODULES].sort();
+  sel.innerHTML = '<option value="">Tous</option>' +
+    mods.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function bindFilters() {
+  ['f-classe', 'f-type', 'f-module', 'f-search'].forEach(id => {
+    document.getElementById(id).addEventListener('input', render);
+    document.getElementById(id).addEventListener('change', render);
+  });
+}
+
+// ===== LOAD =====
+async function loadAllEvals() {
+  try {
+    const q = query(collectionGroup(db, "evaluations"), where("source", "==", "psr_portfolio"));
+    const snap = await getDocs(q);
+    ALL_EVALS = [];
+    BY_ELEVE = new Map();
+    MODULES = new Set();
+    snap.forEach(d => {
+      const data = d.data();
+      data._docId = d.id;
+      data._path = d.ref.path;
+      // eleveCode peut être manquant — fallback via path
+      if (!data.eleveCode) {
+        const m = d.ref.path.match(/^resultats\/([^/]+)\//);
+        if (m) data.eleveCode = m[1];
+      }
+      ALL_EVALS.push(data);
+      if (data.module_id) MODULES.add(data.module_id);
+      if (!BY_ELEVE.has(data.eleveCode)) BY_ELEVE.set(data.eleveCode, []);
+      BY_ELEVE.get(data.eleveCode).push(data);
+    });
+  } catch (e) {
+    console.error("Chargement Firestore impossible :", e);
+    alert("Impossible de charger les données Firestore. Vérifie ta connexion / les règles Firestore.");
+  }
+}
+
+// ===== FILTERING =====
+function getFilteredEvals() {
+  const cl = document.getElementById('f-classe').value;
+  const tp = document.getElementById('f-type').value;
+  const md = document.getElementById('f-module').value;
+  const s = (document.getElementById('f-search').value || '').toUpperCase().trim();
+
+  const codesClasse = cl ? new Set(window.BDD_ELEVES.filter(e => e.classe === cl).map(e => e.userCode)) : null;
+
+  return ALL_EVALS.filter(ev => {
+    if (codesClasse && !codesClasse.has(ev.eleveCode)) return false;
+    if (tp && ev.type !== tp) return false;
+    if (md && ev.module_id !== md) return false;
+    if (s && !(ev.eleveCode || '').toUpperCase().includes(s)) return false;
+    return true;
+  });
+}
+
+function getFilteredEleves() {
+  const cl = document.getElementById('f-classe').value;
+  const s = (document.getElementById('f-search').value || '').toUpperCase().trim();
+  let list = window.BDD_ELEVES.filter(e => e.userCode !== "PROFPSE");
+  if (cl) list = list.filter(e => e.classe === cl);
+  if (s) list = list.filter(e => e.userCode.toUpperCase().includes(s));
+  return list;
+}
+
+// ===== AGGREGATION =====
+function aggregateEleve(eleveCode) {
+  const evals = (BY_ELEVE.get(eleveCode) || []);
+  const co = evals.filter(e => e.type === "chef_oeuvre");
+  const fo = evals.filter(e => e.type === "formation_psr");
+
+  const jalons = {};
+  JALONS_CO.forEach(j => {
+    const ev = co.find(e => (e.module_id || "").includes(j) || (e.devoirId || "").includes(j));
+    if (!ev) jalons[j] = "❌";
+    else if (ev.note_finale != null) jalons[j] = "✅";
+    else jalons[j] = "⏳";
+  });
+
+  const foNotes = fo.map(e => Number(e.note_finale)).filter(n => !isNaN(n));
+  const foMoy = foNotes.length ? foNotes.reduce((a, b) => a + b, 0) / foNotes.length : null;
+
+  const allNotes = evals.map(e => Number(e.note_finale)).filter(n => !isNaN(n));
+  const moy = allNotes.length ? allNotes.reduce((a, b) => a + b, 0) / allNotes.length : null;
+
+  const dates = evals.map(e => e.updatedAtISO || e.createdAtISO).filter(Boolean).sort();
+  const last = dates.length ? dates[dates.length - 1] : null;
+
+  return {
+    nbEvals: evals.length,
+    jalons,
+    foCount: fo.length,
+    foMoy,
+    moy,
+    last
+  };
+}
+
+function badge(note) {
+  if (note == null || isNaN(note)) return '<span class="badge b-na">—</span>';
+  let cls = 'b-fai';
+  if (note >= 16) cls = 'b-exc';
+  else if (note >= 12) cls = 'b-bon';
+  else if (note >= 8) cls = 'b-moy';
+  return `<span class="badge ${cls}">${note.toFixed(1)}/20</span>`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '<span style="color:#9ca3af">—</span>';
+  try { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }); }
+  catch { return iso; }
+}
+
+// ===== RENDER =====
+function render() {
+  renderStats();
+  renderTable();
+}
+
+function renderStats() {
+  const evs = getFilteredEvals();
+  const eleves = getFilteredEleves();
+  const elevesActifs = new Set(evs.map(e => e.eleveCode));
+
+  const notes = evs.map(e => Number(e.note_finale)).filter(n => !isNaN(n));
+  const moy = notes.length ? (notes.reduce((a, b) => a + b, 0) / notes.length) : null;
+
+  // top 5 actifs
+  const counts = {};
+  evs.forEach(e => { counts[e.eleveCode] = (counts[e.eleveCode] || 0) + 1; });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // modules
+  const modCounts = {};
+  evs.forEach(e => { if (e.module_id) modCounts[e.module_id] = (modCounts[e.module_id] || 0) + 1; });
+  const modSorted = Object.entries(modCounts).sort((a, b) => b[1] - a[1]);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="label">Évaluations</div><div class="val">${evs.length}</div><div class="sub">${elevesActifs.size} élèves actifs / ${eleves.length}</div></div>
+    <div class="stat-card"><div class="label">Moyenne classe</div><div class="val">${moy != null ? moy.toFixed(1) + '/20' : '—'}</div><div class="sub">sur les notes saisies</div></div>
+    <div class="stat-card"><div class="label">Top 5 actifs</div><div class="val" style="font-size:13px;line-height:1.5">${top.map(([c, n]) => `${c} <span style="color:#6b7280">(${n})</span>`).join('<br>') || '—'}</div></div>
+    <div class="stat-card"><div class="label">Module +/− traité</div><div class="val" style="font-size:13px;line-height:1.5">${modSorted.length ? `+ ${modSorted[0][0]} (${modSorted[0][1]})<br>− ${modSorted[modSorted.length - 1][0]} (${modSorted[modSorted.length - 1][1]})` : '—'}</div></div>
+  `;
+}
+
+function renderTable() {
+  const eleves = getFilteredEleves();
+  const tb = document.getElementById('tb-eleves');
+  if (!eleves.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Aucun élève</td></tr>'; return; }
+  tb.innerHTML = eleves.map(e => {
+    const a = aggregateEleve(e.userCode);
+    const jal = JALONS_CO.map(j => a.jalons[j]).join(' ');
+    const pct = Math.round((a.foCount / TOTAL_FORMATION) * 100);
+    return `
+      <tr>
+        <td><div class="avatar">${e.userCode.slice(0, 2)}</div></td>
+        <td><strong>${e.userCode}</strong><br><span style="font-size:11px;color:#6b7280">${e.classe}</span></td>
+        <td><span class="jalons">${jal}</span></td>
+        <td>
+          <div><span class="progress"><div style="width:${pct}%"></div></span> ${a.foCount}/${TOTAL_FORMATION}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px">moy. ${a.foMoy != null ? a.foMoy.toFixed(1) : '—'}</div>
+        </td>
+        <td>${badge(a.moy)}</td>
+        <td style="font-size:12px;color:#6b7280">${fmtDate(a.last)}</td>
+        <td><button class="btn btn-sm" data-eleve="${e.userCode}" onclick="window._openDetail('${e.userCode}')">👁️ Détail</button></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ===== DETAIL MODAL =====
+window._openDetail = function (eleveCode) {
+  const eleve = window.BDD_ELEVES.find(e => e.userCode === eleveCode);
+  const evals = (BY_ELEVE.get(eleveCode) || []).slice().sort((a, b) => {
+    return (b.updatedAtISO || b.createdAtISO || '').localeCompare(a.updatedAtISO || a.createdAtISO || '');
+  });
+  document.getElementById('m-titre').textContent = `${eleveCode} — ${eleve ? eleve.classe : ''}`;
+  document.getElementById('m-sous').textContent = `${evals.length} évaluation(s) PSR`;
+
+  const body = document.getElementById('m-body');
+  if (!evals.length) {
+    body.innerHTML = '<div class="empty">Aucune évaluation PSR pour cet élève.</div>';
+  } else {
+    body.innerHTML = evals.map((ev, i) => renderEvalCard(ev, i)).join('');
+    evals.forEach((ev, i) => bindEvalCard(ev, i));
+  }
+  document.getElementById('modal-detail').style.display = 'flex';
+};
+
+function renderEvalCard(ev, i) {
+  const note = ev.note_finale != null ? ev.note_finale : '';
+  const app = ev.appreciation || '';
+  const modifTag = ev.modifie_par_prof ? '<span class="modif-prof-tag">✏️ modifié par prof</span>' : '';
+  return `
+    <div class="eval-card" id="ev-${i}">
+      <h4>${ev.titre || ev.devoirId || '(sans titre)'} ${modifTag}</h4>
+      <div class="eval-meta">
+        Type : <strong>${ev.type || '—'}</strong> · Module : <strong>${ev.module_id || '—'}</strong> ·
+        ${badge(Number(ev.note_finale))} · ${fmtDate(ev.updatedAtISO || ev.createdAtISO)}
+      </div>
+      <div class="eval-edit">
+        <label>Note /20</label>
+        <input type="number" min="0" max="20" step="0.5" id="ev-${i}-note" value="${note}" />
+        <label>Appréciation</label>
+        <textarea id="ev-${i}-app">${escapeHtml(app)}</textarea>
+      </div>
+      <div class="eval-actions">
+        <button class="btn btn-sm" id="ev-${i}-save">💾 Enregistrer</button>
+        <button class="btn btn-sm btn-sec" id="ev-${i}-toggle">👁️ Voir réponses</button>
+        <span class="save-ok" id="ev-${i}-ok"></span>
+      </div>
+      <pre class="reponses" id="ev-${i}-rep" style="display:none">${escapeHtml(JSON.stringify(ev.reponses || {}, null, 2))}</pre>
+    </div>
+  `;
+}
+
+function bindEvalCard(ev, i) {
+  document.getElementById(`ev-${i}-save`).addEventListener('click', () => saveEval(ev, i));
+  document.getElementById(`ev-${i}-toggle`).addEventListener('click', () => {
+    const r = document.getElementById(`ev-${i}-rep`);
+    r.style.display = r.style.display === 'none' ? 'block' : 'none';
+  });
+}
+
+async function saveEval(ev, i) {
+  const note = parseFloat(document.getElementById(`ev-${i}-note`).value);
+  const app = document.getElementById(`ev-${i}-app`).value;
+  const ok = document.getElementById(`ev-${i}-ok`);
+  ok.textContent = '⏳ enregistrement...';
+  try {
+    const ref = doc(db, "resultats", ev.eleveCode, "evaluations", ev.devoirId || ev._docId);
+    const nowIso = new Date().toISOString();
+    await setDoc(ref, {
+      note_finale: isNaN(note) ? null : note,
+      appreciation: app,
+      modifie_par_prof: true,
+      modifie_le: nowIso,
+      updatedAtISO: nowIso,
+      publie: true
+    }, { merge: true });
+    ev.note_finale = isNaN(note) ? null : note;
+    ev.appreciation = app;
+    ev.modifie_par_prof = true;
+    ev.updatedAtISO = nowIso;
+    ok.textContent = '✅ enregistré';
+    render(); // refresh table
+    setTimeout(() => { ok.textContent = ''; }, 2500);
+  } catch (e) {
+    console.error(e);
+    ok.textContent = '❌ erreur';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+// ===== IMPORT JSON =====
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const body = document.getElementById('m-body');
+      document.getElementById('m-titre').textContent = `📥 Import JSON — ${file.name}`;
+      document.getElementById('m-sous').textContent = `Lecture seule`;
+      body.innerHTML = `<pre class="reponses" style="display:block;max-height:600px">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+      document.getElementById('modal-detail').style.display = 'flex';
+    } catch (err) {
+      alert("JSON invalide : " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+</script>
+</body>
+</html>
