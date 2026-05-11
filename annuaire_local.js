@@ -11,8 +11,8 @@
  *   <script src="annuaire_local.js"></script>
  * 
  * API :
- *   AnnuaireLocal.getNom(code)        → "REDACTED" ou null
- *   AnnuaireLocal.getAll()            → { KA47: "REDACTED", ... }
+ *   AnnuaireLocal.getNom(code)        → "Jean DUPONT" ou null
+ *   AnnuaireLocal.getAll()            → { EX01: "Jean DUPONT", ... }
  *   AnnuaireLocal.isLoaded()          → true/false
  *   AnnuaireLocal.count()             → nombre d'élèves chargés
  *   AnnuaireLocal.clear()             → supprime l'annuaire du navigateur

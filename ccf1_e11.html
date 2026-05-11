@@ -835,6 +835,7 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
   <div class="theme-choice" id="headerThemeChoice">Th&egrave;me choisi par l'&eacute;quipe p&eacute;dagogique</div>
   <div class="regulatory">Grille locale d'&eacute;valuation — conforme &agrave; la NS DGER/SDPFE/2025-605</div>
   <button class="settings-gear no-print" onclick="toggleSettings()" title="Param&egrave;tres">&#9881;</button>
+  <div id="annuaire-slot" class="no-print" style="position:absolute;top:12px;right:60px;"></div>
 </div>
 
 <!-- SETTINGS PANEL -->
@@ -1328,6 +1329,9 @@ textarea:focus { border-color: var(--primary-light); outline: none; }
   S&eacute;lectionnez un &eacute;l&egrave;ve pour commencer l'&eacute;valuation.
 </div>
 
+<!-- Annuaire local (RGPD) : resout les codes pseudonymes en noms reels via localStorage -->
+<script src="annuaire_local.js"></script>
+
 <script>
 // ============= UTILITY: HTML ESCAPING =============
 // Escape user-provided strings before injecting into HTML
@@ -1382,17 +1386,49 @@ function storageSet(key, value) {
 }
 
 // ============= DATA =============
+// RGPD : on stocke des CODES pseudonymes. Les noms reels sont resolus
+// via AnnuaireLocal (annuaire_local.js) au moment de l'affichage.
 var DEFAULT_CLASSES = {
-  C2JP: [
-    "REDACTED","REDACTED","REDACTED","REDACTED",
-    "REDACTED","REDACTED","REDACTED",
-    "SEREKOISSE REDACTED","REDACTED","REDACTED"
-  ],
-  C2HORT: [
-    "REDACTED","REDACTED","REDACTED",
-    "REDACTED","REDACTED Leo","REDACTED","REDACTED"
-  ]
+  C2JP: ["WM83","ZF05","LC66","QJ19","AP74","SV92","TK38","HX11","GX61","RD27"],
+  C2HORT: ["NE55","XQ03","HM79","VZ24","CP68","SJ91","FT12"]
 };
+
+// Migration legacy noms -> codes : la table de correspondance n'est PAS
+// stockee en dur (RGPD). Elle est construite dynamiquement depuis
+// l'annuaire local charge par l'utilisateur (AnnuaireLocal.getAll()).
+// Tant que l'annuaire n'est pas charge, la migration ne fait rien :
+// elle sera retentee a l'evenement 'annuaire-updated'.
+function normName(s) {
+  return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+}
+function reverseWords(s) {
+  var parts = (s||"").toString().trim().split(/\s+/);
+  if (parts.length < 2) return s;
+  return [parts[parts.length-1]].concat(parts.slice(0, parts.length-1)).join(" ");
+}
+// Construit le mapping {normName(legacy): code} a partir de l'annuaire local.
+function buildLegacyNameToCode() {
+  var map = {};
+  if (typeof AnnuaireLocal === 'undefined' || !AnnuaireLocal || !AnnuaireLocal.isLoaded || !AnnuaireLocal.isLoaded()) {
+    return map;
+  }
+  var all = AnnuaireLocal.getAll() || {};
+  Object.keys(all).forEach(function(code) {
+    var fullName = all[code];
+    if (!fullName) return;
+    map[normName(fullName)] = code;
+    map[normName(reverseWords(fullName))] = code;
+  });
+  return map;
+}
+
+// Resout un identifiant (code) en libelle d'affichage via l'annuaire local.
+function displayName(code) {
+  if (typeof AnnuaireLocal !== 'undefined' && AnnuaireLocal && typeof AnnuaireLocal.resolveDisplay === 'function') {
+    return AnnuaireLocal.resolveDisplay(code);
+  }
+  return code;
+}
 
 var CLASSES = JSON.parse(JSON.stringify(DEFAULT_CLASSES));
 
@@ -1425,12 +1461,136 @@ var timerRunning = false;
 
 // ============= INIT =============
 function init() {
+  migrateLegacyNamesToCodes();
   loadSettings();
   loadClassesFromStorage();
   loadFromStorage();
   renderStudents();
   initEvalButtons();
   applySettings();
+
+  // Bouton Annuaire local (RGPD)
+  var slot = document.getElementById('annuaire-slot');
+  if (slot && typeof AnnuaireLocal !== 'undefined') {
+    AnnuaireLocal.renderButton(slot);
+  }
+
+  // Rafraichir l'UI quand l'annuaire est charge / efface
+  document.addEventListener('annuaire-updated', function() {
+    renderStudents();
+    if (currentStudent) {
+      var data = getStudentData(currentClass, currentStudent);
+      document.getElementById('evalStudentName').textContent = displayName(data.name);
+    }
+    // Une fois l'annuaire charge, on peut tenter la migration legacy.
+    migrateLegacyNamesToCodes();
+  });
+}
+
+// ============= MIGRATION LEGACY (noms -> codes) =============
+// Si le localStorage contient des entrees indexees par nom complet
+// (ex: "<CLASSE>::<NOM Prenom>"), on les migre vers le code (ex: "<CLASSE>::<CODE>").
+function migrateLegacyNamesToCodes() {
+  try {
+    var BACKUP_KEY = STORAGE_KEY_CLASSES + '_backup_AVANT_MIGRATION';
+    var DATA_BACKUP_KEY = STORAGE_KEY_DATA + '_backup_AVANT_MIGRATION';
+    var MIGRATED_FLAG = 'ccf1_e11_v2_migrated_to_codes';
+
+    if (localStorage.getItem(MIGRATED_FLAG) === '1') return;
+
+    // RGPD : aucun nom en dur. La migration ne peut avoir lieu que si
+    // l'utilisateur a charge son annuaire local.
+    if (typeof AnnuaireLocal === 'undefined' || !AnnuaireLocal || !AnnuaireLocal.isLoaded || !AnnuaireLocal.isLoaded()) {
+      return;
+    }
+    var nameToCode = buildLegacyNameToCode();
+    var lookup = function(n) { return nameToCode[normName(n)]; };
+
+    var rawClasses = localStorage.getItem(STORAGE_KEY_CLASSES);
+    var rawData = localStorage.getItem(STORAGE_KEY_DATA);
+
+    var needsMigration = false;
+    var parsedClasses = null;
+    if (rawClasses) {
+      try { parsedClasses = JSON.parse(rawClasses); } catch(e) { parsedClasses = null; }
+      if (parsedClasses) {
+        Object.keys(parsedClasses).forEach(function(cls) {
+          (parsedClasses[cls] || []).forEach(function(n) {
+            if (lookup(n)) needsMigration = true;
+          });
+        });
+      }
+    }
+    if (rawData) {
+      try {
+        var parsed = JSON.parse(rawData);
+        var d = parsed && parsed._version ? (parsed.data || {}) : parsed;
+        Object.keys(d || {}).forEach(function(k) {
+          var parts = k.split('::');
+          if (parts.length === 2 && lookup(parts[1])) needsMigration = true;
+          if (d[k] && d[k].name && lookup(d[k].name)) needsMigration = true;
+        });
+      } catch(e) {}
+    }
+
+    if (!needsMigration) {
+      localStorage.setItem(MIGRATED_FLAG, '1');
+      return;
+    }
+
+    // Backup brut avant migration
+    if (rawClasses) localStorage.setItem(BACKUP_KEY, rawClasses);
+    if (rawData) localStorage.setItem(DATA_BACKUP_KEY, rawData);
+
+    // Migration CLASSES
+    if (parsedClasses) {
+      var newClasses = {};
+      Object.keys(parsedClasses).forEach(function(cls) {
+        newClasses[cls] = (parsedClasses[cls] || []).map(function(n) {
+          return lookup(n) || n;
+        });
+      });
+      localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(newClasses));
+    }
+
+    // Migration DATA
+    if (rawData) {
+      try {
+        var parsed2 = JSON.parse(rawData);
+        var isWrapped = parsed2 && parsed2._version;
+        var src = isWrapped ? (parsed2.data || {}) : parsed2;
+        var dst = {};
+        Object.keys(src).forEach(function(k) {
+          var entry = src[k];
+          var parts = k.split('::');
+          var newKey = k;
+          if (parts.length === 2) {
+            var cls = parts[0];
+            var nm = parts[1];
+            var code = lookup(nm) || nm;
+            newKey = cls + '::' + code;
+            if (entry && lookup(entry.name)) {
+              entry.name = lookup(entry.name);
+            } else if (entry && !entry.name) {
+              entry.name = code;
+            }
+          }
+          dst[newKey] = entry;
+        });
+        if (isWrapped) {
+          parsed2.data = dst;
+          localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(parsed2));
+        } else {
+          localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dst));
+        }
+      } catch(e) { console.warn('Migration data echec:', e); }
+    }
+
+    localStorage.setItem(MIGRATED_FLAG, '1');
+    console.log('[CCF1 E1.1] Migration noms -> codes effectuee. Backup conserve sous ' + BACKUP_KEY + ' et ' + DATA_BACKUP_KEY);
+  } catch(e) {
+    console.warn('Migration echec:', e);
+  }
 }
 
 // ============= SETTINGS =============
@@ -1596,7 +1756,7 @@ function renderStudents() {
     dot.className = 'dot dot-' + data.status;
     btn.appendChild(dot);
     var nameSpan = document.createElement('span');
-    nameSpan.textContent = name;
+    nameSpan.textContent = displayName(name);
     btn.appendChild(nameSpan);
     btn.onclick = function() { selectStudent(name); };
     item.appendChild(btn);
@@ -1606,7 +1766,7 @@ function renderStudents() {
       delBtn.className = 'delete-student-btn';
       delBtn.type = 'button';
       delBtn.title = 'Supprimer cet élève ajouté';
-      delBtn.setAttribute('aria-label', 'Supprimer ' + name);
+      delBtn.setAttribute('aria-label', 'Supprimer ' + displayName(name));
       delBtn.textContent = '\u00d7';
       delBtn.onclick = function(e) {
         e.stopPropagation();
@@ -1756,12 +1916,12 @@ function deleteAddedStudent(cls, name) {
     (data.sigHG && data.sigHG.trim() !== '')
   );
 
-  var msg = 'Supprimer ' + name + ' de la classe ' + cls + ' ?';
+  var msg = 'Supprimer ' + displayName(name) + ' de la classe ' + cls + ' ?';
   if (hasEvalData) {
     msg += '\n\nAttention : ses notes, observations, appréciations et signatures seront aussi supprimées.';
   }
   if (!confirm(msg)) return;
-  if (hasEvalData && !confirm('Confirmez la suppression définitive de ' + name + '.')) return;
+  if (hasEvalData && !confirm('Confirmez la suppression définitive de ' + displayName(name) + '.')) return;
 
   CLASSES[cls] = CLASSES[cls].filter(function(studentName) {
     return studentName !== name;
@@ -1883,7 +2043,7 @@ function updateTotal(data) {
 
 // ============= LOAD STUDENT EVAL =============
 function loadStudentEval(data) {
-  document.getElementById('evalStudentName').textContent = data.name;
+  document.getElementById('evalStudentName').textContent = displayName(data.name);
   updateStatusBadge(data.status);
   document.getElementById('evalDate').value = data.date || new Date().toISOString().slice(0,10);
 
@@ -2139,8 +2299,9 @@ function resetStudent() {
   if (!currentStudent) return;
   var data = getStudentData(currentClass, currentStudent);
   var name = data.name;
-  if (!confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données de ' + name + ' ? Cette action est irréversible.')) return;
-  if (!confirm('Confirmez la réinitialisation de ' + name + '. Toutes les notes, observations et appréciations seront supprimées.')) return;
+  var disp = displayName(name);
+  if (!confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données de ' + disp + ' ? Cette action est irréversible.')) return;
+  if (!confirm('Confirmez la réinitialisation de ' + disp + '. Toutes les notes, observations et appréciations seront supprimées.')) return;
   // Clear all data
   data.status = 'todo';
   data.indicators = { 1: [null, null, null], 2: [null, null, null, null], 3: [null, null, null], 4: [null, null] };
@@ -2204,7 +2365,7 @@ function generateSummary() {
     template = 'Prestation orale tr\u00e8s insuffisante. Dossier quasi inexistant ou hors sujet. Aucune comp\u00e9tence \u00e9valuable. Accompagnement sp\u00e9cifique n\u00e9cessaire.';
   }
 
-  var summary = data.name + ' obtient ' + total.toFixed(1) + '/20. ' + template;
+  var summary = displayName(data.name) + ' obtient ' + total.toFixed(1) + '/20. ' + template;
 
   document.getElementById('appreciation').value = summary;
   saveData();
@@ -2722,7 +2883,7 @@ function exportWord() {
 '</table>' +
 '<h2 style="text-align:center;margin:6px 0;">GRILLE D\'\u00c9VALUATION E 1.1</h2>' +
 '<table style="width:100%;margin-bottom:4px;">' +
-'<tr><td style="border:none;font-size:8pt;"><b>Candidat(e) :</b> ' + escapeHtml(data.name) + '</td><td style="border:none;font-size:8pt;"><b>Date :</b> ' + escapeHtml(data.date || '') + '</td><td style="border:none;font-size:8pt;"><b>CAPa :</b> Jardinier Paysagiste</td></tr>' +
+'<tr><td style="border:none;font-size:8pt;"><b>Candidat(e) :</b> ' + escapeHtml(displayName(data.name)) + '</td><td style="border:none;font-size:8pt;"><b>Date :</b> ' + escapeHtml(data.date || '') + '</td><td style="border:none;font-size:8pt;"><b>CAPa :</b> Jardinier Paysagiste</td></tr>' +
 '</table>' +
 '<table style="width:100%;">' +
 '<thead>' +
@@ -2880,7 +3041,7 @@ function showClassSummary() {
 
     rows += '<tr' + rowCls + '>';
     rows += '<td class="row-number">' + (idx + 1) + '</td>';
-    rows += '<td>' + escapeHtml(s.name) + '</td>';
+    rows += '<td>' + escapeHtml(displayName(s.name)) + '</td>';
 
     if (s.status === 'absent') {
       rows += '<td colspan="4" style="text-align:center;font-style:italic;">ABI</td>';
@@ -2918,7 +3079,7 @@ function showClassSummary() {
     var pct = (s.total / 20) * 100;
     var col = totalColor(s.total);
     barHtml += '<div class="bar-row">' +
-      '<div class="bar-name">' + escapeHtml(s.name) + '</div>' +
+      '<div class="bar-name">' + escapeHtml(displayName(s.name)) + '</div>' +
       '<div class="bar-track-wrapper">' +
       '<div class="bar-track">' +
       '<div class="bar-fill" style="width:' + pct + '%;background:' + col + ';"></div>' +

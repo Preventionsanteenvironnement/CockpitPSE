@@ -7,7 +7,8 @@
 <script src="./data_appreciation.js"></script>
 <script src="./data_commentaires_competences.js"></script>
 <script src="./data_commentaires_auto.js"></script>
-<script src="./data_classes_eleves.js"></script>
+<script src="./data_eleves.js"></script>
+<script src="./annuaire_local.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
 
@@ -816,6 +817,7 @@
       <input type="file" id="fileStudent" class="hidden" accept=".json,application/json">
       <input type="file" id="fileClass" class="hidden" accept=".json,application/json">
       <input type="file" id="fileSession" class="hidden" accept=".json,application/json">
+      <div id="annuaire-slot" style="display:inline-flex;margin-left:8px;"></div>
     </div>
   </header>
 
@@ -1474,7 +1476,7 @@ const EXAMPLE_MASTER = {
 
 const EXAMPLE_STUDENT = {
   devoirRef:{ titre:"Bac blanc PSE — JO 2024 et prévention", module:"B5" },
-  eleve:{ nom:"REDACTED", prenom:"REDACTED", classe:"B1AGO1", code:"KA47" },
+  eleve:{ nom:"DUPONT", prenom:"Jean", classe:"ExempleClasse", code:"EX01" },
   questions:[
     {
       question:"Q1.1",
@@ -1622,8 +1624,27 @@ function buildStudentKey(item){
   return [data.classe, data.code || 'nocode', data.nom, data.prenom].join('::').toUpperCase();
 }
 
+function getEleves() {
+  const bdd = Array.isArray(window.BDD_ELEVES) ? window.BDD_ELEVES : [];
+  return bdd
+    .filter(e => e.classe !== 'PROF')
+    .map(e => {
+      const code = e.userCode;
+      const fullName = (window.AnnuaireLocal && AnnuaireLocal.getNom(code)) || '';
+      let prenom = '', nom = '';
+      if (fullName) {
+        const parts = fullName.trim().split(/\s+/);
+        const nomParts = parts.filter(p => p === p.toUpperCase() && /[A-ZÀ-Ý]/.test(p));
+        const prenomParts = parts.filter(p => !(p === p.toUpperCase() && /[A-ZÀ-Ý]/.test(p)));
+        nom = nomParts.join(' ') || parts[parts.length-1] || '';
+        prenom = prenomParts.join(' ') || parts.slice(0, -1).join(' ') || '';
+      }
+      return { code, classe: e.classe, prenom, nom };
+    });
+}
+
 function getInitialRoster(){
-  const source = Array.isArray(window.DATA_CLASSES_ELEVES) ? window.DATA_CLASSES_ELEVES : [];
+  const source = getEleves();
   return source.map(normalizeRosterEntry).filter(function(item){
     return item.classe && (item.nom || item.prenom || item.code);
   }).sort(function(a, b){
@@ -4063,6 +4084,18 @@ if(!restoreSessionState()){
   appState.currentClass = getClassList()[0] || '';
   renderAll();
 }
+
+document.addEventListener('DOMContentLoaded', function(){
+  if (window.AnnuaireLocal) {
+    const slot = document.getElementById('annuaire-slot');
+    if (slot) AnnuaireLocal.renderButton(slot);
+  }
+});
+document.addEventListener('annuaire-updated', function(){
+  appState.rosterAll = getInitialRoster();
+  if(!appState.currentClass) appState.currentClass = getClassList()[0] || '';
+  renderAll();
+});
 </script>
 </body>
 </html>

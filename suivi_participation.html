@@ -338,6 +338,7 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
   <button class="btn s" onclick="openCSV()">📂</button>
   <button class="btn pro" onclick="openPronote()">🎓 Pronote</button>
   <button class="btn p" onclick="addStuPrompt()">+ Élève</button>
+  <div id="annuaire-slot" style="display:inline-flex;margin-left:8px;"></div>
 </div>
 
 <!-- ══ DÉFI ══ -->
@@ -480,7 +481,7 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
     <div style="margin:10px 0;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:var(--rs)">
       <div style="font-size:.72rem;font-weight:700;color:var(--wn);margin-bottom:6px">⚡ Chargement rapide</div>
       <button class="mbtn pro" onclick="loadFromCockpit()" style="width:100%;padding:8px;font-size:.82rem">📋 Charger mes classes du Cockpit</button>
-      <div style="font-size:.62rem;color:var(--mu);margin-top:4px">Charge automatiquement tous les élèves depuis data_classes_eleves.js<br>AGO1+AGO2 regroupées, GATL1+GATL2 regroupées</div>
+      <div style="font-size:.62rem;color:var(--mu);margin-top:4px">Charge automatiquement tous les élèves depuis la BDD locale (codes uniquement, noms via Annuaire)<br>AGO1+AGO2 regroupées, GATL1+GATL2 regroupées</div>
     </div>
     <div class="mact">
       <button class="mbtn g" onclick="closeM('mCSV')">Annuler</button>
@@ -519,7 +520,8 @@ main{padding:8px 8px 90px;display:flex;flex-direction:column;gap:7px}
   </div>
 </div>
 
-<script src="data_classes_eleves.js"></script>
+<script src="data_eleves.js"></script>
+<script src="annuaire_local.js"></script>
 <script>
 // ════════════════════════════════
 // CONFIG
@@ -1429,12 +1431,31 @@ function dlCSVTpl(){
 }
 
 // ════════════════════════════════
-// CHARGEMENT COCKPIT (data_classes_eleves.js)
+// CHARGEMENT COCKPIT (BDD_ELEVES + AnnuaireLocal)
 // ════════════════════════════════
+function getEleves() {
+  const bdd = Array.isArray(window.BDD_ELEVES) ? window.BDD_ELEVES : [];
+  return bdd
+    .filter(e => e.classe !== 'PROF')
+    .map(e => {
+      const code = e.userCode;
+      const fullName = (window.AnnuaireLocal && AnnuaireLocal.getNom(code)) || '';
+      let prenom = '', nom = '';
+      if (fullName) {
+        const parts = fullName.trim().split(/\s+/);
+        const nomParts = parts.filter(p => p === p.toUpperCase() && /[A-ZÀ-Ý]/.test(p));
+        const prenomParts = parts.filter(p => !(p === p.toUpperCase() && /[A-ZÀ-Ý]/.test(p)));
+        nom = nomParts.join(' ') || parts[parts.length-1] || '';
+        prenom = prenomParts.join(' ') || parts.slice(0, -1).join(' ') || '';
+      }
+      return { code, classe: e.classe, prenom, nom };
+    });
+}
+
 function loadFromCockpit(){
-  const data = window.DATA_CLASSES_ELEVES;
+  const data = getEleves();
   if(!data || !data.length){
-    alert('Données non trouvées. Vérifiez que data_classes_eleves.js est chargé.');
+    alert('Aucun élève trouvé. Cliquez sur 👤 Annuaire et importez votre fichier annuaire_pse.csv pour afficher les noms (les codes resteront affichés sinon).');
     return;
   }
   // Groupements : AGO1+AGO2 ensemble, GATL1+GATL2 ensemble
@@ -1449,10 +1470,18 @@ function loadFromCockpit(){
     'C1PSR':'C1 PSR','C2PSR':'C2 PSR',
     'C1VAN':'C1 VAN','C2VAN':'C2 VAN'
   };
-  const parsed = data.map(e => ({
-    classe: groupes[e.classe] || e.classe,
-    name: e.prenom + ' ' + e.nom.charAt(0) + '.'
-  }));
+  const parsed = data.map(e => {
+    let name;
+    if (e.prenom || e.nom) {
+      name = (e.prenom + ' ' + (e.nom ? e.nom.charAt(0) + '.' : '')).trim();
+    } else {
+      name = e.code; // Pas d'annuaire chargé : on affiche le code
+    }
+    return {
+      classe: groupes[e.classe] || e.classe,
+      name: name
+    };
+  });
   const newCls = [...new Set(parsed.map(p=>p.classe))].sort();
   // Demander si on remplace ou ajoute
   const repl = confirm('Remplacer les élèves existants ?\n\nOK = Remplacer tout\nAnnuler = Ajouter aux existants');
@@ -1673,6 +1702,16 @@ document.querySelector('.bbar').insertAdjacentHTML('afterbegin',
 );
 
 render();
+
+document.addEventListener('DOMContentLoaded', function(){
+  if (window.AnnuaireLocal) {
+    const slot = document.getElementById('annuaire-slot');
+    if (slot) AnnuaireLocal.renderButton(slot);
+  }
+});
+document.addEventListener('annuaire-updated', function(){
+  render();
+});
 </script>
 </body>
 </html>

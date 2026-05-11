@@ -399,6 +399,7 @@ tr:nth-child(even) td{background:#f8fafc}
       <div class="topbar-sub" id="list-t2">—</div>
     </div>
     <div class="save-ok save-status"><span id="save-t1">—</span></div>
+    <div id="annuaire-slot" style="margin-left:auto"></div>
   </div>
   <button class="btn-back" onclick="go('start')">← Modifier la session</button>
   <div class="list-header">
@@ -511,17 +512,55 @@ tr:nth-child(even) td{background:#f8fafc}
   </div>
 </div>
 
+<!-- Annuaire local (RGPD) : resout les codes pseudonymes en noms reels via localStorage -->
+<script src="annuaire_local.js"></script>
+
 <script>
 // ══════════════════════════════════════════════════════
 // DONNÉES
 // ══════════════════════════════════════════════════════
+// RGPD : on stocke des CODES pseudonymes. Les noms reels sont resolus
+// via AnnuaireLocal (annuaire_local.js) au moment de l'affichage.
 const CLASSES = {
-  C2JP:   ['REDACTED','REDACTED','REDACTED','REDACTED',
-           'REDACTED','REDACTED','REDACTED',
-           'REDACTED','REDACTED','REDACTED'],
-  C2HORT: ['REDACTED','REDACTED','REDACTED',
-           'REDACTED','REDACTED','REDACTED','REDACTED']
+  C2JP:   ['WM83','ZF05','LC66','QJ19','AP74','SV92','TK38','HX11','GX61','RD27'],
+  C2HORT: ['NE55','XQ03','HM79','VZ24','CP68','SJ91','FT12']
 };
+
+// Migration legacy noms -> codes : aucun nom n'est stocke en dur (RGPD).
+// La table de correspondance est construite dynamiquement depuis
+// l'annuaire local charge par l'utilisateur (AnnuaireLocal.getAll()).
+// Tant que l'annuaire n'est pas charge, la migration ne fait rien :
+// elle sera retentee a l'evenement 'annuaire-updated'.
+function normName(s) {
+  return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+}
+function reverseWords(s) {
+  const parts = (s||"").toString().trim().split(/\s+/);
+  if (parts.length < 2) return s;
+  return [parts[parts.length-1]].concat(parts.slice(0, parts.length-1)).join(" ");
+}
+function buildLegacyNameToCode() {
+  const map = {};
+  if (typeof AnnuaireLocal === 'undefined' || !AnnuaireLocal || !AnnuaireLocal.isLoaded || !AnnuaireLocal.isLoaded()) {
+    return map;
+  }
+  const all = AnnuaireLocal.getAll() || {};
+  Object.keys(all).forEach(code => {
+    const fullName = all[code];
+    if (!fullName) return;
+    map[normName(fullName)] = code;
+    map[normName(reverseWords(fullName))] = code;
+  });
+  return map;
+}
+
+// Resout un code en libelle d'affichage via l'annuaire local (RGPD).
+function displayName(code) {
+  if (typeof AnnuaireLocal !== 'undefined' && AnnuaireLocal && typeof AnnuaireLocal.resolveDisplay === 'function') {
+    return AnnuaireLocal.resolveDisplay(code);
+  }
+  return code;
+}
 
 const THEMES = {
   1:{nom:'Prévention',sub:'Adaptation à l\'effort, FC, rythme respiratoire'},
@@ -807,6 +846,84 @@ function load() {
     return;
   }
   migrateOldData();
+  migrateLegacyNamesToCodes();
+}
+
+// ── Migration RGPD : noms complets -> codes pseudonymes ──
+// Reecrit toutes les cles ST.statuts[nom], ST.evals[nom], ST.diffDates[nom]
+// dans chaque session sauvegardee sous S_PREFIX+id.
+function migrateLegacyNamesToCodes() {
+  try {
+    const MIGRATED_FLAG = 'ccf4v3_migrated_to_codes';
+    if (localStorage.getItem(MIGRATED_FLAG) === '1') return;
+
+    // RGPD : aucun nom en dur. Migration uniquement si l'annuaire local
+    // a ete charge par l'utilisateur.
+    if (typeof AnnuaireLocal === 'undefined' || !AnnuaireLocal || !AnnuaireLocal.isLoaded || !AnnuaireLocal.isLoaded()) {
+      return;
+    }
+    const nameToCode = buildLegacyNameToCode();
+    const lookup = (n) => nameToCode[normName(n)];
+
+    const idx = getIndex();
+    const sessionIds = idx.map(s => s.id);
+    // Inclure aussi toute cle S_PREFIX non listee dans l'index
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(S_PREFIX) === 0) {
+        const id = k.substring(S_PREFIX.length);
+        if (sessionIds.indexOf(id) === -1) sessionIds.push(id);
+      }
+    }
+
+    let migratedAny = false;
+
+    sessionIds.forEach(id => {
+      const key = S_PREFIX + id;
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      let s;
+      try { s = JSON.parse(raw); } catch(e) { return; }
+      if (!s || typeof s !== 'object') return;
+
+      // Detection
+      const needs = (obj) => obj && Object.keys(obj).some(k => lookup(k));
+      if (!needs(s.statuts) && !needs(s.evals) && !needs(s.diffDates) && !lookup(s.currentEleve)) {
+        return;
+      }
+
+      // Backup brut
+      const backupKey = key + '_backup_AVANT_MIGRATION';
+      if (!localStorage.getItem(backupKey)) {
+        localStorage.setItem(backupKey, raw);
+      }
+
+      const remap = (obj) => {
+        if (!obj || typeof obj !== 'object') return obj;
+        const out = {};
+        Object.keys(obj).forEach(k => {
+          const newK = lookup(k) || k;
+          out[newK] = obj[k];
+        });
+        return out;
+      };
+      s.statuts = remap(s.statuts || {});
+      s.evals = remap(s.evals || {});
+      s.diffDates = remap(s.diffDates || {});
+      if (s.currentEleve && lookup(s.currentEleve)) {
+        s.currentEleve = lookup(s.currentEleve);
+      }
+      localStorage.setItem(key, JSON.stringify(s));
+      migratedAny = true;
+    });
+
+    localStorage.setItem(MIGRATED_FLAG, '1');
+    if (migratedAny) {
+      console.log('[CCF4] Migration noms -> codes effectuee. Backups conserves sous *_backup_AVANT_MIGRATION');
+    }
+  } catch(e) {
+    console.warn('Migration CCF4 echec:', e);
+  }
 }
 
 // ── Charger une session spécifique ──
@@ -1159,7 +1276,7 @@ function renderList() {
     }
 
     card.innerHTML =
-      '<div style="flex:1"><div class="eleve-nom">'+nom+'</div>'+diffInfo+'</div>'+
+      '<div style="flex:1"><div class="eleve-nom">'+displayName(nom)+'</div>'+diffInfo+'</div>'+
       noteHtml+
       actionBtns+
       '<button class="status-badge '+badgeCls+'" data-nom="'+nom.replace(/"/g,'&quot;')+'" onclick="openPicker(event,this)">'+badgeTxt+' ▾</button>';
@@ -1182,7 +1299,7 @@ let pickerNom = null;
 function openPicker(e, btn) {
   e.stopPropagation();
   pickerNom = btn.getAttribute('data-nom');
-  document.getElementById('picker-nom').textContent = pickerNom;
+  document.getElementById('picker-nom').textContent = displayName(pickerNom);
   const cur = ST.statuts[pickerNom]||'present';
   document.querySelectorAll('.picker-opt').forEach(b => b.classList.toggle('sel', b.dataset.s===cur));
   const dateRow = document.getElementById('picker-date-row');
@@ -1225,9 +1342,9 @@ function closePicker() {
 function openEleve(nom) {
   ST.currentEleve = nom;
   const th = THEMES[ST.theme];
-  document.getElementById('eval-t1').textContent = nom;
+  document.getElementById('eval-t1').textContent = displayName(nom);
   document.getElementById('eval-t2').textContent = 'Thème '+ST.theme+' — '+(th?th.nom:'');
-  document.getElementById('ev-nom').textContent  = nom;
+  document.getElementById('ev-nom').textContent  = displayName(nom);
   document.getElementById('ev-meta').textContent = ST.classe+' • '+ST.date+' • Musculation • Thème '+ST.theme+(th?' — '+th.nom:'');
   buildEvalBody(nom);
   go('eval');
@@ -1441,7 +1558,7 @@ function openFiche(nom) {
 
   let html =
     '<div class="fiche-header">'+
-    '<div><div class="fiche-nom">'+nom+'</div>'+
+    '<div><div class="fiche-nom">'+displayName(nom)+'</div>'+
     '<div class="fiche-meta">'+ST.classe+' • '+ST.date+' • Musculation • Thème '+ST.theme+(th?' — '+th.nom:'')+'</div></div>'+
     '<button class="fiche-close" onclick="closeFiche()">✕</button></div>';
 
@@ -1482,7 +1599,7 @@ function openFiche(nom) {
     // Reset button always shown for evaluated students
     html += '<button class="btn-reset-eleve" onclick="showResetConfirm(this.dataset.nom)" data-nom="'+nom+'">🗑 Réinitialiser cet élève</button>';
     html += '<div class="confirm-reset-box" id="reset-confirm-box">';
-    html += "<div class=\"confirm-reset-msg\">⚠️ Effacer toute l\'évaluation de "+nom+" ? Cette action est irréversible.</div>";
+    html += "<div class=\"confirm-reset-msg\">⚠️ Effacer toute l\'évaluation de "+displayName(nom)+" ? Cette action est irréversible.</div>";
     html += '<div class="confirm-reset-btns">';
     html += '<button class="crb-cancel" onclick="hideResetConfirm()">Annuler</button>';
     html += '<button class="crb-confirm" onclick="doResetEleve(this.dataset.nom)" data-nom="'+nom+'">Confirmer la réinitialisation</button>';
@@ -1562,7 +1679,7 @@ function confirmResetFromList(nom, btn) {
   popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:800;background:white;border:2px solid var(--mm);border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.3);max-width:320px;width:90%';
   popup.innerHTML =
     '<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px">🗑 Réinitialiser</div>'+
-    '<div style="font-size:14px;color:var(--text);margin-bottom:16px">Effacer toute l\'évaluation de <strong>'+nom+'</strong> ? Cette action est irréversible.</div>'+
+    '<div style="font-size:14px;color:var(--text);margin-bottom:16px">Effacer toute l\'évaluation de <strong>'+displayName(nom)+'</strong> ? Cette action est irréversible.</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
     '<button style="padding:12px;border-radius:10px;border:none;background:var(--bg);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--text)" onclick="this.closest(\'.list-reset-popup\').remove()">Annuler</button>'+
     '<button style="padding:12px;border-radius:10px;border:none;background:var(--mm);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" onclick="doResetFromList(\''+nom.replace(/'/g,"\\'")+'\')">Effacer</button>'+
@@ -1580,7 +1697,7 @@ function doResetFromList(nom) {
   delete ST.evals[nom];
   save();
   document.querySelectorAll('.list-reset-popup').forEach(p=>p.remove());
-  showToast('Évaluation de '+nom+' effacée', 'ok');
+  showToast('Évaluation de '+displayName(nom)+' effacée', 'ok');
   renderList();
 }
 
@@ -1606,18 +1723,18 @@ function renderSynthese() {
 
     if(absent){
       const diffInfo = statut==='diff'&&ST.diffDates[nom]?' ('+ST.diffDates[nom]+')':'';
-      rows += '<tr style="opacity:.55"><td><strong>'+nom+'</strong></td>'+
+      rows += '<tr style="opacity:.55"><td><strong>'+displayName(nom)+'</strong></td>'+
         '<td colspan="8"><span class="status-badge '+STATUT_INFO[statut].cls+'">'+STATUT_INFO[statut].lbl+diffInfo+'</span></td></tr>';
       return;
     }
-    if(!ev){ rows += '<tr><td><strong>'+nom+'</strong></td><td colspan="8" style="color:var(--muted);font-style:italic">Non évalué</td></tr>'; return; }
+    if(!ev){ rows += '<tr><td><strong>'+displayName(nom)+'</strong></td><td colspan="8" style="color:var(--muted);font-style:italic">Non évalué</td></tr>'; return; }
 
     const c = ev.criteres;
     const niv = i => c[i].niveau?'<span class="'+NC[c[i].niveau]+'">'+NIV[c[i].niveau]+'</span>':'—';
     const nt  = i => c[i].note!==null?c[i].note:'—';
     const oral = calcOral(ev);
     rows += '<tr style="cursor:pointer" data-nom="'+nom+'" onclick="openFicheFromRow(this)">'+
-      '<td><strong>'+nom+'</strong> <span style="font-size:11px;color:var(--teal)">↗</span></td>'+
+      '<td><strong>'+displayName(nom)+'</strong> <span style="font-size:11px;color:var(--teal)">↗</span></td>'+
       '<td>'+niv(1)+'</td><td class="note-cell">'+nt(1)+'</td>'+
       '<td>'+niv(2)+'</td><td class="note-cell">'+nt(2)+'</td>'+
       '<td>'+niv(3)+'</td><td class="note-cell">'+nt(3)+'</td>'+
@@ -1707,7 +1824,7 @@ function genWord(nom) {
 <h3>Cité scolaire René Pellet – CAPa Horticulteur / Jardinier-Paysagiste<\/h3>
 
 <table class="info-table" style="margin-bottom:14px">
-  <tr><td class="info-lbl">Candidat(e)<\/td><td><strong>${nom}<\/strong><\/td><td class="info-lbl">Classe<\/td><td>${ST.classe}<\/td><\/tr>
+  <tr><td class="info-lbl">Candidat(e)<\/td><td><strong>${displayName(nom)}<\/strong><\/td><td class="info-lbl">Classe<\/td><td>${ST.classe}<\/td><\/tr>
   <tr><td class="info-lbl">Date<\/td><td>${ST.date}<\/td><td class="info-lbl">APSA<\/td><td>Musculation<\/td><\/tr>
   <tr><td class="info-lbl">Thème retenu<\/td><td colspan="3"><strong>Thème ${ST.theme} — ${th?th.nom:''}<\/strong> (${th?th.sub:''})<\/td><\/tr>
   <tr><td class="info-lbl">Enseignant·e Biologie-Éco.<\/td><td>___________________________<\/td><td class="info-lbl">Signature<\/td><td>___________________________<\/td><\/tr>
@@ -1791,6 +1908,28 @@ function genWord(nom) {
 // ══════════════════════════════════════════════════════
 load();
 buildSessionList();
+
+// Bouton Annuaire local (RGPD)
+(function initAnnuaire() {
+  const slot = document.getElementById('annuaire-slot');
+  if (slot && typeof AnnuaireLocal !== 'undefined') {
+    AnnuaireLocal.renderButton(slot);
+  }
+  document.addEventListener('annuaire-updated', function() {
+    try {
+      if (typeof renderList === 'function' && ST && ST.classe) renderList();
+      if (typeof renderSynthese === 'function') renderSynthese();
+      if (ST && ST.currentEleve) {
+        const evNom = document.getElementById('ev-nom');
+        const evT1 = document.getElementById('eval-t1');
+        if (evNom) evNom.textContent = displayName(ST.currentEleve);
+        if (evT1) evT1.textContent = displayName(ST.currentEleve);
+      }
+    } catch(e) {}
+    // Une fois l'annuaire charge, on peut tenter la migration legacy.
+    try { migrateLegacyNamesToCodes(); } catch(e) {}
+  });
+})();
 
 // Alerte si stockage indisponible
 if(!storageAvailable) {

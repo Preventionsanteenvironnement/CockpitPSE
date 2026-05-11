@@ -24,12 +24,11 @@ window.BDD_ELEVES = [
     { userCode: "NE08", classe: "B1AGO1" },
     { userCode: "SA91", classe: "B1AGO1" },
 
-    // B1AGO2 (10 élèves)
+    // B1AGO2 (9 élèves)
     { userCode: "VO35", classe: "B1AGO2" },
     { userCode: "PY64", classe: "B1AGO2" },
     { userCode: "XK19", classe: "B1AGO2" },
     { userCode: "DF82", classe: "B1AGO2" },
-    { userCode: "RT57", classe: "B1AGO2" },
     { userCode: "ML03", classe: "B1AGO2" },
     { userCode: "HG68", classe: "B1AGO2" },
     { userCode: "CP41", classe: "B1AGO2" },
