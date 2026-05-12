@@ -207,10 +207,13 @@
         .hist-info { font-size: 0.8rem; color: #888; }
 
     </style>
+    <script src="data_eleves.js"></script>
+    <script src="annuaire_local.js"></script>
 </head>
 <body>
 
     <div id="sidebar">
+        <div id="annuaire-slot"></div>
         <button class="btn-action btn-open" onclick="window.openScreen()">📺 OUVRIR PROJECTION</button>
 
         <div>
@@ -295,21 +298,36 @@
         const firebaseConfig = { apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI", authDomain: "devoirs-pse.firebaseapp.com", projectId: "devoirs-pse", storageBucket: "devoirs-pse.appspot.com", messagingSenderId: "614730413904", appId: "1:614730413904:web:a5dd478af5de30f6bede55", measurementId: "G-7R9N0JL6GG" };
         const app = initializeApp(firebaseConfig); const db = getFirestore(app);
 
-        const CLASS_DATA = {
-            "Première AGORA": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "Terminale AGORA": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "Aïcha", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "Seconde GATL": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "Anais", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "B1MELEC": ["REDACTED", "REDACTED", "REDACTED", "Kaïs", "REDACTED", "REDACTED", "REDACTED"],
-            "B2MELEC": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "BTMELEC": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "CAN 1": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "HORT 2": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "JP 1": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "JP 2": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "PSR 1": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "PSR 2": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED", "REDACTED"],
-            "VAN": ["REDACTED", "REDACTED", "REDACTED", "REDACTED", "Séfana", "REDACTED", "REDACTED", "Allian", "REDACTED", "REDACTED"]
+        const CLASS_GROUPS = {
+            "Première AGORA":  ["B1AGO1","B1AGO2"],
+            "Terminale AGORA": ["BTAGO1","BTAGO2"],
+            "Seconde GATL":    ["B2GATL1","B2GATL2"],
+            "B1MELEC":         ["B1MELEC"],
+            "B2MELEC":         ["B2MELEC"],
+            "BTMELEC":         ["BTMELEC"],
+            "CAN 1":           ["C1CAN"],
+            "HORT 2":          ["C2HORT"],
+            "JP 1":            ["C1JP"],
+            "JP 2":            ["C2JP"],
+            "PSR 1":           ["C1PSR"],
+            "PSR 2":           ["C2PSR"],
+            "VAN":             ["C1VAN","C2VAN"]
         };
+        function buildClassData() {
+            const bdd = Array.isArray(window.BDD_ELEVES) ? window.BDD_ELEVES : [];
+            const out = {};
+            for (const [label, classes] of Object.entries(CLASS_GROUPS)) {
+                out[label] = bdd.filter(e => classes.includes(e.classe)).map(e => e.userCode);
+            }
+            return out;
+        }
+        const CLASS_DATA = buildClassData();
+        function displayName(code) {
+            if (window.AnnuaireLocal && typeof AnnuaireLocal.resolveDisplay === 'function') {
+                return AnnuaireLocal.resolveDisplay(code);
+            }
+            return code;
+        }
 
         const LOCAL_PLAN_KEY = "classe_plan_local";
         const LOCAL_PLAN_PING_KEY = "classe_plan_local_ping";
@@ -329,7 +347,28 @@
             }
         }
 
+        const LEGACY_PURGE_TOKEN = ["RED","ACT","ED"].join("");
+        function purgeLegacyLocalPlan() {
+            try {
+                const raw = localStorage.getItem(LOCAL_PLAN_KEY);
+                if (raw && raw.indexOf(LEGACY_PURGE_TOKEN) !== -1) {
+                    localStorage.removeItem(LOCAL_PLAN_KEY);
+                    console.log("Plans precedents purges (etaient indexes sur des noms RGPD-incompatibles)");
+                }
+            } catch (e) { /* ignore */ }
+            const hit = (state.students || []).some(n => n === LEGACY_PURGE_TOKEN)
+                || Object.values(state.placements || {}).some(v => v === LEGACY_PURGE_TOKEN);
+            if (hit) {
+                state.students = [];
+                state.placements = {};
+                state.absents = [];
+                state.status = {};
+                console.log("Plans precedents purges (etaient indexes sur des noms RGPD-incompatibles)");
+            }
+        }
+
         window.onload = () => {
+            purgeLegacyLocalPlan();
             const sel = document.getElementById('classSelect');
             Object.keys(CLASS_DATA).forEach(cls => {
                 let opt = document.createElement('option'); opt.value = cls; opt.innerText = cls; sel.appendChild(opt);
@@ -337,6 +376,15 @@
             initStructure(100);
             window.buildGrid();
             window.updateBoardPosition();
+
+            if (window.AnnuaireLocal && typeof AnnuaireLocal.renderButton === 'function') {
+                const slot = document.getElementById('annuaire-slot');
+                if (slot) AnnuaireLocal.renderButton(slot);
+            }
+            document.addEventListener('annuaire-updated', () => {
+                window.buildGrid();
+                renderPools();
+            });
         };
 
         window.openScreen = () => {
@@ -424,7 +472,7 @@
             showNotif("Plan restauré depuis l'historique !", "#3498db");
         }
 
-        // --- SREDACTEDSTIQUES (Profils) ---
+        // --- STATISTIQUES (Profils) ---
         window.showStudentStats = async (name) => {
             const cls = document.getElementById('classSelect').value;
             if(!cls) return;
@@ -510,8 +558,8 @@
                     let stClass = state.status[name] || "";
                     let chip = document.createElement('div');
                     chip.className = `chip ${stClass}`;
-                    chip.innerText = name;
-                    
+                    chip.innerText = displayName(name);
+
                     if(!isArchitectMode) {
                         chip.draggable = true;
                         chip.ondragstart = (e) => { e.dataTransfer.setData("text", name); };
@@ -580,7 +628,7 @@
                     let chip = document.createElement('div');
                     let stClass = state.status[name] || "";
                     chip.className = `chip ${stClass}`;
-                    chip.innerText = name;
+                    chip.innerText = displayName(name);
                     chip.draggable = true;
                     chip.ondragstart = (e) => e.dataTransfer.setData("text", name);
                     chip.ondblclick = () => window.toggleStatus(name);
