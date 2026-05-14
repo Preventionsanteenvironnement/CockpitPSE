@@ -254,8 +254,8 @@ const AnnuaireLocal = (function () {
                 #annuaire-file-input { display: none; }
             </style>
 
-            <button class="annuaire-btn" id="annuaireMainBtn" title="Annuaire local (RGPD)">
-                👤 Annuaire
+            <button class="annuaire-btn" id="annuaireMainBtn" title="Annuaire RGPD local (noms d'eleves stockes uniquement sur cet ordinateur)">
+                🔒 RGPD local
                 <span class="annuaire-count" id="annuaireCount">0</span>
             </button>
 
