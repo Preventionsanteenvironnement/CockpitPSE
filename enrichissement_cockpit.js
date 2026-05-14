@@ -159,7 +159,7 @@ window.rechercherEleve = function(query) {
 };
 
 // ========================================
-// 5. SREDACTEDSTIQUES PAR CLASSE
+// 5. STATISTIQUES PAR CLASSE
 // ========================================
 
 /**

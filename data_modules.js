@@ -199,7 +199,7 @@ window.COMPETENCES_PSE = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// BARÈME DE NOREDACTEDON DU SUIVI
+// BARÈME DE NOTATION DU SUIVI
 // ═══════════════════════════════════════════════════════════════════════
 window.BAREME_SUIVI = {
     travail: {
