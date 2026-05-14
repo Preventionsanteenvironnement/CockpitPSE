@@ -111,7 +111,7 @@
                     note: note,
                     baremeSur: ev.baremeSur || ev.noteSur || 20,
                     mode: ev.mode || "note",
-                    date: toDateISO(ev.date || ev.timestamp || ev.createdAt) || null,
+                    date: toDateISO(ev.dateCorrection || ev.savedAt || ev.date || ev.timestamp || ev.createdAt) || null,
                     statut: ev.statut || null,
                     publie: ev.publie === true,
                     competences: ev.indicateurs || ev.competences || [],
