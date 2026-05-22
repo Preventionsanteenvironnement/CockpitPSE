@@ -4,7 +4,7 @@
    🔒 Il contient uniquement : userCode + classe (pas de données personnelles)
    
    📅 Mise à jour : 28 janvier 2026
-   👥 Total : 150 élèves
+   👥 Total : 151 élèves
    
    ⚠️ PAS DE REGROUPEMENT : chaque classe est indépendante
       BTAGO1 ≠ BTAGO2 (pas de "BTAGO groupé")
@@ -24,11 +24,12 @@ window.BDD_ELEVES = [
     { userCode: "NE08", classe: "B1AGO1" },
     { userCode: "SA91", classe: "B1AGO1" },
 
-    // B1AGO2 (9 élèves)
+    // B1AGO2 (10 élèves)
     { userCode: "VO35", classe: "B1AGO2" },
     { userCode: "PY64", classe: "B1AGO2" },
     { userCode: "XK19", classe: "B1AGO2" },
     { userCode: "DF82", classe: "B1AGO2" },
+    { userCode: "RT57", classe: "B1AGO2" },
     { userCode: "ML03", classe: "B1AGO2" },
     { userCode: "HG68", classe: "B1AGO2" },
     { userCode: "CP41", classe: "B1AGO2" },

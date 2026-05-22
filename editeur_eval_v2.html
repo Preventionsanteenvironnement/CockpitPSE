@@ -1120,7 +1120,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 </script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
@@ -1856,8 +1856,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
     // === LOAD EVAL LIST (real-time) ===
     let pendingLoadId = new URLSearchParams(window.location.search).get('id');
+    let evalSnapshotLoaded = false;
     const qBanque = query(collection(db, "eval_banque_v2"), orderBy("updatedAt", "desc"));
+    document.getElementById('eval-list').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:16px;font-size:0.85rem;">Chargement des evaluations...</div>';
     onSnapshot(qBanque, (snap) => {
+        evalSnapshotLoaded = true;
         firestoreV2PermissionDenied = false;
         allEvals = [];
         snap.forEach(d => {
@@ -1872,7 +1875,31 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
     }, (e) => {
         handleV2PermissionDenied('onSnapshot', e);
+        renderEvalLoadError(e);
     });
+
+    setTimeout(async function() {
+        if (evalSnapshotLoaded || allEvals.length > 0) return;
+        try {
+            const snap = await getDocs(qBanque);
+            evalSnapshotLoaded = true;
+            firestoreV2PermissionDenied = false;
+            allEvals = [];
+            snap.forEach(d => {
+                allEvals.push({ id: d.id, ...d.data() });
+            });
+            renderEvalList();
+        } catch(e) {
+            if (!handleV2PermissionDenied('fallback getDocs', e)) renderEvalLoadError(e);
+        }
+    }, 6000);
+
+    function renderEvalLoadError(e) {
+        const container = document.getElementById('eval-list');
+        if (!container || allEvals.length > 0) return;
+        const message = escHtml((e && e.message) || 'Chargement impossible.');
+        container.innerHTML = '<div style="text-align:center;color:#ef4444;padding:16px;font-size:0.85rem;">Impossible de charger les evaluations.<br><span style="color:#94a3b8;">' + message + '</span></div>';
+    }
 
     function renderEvalList() {
         const container = document.getElementById('eval-list');
@@ -1899,8 +1926,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const classIds = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
             const classInfo = classIds.length > 0 ? classIds.join(', ') : 'Toutes';
 
-            div.innerHTML = '<div class="ei-title">' + (ev.titre || 'Sans titre') + '</div>' +
-                '<div class="ei-meta">' + pubBadge + pastilleBadge + qCountBadge + baremeBadge + ' ' + classInfo + '</div>' +
+            div.innerHTML = '<div class="ei-title">' + escHtml(ev.titre || 'Sans titre') + '</div>' +
+                '<div class="ei-meta">' + pubBadge + pastilleBadge + qCountBadge + baremeBadge + ' ' + escHtml(classInfo) + '</div>' +
                 '<button class="ei-del" style="right:32px;" onclick="duplicateEval(\'' + ev.id + '\', event)" title="Dupliquer">📋</button>' +
                 '<button class="ei-del" onclick="deleteEvalFromSidebar(\'' + ev.id + '\', event)" title="Supprimer">🗑️</button>';
             container.appendChild(div);
