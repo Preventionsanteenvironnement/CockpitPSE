@@ -139,6 +139,27 @@
         .ab-refresh { background: #3b82f6; }
         .ab-export { background: #8b5cf6; }
 
+        /* Vue notes par classe */
+        .class-overview-toolbar {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 16px; margin-bottom: 18px; display: flex; gap: 12px;
+            align-items: center; flex-wrap: wrap;
+        }
+        .class-overview-title { font-size: 1.2rem; font-weight: 800; flex: 1; min-width: 220px; }
+        .class-overview-meta { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; }
+        .class-overview-table { min-width: 980px; }
+        .class-overview-table th.eval-col { min-width: 170px; vertical-align: top; }
+        .eval-head-title { color: #e2e8f0; font-weight: 800; line-height: 1.2; }
+        .eval-head-date { color: #64748b; font-size: 0.65rem; margin-top: 4px; }
+        .class-note-cell { font-weight: 800; }
+        .class-note-muted { color: #64748b; font-weight: 600; }
+        .class-note-date { display: block; color: #64748b; font-size: 0.68rem; font-weight: 500; margin-top: 3px; }
+        .class-note-formatif { color: #93c5fd; font-size: 0.68rem; font-weight: 700; }
+        .class-overview-empty {
+            background:#1e293b; border:1px solid #334155; border-radius:12px;
+            padding:28px; text-align:center; color:#94a3b8;
+        }
+
         /* Results table */
         .results-table-wrap {
             background: #1e293b; border-radius: 12px; border: 1px solid #334155;
@@ -395,6 +416,7 @@
             <div class="filter-pills" id="sidebar-class-pills">
                 <button class="filter-pill active" onclick="setSidebarClassFilter('all')">Toutes</button>
             </div>
+            <button id="class-overview-quick-btn" style="display:none;width:100%;margin-top:8px;padding:10px;background:#06b6d4;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.82rem;"></button>
         </div>
         <div>
             <span style="font-size:0.65rem; color:#475569; text-transform:uppercase;">Par module</span>
@@ -514,6 +536,19 @@
                 <tbody id="results-tbody"></tbody>
             </table>
         </div>
+    </div>
+
+    <!-- Vue notes par classe -->
+    <div id="class-overview-content" style="display:none; max-width:1400px; width:100%; margin:0 auto;">
+        <div class="class-overview-toolbar">
+            <div class="class-overview-title">
+                <div id="class-overview-title">Notes par classe</div>
+                <div class="class-overview-meta" id="class-overview-meta"></div>
+            </div>
+            <button class="ab-btn ab-refresh" onclick="refreshClassOverview()">🔄 Actualiser</button>
+            <button class="ab-btn ab-export" onclick="exportClassOverviewCSV()">📥 Export CSV</button>
+        </div>
+        <div id="class-overview-body" class="class-overview-empty">Choisis une classe pour afficher les notes.</div>
     </div>
 </div>
 
@@ -659,6 +694,234 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         renderEvalSidebarList();
     });
 
+    // === VUE NOTES PAR CLASSE ===
+    let currentClassOverview = '';
+    let classOverviewRows = [];
+    let classOverviewEvals = [];
+
+    function escHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function getEvalTimestamp(ev) {
+        return getTimestamp(ev.dateEvaluation || ev.updatedAt || ev.createdAt || ev.publishedAt);
+    }
+    function getEvalDateLabel(ev) {
+        return formatDate(ev.dateEvaluation || ev.updatedAt || ev.createdAt || ev.publishedAt);
+    }
+    function evalTargetsClass(ev, classe) {
+        const ids = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
+        if (ids.length === 0) return true;
+        return ids.some(id => {
+            const expanded = window.getClassesFromGroupe ? window.getClassesFromGroupe(id) : [id];
+            return expanded.includes(classe);
+        });
+    }
+    function noteLabelForOverview(data, ev) {
+        if (!data) return { label: '--', className: 'class-note-muted', sub: 'Non rendu' };
+        const mode = getModeNotationFromEval(data.modeNotation ? data : ev);
+        const bareme = data.bareme || ev.bareme || 20;
+        const note = data.note_ajustee != null ? data.note_ajustee : (data.note_finale != null ? data.note_finale : data.note);
+        if (mode === 'non_notee') {
+            return { label: 'Soumis', className: 'class-note-formatif', sub: formatDate(data.submittedAt || data.savedAt) };
+        }
+        if (note == null || isNaN(Number(note))) {
+            return { label: '--', className: 'class-note-muted', sub: formatDate(data.submittedAt || data.savedAt) || 'Soumis' };
+        }
+        const pct = Number(note) / bareme * 100;
+        const className = pct >= 60 ? 'note-high' : pct >= 40 ? 'note-mid' : 'note-low';
+        const suffix = mode === 'formatif_visible' ? ' formatif' : '';
+        return { label: note + '/' + bareme, className, sub: (formatDate(data.submittedAt || data.savedAt) || 'Rendu') + suffix };
+    }
+    function overviewNumeric(data, ev) {
+        if (!data) return null;
+        const mode = getModeNotationFromEval(data.modeNotation ? data : ev);
+        if (mode === 'non_notee') return null;
+        const bareme = Number(data.bareme || ev.bareme || 20) || 20;
+        const note = data.note_ajustee != null ? data.note_ajustee : (data.note_finale != null ? data.note_finale : data.note);
+        if (note == null || isNaN(Number(note))) return null;
+        return { note: Number(note), bareme: bareme };
+    }
+    function fmtMoy(n) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ','); }
+    function moyenneEleveSur20(row) {
+        const vals = classOverviewEvals.map(ev => overviewNumeric(row.evals[ev.id], ev)).filter(Boolean);
+        if (vals.length === 0) return null;
+        const sum = vals.reduce((s, v) => s + (v.note / v.bareme * 20), 0);
+        return sum / vals.length;
+    }
+    function moyenneClasseEval(ev) {
+        const vals = classOverviewRows.map(row => overviewNumeric(row.evals[ev.id], ev)).filter(Boolean);
+        if (vals.length === 0) return null;
+        const sum = vals.reduce((s, v) => s + v.note, 0);
+        return { moy: sum / vals.length, bareme: vals[0].bareme, n: vals.length };
+    }
+
+    async function loadClassOverviewData(classe) {
+        const eleves = (window.BDD_ELEVES || [])
+            .filter(e => e.classe === classe)
+            .sort((a, b) => a.userCode.localeCompare(b.userCode));
+        const evals = allEvals
+            .filter(ev => ev.publie && evalTargetsClass(ev, classe))
+            .sort((a, b) => getEvalTimestamp(b) - getEvalTimestamp(a));
+
+        const rows = await Promise.all(eleves.map(async eleve => {
+            const evalMap = {};
+            await Promise.all(evals.map(async ev => {
+                let data = null;
+                try {
+                    const evalSnap = await getDoc(doc(db, "resultats", eleve.userCode, "evaluations", ev.id + '_eval'));
+                    if (evalSnap.exists()) data = evalSnap.data();
+                } catch(e) {}
+                if (!data) {
+                    try {
+                        const respSnap = await getDoc(doc(db, "eval_reponses", eleve.userCode + '_' + ev.id));
+                        if (respSnap.exists()) {
+                            const resp = respSnap.data();
+                            data = {
+                                note: resp.correction && resp.correction.note,
+                                note_finale: resp.correction && resp.correction.note,
+                                bareme: resp.bareme || (resp.correction && resp.correction.bareme) || ev.bareme || 20,
+                                modeNotation: resp.modeNotation || ev.modeNotation,
+                                nonNote: resp.nonNote === true,
+                                submittedAt: resp.submittedAt,
+                                publie: false
+                            };
+                        }
+                    } catch(e) {}
+                }
+                evalMap[ev.id] = data;
+            }));
+            return { eleve, evals: evalMap };
+        }));
+
+        return { eleves, evals, rows };
+    }
+
+    window.openClassOverview = async function(classe) {
+        if (!classe) { showToast('Choisis une classe.'); return; }
+        currentClassOverview = classe;
+        currentEvalId = null;
+        currentEvalData = null;
+        results = [];
+        filteredResults = [];
+        const evalSelector = document.getElementById('eval-selector');
+        if (evalSelector) evalSelector.value = '';
+        document.getElementById('main-empty').style.display = 'none';
+        document.getElementById('main-content').style.display = 'none';
+        document.getElementById('class-overview-content').style.display = 'block';
+        document.getElementById('class-overview-title').textContent = 'Notes de la classe ' + classe;
+        document.getElementById('class-overview-meta').textContent = 'Chargement...';
+        document.getElementById('class-overview-body').className = 'class-overview-empty';
+        document.getElementById('class-overview-body').textContent = 'Chargement des notes de la classe...';
+        renderEvalSidebarList();
+        if (window.innerWidth <= 768) closeMenu();
+
+        try {
+            const data = await loadClassOverviewData(classe);
+            classOverviewRows = data.rows;
+            classOverviewEvals = data.evals;
+            renderClassOverview();
+        } catch(e) {
+            console.error('Erreur vue classe:', e);
+            document.getElementById('class-overview-body').className = 'class-overview-empty';
+            document.getElementById('class-overview-body').textContent = 'Impossible de charger les notes : ' + e.message;
+        }
+    };
+
+    window.refreshClassOverview = function() {
+        if (!currentClassOverview) { showToast('Choisis une classe.'); return; }
+        openClassOverview(currentClassOverview);
+    };
+
+    function renderClassOverview() {
+        const body = document.getElementById('class-overview-body');
+        const nbEleves = classOverviewRows.length;
+        const nbEvals = classOverviewEvals.length;
+        const renderedCells = classOverviewRows.flatMap(row => classOverviewEvals.map(ev => row.evals[ev.id])).filter(Boolean).length;
+        document.getElementById('class-overview-meta').textContent =
+            nbEleves + ' eleve(s) | ' + nbEvals + ' evaluation(s) publiee(s) | ' + renderedCells + ' rendu(s)';
+
+        if (nbEleves === 0) { body.className = 'class-overview-empty'; body.textContent = 'Aucun eleve trouve pour cette classe.'; return; }
+        if (nbEvals === 0) { body.className = 'class-overview-empty'; body.textContent = 'Aucune evaluation publiee pour cette classe.'; return; }
+
+        body.className = 'results-table-wrap';
+        let html = '<table class="results-table class-overview-table"><thead><tr>' +
+            '<th>Eleve</th><th>Classe</th>';
+        classOverviewEvals.forEach(ev => {
+            html += '<th class="eval-col"><div class="eval-head-title">' + escHtml(ev.titre || 'Evaluation') + '</div>' +
+                '<div class="eval-head-date">' + escHtml(getEvalDateLabel(ev)) + '</div></th>';
+        });
+        html += '<th class="eval-col" style="background:#0f3a4d;"><div class="eval-head-title">Moyenne</div><div class="eval-head-date">/20</div></th>';
+        html += '</tr></thead><tbody>';
+
+        classOverviewRows.forEach(row => {
+            const code = row.eleve.userCode;
+            html += '<tr><td class="td-code">' + escHtml(afficherAvecNom(code)) + '</td><td class="td-classe">' + escHtml(row.eleve.classe) + '</td>';
+            classOverviewEvals.forEach(ev => {
+                const label = noteLabelForOverview(row.evals[ev.id], ev);
+                html += '<td class="class-note-cell ' + label.className + '">' + escHtml(label.label) +
+                    '<span class="class-note-date">' + escHtml(label.sub || '') + '</span></td>';
+            });
+            const moy = moyenneEleveSur20(row);
+            const moyCls = moy == null ? 'class-note-muted' : (moy >= 12 ? 'note-high' : moy >= 8 ? 'note-mid' : 'note-low');
+            html += '<td class="class-note-cell ' + moyCls + '" style="font-weight:800;">' + (moy == null ? '--' : fmtMoy(moy) + '/20') + '</td>';
+            html += '</tr>';
+        });
+
+        html += '<tr style="background:#0f3a4d;font-weight:800;"><td class="td-code">Moyenne classe</td><td class="td-classe"></td>';
+        classOverviewEvals.forEach(ev => {
+            const m = moyenneClasseEval(ev);
+            html += '<td class="class-note-cell">' + (m == null ? '--' : fmtMoy(m.moy) + '/' + m.bareme +
+                '<span class="class-note-date">' + m.n + ' note(s)</span>') + '</td>';
+        });
+        const moyGlobale = classOverviewRows.map(moyenneEleveSur20).filter(v => v != null);
+        const mg = moyGlobale.length ? moyGlobale.reduce((s, v) => s + v, 0) / moyGlobale.length : null;
+        html += '<td class="class-note-cell">' + (mg == null ? '--' : fmtMoy(mg) + '/20') + '</td>';
+        html += '</tr>';
+
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    }
+
+    window.exportClassOverviewCSV = function() {
+        if (!currentClassOverview || classOverviewRows.length === 0) { showToast('Aucune vue classe a exporter.'); return; }
+        const header = ['Eleve', 'Code', 'Classe'];
+        classOverviewEvals.forEach(ev => {
+            header.push((ev.titre || 'Evaluation') + ' - note');
+            header.push((ev.titre || 'Evaluation') + ' - date rendu');
+        });
+        header.push('Moyenne /20');
+        const rows = classOverviewRows.map(row => {
+            const line = [getNomEleve(row.eleve.userCode) || row.eleve.userCode, row.eleve.userCode, row.eleve.classe];
+            classOverviewEvals.forEach(ev => {
+                const label = noteLabelForOverview(row.evals[ev.id], ev);
+                line.push(label.label);
+                line.push(label.sub || '');
+            });
+            const moy = moyenneEleveSur20(row);
+            line.push(moy == null ? '' : fmtMoy(moy));
+            return line.map(v => String(v).replace(/;/g, ',')).join(';');
+        });
+        const moyLine = ['Moyenne classe', '', ''];
+        classOverviewEvals.forEach(ev => {
+            const m = moyenneClasseEval(ev);
+            moyLine.push(m == null ? '' : fmtMoy(m.moy) + '/' + m.bareme);
+            moyLine.push('');
+        });
+        const moyGlobale = classOverviewRows.map(moyenneEleveSur20).filter(v => v != null);
+        const mg = moyGlobale.length ? moyGlobale.reduce((s, v) => s + v, 0) / moyGlobale.length : null;
+        moyLine.push(mg == null ? '' : fmtMoy(mg));
+        rows.push(moyLine.map(v => String(v).replace(/;/g, ',')).join(';'));
+        const csv = '﻿' + header.map(v => String(v).replace(/;/g, ',')).join(';') + '\n' + rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'notes_classe_' + currentClassOverview + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV classe exporte !');
+    };
+
     // === SIDEBAR EVAL FILTERS ===
     function buildSidebarFilters() {
         // Class pills
@@ -689,7 +952,17 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             moduleContainer.appendChild(pill);
         });
     }
-    window.setSidebarClassFilter = function(v) { sidebarClassFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
+    window.setSidebarClassFilter = function(v) {
+        sidebarClassFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList();
+        const qb = document.getElementById('class-overview-quick-btn');
+        if (qb) {
+            if (v && v !== 'all') {
+                qb.style.display = 'block';
+                qb.textContent = '📚 Voir toutes les notes de ' + v;
+                qb.onclick = () => openClassOverview(v);
+            } else { qb.style.display = 'none'; }
+        }
+    };
     window.setSidebarModuleFilter = function(v) { sidebarModuleFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
 
     function getFilteredEvals() {
@@ -768,6 +1041,9 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         currentEvalId = evalId;
         currentEvalData = allEvals.find(e => e.id === evalId) || null;
 
+        const coc = document.getElementById('class-overview-content');
+        if (coc) coc.style.display = 'none';
+        currentClassOverview = '';
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
 

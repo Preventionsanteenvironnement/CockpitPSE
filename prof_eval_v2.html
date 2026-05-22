@@ -412,6 +412,7 @@
             <div class="filter-pills" id="sidebar-class-pills">
                 <button class="filter-pill active" onclick="setSidebarClassFilter('all')">Toutes</button>
             </div>
+            <button id="class-overview-quick-btn" style="display:none;width:100%;margin-top:8px;padding:10px;background:#06b6d4;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.82rem;"></button>
         </div>
         <div>
             <span style="font-size:0.65rem; color:#475569; text-transform:uppercase;">Par module</span>
@@ -739,7 +740,17 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             moduleContainer.appendChild(pill);
         });
     }
-    window.setSidebarClassFilter = function(v) { sidebarClassFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
+    window.setSidebarClassFilter = function(v) {
+        sidebarClassFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList();
+        const qb = document.getElementById('class-overview-quick-btn');
+        if (qb) {
+            if (v && v !== 'all') {
+                qb.style.display = 'block';
+                qb.textContent = '📚 Voir toutes les notes de ' + v;
+                qb.onclick = () => openClassOverview(v);
+            } else { qb.style.display = 'none'; }
+        }
+    };
     window.setSidebarModuleFilter = function(v) { sidebarModuleFilter = v; buildSidebarFilters(); renderEvalSelector(); renderEvalSidebarList(); };
 
     function getFilteredEvals() {
@@ -1198,9 +1209,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         return { eleves, evals, rows };
     }
 
-    window.openClassOverview = async function() {
-        const classe = document.getElementById('class-overview-selector').value;
+    window.openClassOverview = async function(classeArg) {
+        const sel0 = document.getElementById('class-overview-selector');
+        const classe = classeArg || (sel0 ? sel0.value : '');
         if (!classe) { showToast('Choisis une classe.'); return; }
+        if (sel0) Array.from(sel0.options).forEach(opt => { opt.selected = opt.value === classe; });
         currentClassOverview = classe;
         currentEvalId = null;
         currentEvalData = null;
