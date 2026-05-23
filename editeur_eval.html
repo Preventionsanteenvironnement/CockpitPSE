@@ -98,6 +98,22 @@
             border-radius: 8px; color: white; font-size: 0.95rem; outline: none; cursor: pointer;
         }
         .form-select:focus { border-color: #3b82f6; }
+        .doc-image-tools {
+            display: none; gap: 10px; align-items: center; flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .doc-file-label {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 9px 12px; border-radius: 8px; border: 1px solid #6366f1;
+            background: rgba(99,102,241,0.14); color: #c7d2fe; font-weight: 800;
+            cursor: pointer; font-size: 0.82rem;
+        }
+        .doc-file-label:hover { background: rgba(99,102,241,0.24); }
+        .doc-photo-note { color: #94a3b8; font-size: 0.78rem; line-height: 1.4; }
+        .doc-image-preview {
+            display: none; max-width: 220px; max-height: 150px; object-fit: contain;
+            border: 1px solid #475569; border-radius: 8px; background: #0f172a;
+        }
 
         .form-row { display: flex; gap: 12px; }
         .form-row > * { flex: 1; }
@@ -627,6 +643,12 @@
                 <div class="form-group" style="margin-bottom:10px;">
                     <label id="doc-content-label">Contenu du texte</label>
                     <textarea class="form-textarea" id="doc-content" placeholder="Collez le texte ici..." rows="4"></textarea>
+                    <div class="doc-image-tools" id="doc-image-tools">
+                        <input type="file" id="doc-image-file" accept="image/*" hidden>
+                        <label class="doc-file-label" for="doc-image-file">Choisir une photo</label>
+                        <span class="doc-photo-note">La photo est compressee automatiquement avant sauvegarde.</span>
+                        <img id="doc-image-preview" class="doc-image-preview" alt="Apercu image">
+                    </div>
                 </div>
                 <div class="form-group" style="margin-bottom:10px;">
                     <label id="doc-description-label">Description (optionnel)</label>
@@ -1337,6 +1359,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         document.getElementById('doc-type').value = 'text';
         document.getElementById('doc-content').value = '';
         document.getElementById('doc-description').value = '';
+        resetDocImageInput();
         document.getElementById('btn-save-doc').textContent = 'Ajouter le document';
         updateDocContentLabel();
         document.getElementById('doc-titre').focus();
@@ -1356,27 +1379,129 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         updateDocContentLabel();
         document.getElementById('doc-content').value = d.content;
         document.getElementById('doc-description').value = d.description || '';
+        resetDocImageInput(d.type === 'image' ? d.content : '');
         document.getElementById('btn-save-doc').textContent = 'Modifier le document';
         document.getElementById('doc-titre').focus();
     };
 
     document.getElementById('doc-type').addEventListener('change', updateDocContentLabel);
+    document.getElementById('doc-image-file').addEventListener('change', handleDocImageFile);
     function updateDocContentLabel() {
         const type = document.getElementById('doc-type').value;
+        const tools = document.getElementById('doc-image-tools');
+        const content = document.getElementById('doc-content');
         if (type === 'video') {
             document.getElementById('doc-content-label').textContent = 'URL YouTube';
-            document.getElementById('doc-content').placeholder = 'https://www.youtube.com/watch?v=...';
+            content.placeholder = 'https://www.youtube.com/watch?v=...';
+            content.rows = 3;
+            tools.style.display = 'none';
         } else if (type === 'image') {
-            document.getElementById('doc-content-label').textContent = 'URL de l\'image';
-            document.getElementById('doc-content').placeholder = 'https://...';
+            document.getElementById('doc-content-label').textContent = 'Image';
+            content.placeholder = 'Collez une URL d image ou choisissez une photo ci-dessous...';
+            content.rows = 2;
+            tools.style.display = 'flex';
+            updateDocImagePreview(content.value.trim());
         } else {
             document.getElementById('doc-content-label').textContent = 'Contenu du texte';
-            document.getElementById('doc-content').placeholder = 'Collez le texte ici...';
+            content.placeholder = 'Collez le texte ici...';
+            content.rows = 4;
+            tools.style.display = 'none';
         }
         const descLabel = document.getElementById('doc-description-label');
         if (descLabel) {
             descLabel.textContent = type === 'image' ? 'Texte sous l\'image (optionnel)' : (type === 'video' ? 'Description de la video (optionnel)' : 'Description supplementaire (optionnel)');
         }
+    }
+
+    function isSafeImageSource(src) {
+        return /^https?:\/\//i.test(src) ||
+            /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(src) ||
+            /^(?:\.\/|\/|images\/|PSE\/|CockpitPSE\/)[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(src);
+    }
+
+    function resetDocImageInput(src) {
+        const input = document.getElementById('doc-image-file');
+        if (input) input.value = '';
+        updateDocImagePreview(src || '');
+    }
+
+    function updateDocImagePreview(src) {
+        const preview = document.getElementById('doc-image-preview');
+        if (!preview) return;
+        if (src && isSafeImageSource(src)) {
+            preview.src = src;
+            preview.style.display = 'block';
+        } else {
+            preview.removeAttribute('src');
+            preview.style.display = 'none';
+        }
+    }
+
+    async function handleDocImageFile(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+            alert('Choisis un fichier image.');
+            event.target.value = '';
+            return;
+        }
+        try {
+            const dataUrl = await compressImageFile(file);
+            document.getElementById('doc-type').value = 'image';
+            document.getElementById('doc-content').value = dataUrl;
+            updateDocContentLabel();
+            showToast('Photo ajoutee au document.');
+        } catch (e) {
+            console.error('Erreur image:', e);
+            alert('Impossible de charger cette photo : ' + e.message);
+            event.target.value = '';
+        }
+    }
+
+    function readFileAsDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('lecture du fichier impossible'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function compressImageFile(file) {
+        const originalDataUrl = await readFileAsDataURL(file);
+        if (file.size <= 650000 && /^image\/(png|jpeg|jpg|webp|gif)$/i.test(file.type)) {
+            return originalDataUrl;
+        }
+
+        const img = await new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error('image illisible'));
+            image.src = originalDataUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        let maxSide = 1200;
+        let quality = 0.82;
+        let dataUrl = originalDataUrl;
+
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+            canvas.width = Math.max(1, Math.round(img.width * ratio));
+            canvas.height = Math.max(1, Math.round(img.height * ratio));
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            if (dataUrl.length < 700000) return dataUrl;
+            maxSide = Math.round(maxSide * 0.82);
+            quality = Math.max(0.55, quality - 0.08);
+        }
+
+        if (dataUrl.length > 900000) {
+            throw new Error('photo trop lourde apres compression. Essaie une image plus petite.');
+        }
+        return dataUrl;
     }
 
     window.saveDocument = function() {
@@ -1402,6 +1527,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             documents.push(newDoc);
             insertAfterDocRef = newDoc.id;
         }
+        resetDocImageInput();
         editingDocIndex = -1;
         updateDocRefDropdowns();
         hideDocForm();
@@ -1535,7 +1661,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         header.style.setProperty('--seg-color', color);
         const typeIcon = docObj.type === 'image' ? '🖼️' : (docObj.type === 'video' ? '🎬' : '📄');
         const descPreview = docObj.description ? ' — ' + escHtml(docObj.description.substring(0, 40)) + (docObj.description.length > 40 ? '...' : '') : '';
+        const imagePreview = docObj.type === 'image' && isSafeImageSource(docObj.content || '')
+            ? '<img src="' + escHtml(docObj.content) + '" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #475569;margin-right:10px;background:#0f172a;">'
+            : '';
         header.innerHTML = '<div class="flow-doc-info">' +
+            imagePreview +
             '<span class="flow-doc-icon">' + typeIcon + '</span>' +
             '<span class="flow-doc-title">' + escHtml(docObj.titre) + '</span>' +
             '<span class="flow-doc-type">(' + docObj.type + descPreview + ')</span>' +
