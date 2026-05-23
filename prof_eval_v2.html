@@ -439,6 +439,12 @@
         <div style="font-size:0.65rem;color:#64748b;margin-top:6px;line-height:1.35;">Toutes les evaluations publiees concernant la classe, avec notes et dates de rendu.</div>
     </div>
 
+    <div class="sidebar-section">
+        <label>Copie de secours JSON</label>
+        <button class="ab-btn" style="background:#f59e0b;color:#111827;width:100%;" onclick="document.getElementById('json-import').click()">💾 Importer une copie JSON</button>
+        <div style="font-size:0.65rem;color:#64748b;margin-top:6px;line-height:1.35;">A utiliser si l'envoi Firebase a bloque en fin de cours.</div>
+    </div>
+
     <div class="sidebar-section" id="session-section" style="display:none;">
         <label>Session synchronisee</label>
         <div class="session-box">
@@ -512,6 +518,8 @@
             <button class="ab-btn ab-refresh" onclick="refreshResults()">🔄 Actualiser</button>
             <button class="ab-btn ab-publish" id="btn-publish-all" onclick="publishAll()">📢 Publier tout</button>
             <button class="ab-btn" id="btn-publish-correction" style="background:#10b981; display:none;" onclick="publishCorrection()">📝 Publier la correction</button>
+            <input type="file" id="json-import" accept=".json,application/json" style="display:none;" onchange="importEmergencyJSON(event)">
+            <button class="ab-btn" style="background:#f59e0b;color:#111827;" onclick="document.getElementById('json-import').click()">💾 Import JSON</button>
             <button class="ab-btn ab-export" onclick="exportCSV()">📥 Export CSV</button>
             <button class="ab-btn" style="background:#8b5cf6;" onclick="exportResultsPDF()">📄 PDF</button>
             <button class="ab-btn" style="background:#dc2626;" onclick="deleteEvaluation()">🗑️ Supprimer eval</button>
@@ -1005,6 +1013,152 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             return null;
         }
     }
+
+    function getExpectedAnswerText(q) {
+        if (!q) return '';
+        if (q.type === 'qcm_single') return (q.choices || [])[q.correct] || '';
+        if (q.type === 'qcm_multi') return (q.correct || []).map(c => (q.choices || [])[c]).join(', ');
+        if (q.type === 'vf') return q.correct ? 'Vrai' : 'Faux';
+        if (q.type === 'mot') return q.correct || q.reponse || '';
+        if (q.type === 'nombre') return String(q.correct) + (q.tolerance ? ' (+/- ' + q.tolerance + ')' : '');
+        if (q.type === 'ordonner') return (q.correct || []).map(i => (q.items || [])[i]).join(' -> ');
+        if (q.type === 'pad') return [q.danger, q.situation_dangereuse, q.evenement_declencheur, q.dommage].filter(Boolean).join(' -> ');
+        if (q.type === 'prevention') return (q.niveaux || []).map(n => (n.label || n.niveau) + ': ' + (n.bonne_reponse || '')).join(' | ');
+        return '';
+    }
+
+    function formatRawAnswerForImport(q, raw) {
+        if (raw === undefined || raw === null) return null;
+        if (q.type === 'qcm_single') return (q.choices || [])[raw] || String(raw);
+        if (q.type === 'qcm_multi') return (Array.isArray(raw) ? raw : []).map(i => (q.choices || [])[i] || String(i)).join(', ');
+        if (q.type === 'vf') return raw === true ? 'Vrai' : 'Faux';
+        if (q.type === 'pad') {
+            return [
+                'Danger: ' + (raw.danger || ''),
+                'Situation: ' + (raw.sitdang || ''),
+                'Evenement: ' + (raw.event || ''),
+                'Dommage: ' + (raw.dommage || '')
+            ].join(' | ');
+        }
+        if (q.type === 'prevention') {
+            return (q.niveaux || []).map(n => (n.label || n.niveau) + ': ' + (raw[n.niveau] || '')).join(' | ');
+        }
+        return String(raw);
+    }
+
+    async function writeEmergencyImport(payload) {
+        const resp = payload.response || payload.respData || payload.data;
+        if (!resp) throw new Error('JSON invalide : bloc response manquant.');
+        const eleveCode = resp.eleveCode || payload.eleveCode;
+        const evalId = resp.evalId || payload.evalId;
+        if (!eleveCode || !evalId) throw new Error('JSON invalide : eleveCode ou evalId manquant.');
+
+        const evalData = payload.evalData || allEvals.find(ev => ev.id === evalId) || {};
+        const correction = resp.correction || payload.correction || {};
+        const qs = evalData.questions || [];
+        const respDocId = payload.respDocId || (eleveCode + '_' + evalId);
+        const now = new Date().toISOString();
+        const safeResp = {
+            ...resp,
+            eleveCode,
+            evalId,
+            titre: resp.titre || ('Auto-evaluation : ' + (evalData.titre || payload.evalTitre || 'Evaluation')),
+            classe: resp.classe || payload.classe || '',
+            reponses: resp.reponses || payload.answers || {},
+            correction,
+            modeNotation: resp.modeNotation || evalData.modeNotation || 'notee',
+            nonNote: resp.nonNote === true || evalData.nonNote === true,
+            bareme: resp.bareme || correction.bareme || evalData.bareme || 20,
+            submittedAt: resp.submittedAt || payload.exportedAt || now,
+            importedAt: now,
+            importedFromJSON: true
+        };
+
+        const blueprintContent = qs.map((q, i) => ({
+            type: 'question',
+            qid: q.id,
+            label: 'Q' + (i + 1),
+            question: q.question,
+            competence: q.competence,
+            bareme: q.points,
+            reponseAttendue: getExpectedAnswerText(q),
+            correction: q.correction || '',
+            explication: q.explication || ''
+        }));
+
+        const questionsMap = {};
+        qs.forEach((q, i) => {
+            const result = correction.questions && correction.questions[q.id];
+            questionsMap['q_' + i] = {
+                level: result ? (result.level || (result.isCorrect ? 'M' : 'I')) : 'NT',
+                comment: q.correction || ''
+            };
+        });
+
+        const reponsesSimple = {};
+        qs.forEach(q => {
+            reponsesSimple[q.id] = formatRawAnswerForImport(q, safeResp.reponses[q.id]);
+        });
+
+        await setDoc(doc(db, "eval_reponses", respDocId), safeResp, { merge: true });
+        await setDoc(doc(db, "resultats", eleveCode, "copies", evalId + '_autoeval'), {
+            eleveCode,
+            devoirId: evalId,
+            titre: 'Auto-evaluation : ' + (evalData.titre || payload.evalTitre || 'Evaluation'),
+            createdAtISO: safeResp.submittedAt,
+            importedAt: now,
+            eleve: { userCode: eleveCode, classe: safeResp.classe || '' },
+            reponses: reponsesSimple,
+            source: 'auto_eval_json_import',
+            temps_secondes: safeResp.tempsSecondes || payload.tempsSecondes || 0
+        }, { merge: true });
+
+        const evalDoc = {
+            eleveCode,
+            devoirId: evalId,
+            titre: 'Auto-evaluation : ' + (evalData.titre || payload.evalTitre || 'Evaluation'),
+            note_finale: correction.note != null ? correction.note : null,
+            appreciation: correction.note != null ? ('Auto-correction automatique. Note : ' + correction.note + '/' + (correction.bareme || safeResp.bareme)) : 'Copie importee depuis JSON de secours.',
+            publie: false,
+            autocorrected: true,
+            importedFromJSON: true,
+            importedAt: now,
+            source: 'auto_eval_json_import',
+            competences: correction.competences || {},
+            questions: questionsMap,
+            modeNotation: safeResp.modeNotation,
+            nonNote: safeResp.nonNote === true,
+            blueprint: {
+                titre: 'Auto-evaluation : ' + (evalData.titre || payload.evalTitre || 'Evaluation'),
+                content: blueprintContent
+            },
+            savedAt: now,
+            savedBy: 'json_import'
+        };
+        await setDoc(doc(db, "resultats", eleveCode, "evaluations", evalId + '_eval'), evalDoc, { merge: true });
+
+        return { eleveCode, evalId, titre: evalData.titre || payload.evalTitre || evalId };
+    }
+
+    window.importEmergencyJSON = async function(event) {
+        const file = event && event.target && event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const payload = JSON.parse(text);
+            if (payload.type && payload.type !== 'mapse_auto_eval_secours') {
+                if (!confirm('Ce JSON ne semble pas etre une copie de secours MAPSE. Essayer quand meme ?')) return;
+            }
+            const result = await writeEmergencyImport(payload);
+            showToast('Copie JSON importee : ' + result.eleveCode);
+            if (currentEvalId === result.evalId) await loadResults();
+        } catch(e) {
+            console.error('Erreur import JSON:', e);
+            alert('Import impossible : ' + e.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
 
     // === CLASS FILTERS ===
     function buildClassFilters() {
