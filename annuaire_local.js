@@ -403,3 +403,7 @@ const AnnuaireLocal = (function () {
     };
 
 })();
+
+// Expose explicitement sur window : un const global n'est pas une
+// propriete de window et reste invisible depuis un <script type="module">.
+if (typeof window !== "undefined") window.AnnuaireLocal = AnnuaireLocal;
