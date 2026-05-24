@@ -214,6 +214,13 @@
 
     <div id="sidebar">
         <div id="annuaire-slot"></div>
+        <div id="plan-annuaire" style="margin-bottom:10px; padding:10px; border:1px solid #475569; border-radius:10px; background:#1e293b;">
+            <div style="font-weight:700; font-size:0.85rem; color:#e2e8f0; margin-bottom:6px;">🔒 Noms des élèves (RGPD local)</div>
+            <div id="plan-annuaire-status" style="font-size:0.72rem; color:#94a3b8; margin-bottom:8px;">Aucune liste chargée — affichage par codes.</div>
+            <button id="plan-annuaire-btn" class="btn-action" style="width:100%;">📂 Importer la liste (CSV)</button>
+            <button id="plan-annuaire-clear" class="btn-action" style="width:100%; margin-top:6px; display:none; background:#7f1d1d;">🗑️ Retirer les noms</button>
+            <input type="file" id="plan-annuaire-file" accept=".csv,.txt" style="display:none;">
+        </div>
         <button class="btn-action btn-open" onclick="window.openScreen()">📺 OUVRIR PROJECTION</button>
 
         <div>
@@ -322,11 +329,78 @@
             return out;
         }
         const CLASS_DATA = buildClassData();
+        // Lecture autonome des noms (deux cles localStorage), sans dependance externe
+        function readNames() {
+            const out = {};
+            try { Object.assign(out, JSON.parse(localStorage.getItem('cockpit_eleves_noms') || '{}')); } catch (e) {}
+            try { Object.assign(out, JSON.parse(localStorage.getItem('pse_annuaire_local') || '{}')); } catch (e) {}
+            return out;
+        }
         function displayName(code) {
-            if (window.AnnuaireLocal && typeof AnnuaireLocal.resolveDisplay === 'function') {
-                return AnnuaireLocal.resolveDisplay(code);
-            }
-            return code;
+            if (!code) return code;
+            const names = readNames();
+            const nom = names[String(code).toUpperCase()] || names[code];
+            return nom ? (nom + ' (' + code + ')') : code;
+        }
+        function parseCsvToMap(text) {
+            const map = {};
+            String(text).split(/\r?\n/).forEach(line => {
+                line = line.trim(); if (!line) return;
+                const parts = line.split(/[,;\t]/).map(s => s.trim());
+                if (parts.length < 2) return;
+                const code = parts[0].toUpperCase();
+                const nom = parts.slice(1).join(' ').trim();
+                if (!code || !nom || code === 'CODE' || code === 'ID') return;
+                map[code] = nom;
+            });
+            return map;
+        }
+        function saveNames(map) {
+            ['cockpit_eleves_noms', 'pse_annuaire_local'].forEach(key => {
+                let existing = {};
+                try { existing = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) {}
+                localStorage.setItem(key, JSON.stringify(Object.assign(existing, map)));
+            });
+            try { localStorage.setItem('pse_annuaire_date', new Date().toISOString()); } catch (e) {}
+        }
+        function countNames() { return Object.keys(readNames()).length; }
+        function refreshAnnuaireStatus() {
+            const st = document.getElementById('plan-annuaire-status');
+            const clr = document.getElementById('plan-annuaire-clear');
+            const n = countNames();
+            if (st) st.innerHTML = n > 0 ? ('✅ ' + n + ' élève(s) chargé(s) — noms affichés.') : 'Aucune liste chargée — affichage par codes.';
+            if (clr) clr.style.display = n > 0 ? '' : 'none';
+        }
+        function setupPlanAnnuaire() {
+            const btn = document.getElementById('plan-annuaire-btn');
+            const file = document.getElementById('plan-annuaire-file');
+            const clr = document.getElementById('plan-annuaire-clear');
+            if (!btn || !file) return;
+            btn.addEventListener('click', () => file.click());
+            file.addEventListener('change', e => {
+                const f = e.target.files[0]; if (!f) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const map = parseCsvToMap(ev.target.result);
+                        const added = Object.keys(map).length;
+                        saveNames(map);
+                        refreshAnnuaireStatus();
+                        window.buildGrid(); renderPools();
+                        alert('✅ ' + added + ' nom(s) importé(s). Total : ' + countNames() + ' élève(s).');
+                    } catch (err) { alert('Erreur import : ' + err.message); }
+                };
+                reader.onerror = () => alert('Erreur de lecture du fichier');
+                reader.readAsText(f, 'UTF-8');
+                file.value = '';
+            });
+            if (clr) clr.addEventListener('click', () => {
+                if (confirm('Retirer les noms de ce navigateur ?')) {
+                    try { localStorage.removeItem('cockpit_eleves_noms'); localStorage.removeItem('pse_annuaire_local'); localStorage.removeItem('pse_annuaire_date'); } catch (e) {}
+                    refreshAnnuaireStatus(); window.buildGrid(); renderPools();
+                }
+            });
+            refreshAnnuaireStatus();
         }
 
         const LOCAL_PLAN_KEY = "classe_plan_local";
@@ -377,11 +451,9 @@
             window.buildGrid();
             window.updateBoardPosition();
 
-            if (window.AnnuaireLocal && typeof AnnuaireLocal.renderButton === 'function') {
-                const slot = document.getElementById('annuaire-slot');
-                if (slot) AnnuaireLocal.renderButton(slot);
-            }
+            setupPlanAnnuaire();
             document.addEventListener('annuaire-updated', () => {
+                refreshAnnuaireStatus();
                 window.buildGrid();
                 renderPools();
             });
