@@ -66,7 +66,10 @@
   <h1>📋 Récapitulatif des notes</h1>
   <span class="badge">Auto-évaluations v1 + V2</span>
   <span class="spacer"></span>
-  <span id="annuaireSlot"></span>
+  <span id="annuaireStatus" style="font-size:0.72rem; color:#cbd5e1;"></span>
+  <button id="annuaireImport" class="btn btn-ghost" style="background:#16a34a;color:#fff;">📂 Importer les noms (CSV)</button>
+  <button id="annuaireClear" class="btn btn-ghost" style="display:none;">🗑️</button>
+  <input type="file" id="annuaireFile" accept=".csv,.txt" style="display:none;">
 </header>
 
 <div class="toolbar">
@@ -150,9 +153,40 @@ function noteClass(note, bareme) {
   const p = note / bareme * 100;
   return p >= 60 ? "n-hi" : p >= 40 ? "n-mid" : "n-lo";
 }
-function nomEleve(code) {
-  return (typeof AnnuaireLocal !== "undefined" && AnnuaireLocal.getNom(code)) || code;
+// Lecture autonome des noms (deux cles localStorage), sans dependance externe
+function readNames() {
+  const out = {};
+  try { Object.assign(out, JSON.parse(localStorage.getItem("cockpit_eleves_noms") || "{}")); } catch (e) {}
+  try { Object.assign(out, JSON.parse(localStorage.getItem("pse_annuaire_local") || "{}")); } catch (e) {}
+  return out;
 }
+function nomEleve(code) {
+  if (!code) return code;
+  const names = readNames();
+  return names[String(code).toUpperCase()] || names[code] || code;
+}
+function parseCsvToMap(text) {
+  const map = {};
+  String(text).split(/\r?\n/).forEach(line => {
+    line = line.trim(); if (!line) return;
+    const parts = line.split(/[,;\t]/).map(s => s.trim());
+    if (parts.length < 2) return;
+    const c = parts[0].toUpperCase();
+    const nom = parts.slice(1).join(" ").trim();
+    if (!c || !nom || c === "CODE" || c === "ID") return;
+    map[c] = nom;
+  });
+  return map;
+}
+function saveNames(map) {
+  ["cockpit_eleves_noms", "pse_annuaire_local"].forEach(key => {
+    let existing = {};
+    try { existing = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) {}
+    localStorage.setItem(key, JSON.stringify(Object.assign(existing, map)));
+  });
+  try { localStorage.setItem("pse_annuaire_date", new Date().toISOString()); } catch (e) {}
+}
+function countNames() { return Object.keys(readNames()).length; }
 
 // ── Chargement des deux banques (titres + barème + mode) ──
 async function loadBanks() {
@@ -375,9 +409,36 @@ function fillClasses() {
   list.forEach(c => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label || c.id; sel.appendChild(o); });
 }
 
-if (typeof AnnuaireLocal !== "undefined" && AnnuaireLocal.renderButton) AnnuaireLocal.renderButton($("annuaireSlot"));
-document.addEventListener("annuaire-updated", () => renderGrid());
-document.addEventListener("annuaire-toggle", () => renderGrid());
+function refreshAnnuaireStatus() {
+  const n = countNames();
+  $("annuaireStatus").textContent = n > 0 ? ("🔒 " + n + " nom(s) chargé(s)") : "🔒 Aucun nom chargé (codes)";
+  $("annuaireClear").style.display = n > 0 ? "" : "none";
+}
+$("annuaireImport").addEventListener("click", () => $("annuaireFile").click());
+$("annuaireFile").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const map = parseCsvToMap(ev.target.result);
+      const added = Object.keys(map).length;
+      saveNames(map);
+      refreshAnnuaireStatus();
+      renderGrid();
+      alert("✅ " + added + " nom(s) importé(s). Total : " + countNames() + " élève(s).");
+    } catch (err) { alert("Erreur import : " + err.message); }
+  };
+  reader.onerror = () => alert("Erreur de lecture du fichier");
+  reader.readAsText(f, "UTF-8");
+  $("annuaireFile").value = "";
+});
+$("annuaireClear").addEventListener("click", () => {
+  if (confirm("Retirer les noms de ce navigateur ?")) {
+    try { localStorage.removeItem("cockpit_eleves_noms"); localStorage.removeItem("pse_annuaire_local"); localStorage.removeItem("pse_annuaire_date"); } catch (e) {}
+    refreshAnnuaireStatus(); renderGrid();
+  }
+});
+refreshAnnuaireStatus();
 
 fillClasses();
 $("classeSelect").addEventListener("change", e => { $("panel").style.display="none"; $("layout").classList.remove("with-panel"); loadClasse(e.target.value); });
