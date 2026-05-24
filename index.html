@@ -340,6 +340,57 @@
         </header>
 
         <div id="dashboard" class="view-section active">
+            <div id="annuaire-banner" style="margin:0 0 16px; padding:14px 18px; border-radius:14px; border:1px solid #bbf7d0; background:linear-gradient(135deg,#ecfdf5,#eff6ff); display:flex; flex-wrap:wrap; align-items:center; gap:14px;">
+                <div style="font-size:1.7rem;">🔒</div>
+                <div style="flex:1; min-width:220px;">
+                    <div style="font-weight:800; color:#0f172a;">Annuaire des élèves (noms) — RGPD local</div>
+                    <div id="annuaire-banner-status" style="font-size:0.82rem; color:#475569; margin-top:2px;">Aucun annuaire chargé. Importe ton fichier CSV une seule fois : les noms s'afficheront partout (plan de classe, récap des notes, résultats…). Stockés uniquement sur cet ordinateur.</div>
+                </div>
+                <button id="annuaire-banner-import" style="flex:0 0 auto; padding:10px 16px; cursor:pointer; border:none; background:#16a34a; color:#fff; border-radius:10px; font-weight:700;">📂 Importer le CSV</button>
+                <button id="annuaire-banner-clear" style="flex:0 0 auto; padding:10px 14px; cursor:pointer; border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:10px; font-weight:600; display:none;">🗑️ Effacer</button>
+                <input type="file" id="annuaire-banner-file" accept=".csv,.txt" style="display:none;">
+            </div>
+            <script>
+            (function(){
+                function initAnnuaireBanner(){
+                    if (typeof AnnuaireLocal === 'undefined') return;
+                    var status = document.getElementById('annuaire-banner-status');
+                    var btnImport = document.getElementById('annuaire-banner-import');
+                    var btnClear = document.getElementById('annuaire-banner-clear');
+                    var fileInput = document.getElementById('annuaire-banner-file');
+                    if (!status || !btnImport) return;
+                    function refresh(){
+                        var n = AnnuaireLocal.count();
+                        if (n > 0){
+                            status.innerHTML = '✅ <strong>' + n + ' élève(s)</strong> chargé(s) — noms visibles partout (plan de classe, récap des notes, résultats…). Stockés uniquement sur cet ordinateur.';
+                            btnImport.textContent = '🔄 Réimporter';
+                            btnClear.style.display = '';
+                        } else {
+                            status.textContent = "Aucun annuaire chargé. Importe ton fichier CSV une seule fois : les noms s'afficheront partout (plan de classe, récap des notes, résultats…). Stockés uniquement sur cet ordinateur.";
+                            btnImport.textContent = '📂 Importer le CSV';
+                            btnClear.style.display = 'none';
+                        }
+                    }
+                    btnImport.addEventListener('click', function(){ fileInput.click(); });
+                    fileInput.addEventListener('change', async function(e){
+                        var f = e.target.files[0]; if (!f) return;
+                        try { var r = await AnnuaireLocal.importCSV(f); alert(r.message); refresh(); document.dispatchEvent(new CustomEvent('annuaire-updated', { detail:r })); }
+                        catch(err){ alert('Erreur import : ' + err.message); }
+                        fileInput.value = '';
+                    });
+                    btnClear.addEventListener('click', function(){
+                        if (confirm("Effacer l'annuaire local ? Les noms seront retirés de ce navigateur.")) {
+                            AnnuaireLocal.clear(); refresh();
+                            document.dispatchEvent(new CustomEvent('annuaire-updated', { detail:{ total:0 } }));
+                        }
+                    });
+                    document.addEventListener('annuaire-updated', refresh);
+                    refresh();
+                }
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAnnuaireBanner);
+                else initAnnuaireBanner();
+            })();
+            </script>
             <div class="quick-actions">
                 <a href="jeux-live/animateur.html" target="_blank" class="btn-quick" style="border-color:#2563eb; background: linear-gradient(135deg, rgba(37,99,235,0.14), rgba(15,118,110,0.08));"><span>🎲</span><div><strong>Jeux Live QR</strong><span>Party Live vidéoprojecteur + téléphones</span></div></a>
                 <a href="jeux-live/bibliotheque.html" target="_blank" class="btn-quick" style="border-color:#0f766e; background: linear-gradient(135deg, rgba(15,118,110,0.12), rgba(37,99,235,0.06));"><span>📚</span><div><strong>Bibliothèque Jeux</strong><span>Importer, éditer et lancer les jeux</span></div></a>
