@@ -27,43 +27,59 @@ const AnnuaireLocal = (function () {
 
     const STORAGE_KEY = "pse_annuaire_local";
     const STORAGE_DATE_KEY = "pse_annuaire_date";
+    // Clé de l'annuaire historique (prof_eval, dashboard, dossier-classe…).
+    // On lit/écrit les deux pour qu'un seul import suffise partout.
+    const LEGACY_KEY = "cockpit_eleves_noms";
 
     // ─── Lecture / Écriture localStorage ───────────────────────
 
-    function _read() {
+    function _parse(key) {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = localStorage.getItem(key);
             return raw ? JSON.parse(raw) : {};
         } catch (e) {
-            console.warn("⚠️ Annuaire local corrompu, reset.", e);
-            localStorage.removeItem(STORAGE_KEY);
+            console.warn("⚠️ Annuaire (" + key + ") corrompu, ignoré.", e);
             return {};
         }
+    }
+
+    function _read() {
+        return _parse(STORAGE_KEY);
+    }
+
+    // Vue fusionnée des deux annuaires (le principal a priorité)
+    function _readMerged() {
+        return Object.assign({}, _parse(LEGACY_KEY), _parse(STORAGE_KEY));
     }
 
     function _write(data) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         localStorage.setItem(STORAGE_DATE_KEY, new Date().toISOString());
+        // Miroir vers l'annuaire historique pour les pages qui le lisent
+        try {
+            const legacy = Object.assign({}, _parse(LEGACY_KEY), data);
+            localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy));
+        } catch (e) { console.warn("⚠️ Miroir annuaire historique impossible.", e); }
     }
 
     // ─── API publique ──────────────────────────────────────────
 
     function getNom(code) {
         if (!code) return null;
-        const data = _read();
+        const data = _readMerged();
         return data[code.trim().toUpperCase()] || data[code.trim()] || null;
     }
 
     function getAll() {
-        return _read();
+        return _readMerged();
     }
 
     function isLoaded() {
-        return Object.keys(_read()).length > 0;
+        return Object.keys(_readMerged()).length > 0;
     }
 
     function count() {
-        return Object.keys(_read()).length;
+        return Object.keys(_readMerged()).length;
     }
 
     function getDate() {
@@ -73,6 +89,8 @@ const AnnuaireLocal = (function () {
     function clear() {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(STORAGE_DATE_KEY);
+        // Supprime aussi l'annuaire historique : "supprimer" doit tout effacer
+        localStorage.removeItem(LEGACY_KEY);
     }
 
     /**
