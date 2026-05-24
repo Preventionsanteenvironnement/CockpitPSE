@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Récapitulatif des notes — Cockpit PSE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script src="data_eleves.js"></script>
+<script src="data_modules.js"></script>
+<script src="annuaire_local.js"></script>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --muted:#94a3b8; --txt:#e2e8f0; --accent:#facc15; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#f1f5f9; color:#0f172a; }
+  header { background:linear-gradient(135deg,#0f172a,#1e293b); color:#fff; padding:18px 24px; display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
+  header h1 { font-size:1.15rem; margin:0; flex:0 0 auto; }
+  header .spacer { flex:1; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 24px; background:#fff; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:10; }
+  select, button { font-family:inherit; font-size:0.85rem; }
+  select { padding:8px 12px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; }
+  .btn { padding:8px 14px; border-radius:8px; border:none; font-weight:600; cursor:pointer; color:#fff; }
+  .btn-primary { background:#2563eb; }
+  .btn-green { background:#16a34a; }
+  .btn-ghost { background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  main { display:grid; grid-template-columns:1fr; gap:18px; padding:18px 24px; }
+  @media(min-width:1100px){ main.with-panel { grid-template-columns:1fr 420px; } }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:0; overflow:hidden; }
+  .card h2 { font-size:0.95rem; margin:0; padding:14px 18px; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+  .grid-wrap { overflow:auto; max-height:72vh; }
+  table { border-collapse:collapse; width:100%; font-size:0.8rem; }
+  th, td { padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:center; white-space:nowrap; }
+  th { position:sticky; top:0; background:#0f3a4d; color:#fff; font-weight:600; z-index:2; }
+  th.eval-h { font-size:0.7rem; max-width:160px; white-space:normal; }
+  th .eval-d { display:block; color:#9fd3e6; font-weight:400; font-size:0.62rem; margin-top:2px; }
+  td.name { text-align:left; font-weight:600; position:sticky; left:0; background:#fff; cursor:pointer; }
+  td.name:hover { background:#eff6ff; }
+  tr:nth-child(even) td.name { background:#fafbfc; }
+  td.name.sel { background:#dbeafe; }
+  .note { display:inline-block; min-width:40px; padding:2px 8px; border-radius:999px; font-weight:700; }
+  .n-hi { background:#dcfce7; color:#166534; }
+  .n-mid { background:#fef9c3; color:#854d0e; }
+  .n-lo { background:#fee2e2; color:#991b1b; }
+  .n-na { background:#f1f5f9; color:#64748b; font-weight:600; }
+  .sub-date { display:block; font-size:0.6rem; color:#94a3b8; font-weight:400; margin-top:1px; }
+  td.moy { font-weight:800; background:#f0f9ff; }
+  .empty { padding:40px; text-align:center; color:#94a3b8; }
+  /* student panel */
+  #panel .stat-row { display:flex; gap:10px; padding:14px 18px; flex-wrap:wrap; }
+  .stat { flex:1; min-width:90px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; text-align:center; }
+  .stat .v { font-size:1.3rem; font-weight:800; color:#0f172a; }
+  .stat .l { font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:.03em; }
+  #panel .eval-list { padding:6px 18px 14px; }
+  .ev-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:0.8rem; }
+  .ev-item .t { flex:1; }
+  .ev-item .d { color:#94a3b8; font-size:0.68rem; }
+  .radar-box { padding:10px 18px 22px; }
+  .badge { font-size:0.62rem; padding:2px 7px; border-radius:999px; background:#e2e8f0; color:#475569; font-weight:600; }
+  .src-v2 { background:#ede9fe; color:#6d28d9; }
+  .hint { font-size:0.7rem; color:#64748b; padding:0 24px 18px; }
+  .close-x { background:none; border:none; font-size:1.1rem; cursor:pointer; color:#64748b; float:right; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Récapitulatif des notes</h1>
+  <span class="badge">Auto-évaluations v1 + V2</span>
+  <span class="spacer"></span>
+  <span id="annuaireSlot"></span>
+</header>
+
+<div class="toolbar">
+  <label style="font-size:.8rem;font-weight:600;">Classe :</label>
+  <select id="classeSelect"><option value="">— choisir une classe —</option></select>
+  <button class="btn btn-ghost" id="btnRefresh">↻ Actualiser</button>
+  <button class="btn btn-green" id="btnExport" disabled>📥 Export CSV (Pronote)</button>
+  <span id="status" style="font-size:.78rem;color:#64748b;"></span>
+</div>
+
+<p class="hint">Clique sur le nom d'un élève pour voir le détail de ses notes et son radar de compétences. Les noms restent sur cet ordinateur (RGPD) — importe ton annuaire via le bouton 🔒 en haut à droite.</p>
+
+<main id="layout">
+  <div class="card">
+    <h2>Vue classe</h2>
+    <div class="grid-wrap"><div id="grid"><div class="empty">Choisis une classe pour afficher les notes.</div></div></div>
+  </div>
+  <div class="card" id="panel" style="display:none;">
+    <h2><span id="panelName">Élève</span><button class="close-x" id="panelClose">✕</button></h2>
+    <div class="stat-row" id="panelStats"></div>
+    <div class="radar-box"><canvas id="radar" height="260"></canvas></div>
+    <div class="eval-list" id="panelEvals"></div>
+  </div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+  authDomain: "devoirs-pse.firebaseapp.com",
+  projectId: "devoirs-pse",
+  storageBucket: "devoirs-pse.firebasestorage.app",
+  messagingSenderId: "614730413904",
+  appId: "1:614730413904:web:a5dd478af5de30f6bede55"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+
+// ── Libellés de compétences (depuis data_modules.js) ──
+const COMP_LABELS = {};
+if (window.COMPETENCES_PSE) {
+  Object.values(window.COMPETENCES_PSE).forEach(arr => (arr || []).forEach(c => { if (c && c.id) COMP_LABELS[c.id] = c.titre; }));
+}
+
+const evalMeta = {};   // evalId -> {titre, bareme, modeNotation, nonNote, niveau, source}
+let classData = [];    // réponses brutes de la classe sélectionnée
+let currentClasse = "";
+let radarChart = null;
+
+const $ = id => document.getElementById(id);
+const setStatus = t => { $("status").textContent = t || ""; };
+
+function fmtDate(v) {
+  if (!v) return "";
+  try {
+    const dt = v.toDate ? v.toDate() : new Date(v);
+    if (isNaN(dt.getTime())) return "";
+    return dt.toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"2-digit" });
+  } catch (e) { return ""; }
+}
+function tsOf(v) {
+  if (!v) return 0;
+  try { const dt = v.toDate ? v.toDate() : new Date(v); return isNaN(dt.getTime()) ? 0 : dt.getTime(); } catch(e){ return 0; }
+}
+function isNonNote(meta, r) {
+  const mode = (r && r.modeNotation) || (meta && meta.modeNotation);
+  return mode === "non_notee" || (r && r.nonNote === true);
+}
+function noteOf(r) {
+  if (r && r.correction && r.correction.note != null) return Number(r.correction.note);
+  if (r && r.note_finale != null) return Number(r.note_finale);
+  if (r && r.note != null) return Number(r.note);
+  return null;
+}
+function baremeOf(meta, r) {
+  return Number((r && r.bareme) || (r && r.correction && r.correction.bareme) || (meta && meta.bareme) || 20) || 20;
+}
+function noteClass(note, bareme) {
+  if (note == null) return "n-na";
+  const p = note / bareme * 100;
+  return p >= 60 ? "n-hi" : p >= 40 ? "n-mid" : "n-lo";
+}
+function nomEleve(code) {
+  return (window.AnnuaireLocal && AnnuaireLocal.getNom(code)) || code;
+}
+
+// ── Chargement des deux banques (titres + barème + mode) ──
+async function loadBanks() {
+  for (const [coll, src] of [["eval_banque","v1"], ["eval_banque_v2","v2"]]) {
+    try {
+      const snap = await getDocs(collection(db, coll));
+      snap.forEach(d => {
+        const e = d.data();
+        evalMeta[d.id] = {
+          titre: e.titre || d.id,
+          bareme: e.bareme || 20,
+          modeNotation: e.modeNotation,
+          nonNote: e.nonNote === true,
+          niveau: e.niveau,
+          source: src
+        };
+      });
+    } catch (e) { console.warn("Banque " + coll + " :", e.message); }
+  }
+}
+
+async function loadClasse(classe) {
+  currentClasse = classe;
+  classData = [];
+  if (!classe) { renderGrid(); return; }
+  setStatus("Chargement…");
+  try {
+    const snap = await getDocs(query(collection(db, "eval_reponses"), where("classe", "==", classe)));
+    classData = snap.docs.map(d => d.data());
+  } catch (e) {
+    setStatus("Erreur : " + e.message);
+    return;
+  }
+  setStatus(classData.length + " copie(s) — " + getElevesDeClasse(classe).length + " élève(s)");
+  renderGrid();
+}
+
+function evalsOfClass() {
+  const map = {};
+  classData.forEach(r => {
+    if (!r.evalId) return;
+    if (!map[r.evalId]) map[r.evalId] = { id:r.evalId, ts:0 };
+    map[r.evalId].ts = Math.max(map[r.evalId].ts, tsOf(r.submittedAt || r.submittedAtClient));
+  });
+  return Object.values(map).sort((a,b) => b.ts - a.ts);
+}
+
+function cellByEleveEval() {
+  const m = {};
+  classData.forEach(r => { if (r.eleveCode && r.evalId) m[r.eleveCode + "|" + r.evalId] = r; });
+  return m;
+}
+
+function moyenneSur20(eleveCode, evals, cells) {
+  const vals = [];
+  evals.forEach(ev => {
+    const r = cells[eleveCode + "|" + ev.id];
+    const meta = evalMeta[ev.id];
+    if (!r || isNonNote(meta, r)) return;
+    const n = noteOf(r), b = baremeOf(meta, r);
+    if (n != null) vals.push(n / b * 20);
+  });
+  if (!vals.length) return null;
+  return vals.reduce((s,v)=>s+v,0) / vals.length;
+}
+
+function renderGrid() {
+  const host = $("grid");
+  if (!currentClasse) { host.innerHTML = '<div class="empty">Choisis une classe pour afficher les notes.</div>'; $("btnExport").disabled = true; return; }
+  const eleves = getElevesDeClasse(currentClasse).slice().sort((a,b)=> nomEleve(a.userCode).localeCompare(nomEleve(b.userCode),"fr"));
+  const evals = evalsOfClass();
+  if (!evals.length) { host.innerHTML = '<div class="empty">Aucune copie pour cette classe.</div>'; $("btnExport").disabled = true; return; }
+  const cells = cellByEleveEval();
+
+  let h = "<table><thead><tr><th style='position:sticky;left:0;z-index:3;'>Élève</th>";
+  evals.forEach(ev => {
+    const meta = evalMeta[ev.id] || {};
+    const src = meta.source === "v2" ? " <span class='badge src-v2'>V2</span>" : "";
+    h += "<th class='eval-h'>" + esc(meta.titre || ev.id) + src + "<span class='eval-d'>" + (fmtDate(ev.ts) || "") + "</span></th>";
+  });
+  h += "<th>Moy /20</th></tr></thead><tbody>";
+
+  eleves.forEach(el => {
+    h += "<tr><td class='name' data-code='" + esc(el.userCode) + "'>" + esc(nomEleve(el.userCode)) + "</td>";
+    evals.forEach(ev => {
+      const r = cells[el.userCode + "|" + ev.id];
+      const meta = evalMeta[ev.id];
+      if (!r) { h += "<td>·</td>"; return; }
+      const date = "<span class='sub-date'>" + (fmtDate(r.submittedAt || r.submittedAtClient) || "") + "</span>";
+      if (isNonNote(meta, r)) { h += "<td><span class='note n-na'>Soumis</span>" + date + "</td>"; return; }
+      const n = noteOf(r), b = baremeOf(meta, r);
+      const label = n == null ? "—" : (Math.round(n*100)/100) + "/" + b;
+      h += "<td><span class='note " + noteClass(n,b) + "'>" + label + "</span>" + date + "</td>";
+    });
+    const moy = moyenneSur20(el.userCode, evals, cells);
+    h += "<td class='moy'>" + (moy == null ? "—" : (Math.round(moy*100)/100).toFixed(2).replace(".",",")) + "</td></tr>";
+  });
+  h += "</tbody></table>";
+  host.innerHTML = h;
+  $("btnExport").disabled = false;
+
+  host.querySelectorAll("td.name").forEach(td => td.addEventListener("click", () => {
+    host.querySelectorAll("td.name").forEach(x=>x.classList.remove("sel"));
+    td.classList.add("sel");
+    openStudent(td.dataset.code);
+  }));
+}
+
+function openStudent(code) {
+  const evals = evalsOfClass();
+  const cells = cellByEleveEval();
+  const rows = [];
+  evals.forEach(ev => { const r = cells[code + "|" + ev.id]; if (r) rows.push({ ev, r, meta: evalMeta[ev.id] || {} }); });
+
+  $("panelName").textContent = nomEleve(code) + " (" + code + ")";
+  $("layout").classList.add("with-panel");
+  $("panel").style.display = "block";
+
+  // stats
+  const moy = moyenneSur20(code, evals, cells);
+  const noted = rows.filter(x => !isNonNote(x.meta, x.r) && noteOf(x.r) != null);
+  const lastTs = Math.max(0, ...rows.map(x => tsOf(x.r.submittedAt || x.r.submittedAtClient)));
+  $("panelStats").innerHTML =
+    stat(moy == null ? "—" : (Math.round(moy*100)/100).toFixed(2).replace(".",","), "Moyenne /20") +
+    stat(noted.length, "Évals notées") +
+    stat(rows.length, "Copies rendues") +
+    stat(lastTs ? fmtDate(lastTs) : "—", "Dernière");
+
+  // liste
+  $("panelEvals").innerHTML = rows
+    .sort((a,b)=> tsOf(b.r.submittedAt||b.r.submittedAtClient) - tsOf(a.r.submittedAt||a.r.submittedAtClient))
+    .map(x => {
+      const src = x.meta.source === "v2" ? " <span class='badge src-v2'>V2</span>" : "";
+      let val;
+      if (isNonNote(x.meta, x.r)) val = "<span class='note n-na'>Soumis</span>";
+      else { const n=noteOf(x.r), b=baremeOf(x.meta,x.r); val = "<span class='note "+noteClass(n,b)+"'>"+(n==null?"—":(Math.round(n*100)/100)+"/"+b)+"</span>"; }
+      return "<div class='ev-item'><span class='t'>" + esc(x.meta.titre || x.ev.id) + src +
+             "<span class='d'>" + (fmtDate(x.r.submittedAt||x.r.submittedAtClient)||"") + "</span></span>" + val + "</div>";
+    }).join("") || "<div class='empty'>Aucune copie.</div>";
+
+  renderRadar(rows);
+}
+
+function renderRadar(rows) {
+  const agg = {};
+  rows.forEach(x => {
+    const comp = x.r.correction && x.r.correction.competences;
+    if (!comp) return;
+    Object.entries(comp).forEach(([k, v]) => {
+      if (!v || typeof v !== "object") return;
+      if (!agg[k]) agg[k] = { pts:0, max:0 };
+      agg[k].pts += Number(v.pts) || 0;
+      agg[k].max += Number(v.max) || 0;
+    });
+  });
+  const keys = Object.keys(agg).filter(k => agg[k].max > 0).sort();
+  const ctx = $("radar");
+  if (radarChart) { radarChart.destroy(); radarChart = null; }
+  if (!keys.length) { ctx.style.display = "none"; return; }
+  ctx.style.display = "block";
+  radarChart = new Chart(ctx, {
+    type: "radar",
+    data: {
+      labels: keys.map(k => COMP_LABELS[k] ? (k + " — " + COMP_LABELS[k]) : k),
+      datasets: [{
+        label: "% de maîtrise",
+        data: keys.map(k => Math.round(agg[k].pts / agg[k].max * 100)),
+        fill: true,
+        backgroundColor: "rgba(37,99,235,0.18)",
+        borderColor: "rgba(37,99,235,0.9)",
+        pointBackgroundColor: "rgba(37,99,235,1)"
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: { r: { min:0, max:100, ticks:{ stepSize:25 } } },
+      plugins: { legend: { display:false } }
+    }
+  });
+}
+
+function stat(v, l) { return "<div class='stat'><div class='v'>" + esc(String(v)) + "</div><div class='l'>" + esc(l) + "</div></div>"; }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+function exportCSV() {
+  if (!currentClasse) return;
+  const eleves = getElevesDeClasse(currentClasse).slice().sort((a,b)=> nomEleve(a.userCode).localeCompare(nomEleve(b.userCode),"fr"));
+  const evals = evalsOfClass();
+  const cells = cellByEleveEval();
+  const head = ["Nom", "Code", "Classe"];
+  evals.forEach(ev => { const m = evalMeta[ev.id]||{}; head.push((m.titre||ev.id) + " (" + (fmtDate(ev.ts)||"") + ")"); });
+  head.push("Moyenne/20");
+  const lines = [head];
+  eleves.forEach(el => {
+    const row = [nomEleve(el.userCode), el.userCode, currentClasse];
+    evals.forEach(ev => {
+      const r = cells[el.userCode + "|" + ev.id]; const meta = evalMeta[ev.id];
+      if (!r) { row.push(""); return; }
+      if (isNonNote(meta, r)) { row.push("Soumis"); return; }
+      const n = noteOf(r), b = baremeOf(meta, r);
+      row.push(n == null ? "" : String(Math.round(n*100)/100).replace(".",",") + "/" + b);
+    });
+    const moy = moyenneSur20(el.userCode, evals, cells);
+    row.push(moy == null ? "" : (Math.round(moy*100)/100).toFixed(2).replace(".",","));
+    lines.push(row);
+  });
+  const csv = lines.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(";")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type:"text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "recap_notes_" + currentClasse + "_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Init ──
+function fillClasses() {
+  const sel = $("classeSelect");
+  const list = (window.getListeClassesPourAffichage ? getListeClassesPourAffichage() : []);
+  list.forEach(c => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label || c.id; sel.appendChild(o); });
+}
+
+if (window.AnnuaireLocal && AnnuaireLocal.renderButton) AnnuaireLocal.renderButton($("annuaireSlot"));
+document.addEventListener("annuaire-updated", () => renderGrid());
+document.addEventListener("annuaire-toggle", () => renderGrid());
+
+fillClasses();
+$("classeSelect").addEventListener("change", e => { $("panel").style.display="none"; $("layout").classList.remove("with-panel"); loadClasse(e.target.value); });
+$("btnRefresh").addEventListener("click", async () => { await loadBanks(); await loadClasse(currentClasse); });
+$("btnExport").addEventListener("click", exportCSV);
+$("panelClose").addEventListener("click", () => { $("panel").style.display="none"; $("layout").classList.remove("with-panel"); document.querySelectorAll("td.name").forEach(x=>x.classList.remove("sel")); });
+
+loadBanks().then(() => setStatus("Banques chargées — choisis une classe."));
+</script>
+</body>
+</html>
