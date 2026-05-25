@@ -2880,6 +2880,22 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     <div class="modal-content">
         <h3>📥 Importer une évaluation (JSON)</h3>
         <p class="info-text" style="margin-bottom:8px;">Collez le JSON généré par l'IA ou créé manuellement. L'import remplace les documents et questions existants.</p>
+        <div id="comp-focus-box" style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:10px;">
+            <div style="font-weight:700;color:#a5b4fc;margin-bottom:6px;font-size:0.85rem;">🎯 Compétences à cibler (le prompt s'adapte)</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                <button type="button" class="btn-import-json" onclick="setCompPreset('decouverte')">Découverte (C1·C2·C4)</button>
+                <button type="button" class="btn-import-json" onclick="setCompPreset('intermediaire')">Intermédiaire (+C3·C5)</button>
+                <button type="button" class="btn-import-json" onclick="setCompPreset('complet')">Complet (C1→C6)</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:0.8rem;color:#e2e8f0;">
+                <label><input type="checkbox" class="comp-focus" value="C1" checked> C1 Traiter une info</label>
+                <label><input type="checkbox" class="comp-focus" value="C2" checked> C2 Analyser</label>
+                <label><input type="checkbox" class="comp-focus" value="C3"> C3 Expliquer</label>
+                <label><input type="checkbox" class="comp-focus" value="C4" checked> C4 Proposer</label>
+                <label><input type="checkbox" class="comp-focus" value="C5"> C5 Argumenter</label>
+                <label><input type="checkbox" class="comp-focus" value="C6"> C6 Communiquer</label>
+            </div>
+        </div>
         <details class="import-prompt-details">
             <summary>📋 Voir le prompt IA</summary>
             <pre id="import-prompt-text"></pre>
@@ -3091,40 +3107,61 @@ window.closeImportModal = function() {
     document.getElementById('import-modal').style.display = 'none';
 };
 
+function getFocusCompetences() {
+    const boxes = Array.from(document.querySelectorAll('.comp-focus'));
+    const sel = boxes.filter(b => b.checked).map(b => b.value);
+    return sel.length ? sel : ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+}
+window.setCompPreset = function(p) {
+    const map = { decouverte: ['C1', 'C2', 'C4'], intermediaire: ['C1', 'C2', 'C3', 'C4', 'C5'], complet: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] };
+    const want = map[p] || [];
+    document.querySelectorAll('.comp-focus').forEach(b => { b.checked = want.includes(b.value); });
+};
 async function buildModuleContext() {
+    const comps = getFocusCompetences();
+    const bareme = (typeof currentBareme !== 'undefined' && currentBareme) ? currentBareme : 20;
+    let ctx = '\n\n=== PARAMETRES (a respecter imperativement) ===\n';
+    ctx += 'Bareme : sur ' + bareme + ' points. La somme des points de TOUTES les questions doit faire EXACTEMENT ' + bareme + '.\n';
+    ctx += 'Competences a evaluer UNIQUEMENT : ' + comps.join(', ') + '. Ne genere aucune question portant sur une autre competence.\n';
+    ctx += "Regle type 'mot' : la reponse attendue fait 1 ou 2 mots maximum ; ajoute dans la consigne, entre parentheses, \"(ecris le mot correctement)\". (La correction ignore les accents et les majuscules.)\n";
+    if (comps.includes('C3') || comps.includes('C5')) {
+        ctx += "C3 (expliquer) / C5 (argumenter) : NE PAS faire rediger une phrase libre (non auto-corrigeable). Transforme-les en RECONNAISSANCE : QCM 'choisir la bonne explication / le bon argument', vrai-faux, association cause->consequence, ou 'ordonner' les etapes d'un mecanisme.\n";
+    }
+    if (comps.includes('C6')) {
+        ctx += "C6 (communication ecrite) ne s'evalue pas en auto-correction : ne genere pas de question dediee a C6.\n";
+    }
+    // Contexte du module selectionne (objectif + notions + approche)
     try {
         const modSel = document.getElementById('eval-module');
         const moduleId = modSel ? modSel.value : '';
-        if (!moduleId) return '';
-        const resp = await fetch('programme_modules.json', { cache: 'no-store' });
-        const prog = await resp.json();
-        const m = prog.modules && prog.modules[moduleId];
-        if (!m) return '';
-        let ctx = '\n\n=== CONTEXTE DU MODULE (a respecter imperativement) ===\n';
-        ctx += 'Module ' + (m.code || moduleId) + ' (' + (m.niveau || '') + ') : ' + (m.titre || '') + '\n';
-        if (m.objectif) ctx += 'Objectif general : ' + m.objectif + '\n';
-        if (m.notions && m.notions.length) {
-            ctx += "Notions cles que les eleves doivent maitriser a la fin du module (cible les questions dessus, approche par competences) :\n- " + m.notions.join('\n- ') + '\n';
+        if (moduleId) {
+            const resp = await fetch('programme_modules.json', { cache: 'no-store' });
+            const prog = await resp.json();
+            const m = prog.modules && prog.modules[moduleId];
+            if (m) {
+                ctx += '\n=== CONTEXTE DU MODULE ===\n';
+                ctx += 'Module ' + (m.code || moduleId) + ' (' + (m.niveau || '') + ') : ' + (m.titre || '') + '\n';
+                if (m.objectif) ctx += 'Objectif general : ' + m.objectif + '\n';
+                if (m.notions && m.notions.length) ctx += "Notions cles a evaluer :\n- " + m.notions.join('\n- ') + '\n';
+                const blob = ((m.objectif || '') + ' ' + (m.notions || []).join(' ')).toLowerCase();
+                const padOK = blob.includes('apparition du dommage') || blob.includes('evenement declencheur') || blob.includes('événement déclencheur') || (blob.includes('situation dangereuse') && blob.includes('dommage'));
+                const prevContext = blob.includes('danger') || blob.includes('risque professionnel') || blob.includes('situation dangereuse');
+                const prevOK = blob.includes('suppression du risque') || blob.includes('reduction du risque') || blob.includes('réduction du risque') || blob.includes('principes generaux de prevention') || blob.includes('principes généraux de prévention') || ((blob.includes('protection collective') || blob.includes('protection individuelle')) && prevContext);
+                // PAD/Prevention evaluent surtout C2 : ne les proposer que si C2 est ciblee
+                if (comps.includes('C2') && padOK) ctx += "- Approche par le risque : inclus au moins un exercice de type 'pad' (danger -> situation dangereuse -> evenement declencheur -> dommage).\n";
+                if (comps.includes('C2') && prevOK) ctx += "- Inclus au moins un exercice de type 'prevention' (supprimer, reduire, protection collective, protection individuelle, formation).\n";
+            }
         }
-        // Detection de l'approche pedagogique a partir des notions (le PAD n'est PAS systematique)
-        const blob = ((m.objectif || '') + ' ' + (m.notions || []).join(' ')).toLowerCase();
-        const padOK = blob.includes('apparition du dommage') || blob.includes('evenement declencheur') || blob.includes('événement déclencheur') || (blob.includes('situation dangereuse') && blob.includes('dommage'));
-        const prevContext = blob.includes('danger') || blob.includes('risque professionnel') || blob.includes('situation dangereuse');
-        const prevOK = blob.includes('suppression du risque') || blob.includes('reduction du risque') || blob.includes('réduction du risque') || blob.includes('principes generaux de prevention') || blob.includes('principes généraux de prévention') || ((blob.includes('protection collective') || blob.includes('protection individuelle')) && prevContext);
-        ctx += "\nCONSIGNE : genere des questions qui evaluent precisement ces notions du module. Une consigne = un seul verbe d'action (identifier, expliquer, proposer, justifier...).\n";
-        if (padOK) ctx += "- Ce module releve de l'APPROCHE PAR LE RISQUE : inclus au moins un exercice de type 'pad' (Processus d'Apparition du Dommage : danger -> situation dangereuse -> evenement declencheur -> dommage).\n";
-        if (prevOK) ctx += "- Inclus au moins un exercice de type 'prevention' (hierarchie des mesures : supprimer, reduire, protection collective, protection individuelle, formation/information).\n";
-        if (!padOK && !prevOK) ctx += "- Ce module ne se prete PAS au PAD ni a la hierarchie de prevention : n'utilise PAS les types 'pad' ni 'prevention'. Reste sur qcm, qcm_multi, vf, mot, nombre, ordonner.\n";
-        ctx += "IMPORTANT : reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
-        return ctx;
-    } catch (e) { console.warn('Contexte module non injecte:', e && e.message); return ''; }
+    } catch (e) { console.warn('Contexte module non injecte:', e && e.message); }
+    ctx += "\nIMPORTANT : une consigne = un seul verbe d'action. Reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
+    return ctx;
 }
 window.copyImportPrompt = async function() {
     const ctx = await buildModuleContext();
     const fullPrompt = IMPORT_PROMPT + ctx;
     try {
         await navigator.clipboard.writeText(fullPrompt);
-        showToast(ctx ? '📋 Prompt copié (avec contexte du module) !' : '📋 Prompt copié !');
+        showToast('📋 Prompt copié (paramètres + module) !');
     } catch (e) {
         const ta = document.createElement('textarea');
         ta.value = fullPrompt;
@@ -3132,7 +3169,7 @@ window.copyImportPrompt = async function() {
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast(ctx ? '📋 Prompt copié (avec contexte du module) !' : '📋 Prompt copié !');
+        showToast('📋 Prompt copié (paramètres + module) !');
     }
 };
 
