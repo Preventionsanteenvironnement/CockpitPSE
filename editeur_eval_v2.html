@@ -3091,19 +3091,40 @@ window.closeImportModal = function() {
     document.getElementById('import-modal').style.display = 'none';
 };
 
-window.copyImportPrompt = function() {
-    navigator.clipboard.writeText(IMPORT_PROMPT).then(() => {
-        showToast('📋 Prompt copié !');
-    }).catch(() => {
-        // Fallback
+async function buildModuleContext() {
+    try {
+        const modSel = document.getElementById('eval-module');
+        const moduleId = modSel ? modSel.value : '';
+        if (!moduleId) return '';
+        const resp = await fetch('programme_modules.json', { cache: 'no-store' });
+        const prog = await resp.json();
+        const m = prog.modules && prog.modules[moduleId];
+        if (!m) return '';
+        let ctx = '\n\n=== CONTEXTE DU MODULE (a respecter imperativement) ===\n';
+        ctx += 'Module ' + (m.code || moduleId) + ' (' + (m.niveau || '') + ') : ' + (m.titre || '') + '\n';
+        if (m.objectif) ctx += 'Objectif general : ' + m.objectif + '\n';
+        if (m.notions && m.notions.length) {
+            ctx += "Notions cles que les eleves doivent maitriser a la fin du module (cible les questions dessus, approche par competences) :\n- " + m.notions.join('\n- ') + '\n';
+        }
+        ctx += "\nCONSIGNE : genere des questions qui evaluent precisement ces notions du module. Tu peux melanger les types (qcm, qcm_multi, vf, mot, nombre, ordonner, pad, prevention). Si le module porte sur la sante/securite au travail, inclus au moins un exercice 'pad' et un exercice 'prevention'.\nIMPORTANT : reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
+        return ctx;
+    } catch (e) { console.warn('Contexte module non injecte:', e && e.message); return ''; }
+}
+window.copyImportPrompt = async function() {
+    const ctx = await buildModuleContext();
+    const fullPrompt = IMPORT_PROMPT + ctx;
+    try {
+        await navigator.clipboard.writeText(fullPrompt);
+        showToast(ctx ? '📋 Prompt copié (avec contexte du module) !' : '📋 Prompt copié !');
+    } catch (e) {
         const ta = document.createElement('textarea');
-        ta.value = IMPORT_PROMPT;
+        ta.value = fullPrompt;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast('📋 Prompt copié !');
-    });
+        showToast(ctx ? '📋 Prompt copié (avec contexte du module) !' : '📋 Prompt copié !');
+    }
 };
 
 function ensurePreventionLevelsForImport(levels) {
