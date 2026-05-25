@@ -3106,7 +3106,16 @@ async function buildModuleContext() {
         if (m.notions && m.notions.length) {
             ctx += "Notions cles que les eleves doivent maitriser a la fin du module (cible les questions dessus, approche par competences) :\n- " + m.notions.join('\n- ') + '\n';
         }
-        ctx += "\nCONSIGNE : genere des questions qui evaluent precisement ces notions du module. Tu peux melanger les types (qcm, qcm_multi, vf, mot, nombre, ordonner, pad, prevention). Si le module porte sur la sante/securite au travail, inclus au moins un exercice 'pad' et un exercice 'prevention'.\nIMPORTANT : reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
+        // Detection de l'approche pedagogique a partir des notions (le PAD n'est PAS systematique)
+        const blob = ((m.objectif || '') + ' ' + (m.notions || []).join(' ')).toLowerCase();
+        const padOK = blob.includes('apparition du dommage') || blob.includes('evenement declencheur') || blob.includes('événement déclencheur') || (blob.includes('situation dangereuse') && blob.includes('dommage'));
+        const prevContext = blob.includes('danger') || blob.includes('risque professionnel') || blob.includes('situation dangereuse');
+        const prevOK = blob.includes('suppression du risque') || blob.includes('reduction du risque') || blob.includes('réduction du risque') || blob.includes('principes generaux de prevention') || blob.includes('principes généraux de prévention') || ((blob.includes('protection collective') || blob.includes('protection individuelle')) && prevContext);
+        ctx += "\nCONSIGNE : genere des questions qui evaluent precisement ces notions du module. Une consigne = un seul verbe d'action (identifier, expliquer, proposer, justifier...).\n";
+        if (padOK) ctx += "- Ce module releve de l'APPROCHE PAR LE RISQUE : inclus au moins un exercice de type 'pad' (Processus d'Apparition du Dommage : danger -> situation dangereuse -> evenement declencheur -> dommage).\n";
+        if (prevOK) ctx += "- Inclus au moins un exercice de type 'prevention' (hierarchie des mesures : supprimer, reduire, protection collective, protection individuelle, formation/information).\n";
+        if (!padOK && !prevOK) ctx += "- Ce module ne se prete PAS au PAD ni a la hierarchie de prevention : n'utilise PAS les types 'pad' ni 'prevention'. Reste sur qcm, qcm_multi, vf, mot, nombre, ordonner.\n";
+        ctx += "IMPORTANT : reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
         return ctx;
     } catch (e) { console.warn('Contexte module non injecte:', e && e.message); return ''; }
 }
