@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultats Auto-Evaluations V2 — Prof</title>
+    <title>Resultats Auto-Evaluations — Prof</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -401,7 +401,7 @@
 <div id="sidebar">
     <button class="close-sidebar-btn" onclick="closeMenu()">✕</button>
     <div class="sidebar-header">
-        <h2>📊 Resultats Eval V2</h2>
+        <h2>📊 Resultats Auto-evaluations</h2>
         <a href="index.html">← Cockpit</a>
     </div>
 
@@ -481,7 +481,7 @@
     <!-- Empty state -->
     <div id="main-empty">
         <div class="big-icon">📊</div>
-        <h2 style="margin-bottom:8px;">Resultats des auto-evaluations V2</h2>
+        <h2 style="margin-bottom:8px;">Resultats des auto-evaluations</h2>
         <p>Selectionne une evaluation dans la sidebar pour voir les resultats des eleves.</p>
     </div>
 
@@ -683,6 +683,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     // === STATE ===
     let allEvals = [];
     let currentEvalId = null;
+    let currentEvalBank = 'eval_banque_v2'; // banque d'origine de l'eval selectionnee (v1 = eval_banque, v2 = eval_banque_v2)
     let currentEvalData = null;
     let results = [];
     let filteredResults = [];
@@ -703,17 +704,29 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     let classOverviewRows = [];
     let classOverviewEvals = [];
 
-    // === LOAD ALL EVALS (real-time) ===
-    const qBanque = query(collection(db, "eval_banque_v2"), orderBy("updatedAt", "desc"));
-    onSnapshot(qBanque, (snap) => {
-        allEvals = [];
-        snap.forEach(d => {
-            allEvals.push({ id: d.id, ...d.data() });
+    // === LOAD ALL EVALS (real-time) - lit les DEUX banques (auto-evaluations unifiees v1 + v2) ===
+    const _bankCache = { "eval_banque": [], "eval_banque_v2": [] };
+    function _rebuildAllEvals() {
+        const byId = {};
+        // En cas de collision d'id, la v2 est prioritaire (ecrite en dernier)
+        ["eval_banque", "eval_banque_v2"].forEach(bank => {
+            _bankCache[bank].forEach(ev => { byId[ev.id] = ev; });
+        });
+        allEvals = Object.values(byId).sort((a, b) => {
+            const ta = a.updatedAt && a.updatedAt.toMillis ? a.updatedAt.toMillis() : (a.updatedAt || 0);
+            const tb = b.updatedAt && b.updatedAt.toMillis ? b.updatedAt.toMillis() : (b.updatedAt || 0);
+            return tb - ta;
         });
         buildSidebarFilters();
         renderClassOverviewSelector();
         renderEvalSelector();
         renderEvalSidebarList();
+    }
+    ["eval_banque", "eval_banque_v2"].forEach(bank => {
+        onSnapshot(collection(db, bank), (snap) => {
+            _bankCache[bank] = snap.docs.map(d => ({ id: d.id, _bank: bank, ...d.data() }));
+            _rebuildAllEvals();
+        }, (err) => console.warn('Lecture ' + bank + ' impossible:', err && err.message));
     });
 
     try { renderClassOverviewSelector(); } catch(e) { console.warn('Initialisation vue classe differee:', e); }
@@ -836,6 +849,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         currentEvalId = evalId;
         currentEvalData = allEvals.find(e => e.id === evalId) || null;
+        currentEvalBank = (currentEvalData && currentEvalData._bank) || 'eval_banque_v2';
 
         document.getElementById('class-overview-content').style.display = 'none';
         document.getElementById('main-empty').style.display = 'none';
@@ -1741,7 +1755,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         if (currentEvalData.correctionPubliee) {
             if (!confirm('La correction est deja publiee. Voulez-vous la depublier ?')) return;
             try {
-                await updateDoc(doc(db, "eval_banque_v2", currentEvalId), { correctionPubliee: false });
+                await updateDoc(doc(db, currentEvalBank, currentEvalId), { correctionPubliee: false });
                 currentEvalData.correctionPubliee = false;
                 const btn = document.getElementById('btn-publish-correction');
                 btn.textContent = '📝 Publier la correction';
@@ -1754,7 +1768,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         }
         if (!confirm('Publier la correction ? Les eleves pourront voir les bonnes reponses.')) return;
         try {
-            await updateDoc(doc(db, "eval_banque_v2", currentEvalId), { correctionPubliee: true });
+            await updateDoc(doc(db, currentEvalBank, currentEvalId), { correctionPubliee: true });
             currentEvalData.correctionPubliee = true;
             const btn = document.getElementById('btn-publish-correction');
             btn.textContent = '✅ Correction publiee';
@@ -1854,7 +1868,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             } catch(e) { /* copy may not exist */ }
 
             // 6. Register in eval's deuxieme_chance list
-            const evalRef = doc(db, "eval_banque_v2", currentEvalId);
+            const evalRef = doc(db, currentEvalBank, currentEvalId);
             const evalSnap2 = await getDoc(evalRef);
             const currentList = evalSnap2.exists() ? (evalSnap2.data().deuxieme_chance_eleves || []) : [];
             if (!currentList.includes(eleveCode)) {
@@ -2379,7 +2393,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             });
 
             // 5. Delete the evaluation itself
-            deleteTasks.push(deleteDoc(doc(db, "eval_banque_v2", currentEvalId)));
+            deleteTasks.push(deleteDoc(doc(db, currentEvalBank, currentEvalId)));
 
             await Promise.all(deleteTasks);
 
@@ -2399,7 +2413,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         showToast('Suppression en cours...');
 
         try {
-            await deleteDoc(doc(db, "eval_banque_v2", currentEvalId));
+            await deleteDoc(doc(db, currentEvalBank, currentEvalId));
             resetAfterEvalDelete();
             showToast('Evaluation supprimee (notes conservees)');
         } catch(e) {
