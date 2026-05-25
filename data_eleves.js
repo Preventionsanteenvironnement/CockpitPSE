@@ -233,11 +233,15 @@ window.getListeClassesPourAffichage = function() {
 };
 
 /**
- * Obtenir les classes d'un groupe
- * ⚠️ PAS DE REGROUPEMENT - Retourne simplement la classe elle-même
+ * Obtenir les classes d'un groupe.
+ * Consulte GROUPES_CLASSES (defini dans data_modules.js) AU MOMENT DE L'APPEL,
+ * donc robuste quel que soit l'ordre de chargement des scripts.
+ * Ex : getClassesFromGroupe("BTAGO") -> ["BTAGO1","BTAGO2"].
  */
 window.getClassesFromGroupe = function(classeId) {
-    // Pas de regroupement : une classe = elle-même
+    if (window.GROUPES_CLASSES && window.GROUPES_CLASSES[classeId]) {
+        return window.GROUPES_CLASSES[classeId];
+    }
     return [classeId];
 };
 
