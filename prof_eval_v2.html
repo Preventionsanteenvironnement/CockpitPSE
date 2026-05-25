@@ -1287,9 +1287,11 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     function evalTargetsClass(ev, classe) {
         const ids = ev.classeIds || (ev.classeId ? [ev.classeId] : []);
         if (ids.length === 0) return true;
+        // La classe selectionnee peut etre un GROUPE (ex. BTAGO) -> on compare au niveau des classes concretes
+        const cibles = new Set(window.getClassesFromGroupe ? window.getClassesFromGroupe(classe) : [classe]);
         return ids.some(id => {
             const expanded = window.getClassesFromGroupe ? window.getClassesFromGroupe(id) : [id];
-            return expanded.includes(classe);
+            return expanded.some(c => cibles.has(c));
         });
     }
 
@@ -1337,8 +1339,10 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
     }
 
     async function loadClassOverviewData(classe) {
+        // La classe selectionnee peut etre un GROUPE (ex. BTAGO) -> on prend les eleves de toutes les classes membres
+        const cibles = (window.getClassesFromGroupe ? window.getClassesFromGroupe(classe) : [classe]);
         const eleves = (window.BDD_ELEVES || [])
-            .filter(e => e.classe === classe)
+            .filter(e => cibles.includes(e.classe))
             .sort((a, b) => a.userCode.localeCompare(b.userCode));
         const evals = allEvals
             .filter(ev => ev.publie && evalTargetsClass(ev, classe))
