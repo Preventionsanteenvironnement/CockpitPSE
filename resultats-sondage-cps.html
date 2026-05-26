@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 Résultats Sondage CPS — Cockpit PSE</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    background: #f5f7fa;
+    color: #1f2937;
+    padding: 0 0 60px;
+  }
+  header {
+    background: linear-gradient(135deg, #4a148c, #6a1b9a);
+    color: #fff;
+    padding: 24px 32px;
+    box-shadow: 0 4px 20px rgba(74,20,140,0.2);
+  }
+  header h1 { margin: 0; font-size: 1.5em; font-weight: 800; }
+  header .subtitle { opacity: 0.85; font-size: 0.9em; margin-top: 4px; }
+  .nav-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 32px;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .nav-btn {
+    padding: 8px 14px;
+    background: #f3f4f6;
+    color: #4b5563;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 0.88em;
+    font-weight: 500;
+    transition: all 0.15s;
+    border: 1px solid #e5e7eb;
+  }
+  .nav-btn:hover { background: #e5e7eb; }
+  .nav-btn.active { background: #4a148c; color: #fff; border-color: #4a148c; }
+  .container { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: #fff;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border-left: 4px solid #8e24aa;
+  }
+  .stat-card .label { font-size: 0.78em; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .stat-card .value { font-size: 2em; font-weight: 800; color: #4a148c; margin: 4px 0; }
+  .stat-card .sub { font-size: 0.82em; color: #9ca3af; }
+  .toolbar {
+    display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+  }
+  .toolbar label { font-size: 0.88em; color: #4b5563; font-weight: 500; }
+  .toolbar select, .toolbar button {
+    padding: 8px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.88em;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .toolbar button { background: #4a148c; color: #fff; border-color: #4a148c; font-weight: 600; }
+  .toolbar button:hover { background: #6a1b9a; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .panel h2 {
+    margin: 0 0 14px 0;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #1f2937;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f3e5f5;
+  }
+  .panel.full { grid-column: 1 / -1; }
+  canvas { max-width: 100%; }
+  .priorite-list { display: flex; flex-direction: column; gap: 8px; }
+  .priorite-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: #fafafa;
+    border-radius: 8px;
+    border-left: 4px solid #8e24aa;
+  }
+  .priorite-item.top1 { background: linear-gradient(90deg, #fce7f3, #fafafa); border-left-color: #d4145a; }
+  .priorite-item.top2 { background: linear-gradient(90deg, #f3e5f5, #fafafa); }
+  .priorite-item.top3 { background: linear-gradient(90deg, #ede7f6, #fafafa); }
+  .priorite-rank { width: 30px; height: 30px; background: #8e24aa; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9em; flex-shrink: 0; }
+  .priorite-item.top1 .priorite-rank { background: #d4145a; }
+  .priorite-label { flex: 1; font-size: 0.93em; font-weight: 500; }
+  .priorite-score { font-weight: 700; color: #4a148c; font-size: 0.92em; }
+  .verbatim-list { display: flex; flex-direction: column; gap: 10px; max-height: 500px; overflow-y: auto; }
+  .verbatim {
+    padding: 12px 14px;
+    background: #fafafa;
+    border-radius: 8px;
+    border-left: 3px solid #d1d5db;
+    font-size: 0.92em;
+    font-style: italic;
+    color: #374151;
+  }
+  .verbatim .meta { font-size: 0.75em; color: #9ca3af; font-style: normal; margin-top: 6px; }
+  .loading { text-align: center; padding: 60px; color: #6b7280; font-style: italic; }
+  .empty { text-align: center; padding: 40px; color: #9ca3af; font-style: italic; font-size: 0.95em; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72em; font-weight: 700; }
+  .badge-green { background: #d1fae5; color: #065f46; }
+  .badge-orange { background: #fed7aa; color: #9a3412; }
+  .badge-red { background: #fecaca; color: #991b1b; }
+  .legend-cps {
+    background: #ede7f6;
+    color: #4a148c;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Résultats Sondage CPS — Communication</h1>
+  <div class="subtitle">Pilotage des ateliers Terminale Bac Pro · Référentiel Santé publique France 2025</div>
+</header>
+
+<nav class="nav-bar">
+  <a href="index.html" class="nav-btn">🏠 Cockpit</a>
+  <a href="dashboard.html" class="nav-btn">📊 Tableau de Bord</a>
+  <a href="suivi.html" class="nav-btn">📝 Suivi de Classe</a>
+  <a href="resultats-sondage-cps.html" class="nav-btn active">📊 Sondage CPS</a>
+  <a href="https://preventionsanteenvironnement.github.io/cps/sondage/" target="_blank" class="nav-btn" style="margin-left:auto; background:#8e24aa; color:#fff; border-color:#8e24aa;">🔗 Voir le sondage élèves</a>
+</nav>
+
+<div class="container">
+
+  <div class="legend-cps">
+    💡 <strong>Lecture :</strong> ce dashboard agrège les réponses anonymes des élèves au sondage de besoins en communication.
+    Les <strong>priorités d'ateliers</strong> (panneau central) sont pondérées : un vote en priorité 1 = 5 points, priorité 2 = 4 points, etc.
+    Plus le score est élevé, plus l'atelier est attendu par les élèves.
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">Réponses reçues</div>
+      <div class="value" id="statTotal">—</div>
+      <div class="sub" id="statDate">en attente…</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#1976d2;">
+      <div class="label">Niveau moyen perçu</div>
+      <div class="value" id="statMoyenne">—</div>
+      <div class="sub">auto-évaluation /5</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#d4145a;">
+      <div class="label">Compétence la + faible</div>
+      <div class="value" id="statFaible" style="font-size:1em;">—</div>
+      <div class="sub" id="statFaibleScore">—</div>
+    </div>
+    <div class="stat-card" style="border-left-color:#2e7d32;">
+      <div class="label">Difficulté n°1</div>
+      <div class="value" id="statDiff" style="font-size:1em;">—</div>
+      <div class="sub" id="statDiffPct">—</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label>Filtrer par classe :</label>
+    <select id="filterClasse">
+      <option value="">Toutes les classes</option>
+      <option value="TBP1">Terminale Bac Pro 1</option>
+      <option value="TBP2">Terminale Bac Pro 2</option>
+      <option value="TBP3">Terminale Bac Pro 3</option>
+      <option value="autre">Autre</option>
+    </select>
+    <button onclick="loadData()">🔄 Rafraîchir</button>
+    <button onclick="exportCSV()">📥 Export CSV</button>
+    <button onclick="exportJSON()">📦 Export JSON</button>
+  </div>
+
+  <div class="grid">
+
+    <div class="panel full">
+      <h2>🏆 Priorités d'ateliers (votes pondérés)</h2>
+      <div class="priorite-list" id="prioritesList"><div class="loading">⏳ Chargement…</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>📊 Auto-évaluation par compétence (moyenne sur 5)</h2>
+      <canvas id="chartAuto" height="280"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>⚠️ Difficultés les plus citées (% d'élèves)</h2>
+      <canvas id="chartDiff" height="280"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>🎯 Modalités préférées</h2>
+      <canvas id="chartModal" height="260"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>👤 Profil des répondants</h2>
+      <canvas id="chartProfil" height="260"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>💬 Situations vécues (verbatim Section E1)</h2>
+      <div class="verbatim-list" id="verbatimE1"><div class="loading">⏳ Chargement…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>🎯 Objectifs personnels (verbatim Section E2)</h2>
+      <div class="verbatim-list" id="verbatimE2"><div class="loading">⏳ Chargement…</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Auth Google (réutilise pattern Cockpit) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWdCMvOiAJln3eT9LIAQD3RWJUD0lQcLI",
+  authDomain: "devoirs-pse.firebaseapp.com",
+  projectId: "devoirs-pse",
+  storageBucket: "devoirs-pse.firebasestorage.app",
+  messagingSenderId: "614730413904",
+  appId: "1:614730413904:web:a5dd478af5de30f6bede55",
+  measurementId: "G-7R9N0JL6GG"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// === Référentiels d'affichage ===
+const LABELS_AUTO = {
+  a1: "A1 · Exprimer mes idées clairement",
+  a2: "A2 · Écouter sans interrompre",
+  a3: "A3 · Dire non sans agresser",
+  a4: "A4 · Demander de l'aide",
+  a5: "A5 · Gérer un désaccord sans m'énerver",
+  a6: "A6 · Parler devant un groupe",
+  a7: "A7 · Reformuler / vérifier la compréhension",
+  a8: "A8 · Repérer mes émotions en parlant",
+  a9: "A9 · M'adresser à un adulte (pro)",
+  a10: "A10 · Adapter mon langage à la situation"
+};
+const LABELS_DIFF = {
+  b1: "Bloquer devant un groupe",
+  b2: "S'emporter et le regretter",
+  b3: "Se taire face à un adulte",
+  b4: "Ne pas oser refuser ses potes",
+  b5: "Perdre ses mots en entretien",
+  b6: "Se fermer / contre-attaquer face à la critique",
+  b7: "Se sentir jugé en parlant",
+  b8: "Ne pas dire ce qu'on ressent",
+  b9: "Couper la parole sans s'en rendre compte",
+  b10: "Dire ce que les autres veulent entendre",
+  b11: "Langage de tous les jours problématique en pro",
+  b12: "Difficulté avec les sous-entendus",
+  b13: "Ne pas regarder dans les yeux",
+  b14: "Téléphone plus difficile que face à face",
+  b15: "Mes messages écrits sont mal pris",
+  b16: "Stress qui coupe la parole"
+};
+const LABELS_ATELIERS = {
+  c1: "🗣️ Prendre la parole devant un groupe",
+  c2: "👂 Écoute active et reformulation",
+  c3: "🙅 Dire non sans casser la relation",
+  c4: "⚔️ Gérer un conflit sans s'énerver",
+  c5: "💼 Communiquer en milieu pro",
+  c6: "🎭 Adapter mon langage (codes sociaux)",
+  c7: "💬 Faire passer un message clair",
+  c8: "🤝 Convaincre sans manipuler",
+  c9: "🧘 Gérer mes émotions en parlant",
+  c10: "👀 Décoder le non-verbal",
+  c11: "🗨️ Sortir d'une dispute (famille/amis)",
+  c12: "📱 Communication en ligne"
+};
+const LABELS_MODAL = {
+  m1: "🎭 Jeux de rôle / mises en situation",
+  m2: "👥 Discussions en petit groupe",
+  m3: "🎬 Vidéos à analyser",
+  m4: "🤝 Exercices en binôme",
+  m5: "📝 Travail individuel auto-corrigé",
+  m6: "🎤 Théâtre / improvisation",
+  m7: "📋 Études de cas concrets",
+  m8: "📲 Quiz / tests interactifs",
+  m9: "🎙️ S'enregistrer / se filmer",
+  m10: "🧑‍🏫 Démonstrations du prof"
+};
+
+let allData = [];
+let charts = {};
+
+// === Auth ===
+onAuthStateChanged(auth, async user => {
+  if (!user) {
+    const provider = new GoogleAuthProvider();
+    try { await signInWithPopup(auth, provider); } catch(e) { alert("Connexion Google nécessaire pour voir les résultats."); console.error(e); }
+  } else {
+    loadData();
+  }
+});
+
+window.loadData = async function loadData() {
+  document.getElementById('prioritesList').innerHTML = '<div class="loading">⏳ Chargement…</div>';
+  try {
+    const q = query(collection(db, 'sondage_cps'), orderBy('ts', 'desc'));
+    const snap = await getDocs(q);
+    allData = [];
+    snap.forEach(d => allData.push({ id: d.id, ...d.data() }));
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('prioritesList').innerHTML = `<div class="empty">❌ Erreur : ${e.message}<br><small>Vérifie les règles Firestore (collection <code>sondage_cps</code>)</small></div>`;
+  }
+};
+
+document.getElementById('filterClasse').addEventListener('change', render);
+
+function render() {
+  const classe = document.getElementById('filterClasse').value;
+  const data = classe ? allData.filter(r => r.classe === classe) : allData;
+  const n = data.length;
+
+  document.getElementById('statTotal').textContent = n;
+  document.getElementById('statDate').textContent = n > 0
+    ? `dernière : ${data[0].ts?.toDate ? data[0].ts.toDate().toLocaleDateString('fr-FR') : '—'}`
+    : 'aucune réponse';
+
+  if (n === 0) {
+    document.getElementById('prioritesList').innerHTML = '<div class="empty">Aucune réponse pour le moment.<br>Partage le QR code aux élèves !</div>';
+    document.getElementById('verbatimE1').innerHTML = '<div class="empty">—</div>';
+    document.getElementById('verbatimE2').innerHTML = '<div class="empty">—</div>';
+    ['Moyenne','Faible','FaibleScore','Diff','DiffPct'].forEach(k => document.getElementById('stat'+k).textContent = '—');
+    Object.values(charts).forEach(c => c?.destroy?.());
+    charts = {};
+    return;
+  }
+
+  // === Auto-évaluation : moyenne par item ===
+  const autoMoyennes = {};
+  Object.keys(LABELS_AUTO).forEach(k => {
+    const vals = data.map(r => r.auto_eval?.[k]).filter(v => typeof v === 'number');
+    autoMoyennes[k] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+  });
+  const moyenneGlobale = Object.values(autoMoyennes).reduce((a,b)=>a+b,0) / Object.keys(autoMoyennes).length;
+  document.getElementById('statMoyenne').textContent = moyenneGlobale.toFixed(2);
+
+  // compétence la + faible
+  const tri = Object.entries(autoMoyennes).sort((a,b)=>a[1]-b[1]);
+  document.getElementById('statFaible').textContent = LABELS_AUTO[tri[0][0]].replace(/^A\d+ · /, '');
+  document.getElementById('statFaibleScore').textContent = `${tri[0][1].toFixed(2)} / 5`;
+
+  // === Difficultés ===
+  const diffCount = {};
+  Object.keys(LABELS_DIFF).forEach(k => diffCount[k] = 0);
+  data.forEach(r => (r.difficultes||[]).forEach(d => { if (diffCount[d] !== undefined) diffCount[d]++; }));
+  const diffSorted = Object.entries(diffCount).map(([k,v]) => ({k, label: LABELS_DIFF[k], pct: v/n*100, count: v})).sort((a,b)=>b.pct-a.pct);
+  document.getElementById('statDiff').textContent = diffSorted[0].label;
+  document.getElementById('statDiffPct').textContent = `${Math.round(diffSorted[0].pct)} % des élèves`;
+
+  // === Vote ateliers pondéré ===
+  const POIDS = [5,4,3,2,1]; // priorité 1 → 5pts, etc.
+  const ateliersScore = {};
+  Object.keys(LABELS_ATELIERS).forEach(k => ateliersScore[k] = { score: 0, votes: 0, top1: 0 });
+  data.forEach(r => {
+    (r.vote_ateliers||[]).forEach((id, idx) => {
+      if (ateliersScore[id] && idx < 5) {
+        ateliersScore[id].score += POIDS[idx];
+        ateliersScore[id].votes++;
+        if (idx === 0) ateliersScore[id].top1++;
+      }
+    });
+  });
+  const ateliersSorted = Object.entries(ateliersScore).map(([k,v]) => ({k, label: LABELS_ATELIERS[k], ...v})).sort((a,b)=>b.score-a.score);
+
+  // === Modalités ===
+  const modalCount = {};
+  Object.keys(LABELS_MODAL).forEach(k => modalCount[k] = 0);
+  data.forEach(r => (r.modalites||[]).forEach(m => { if (modalCount[m] !== undefined) modalCount[m]++; }));
+
+  // === Profils ===
+  const profilCount = { reserve:0, moyenne:0, expansif:0, variable:0 };
+  data.forEach(r => { if (profilCount[r.e3_profil] !== undefined) profilCount[r.e3_profil]++; });
+
+  // ====== RENDU GRAPHIQUES ======
+  Object.values(charts).forEach(c => c?.destroy?.());
+  charts = {};
+
+  // priorités d'ateliers
+  const list = document.getElementById('prioritesList');
+  list.innerHTML = '';
+  ateliersSorted.forEach((a, i) => {
+    const div = document.createElement('div');
+    div.className = 'priorite-item' + (i === 0 ? ' top1' : i === 1 ? ' top2' : i === 2 ? ' top3' : '');
+    div.innerHTML = `
+      <div class="priorite-rank">${i+1}</div>
+      <div class="priorite-label">${a.label}</div>
+      <div class="priorite-score">${a.score} pts &nbsp;·&nbsp; ${a.votes} vote(s) &nbsp;·&nbsp; ${a.top1} en n°1</div>
+    `;
+    list.appendChild(div);
+  });
+
+  // Auto-eval radar
+  charts.auto = new Chart(document.getElementById('chartAuto'), {
+    type: 'radar',
+    data: {
+      labels: Object.keys(LABELS_AUTO).map(k => LABELS_AUTO[k].replace(/^A\d+ · /, '')),
+      datasets: [{ label: 'Moyenne /5', data: Object.values(autoMoyennes), backgroundColor: 'rgba(142,36,170,0.25)', borderColor: '#6a1b9a', borderWidth: 2, pointBackgroundColor: '#6a1b9a' }]
+    },
+    options: { responsive: true, scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+  });
+
+  // Difficultés barres
+  charts.diff = new Chart(document.getElementById('chartDiff'), {
+    type: 'bar',
+    data: {
+      labels: diffSorted.map(d => d.label),
+      datasets: [{ label: '% d\'élèves', data: diffSorted.map(d => Math.round(d.pct)), backgroundColor: diffSorted.map((_,i) => i === 0 ? '#d4145a' : i < 3 ? '#8e24aa' : '#ce93d8') }]
+    },
+    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { max: 100, ticks: { callback: v => v + '%' } } } }
+  });
+
+  // Modalités
+  const modSorted = Object.entries(modalCount).map(([k,v])=>({label:LABELS_MODAL[k], v})).sort((a,b)=>b.v-a.v);
+  charts.modal = new Chart(document.getElementById('chartModal'), {
+    type: 'bar',
+    data: { labels: modSorted.map(m=>m.label), datasets: [{ data: modSorted.map(m=>m.v), backgroundColor: '#7e57c2' }] },
+    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  // Profil donut
+  charts.profil = new Chart(document.getElementById('chartProfil'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Réservé(e)', 'Dans la moyenne', 'Expansif(ve)', 'Variable'],
+      datasets: [{ data: [profilCount.reserve, profilCount.moyenne, profilCount.expansif, profilCount.variable], backgroundColor: ['#ce93d8', '#9575cd', '#7e57c2', '#5e35b1'] }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // verbatim E1
+  const vE1 = document.getElementById('verbatimE1');
+  const e1List = data.filter(r => r.e1_situation && r.e1_situation.trim().length > 5);
+  vE1.innerHTML = e1List.length === 0 ? '<div class="empty">Aucune situation racontée.</div>' :
+    e1List.map(r => `<div class="verbatim">« ${escapeHtml(r.e1_situation)} »<div class="meta">${r.classe || '—'} · ${r.e3_profil || '—'}</div></div>`).join('');
+
+  // verbatim E2
+  const vE2 = document.getElementById('verbatimE2');
+  const e2List = data.filter(r => r.e2_objectif && r.e2_objectif.trim().length > 3);
+  vE2.innerHTML = e2List.length === 0 ? '<div class="empty">Aucun objectif renseigné.</div>' :
+    e2List.map(r => `<div class="verbatim">« ${escapeHtml(r.e2_objectif)} »<div class="meta">${r.classe || '—'} · ${r.e3_profil || '—'}</div></div>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+window.exportCSV = function() {
+  if (allData.length === 0) { alert("Aucune donnée."); return; }
+  const cols = ['id','classe','e3_profil','e4_projet', ...Object.keys(LABELS_AUTO), ...Object.keys(LABELS_ATELIERS).map(k=>'rang_'+k), 'difficultes','modalites','e1','e2','ts'];
+  const lines = [cols.join(';')];
+  allData.forEach(r => {
+    const row = [
+      r.id, r.classe||'', r.e3_profil||'', r.e4_projet||'',
+      ...Object.keys(LABELS_AUTO).map(k => r.auto_eval?.[k] ?? ''),
+      ...Object.keys(LABELS_ATELIERS).map(k => { const i = (r.vote_ateliers||[]).indexOf(k); return i >= 0 ? (i+1) : ''; }),
+      (r.difficultes||[]).join('|'),
+      (r.modalites||[]).join('|'),
+      '"' + String(r.e1_situation||'').replace(/"/g,'""') + '"',
+      '"' + String(r.e2_objectif||'').replace(/"/g,'""') + '"',
+      r.ts?.toDate ? r.ts.toDate().toISOString() : ''
+    ];
+    lines.push(row.join(';'));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sondage_cps_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+};
+
+window.exportJSON = function() {
+  if (allData.length === 0) { alert("Aucune donnée."); return; }
+  const blob = new Blob([JSON.stringify(allData, (k,v) => v?.toDate ? v.toDate().toISOString() : v, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sondage_cps_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+};
+</script>
+
+</body>
+</html>
