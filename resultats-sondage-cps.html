@@ -188,8 +188,9 @@
       <option value="autre">Autre</option>
     </select>
     <button onclick="loadData()">🔄 Rafraîchir</button>
-    <button onclick="exportCSV()">📥 Export CSV</button>
-    <button onclick="exportJSON()">📦 Export JSON</button>
+    <button onclick="exportCSV()">📥 Export CSV (données brutes)</button>
+    <button onclick="exportJSON()">📦 Export JSON (données brutes)</button>
+    <button onclick="exportBilanIA()" style="background:#16a34a; border-color:#16a34a;">🤖 Export Bilan IA (JSON synthèse)</button>
   </div>
 
   <div class="grid">
@@ -507,6 +508,126 @@ window.exportJSON = function() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `sondage_cps_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+};
+
+// === Export Bilan IA : JSON synthétisé, pré-analysé, prêt pour conception d'ateliers ===
+window.exportBilanIA = function() {
+  const classe = document.getElementById('filterClasse').value;
+  const data = classe ? allData.filter(r => r.classe === classe) : allData;
+  const n = data.length;
+  if (n === 0) { alert("Aucune donnée à synthétiser."); return; }
+
+  // Auto-évaluation : moyennes triées (faibles d'abord = priorité)
+  const autoMoyennes = Object.keys(LABELS_AUTO).map(k => {
+    const vals = data.map(r => r.auto_eval?.[k]).filter(v => typeof v === 'number');
+    const moyenne = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    const ecartType = vals.length > 1 ? Math.sqrt(vals.reduce((s,v)=>s+(v-moyenne)**2,0)/vals.length) : 0;
+    return { code: k, libelle: LABELS_AUTO[k], moyenne_sur_5: +moyenne.toFixed(2), ecart_type: +ecartType.toFixed(2), nb_reponses: vals.length };
+  }).sort((a,b)=>a.moyenne_sur_5-b.moyenne_sur_5);
+
+  const moyenneGlobale = +(autoMoyennes.reduce((s,x)=>s+x.moyenne_sur_5,0) / autoMoyennes.length).toFixed(2);
+
+  // Difficultés (% trié)
+  const diffStats = Object.keys(LABELS_DIFF).map(k => {
+    const count = data.filter(r => (r.difficultes||[]).includes(k)).length;
+    return { code: k, libelle: LABELS_DIFF[k], nb_eleves: count, pourcentage: +(count/n*100).toFixed(1) };
+  }).sort((a,b)=>b.pourcentage-a.pourcentage);
+
+  // Vote pondéré ateliers
+  const POIDS = [5,4,3,2,1];
+  const ateliersScores = Object.keys(LABELS_ATELIERS).map(k => {
+    let score = 0, votes = 0, rangs = [0,0,0,0,0];
+    data.forEach(r => {
+      const idx = (r.vote_ateliers||[]).indexOf(k);
+      if (idx >= 0 && idx < 5) { score += POIDS[idx]; votes++; rangs[idx]++; }
+    });
+    return {
+      code: k, libelle: LABELS_ATELIERS[k],
+      score_pondere: score,
+      nb_votes: votes,
+      pourcentage_eleves_qui_l_ont_choisi: +(votes/n*100).toFixed(1),
+      repartition_rangs: { rang_1: rangs[0], rang_2: rangs[1], rang_3: rangs[2], rang_4: rangs[3], rang_5: rangs[4] }
+    };
+  }).sort((a,b)=>b.score_pondere-a.score_pondere);
+
+  // Modalités
+  const modalStats = Object.keys(LABELS_MODAL).map(k => {
+    const count = data.filter(r => (r.modalites||[]).includes(k)).length;
+    return { code: k, libelle: LABELS_MODAL[k], nb_eleves: count, pourcentage: +(count/n*100).toFixed(1) };
+  }).sort((a,b)=>b.pourcentage-a.pourcentage);
+
+  // Profils
+  const profilCount = { reserve:0, moyenne:0, expansif:0, variable:0 };
+  data.forEach(r => { if (profilCount[r.e3_profil] !== undefined) profilCount[r.e3_profil]++; });
+  const profils = Object.entries(profilCount).map(([k,v]) => ({ profil: k, nb_eleves: v, pourcentage: +(v/n*100).toFixed(1) }));
+
+  // Projets post-bac
+  const projetCount = { vie_active:0, etudes:0, alternance:0, indecis:0 };
+  data.forEach(r => { if (projetCount[r.e4_projet] !== undefined) projetCount[r.e4_projet]++; });
+  const projets = Object.entries(projetCount).map(([k,v]) => ({ projet: k, nb_eleves: v, pourcentage: +(v/n*100).toFixed(1) }));
+
+  // Verbatim
+  const verbatimSituations = data.filter(r => r.e1_situation?.trim().length > 5).map(r => ({ texte: r.e1_situation.trim(), classe: r.classe||null, profil: r.e3_profil||null }));
+  const verbatimObjectifs = data.filter(r => r.e2_objectif?.trim().length > 3).map(r => ({ texte: r.e2_objectif.trim(), classe: r.classe||null, profil: r.e3_profil||null }));
+
+  // Recommandations pré-calculées
+  const top5Ateliers = ateliersScores.slice(0, 5);
+  const top3CompetencesFaibles = autoMoyennes.slice(0, 3);
+  const top5Difficultes = diffStats.slice(0, 5);
+  const top3Modalites = modalStats.slice(0, 3);
+
+  // Synthèse narrative pour l'IA
+  const synthese_narrative = [
+    `Sondage de ${n} élève(s) de terminale bac pro${classe ? ` (filtre classe : ${classe})` : ''}.`,
+    `Niveau moyen auto-évalué en communication : ${moyenneGlobale}/5.`,
+    `Compétence la plus faible : "${top3CompetencesFaibles[0].libelle}" (${top3CompetencesFaibles[0].moyenne_sur_5}/5).`,
+    `Difficulté n°1 : "${top5Difficultes[0].libelle}" → ${top5Difficultes[0].pourcentage}% des élèves concernés.`,
+    `Atelier le plus demandé : "${top5Ateliers[0].libelle}" (${top5Ateliers[0].score_pondere} pts, ${top5Ateliers[0].nb_votes}/${n} votes).`,
+    `Modalité préférée : "${top3Modalites[0].libelle}" (${top3Modalites[0].pourcentage}% d'adhésion).`
+  ].join(' ');
+
+  const bilan = {
+    meta: {
+      genere_le: new Date().toISOString(),
+      source: "Sondage CPS Communication — Terminale Bac Pro",
+      referentiel: "Santé publique France 2025 — CPS S1 (Développer des relations constructives) + extensions",
+      nb_repondants: n,
+      filtre_classe: classe || "toutes_classes",
+      instructions_pour_ia: "Utilise ce JSON pour concevoir 18h d'ateliers de communication, organisés selon les priorités ci-dessous. Pondère la conception selon : (1) les ateliers les plus votés, (2) les compétences les plus faibles, (3) les difficultés les plus citées, (4) les modalités plébiscitées. Croise avec les verbatims pour cibler des situations vécues réelles."
+    },
+    synthese_narrative,
+    top_priorites: {
+      ateliers_a_construire_en_priorite: top5Ateliers,
+      competences_a_renforcer_en_priorite: top3CompetencesFaibles,
+      difficultes_majeures_a_traiter: top5Difficultes,
+      modalites_a_privilegier: top3Modalites
+    },
+    detail_complet: {
+      auto_evaluation_par_competence: autoMoyennes,
+      moyenne_globale_sur_5: moyenneGlobale,
+      difficultes_vecues_par_frequence: diffStats,
+      vote_ateliers_par_score_pondere: ateliersScores,
+      modalites_par_preference: modalStats,
+      profils_communicants: profils,
+      projets_post_bac: projets
+    },
+    verbatim: {
+      situations_communication_difficiles: verbatimSituations,
+      objectifs_personnels_eleves: verbatimObjectifs
+    },
+    legendes: {
+      echelle_auto_evaluation: "1 = pas du tout à l'aise, 5 = très à l'aise",
+      ponderation_vote_ateliers: "Rang 1 = 5 pts, Rang 2 = 4 pts, Rang 3 = 3 pts, Rang 4 = 2 pts, Rang 5 = 1 pt",
+      profils: { reserve: "Plutôt réservé(e)", moyenne: "Dans la moyenne", expansif: "Plutôt expansif(ve)", variable: "Ça dépend des situations" },
+      projets: { vie_active: "Entrer dans la vie active", etudes: "Poursuivre des études", alternance: "Alternance / apprentissage", indecis: "Ne sait pas encore" }
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(bilan, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bilan_sondage_cps_IA_${new Date().toISOString().slice(0,10)}${classe ? '_'+classe : ''}.json`;
   a.click();
 };
 </script>
