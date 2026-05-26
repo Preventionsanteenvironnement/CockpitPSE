@@ -340,18 +340,75 @@
             if (!code) return code;
             const names = readNames();
             const nom = names[String(code).toUpperCase()] || names[code];
-            return nom ? (nom + ' (' + code + ')') : code;
+            return nom ? firstNameOnly(nom, code) : code;
+        }
+        function classForCode(code) {
+            const row = (window.BDD_ELEVES || []).find(e => e.userCode === code);
+            return row ? row.classe : "";
+        }
+        function firstNameOnly(value, code) {
+            let text = String(value || '').replace(/\([^)]*\)/g, '').trim();
+            if (!text) return code;
+            const cls = classForCode(code);
+            if (cls && text.toUpperCase().startsWith(cls.toUpperCase() + ' ')) {
+                text = text.slice(cls.length).trim();
+            }
+            return text.split(/\s+/)[0] || code;
+        }
+        function splitCsvLine(line) {
+            return String(line).split(/[,;\t]/).map(s => s.trim());
+        }
+        function normalizeHeader(value) {
+            return String(value || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase().trim();
         }
         function parseCsvToMap(text) {
             const map = {};
-            String(text).split(/\r?\n/).forEach(line => {
-                line = line.trim(); if (!line) return;
-                const parts = line.split(/[,;\t]/).map(s => s.trim());
+            const lines = String(text).split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+            if (!lines.length) return map;
+
+            const headers = splitCsvLine(lines[0]).map(normalizeHeader);
+            const hasHeader = ['code', 'usercode', 'acccode', 'id', 'classe', 'prenom', 'nom', 'nom_complet', 'nomcomplet', 'fullname'].some(h => headers.includes(h));
+            if (hasHeader) {
+                const codeIdx = headers.findIndex(h => ['code', 'usercode', 'acccode', 'id'].includes(h));
+                const classeIdx = headers.indexOf('classe');
+                const prenomIdx = headers.indexOf('prenom');
+                const nomIdx = headers.indexOf('nom');
+                const fullNameIdx = headers.findIndex(h => ['nom_complet', 'nomcomplet', 'fullname'].includes(h));
+                const rowsByClass = {};
+
+                lines.slice(1).forEach(line => {
+                    const parts = splitCsvLine(line);
+                    const code = codeIdx >= 0 ? String(parts[codeIdx] || '').toUpperCase() : '';
+                    const prenom = prenomIdx >= 0 ? String(parts[prenomIdx] || '').trim() : '';
+                    const nom = nomIdx >= 0 ? String(parts[nomIdx] || '').trim() : '';
+                    const fullName = fullNameIdx >= 0 ? String(parts[fullNameIdx] || '').trim() : '';
+                    const classe = classeIdx >= 0 ? String(parts[classeIdx] || '').trim() : '';
+                    if (code && prenom) map[code] = prenom;
+                    else if (code && fullName) map[code] = firstNameOnly(fullName, code);
+                    else if (classe && prenom) {
+                        rowsByClass[classe] = rowsByClass[classe] || [];
+                        rowsByClass[classe].push({ prenom, nom });
+                    }
+                });
+
+                Object.entries(rowsByClass).forEach(([classe, rows]) => {
+                    const eleves = (window.BDD_ELEVES || []).filter(e => e.classe === classe);
+                    rows.forEach((row, idx) => {
+                        if (eleves[idx] && row.prenom) map[eleves[idx].userCode] = row.prenom;
+                    });
+                });
+                return map;
+            }
+
+            lines.forEach(line => {
+                const parts = splitCsvLine(line);
                 if (parts.length < 2) return;
                 const code = parts[0].toUpperCase();
                 const nom = parts.slice(1).join(' ').trim();
                 if (!code || !nom || code === 'CODE' || code === 'ID') return;
-                map[code] = nom;
+                map[code] = firstNameOnly(nom, code);
             });
             return map;
         }
