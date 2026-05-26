@@ -305,6 +305,39 @@ const LABELS_FREIN = {
 const LABELS_PROFIL = { reserve: "Réservé(e)", moyenne: "Dans la moyenne", expansif: "Expansif(ve)", variable: "Variable" };
 const LABELS_PROJET = { vie_active: "Vie active", etudes: "Études", alternance: "Alternance", indecis: "Indécis" };
 
+// === Référentiel CPS — mapping item → code savoir-faire ===
+const CPS_MAPPING = {
+  ae1:"C1.1",ae2:"C1.5",ae3:"E1.2",ae4:"S1.2",ae5:"S1.1",ae6:"S2.1",ae7:"S1.3",ae8:"C2.4",ae9:"E2.3",ae10:"C1.4",ae11:"C1.6",ae12:"S1.1",
+  th1:"C1.1",th2:"C1.5",th3:"C1.5",th4:"C1.3",th5:"C1.3",th6:"C1.4",th7:"C1.2",th8:"C1.6",th9:"E1.1",th10:"E1.2",th11:"E2.3",th12:"S1.1",th13:"S1.1",th14:"S1.2",th15:"S1.2",th16:"S2.2",th17:"S1.3",th18:"S1.3",th19:"S1.1",
+  s1:"S1.1",s2:"S1.1",s3:"E2.3",s4:"C1.5",s5:"C2.4",s6:"S2.1",s7:"E2.1",s8:"C2.2",s9:"S1.2",s10:"S1.3",s11:"S2.2",s12:"S2.2",s13:"C2.1",s14:"C1.3",s15:"S1.3",s16:"S1.1",s17:"C1.4",s18:"C2.3",s19:"C1.6",
+  d1:"S1.1",d2:"E2.1",d3:"S2.1",d4:"S2.1",d5:"E2.3",d6:"S1.1",d7:"C1.5",d8:"E2.1",d9:"S1.2",d10:"S2.1",d11:"S1.1",d12:"S1.2",d13:"S1.1",d14:"S1.1",d15:"S1.1",d16:"E2.3",
+  a1:"S1.1",a2:"S1.2",a3:"S2.1",a4:"S2.2",a5:"S1.1",a6:"S1.1",a7:"S1.1",a8:"C1.2",a9:"E2.3",a10:"S1.2",a11:"S2.2",a12:"S1.1",a13:"C1.5",a14:"S1.3",a15:"C1.1",
+  pr1:"S1.1",pr2:"S1.1",pr3:"S2.2",pr4:"S1.1",pr5:"C2.4",pr6:"S1.3",pr7:"S2.2",pr8:"C2.1",pr9:"E2.2",pr10:"C1.4",pr11:"C1.5",pr12:"S1.1",pr13:"S1.1",pr14:"C1.3",pr15:"S1.1"
+};
+const CPS_LIBELLES = {
+  "C1.1": "C1.1 — Accroître sa connaissance de soi",
+  "C1.2": "C1.2 — Savoir penser de façon critique",
+  "C1.3": "C1.3 — Connaître ses valeurs, besoins et buts",
+  "C1.4": "C1.4 — Prendre des décisions constructives",
+  "C1.5": "C1.5 — S'auto-évaluer positivement",
+  "C1.6": "C1.6 — Renforcer sa pleine attention",
+  "C2.1": "C2.1 — Atteindre ses buts personnels",
+  "C2.2": "C2.2 — Gérer ses impulsions",
+  "C2.3": "C2.3 — Résoudre des problèmes de façon créative",
+  "C2.4": "C2.4 — Savoir demander de l'aide",
+  "E1.1": "E1.1 — Comprendre les émotions",
+  "E1.2": "E1.2 — Identifier ses émotions",
+  "E2.1": "E2.1 — Exprimer ses émotions de façon constructive",
+  "E2.2": "E2.2 — Réguler ses émotions",
+  "E2.3": "E2.3 — Comprendre et gérer son stress",
+  "S1.1": "S1.1 — Communiquer de façon efficace et positive",
+  "S1.2": "S1.2 — Communiquer de façon empathique",
+  "S1.3": "S1.3 — Développer des liens et comportements prosociaux",
+  "S2.1": "S2.1 — S'affirmer et résister à la pression sociale",
+  "S2.2": "S2.2 — Résoudre les conflits de façon constructive"
+};
+const CPS_CATEGORIE = code => code.startsWith('C') ? 'cognitive' : code.startsWith('E') ? 'émotionnelle' : 'sociale';
+
 let allData = [];
 let charts = {};
 
@@ -576,12 +609,67 @@ window.exportBilanIA = function() {
 
   const verb = field => data.filter(r => r[field]?.trim().length > 3).map(r => ({ texte: r[field].trim(), classe: r.classe||null, profil: r.profil||null, projet: r.projet_post_bac||null }));
 
+  // === Analyse par code CPS savoir-faire ===
+  const cpsAggregation = {};
+  const ensureCps = code => { if (!cpsAggregation[code]) cpsAggregation[code] = { code, libelle: CPS_LIBELLES[code] || code, categorie: CPS_CATEGORIE(code), faiblesse_auto_eval: { somme: 0, n: 0 }, interet_themes: { somme: 0, n: 0 }, situations_progresser_count: 0, difficultes_count: 0, votes_ateliers: { score: 0, votes: 0 }, situations_pro_count: 0 }; };
+
+  // Auto-éval (5 - moyenne = "niveau de faiblesse" inverse — plus c'est haut, plus c'est faible)
+  Object.entries(CPS_MAPPING).forEach(([item, code]) => {
+    if (item.startsWith('ae')) {
+      ensureCps(code);
+      const vals = data.map(r => r.auto_eval?.[item]).filter(v => typeof v === 'number');
+      if (vals.length) { cpsAggregation[code].faiblesse_auto_eval.somme += vals.reduce((a,b)=>a+b,0); cpsAggregation[code].faiblesse_auto_eval.n += vals.length; }
+    } else if (item.startsWith('th')) {
+      ensureCps(code);
+      const vals = data.map(r => r.themes?.[item]).filter(v => typeof v === 'number');
+      if (vals.length) { cpsAggregation[code].interet_themes.somme += vals.reduce((a,b)=>a+b,0); cpsAggregation[code].interet_themes.n += vals.length; }
+    } else if (item.startsWith('s') && !item.startsWith('se')) {
+      ensureCps(code);
+      cpsAggregation[code].situations_progresser_count += data.filter(r => (r.situations_progresser||[]).includes(item)).length;
+    } else if (item.startsWith('d')) {
+      ensureCps(code);
+      cpsAggregation[code].difficultes_count += data.filter(r => (r.difficultes||[]).includes(item)).length;
+    } else if (item.startsWith('a') && !item.startsWith('ae') && !item.startsWith('ac')) {
+      ensureCps(code);
+      data.forEach(r => { const idx = (r.vote_ateliers||[]).indexOf(item); if (idx >= 0 && idx < 5) { cpsAggregation[code].votes_ateliers.score += POIDS[idx]; cpsAggregation[code].votes_ateliers.votes++; } });
+    } else if (item.startsWith('pr')) {
+      ensureCps(code);
+      cpsAggregation[code].situations_pro_count += data.filter(r => (r.situations_pro||[]).includes(item)).length;
+    }
+  });
+
+  const cpsAnalysis = Object.values(cpsAggregation).map(c => {
+    const niveauMoyen = c.faiblesse_auto_eval.n ? +(c.faiblesse_auto_eval.somme/c.faiblesse_auto_eval.n).toFixed(2) : null;
+    const interetMoyen = c.interet_themes.n ? +(c.interet_themes.somme/c.interet_themes.n).toFixed(2) : null;
+    // Score de priorité : 1) niveau faible + 2) intérêt fort + 3) votes ateliers + 4) difficultés citées
+    const scorePriorite = (niveauMoyen !== null ? (5 - niveauMoyen) * 4 : 0)
+                       + (interetMoyen !== null ? interetMoyen * 3 : 0)
+                       + c.votes_ateliers.score
+                       + c.difficultes_count * 2
+                       + c.situations_progresser_count * 1.5
+                       + c.situations_pro_count;
+    return {
+      code: c.code, libelle: c.libelle, categorie: c.categorie,
+      niveau_eleves_perçu_sur_5: niveauMoyen,
+      interet_eleves_sur_5: interetMoyen,
+      nb_eleves_difficulte_associee: c.difficultes_count,
+      nb_eleves_souhaite_progresser: c.situations_progresser_count,
+      nb_eleves_souhait_pro: c.situations_pro_count,
+      score_votes_ateliers: c.votes_ateliers.score,
+      nb_votes_ateliers: c.votes_ateliers.votes,
+      score_priorite_global: +scorePriorite.toFixed(2)
+    };
+  }).sort((a,b) => b.score_priorite_global - a.score_priorite_global);
+
+  const topCps = cpsAnalysis.slice(0, 8);
+
   const synthese_narrative = [
-    `Sondage v2 (15 sections) de ${n} élève(s) de terminale bac pro${classe ? ` — filtre : ${classe}` : ''}.`,
+    `Sondage v3 (15 sections, tagué CPS) de ${n} élève(s) de terminale bac pro${classe ? ` — filtre : ${classe}` : ''}.`,
     `Niveau moyen auto-évalué : ${moyenneGlobale}/5 sur 12 compétences.`,
     `Compétence la plus faible : "${autoEval[0].libelle}" (${autoEval[0].moyenne_sur_5}/5).`,
     `Thème le plus plébiscité : "${themes[0].libelle}" (intérêt ${themes[0].moyenne_sur_5}/5).`,
-    `Atelier n°1 demandé : "${ateliers[0].libelle}" (${ateliers[0].score_pondere} pts, ${ateliers[0].nb_votes}/${n} élèves).`
+    `Atelier n°1 demandé : "${ateliers[0].libelle}" (${ateliers[0].score_pondere} pts, ${ateliers[0].nb_votes}/${n} élèves).`,
+    `CPS prioritaire selon score global : "${topCps[0].libelle}" (score ${topCps[0].score_priorite_global}).`
   ].join(' ');
 
   const bilan = {
@@ -593,7 +681,7 @@ window.exportBilanIA = function() {
       filtre_classe: classe || "toutes_classes",
       nb_sections_sondage: 15,
       duree_moyenne_estimee_min: "10-15",
-      instructions_pour_ia: "Utilise ce JSON pour concevoir 18h d'ateliers de communication et CPS. Croise les 5 axes : (1) ateliers les plus votés [vote_pondere], (2) compétences les plus faibles [auto_eval croissant], (3) difficultés les plus citées, (4) situations pro à travailler, (5) thèmes les plus plébiscités. Adapte aux modalités préférées des élèves (configuration, format, durée, structure). RESPECTE le cadre de sécurité psychologique et les sujets sensibles signalés. Appuie-toi sur les verbatims pour ancrer dans le vécu réel."
+      instructions_pour_ia: "Utilise ce JSON pour concevoir les ateliers CPS du parcours éducatif de santé. Méthode recommandée : (1) commence par 'analyse_par_cps_referentiel.top_8_cps_a_travailler' qui te donne les CPS prioritaires du référentiel Santé publique France à cibler, (2) croise avec 'top_priorites' pour les ateliers concrets votés, (3) respecte 'modalites_pedagogiques' (config, format, durée, structure préférés), (4) respecte STRICTEMENT 'cadre_securite_psychologique' (conditions de participation, sujets sensibles à cadrer), (5) module l'engagement via 'engagement.motivations' et neutralise 'engagement.freins', (6) ancre les exercices dans les 'verbatim' (situations réelles des élèves). Chaque atelier conçu doit explicitement référencer son/ses code(s) CPS savoir-faire (ex. S1.1, E2.3) pour traçabilité référentielle."
     },
     synthese_narrative,
     top_priorites: {
@@ -603,6 +691,16 @@ window.exportBilanIA = function() {
       situations_progresser_top: synth(LABELS_SITUATIONS, 'situations_progresser').slice(0, 7),
       difficultes_majeures: synth(LABELS_DIFF, 'difficultes').slice(0, 7),
       situations_pro_prioritaires: synth(LABELS_PRO, 'situations_pro').slice(0, 7)
+    },
+    analyse_par_cps_referentiel: {
+      explication: "Chaque savoir-faire CPS du référentiel Santé publique France 2025 reçoit un score de priorité agrégé. Calcul : (5 - niveau auto-éval) ×4 + intérêt thème ×3 + score votes ateliers + difficultés ×2 + situations à progresser ×1.5 + situations pro ×1. Plus le score est élevé, plus la CPS est à travailler en priorité.",
+      classement_priorites_cps: cpsAnalysis,
+      top_8_cps_a_travailler: topCps,
+      cps_par_categorie: {
+        cognitives: cpsAnalysis.filter(c => c.categorie === 'cognitive'),
+        emotionnelles: cpsAnalysis.filter(c => c.categorie === 'émotionnelle'),
+        sociales: cpsAnalysis.filter(c => c.categorie === 'sociale')
+      }
     },
     modalites_pedagogiques: {
       activites_preferees: synth(LABELS_ACT, 'activites_preferees'),
