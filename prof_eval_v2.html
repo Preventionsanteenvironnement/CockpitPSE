@@ -148,6 +148,19 @@
         .class-overview-meta { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; }
         .class-overview-table { min-width: 980px; }
         .class-overview-table th.eval-col { min-width: 170px; vertical-align: top; }
+        /* Colonnes figees : Eleve (gauche) + Moyenne (droite) */
+        .class-overview-table td.td-code, .class-overview-table thead th:first-child {
+            position: sticky; left: 0; background: #0f172a; z-index: 3;
+            box-shadow: inset -1px 0 0 #334155;
+        }
+        .class-overview-table thead th:first-child { z-index: 5; }
+        .class-overview-table td.td-code { cursor: pointer; }
+        .class-overview-table td.td-code:hover { color: #3b82f6; }
+        .class-overview-table td.moy-col, .class-overview-table thead th.moy-col {
+            position: sticky; right: 0; background: #0f172a; z-index: 3;
+            box-shadow: inset 1px 0 0 #334155;
+        }
+        .class-overview-table thead th.moy-col { z-index: 5; }
         .eval-head-title { color: #e2e8f0; font-weight: 800; line-height: 1.2; }
         .eval-head-date { color: #64748b; font-size: 0.65rem; margin-top: 4px; }
         .class-note-cell { font-weight: 800; }
@@ -557,6 +570,7 @@
                 <div id="class-overview-title">Notes par classe</div>
                 <div class="class-overview-meta" id="class-overview-meta"></div>
             </div>
+            <select id="overview-module-filter" onchange="renderClassOverview()" style="display:none; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:8px 10px; font-size:0.85rem;"></select>
             <button class="ab-btn ab-refresh" onclick="refreshClassOverview()">🔄 Actualiser</button>
             <button class="ab-btn ab-export" onclick="exportClassOverviewCSV()">📥 Export CSV</button>
         </div>
@@ -1450,45 +1464,86 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             return;
         }
 
+        // Filtre par module (reduit le nombre de colonnes)
+        const modSel = document.getElementById('overview-module-filter');
+        const modsDispo = [...new Set(evalsAffichees.map(ev => ev.moduleId).filter(Boolean))].sort();
+        let selectedMod = modSel ? (modSel.value || 'all') : 'all';
+        if (modSel) {
+            if (!modsDispo.includes(selectedMod)) selectedMod = 'all';
+            modSel.innerHTML = '<option value="all">Tous les modules</option>' + modsDispo.map(m => '<option value="' + escHtml(m) + '"' + (m === selectedMod ? ' selected' : '') + '>Module ' + escHtml(m) + '</option>').join('');
+            modSel.style.display = modsDispo.length > 1 ? '' : 'none';
+        }
+        const evalsToShow = (selectedMod && selectedMod !== 'all') ? evalsAffichees.filter(ev => ev.moduleId === selectedMod) : evalsAffichees;
+
         body.className = 'results-table-wrap';
         let html = '<table class="results-table class-overview-table"><thead><tr>' +
             '<th>Eleve</th><th>Classe</th>';
-        evalsAffichees.forEach(ev => {
+        evalsToShow.forEach(ev => {
             html += '<th class="eval-col"><div class="eval-head-title">' + escHtml(ev.titre || 'Evaluation') + '</div>' +
                 '<div class="eval-head-date">' + escHtml(getEvalDateLabel(ev)) + '</div></th>';
         });
-        html += '<th class="eval-col" style="background:#0f3a4d;"><div class="eval-head-title">Moyenne</div><div class="eval-head-date">/20</div></th>';
+        html += '<th class="eval-col moy-col" style="background:#0f3a4d;"><div class="eval-head-title">Moyenne</div><div class="eval-head-date">/20</div></th>';
         html += '</tr></thead><tbody>';
 
         classOverviewRows.forEach(row => {
             const code = row.eleve.userCode;
-            html += '<tr><td class="td-code">' + escHtml(afficherAvecNom(code)) + '</td><td class="td-classe">' + escHtml(row.eleve.classe) + '</td>';
-            evalsAffichees.forEach(ev => {
+            html += '<tr><td class="td-code" onclick="showStudentSheet(\'' + escHtml(code) + '\')" title="Voir la fiche de l\'eleve">' + escHtml(afficherAvecNom(code)) + '</td><td class="td-classe">' + escHtml(row.eleve.classe) + '</td>';
+            evalsToShow.forEach(ev => {
                 const label = noteLabelForOverview(row.evals[ev.id], ev);
                 html += '<td class="class-note-cell ' + label.className + '">' + escHtml(label.label) +
                     '<span class="class-note-date">' + escHtml(label.sub || '') + '</span></td>';
             });
             const moy = moyenneEleveSur20(row);
             const moyCls = moy == null ? 'class-note-muted' : (moy >= 12 ? 'note-high' : moy >= 8 ? 'note-mid' : 'note-low');
-            html += '<td class="class-note-cell ' + moyCls + '" style="font-weight:800;">' + (moy == null ? '--' : fmtMoy(moy) + '/20') + '</td>';
+            html += '<td class="class-note-cell moy-col ' + moyCls + '" style="font-weight:800;">' + (moy == null ? '--' : fmtMoy(moy) + '/20') + '</td>';
             html += '</tr>';
         });
 
         // Ligne moyenne de la classe par evaluation
         html += '<tr style="background:#0f3a4d;font-weight:800;"><td class="td-code">Moyenne classe</td><td class="td-classe"></td>';
-        evalsAffichees.forEach(ev => {
+        evalsToShow.forEach(ev => {
             const m = moyenneClasseEval(ev);
             html += '<td class="class-note-cell">' + (m == null ? '--' : fmtMoy(m.moy) + '/' + m.bareme +
                 '<span class="class-note-date">' + m.n + ' note(s)</span>') + '</td>';
         });
         const moyGlobale = classOverviewRows.map(moyenneEleveSur20).filter(v => v != null);
         const mg = moyGlobale.length ? moyGlobale.reduce((s, v) => s + v, 0) / moyGlobale.length : null;
-        html += '<td class="class-note-cell">' + (mg == null ? '--' : fmtMoy(mg) + '/20') + '</td>';
+        html += '<td class="class-note-cell moy-col">' + (mg == null ? '--' : fmtMoy(mg) + '/20') + '</td>';
         html += '</tr>';
 
         html += '</tbody></table>';
         body.innerHTML = html;
     }
+    window.renderClassOverview = renderClassOverview;
+
+    // Fiche eleve : toutes ses notes en vertical (clic sur le nom)
+    window.showStudentSheet = function(code) {
+        const row = classOverviewRows.find(r => r.eleve.userCode === code);
+        if (!row) return;
+        const evalsRendues = classOverviewEvals.filter(ev => row.evals[ev.id]);
+        let h = '';
+        if (!evalsRendues.length) {
+            h = '<p style="color:#94a3b8;">Aucune copie rendue pour cet eleve.</p>';
+        } else {
+            h = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' +
+                '<tr><th style="text-align:left;padding:6px;color:#94a3b8;">Évaluation</th><th style="padding:6px;color:#94a3b8;">Note</th><th style="padding:6px;color:#94a3b8;">Date</th></tr>';
+            evalsRendues.forEach(ev => {
+                const label = noteLabelForOverview(row.evals[ev.id], ev);
+                h += '<tr style="border-top:1px solid #334155;"><td style="padding:6px;">' + escHtml(ev.titre || 'Evaluation') + '</td>' +
+                     '<td style="padding:6px;text-align:center;font-weight:800;">' + escHtml(label.label) + '</td>' +
+                     '<td style="padding:6px;color:#94a3b8;">' + escHtml(label.sub || '') + '</td></tr>';
+            });
+            h += '</table>';
+            const moy = moyenneEleveSur20(row);
+            h += '<div style="margin-top:12px;font-weight:800;font-size:1rem;">Moyenne : ' + (moy == null ? '--' : fmtMoy(moy) + '/20') + '</div>';
+        }
+        const titleEl = document.getElementById('modal-title');
+        const bodyEl = document.getElementById('modal-body');
+        if (titleEl) titleEl.textContent = afficherAvecNom(code);
+        if (bodyEl) bodyEl.innerHTML = h;
+        const modal = document.getElementById('modal-detail');
+        if (modal) modal.classList.add('visible');
+    };
 
     window.exportClassOverviewCSV = function() {
         if (!currentClassOverview || classOverviewRows.length === 0) {
