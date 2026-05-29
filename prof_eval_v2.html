@@ -1433,25 +1433,27 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         const body = document.getElementById('class-overview-body');
         const nbEleves = classOverviewRows.length;
         const nbEvals = classOverviewEvals.length;
-        const renderedCells = classOverviewRows.flatMap(row => classOverviewEvals.map(ev => row.evals[ev.id])).filter(Boolean).length;
+        // N'afficher que les evaluations reellement rendues par au moins un eleve de la classe (sinon colonnes vides illisibles)
+        const evalsAffichees = classOverviewEvals.filter(ev => classOverviewRows.some(row => row.evals[ev.id]));
+        const renderedCells = classOverviewRows.flatMap(row => evalsAffichees.map(ev => row.evals[ev.id])).filter(Boolean).length;
         document.getElementById('class-overview-meta').textContent =
-            nbEleves + ' eleve(s) | ' + nbEvals + ' evaluation(s) publiee(s) | ' + renderedCells + ' rendu(s)';
+            nbEleves + ' eleve(s) | ' + evalsAffichees.length + ' eval(s) rendue(s) sur ' + nbEvals + ' publiee(s) | ' + renderedCells + ' copie(s)';
 
         if (nbEleves === 0) {
             body.className = 'class-overview-empty';
             body.textContent = 'Aucun eleve trouve pour cette classe.';
             return;
         }
-        if (nbEvals === 0) {
+        if (evalsAffichees.length === 0) {
             body.className = 'class-overview-empty';
-            body.textContent = 'Aucune evaluation publiee pour cette classe.';
+            body.textContent = 'Aucune note rendue pour cette classe (les evaluations publiees n\'ont pas encore ete faites par ces eleves).';
             return;
         }
 
         body.className = 'results-table-wrap';
         let html = '<table class="results-table class-overview-table"><thead><tr>' +
             '<th>Eleve</th><th>Classe</th>';
-        classOverviewEvals.forEach(ev => {
+        evalsAffichees.forEach(ev => {
             html += '<th class="eval-col"><div class="eval-head-title">' + escHtml(ev.titre || 'Evaluation') + '</div>' +
                 '<div class="eval-head-date">' + escHtml(getEvalDateLabel(ev)) + '</div></th>';
         });
@@ -1461,7 +1463,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         classOverviewRows.forEach(row => {
             const code = row.eleve.userCode;
             html += '<tr><td class="td-code">' + escHtml(afficherAvecNom(code)) + '</td><td class="td-classe">' + escHtml(row.eleve.classe) + '</td>';
-            classOverviewEvals.forEach(ev => {
+            evalsAffichees.forEach(ev => {
                 const label = noteLabelForOverview(row.evals[ev.id], ev);
                 html += '<td class="class-note-cell ' + label.className + '">' + escHtml(label.label) +
                     '<span class="class-note-date">' + escHtml(label.sub || '') + '</span></td>';
@@ -1474,7 +1476,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
 
         // Ligne moyenne de la classe par evaluation
         html += '<tr style="background:#0f3a4d;font-weight:800;"><td class="td-code">Moyenne classe</td><td class="td-classe"></td>';
-        classOverviewEvals.forEach(ev => {
+        evalsAffichees.forEach(ev => {
             const m = moyenneClasseEval(ev);
             html += '<td class="class-note-cell">' + (m == null ? '--' : fmtMoy(m.moy) + '/' + m.bareme +
                 '<span class="class-note-date">' + m.n + ' note(s)</span>') + '</td>';
@@ -1493,15 +1495,16 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             showToast('Aucune vue classe a exporter.');
             return;
         }
+        const evalsAffichees = classOverviewEvals.filter(ev => classOverviewRows.some(row => row.evals[ev.id]));
         const header = ['Eleve', 'Code', 'Classe'];
-        classOverviewEvals.forEach(ev => {
+        evalsAffichees.forEach(ev => {
             header.push((ev.titre || 'Evaluation') + ' - note');
             header.push((ev.titre || 'Evaluation') + ' - date rendu');
         });
         header.push('Moyenne /20');
         const rows = classOverviewRows.map(row => {
             const line = [getNomEleve(row.eleve.userCode) || row.eleve.userCode, row.eleve.userCode, row.eleve.classe];
-            classOverviewEvals.forEach(ev => {
+            evalsAffichees.forEach(ev => {
                 const label = noteLabelForOverview(row.evals[ev.id], ev);
                 line.push(label.label);
                 line.push(label.sub || '');
@@ -1512,7 +1515,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
         });
         // Ligne moyenne classe
         const moyLine = ['Moyenne classe', '', ''];
-        classOverviewEvals.forEach(ev => {
+        evalsAffichees.forEach(ev => {
             const m = moyenneClasseEval(ev);
             moyLine.push(m == null ? '' : fmtMoy(m.moy) + '/' + m.bareme);
             moyLine.push('');
