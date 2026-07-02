@@ -47,6 +47,17 @@
   .muted{color:var(--soft);font-size:.85rem}
   .note{color:var(--soft);font-size:.8rem;margin-top:6px;line-height:1.5}
   .empty{text-align:center;color:var(--soft);padding:30px}
+  .tbl-hint{font-size:.8rem;color:var(--soft);margin-bottom:12px}
+  .tbl-wrap{overflow-x:auto}
+  .tbl{width:100%;border-collapse:collapse;font-size:.88rem}
+  .tbl th{text-align:left;padding:9px 10px;border-bottom:2px solid var(--line);color:var(--soft);font-size:.76rem;font-weight:700;cursor:pointer;white-space:nowrap;user-select:none}
+  .tbl th.num{text-align:right}
+  .tbl th.sorted{color:var(--accent)}
+  .tbl td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tbl td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:650;white-space:nowrap}
+  .tbl tbody tr:hover{background:#f8fafc}
+  .tbl .pg{font-weight:600;line-height:1.25}
+  .tbl .pk{color:var(--soft);font-size:.68rem}
 </style>
 </head>
 <body>
@@ -63,6 +74,22 @@
       <h2><span class="dot"></span>Pages &amp; outils les plus consultés · 30 jours</h2>
       <div id="rank" class="rank"><div class="empty">Chargement…</div></div>
       <p class="note">« Vues » = pages ouvertes · « pers. » = personnes distinctes ayant ouvert cette page (estimées par navigateur).</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Détail par page — tout le portail</h2>
+      <div class="tbl-hint">Clique sur un en-tête de colonne pour trier (le plus consulté, le moins consulté…). « Pers. » = personnes distinctes.</div>
+      <div class="tbl-wrap"><table class="tbl" id="tbl">
+        <thead><tr>
+          <th data-s="label">Page ⇅</th>
+          <th data-s="v30" class="num">Vues · 30 j</th>
+          <th data-s="u30" class="num">Pers. · 30 j</th>
+          <th data-s="v7" class="num">7 j</th>
+          <th data-s="vToday" class="num">Auj.</th>
+          <th data-s="pct" class="num">Part</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="6" class="empty">Chargement…</td></tr></tbody>
+      </table></div>
     </div>
 
     <div class="card">
@@ -99,12 +126,19 @@ const app = initializeApp({
 const db = getFirestore(app);
 
 const LABELS = {
-  home:'Accueil du portail', 'parcours-pfmp':'Parcours PFMP', sondages:'Sondages',
-  reunions:'Réunions & rendez-vous', murs:"Mur d'idées", cartes:'Carte mentale',
-  canevas:'Monter un projet (canevas)', 'chef-doeuvre':"Chef-d'œuvre CAP", gevasco:'GEVA-Sco',
-  projets:'Atelier projet', 'enquete-aesh':'Enquête AESH', cps:'CPS',
-  'referentiel-agora':'Référentiel Bac pro AGOrA', 'planning-psr':'Planning AESH — PSR & MELEC',
-  'planning-aesh':'Planning AESH — accompagnement', 'parcours-pfmp_resultats':'Parcours PFMP · résultats'
+  "home":"Accueil du portail",
+  "parcours-pfmp":"Le parcours PFMP — construction d'équipe","parcours-pfmp_resultats":"Parcours PFMP · résultats",
+  "sondages":"Sondage express","reunions":"Trouver un créneau (réunions)","murs":"Mur d'idées — réfléchir à plusieurs",
+  "canevas":"Monter un projet — canevas","chef-doeuvre":"Chef-d'œuvre CAP — projet sur deux ans","gevasco":"Observation GEVA-Sco — grille enseignant",
+  "projets":"Atelier projet — construire à plusieurs mains","enquete-aesh":"Enquête AESH — vos besoins",
+  "referentiel-agora":"Référentiel Bac pro AGOrA — Outil de l'enseignant","planning-psr":"Coordination PSR — Planning","planning-aesh":"Planning AESH",
+  "cps":"CPS — Compétences Psychosociales","cps_sondage":"Sondage CPS — Mieux se connaître","cps_sondage_bilan-competences":"Bilan compétences CPS","cps_triangle-pedagogique":"Le Triangle Pédagogique","cps_Model-Bucheton":"Dominique Bucheton — L'Agir Enseignant","cps_bilandesemaine":"AGOrA2 — Préparation conseil de classe","cps_etayage-Jerome-Bruner":"L'Étayage & le Rapport au Savoir (Bruner)","cps_identifier-styles-communication":"Les Comportements de Communication","cps_seance3soutien au parcours":"Séance 3 — Mon Projet Post-Bac & Bilan",
+  "cps_c1-1_dimensions_soi":"C1.1 — Dimensions du Soi","cps_resume_c1-1_c1-2":"C1.1–C1.2 — Connaissance de Soi (synthèse)","cps_c1-2_role_image":"C1.2 — Rôle et Limites de l'Image de Soi","cps_c1-3_besoins_psychos":"C1.3 — Besoins Psychologiques","cps_c1-3_buts_personnels":"C1.3 — Buts Personnels","cps_c1-3_questionner_image":"C1.3 — Fusion & Défusion Cognitive","cps_c1-3_valeurs_personnelles":"C1.3 — Valeurs Personnelles","cps_resume_c1-3_c1-4":"C1.3–C1.4 (synthèse)","cps_c1-4_renforcer_soi":"C1.4 — Le Soi Sujet & méthode AADA","cps_c1-5_enrichir_image":"C1.5 — S'auto-évaluer positivement","cps_c1-5_observer_soi":"C1.5 — Observer son Soi Interne","cps_c1-5_relation_bienveillante":"C1.5 — Relation Bienveillante","cps_resume_c1-5":"C1.5 (synthèse)","cps_c1-6_activites_attention":"C1.6 — Pleine Attention au Quotidien","cps_c1-6_diriger_attention":"C1.6 — Diriger son Attention","cps_c1-6_observer_experience":"C1.6 — Observer et Accueillir","cps_resume_c1-6":"C1.6 — Pleine Attention (synthèse)",
+  "cps_e1-1_fonction_emotions":"E1.1 — Fonction des Émotions","cps_e1-1_nature_emotions":"E1.1 — Comprendre ses Émotions","cps_resume_e1-1":"E1.1 (synthèse)","cps_e1-2_nommer_emotions":"E1.2 — Nommer l'Émotion","cps_e1-2_percevoir_experience":"E1.2 — Identifier ses émotions","cps_resume_e1-2":"E1.2 (synthèse)",
+  "cps_s1-1_attitudes_soutenantes":"S1.1 — Attitudes soutenantes","cps_s1-1_eviter_attitudes":"S1.1 — Obstacles à la Communication","cps_s1-1_formuler_demandes":"S1.1 — Communication Efficace","cps_resume_s1-1":"S1.1 (synthèse)","cps_s1-2_caracteristiques_com":"S1.2 — Caractéristiques de la communication","cps_s1-2_ecouter_empathique":"S1.2 — Écouter avec empathie","cps_s1-2_parler_empathique":"S1.2 — Écouter et Parler avec empathie","cps_resume_s1-2":"S1.2 (synthèse)","cps_s1-3_comportements_prosociaux":"S1.3 — Comportements Prosociaux","cps_s1-3_entrer_relation":"S1.3 — Entrer en relation","cps_s1-3_mise_oeuvre_prosociaux":"S1.3 — Prosocialité & Gratitude","cps_resume_s1-3":"S1.3 (synthèse)",
+  "guides_pfmp":"Guide — PFMP","guides_professeur-principal":"Guide — Professeur principal","guides_ecole-inclusive":"Guide — École inclusive","guides_differenciation":"Guide — Différenciation pédagogique","guides_elections-delegues":"Guide — Élections de délégués","guides_referentiel-competences":"Guide — Référentiel des compétences","guides_coeducation":"Guide — La coéducation","guides_reflexivite-etude":"Guide — La réflexivité","guides_penser-apprendre":"Guide — Penser l'acte d'apprendre","guides_art-de-la-parole":"Guide — L'art de la parole",
+  "guides_aesh-missions":"Guide AESH — Les missions","guides_aesh-accompagner-classe":"Guide AESH — Accompagner en classe","guides_aesh-reforme":"Guide AESH — Où va le métier","guides_aesh-secretaire-scripteur":"Guide AESH — Secrétaire & scripteur","guides_aesh-examen-amenage":"Guide AESH — Un examen aménagé","guides_aesh-amenagements-examens":"Guide AESH — Les aménagements d'examens",
+  "guides_bourdieu-ecole":"Guide — Bourdieu, l'école et la reproduction","guides_byung-chul-han":"Guide — Byung-Chul Han","guides_morin-enseigner-vivre":"Guide — Morin, enseigner à vivre","guides_morin-methode":"Guide — Morin, La Méthode","guides_morin-pensee-complexe":"Guide — Morin, la pensée complexe"
 };
 const label = k => LABELS[k] || (k.startsWith('guides_') ? 'Guide · ' + k.slice(7).replace(/_/g,' ') : k.replace(/_/g,' · '));
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -149,6 +183,21 @@ const isDay = id => /^\d{4}-\d{2}-\d{2}$/.test(id);
       <div class="bar-wrap"><div class="nm" title="${esc(label(k))}">${esc(label(k))}</div><div class="bar"><span style="width:${Math.max(3,Math.round(v/maxV*100))}%"></span></div></div>
       <div class="val">${v}<small>${upages[k]||0} pers.</small></div>
     </div>`).join('') : '<div class="empty">Aucune visite enregistrée pour l\'instant.</div>';
+
+  // Détail par page — tableau triable (tout le portail)
+  const k7=dkey(new Date(Date.now()-6*864e5));
+  const p7={}; days.filter(d=>d.id>=k7).forEach(d=>{ for(const[k,v]of Object.entries(d.pages||{}))p7[k]=(p7[k]||0)+v; });
+  const pToday=tDoc.pages||{};
+  const allKeys=new Set([...Object.keys(pages),...Object.keys(pToday),...Object.keys(p7)]);
+  const rows=[...allKeys].map(k=>({label:label(k),key:k,v30:pages[k]||0,u30:upages[k]||0,v7:p7[k]||0,vToday:pToday[k]||0,pct:pv30?Math.round((pages[k]||0)/pv30*100):0}));
+  let sortKey='v30', sortDir=-1;
+  function renderTbl(){
+    rows.sort((a,b)=>{ let x=a[sortKey],y=b[sortKey]; if(sortKey==='label'){x=(''+x).toLowerCase();y=(''+y).toLowerCase();return sortDir*(x<y?-1:x>y?1:0);} return sortDir*((x||0)-(y||0)); });
+    document.getElementById('tbody').innerHTML = rows.length ? rows.map(r=>`<tr><td><div class="pg">${esc(r.label)}</div><div class="pk">${esc(r.key)}</div></td><td class="num">${r.v30}</td><td class="num">${r.u30}</td><td class="num">${r.v7}</td><td class="num">${r.vToday}</td><td class="num">${r.pct}%</td></tr>`).join('') : '<tr><td colspan="6" class="empty">Aucune visite enregistrée.</td></tr>';
+    document.querySelectorAll('#tbl th').forEach(th=>th.classList.toggle('sorted', th.dataset.s===sortKey));
+  }
+  document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{ const k=th.dataset.s; if(sortKey===k)sortDir*=-1; else{ sortKey=k; sortDir=(k==='label')?1:-1; } renderTbl(); });
+  renderTbl();
 
   // Tendance 14 jours
   const tr=[]; for(let i=13;i>=0;i--){ const dd=new Date(); dd.setDate(dd.getDate()-i); const k=dkey(dd); tr.push({k,d:dd,pv:(byId[k]||{}).pageviews||0}); }
