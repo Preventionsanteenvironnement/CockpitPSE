@@ -238,6 +238,57 @@
             color: #e2e8f0; font-size: 0.9rem; line-height: 1.6;
         }
         .preview-box .trou { display: inline-block; border-bottom: 2px solid #3b82f6; min-width: 80px; padding: 2px 4px; color: #3b82f6; font-weight: 700; }
+        .preview-card {
+            background: #111827;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 18px;
+        }
+        .preview-card h3 { font-size: 1rem; margin-bottom: 8px; color: #e2e8f0; }
+        .preview-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin: 14px 0 12px;
+        }
+        .preview-toolbar button {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #1e293b;
+            color: #e2e8f0;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .preview-toolbar button:hover { border-color: #60a5fa; color: white; }
+        .preview-status { font-size: 0.8rem; color: #94a3b8; }
+        .preview-frame-wrap {
+            border: 1px solid #334155;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8fafc;
+            min-height: 280px;
+        }
+        .preview-frame {
+            width: 100%;
+            height: 620px;
+            border: none;
+            display: block;
+            background: #f8fafc;
+        }
+        .preview-empty {
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            color: #94a3b8;
+            background: #0f172a;
+            border: 1px dashed #334155;
+            border-radius: 12px;
+        }
 
         /* Bottom actions */
         .bottom-actions { display: flex; gap: 12px; padding-top: 10px; }
@@ -1621,6 +1672,29 @@
             </div>
         </details>
 
+        <div class="preview-card">
+            <h3>👁️ Aperçu intégré</h3>
+            <p style="color:#94a3b8; font-size:0.85rem; line-height:1.5;">
+                Affiche le rendu élève réel directement dans l’éditeur, sans publication.
+            </p>
+            <div class="preview-toolbar">
+                <button type="button" onclick="refreshPreviewPane()">Actualiser l’aperçu</button>
+                <button type="button" onclick="openPreviewTab()">Ouvrir dans un onglet</button>
+                <span class="preview-status" id="preview-status">L’aperçu s’affichera ici après actualisation.</span>
+            </div>
+            <div class="preview-empty" id="preview-frame-empty">
+                Prépare ton exercice puis clique sur Actualiser l’aperçu.
+            </div>
+            <div class="preview-frame-wrap" id="preview-frame-wrap" style="display:none;">
+                <iframe
+                    id="preview-frame"
+                    class="preview-frame"
+                    title="Aperçu exercice élève"
+                    loading="lazy"
+                    referrerpolicy="strict-origin-when-cross-origin"></iframe>
+            </div>
+        </div>
+
         <!-- ACTIONS -->
         <div class="bottom-actions">
             <button class="btn-save" onclick="saveExercice()">💾 Sauvegarder</button>
@@ -1694,6 +1768,7 @@
     let currentExoId = null;
     let allExercices = [];
     var currentSourcePrompt = null;
+    const EXO_PREVIEW_STORAGE_KEY = 'pse_exercice_preview_current';
     const exoFilters = {
         classeId: '',
         moduleId: '',
@@ -3392,6 +3467,111 @@
         choixContainer.appendChild(div);
     };
 
+    function buildPreviewExerciseData() {
+        const rawType = document.getElementById('exo-type').value;
+        const type = rawType === 'hierarchiser' ? 'ordre' : rawType;
+        const titre = (document.getElementById('exo-titre').value || '').trim() || 'Aperçu sans titre';
+        const classeIds = getSelectedClasseIds();
+        const classeId = classeIds.length > 0 ? classeIds[0] : null;
+        const moduleId = document.getElementById('exo-module').value || null;
+        const dossier = document.getElementById('exo-dossier').value || null;
+        const sous_dossier = document.getElementById('exo-sous-dossier').value || null;
+        const sous_theme = (moduleId === 'MD2' && document.getElementById('exo-sous-theme').value)
+            ? document.getElementById('exo-sous-theme').value
+            : null;
+        let niveau = null;
+        if (classeId) {
+            const classesFromGroup = window.getClassesFromGroupe ? window.getClassesFromGroupe(classeId) : [classeId];
+            niveau = window.getNiveauClasse ? window.getNiveauClasse(classesFromGroup[0]) : null;
+        }
+        const contenu = getContenuFromForm();
+        const globalImage = normalizeGlobalExoImagePath((document.getElementById('exo-image') || {}).value || '');
+        if (globalImage) contenu.image = globalImage;
+        else if (contenu && Object.prototype.hasOwnProperty.call(contenu, 'image')) delete contenu.image;
+        const catCb = document.getElementById('exo-categorie-competences');
+        const categorie = (catCb.checked || AUTO_COMPETENCES_TYPES.includes(type)) ? 'competences' : 'modules';
+        let competences_cibles = getSelectedCompetences();
+        if (AUTO_COMPETENCES_TYPES.includes(type) && competences_cibles.length === 0) {
+            competences_cibles = ['C2', 'C3', 'C4', 'C5', 'C6'];
+        }
+        return {
+            id: currentExoId || 'preview_draft',
+            titre,
+            type,
+            classeIds,
+            classeId,
+            moduleId,
+            dossier,
+            sous_dossier,
+            sous_theme,
+            niveau,
+            difficulte: currentDifficulty,
+            contenu,
+            categorie,
+            competences_cibles,
+            ccf: document.getElementById('exo-ccf') ? document.getElementById('exo-ccf').checked : false,
+            publie: false
+        };
+    }
+
+    function getPreviewDraftUrl(embed) {
+        var url = '../PSE/exercices.html?previewDraft=' + encodeURIComponent(EXO_PREVIEW_STORAGE_KEY);
+        if (embed) url += '&embed=1';
+        return url + '&ts=' + Date.now();
+    }
+
+    function persistPreviewDraft() {
+        const exo = buildPreviewExerciseData();
+        localStorage.setItem(EXO_PREVIEW_STORAGE_KEY, JSON.stringify({
+            savedAt: Date.now(),
+            exercice: exo
+        }));
+        return exo;
+    }
+
+    function resetPreviewPane(message) {
+        const frame = document.getElementById('preview-frame');
+        const frameWrap = document.getElementById('preview-frame-wrap');
+        const empty = document.getElementById('preview-frame-empty');
+        const status = document.getElementById('preview-status');
+        if (frame) frame.src = 'about:blank';
+        if (frameWrap) frameWrap.style.display = 'none';
+        if (empty) {
+            empty.style.display = 'flex';
+            empty.textContent = message || 'L’aperçu s’affichera ici après actualisation.';
+        }
+        if (status) status.textContent = message || 'L’aperçu s’affichera ici après actualisation.';
+    }
+
+    window.refreshPreviewPane = function(options) {
+        const frame = document.getElementById('preview-frame');
+        const frameWrap = document.getElementById('preview-frame-wrap');
+        const empty = document.getElementById('preview-frame-empty');
+        const status = document.getElementById('preview-status');
+        try {
+            persistPreviewDraft();
+            if (frame) frame.src = getPreviewDraftUrl(true);
+            if (frameWrap) frameWrap.style.display = '';
+            if (empty) empty.style.display = 'none';
+            if (status) status.textContent = 'Rendu élève actualisé.';
+            if (!options || !options.silent) showToast('👁️ Aperçu actualisé');
+        } catch (e) {
+            console.error('Preview refresh error:', e);
+            resetPreviewPane('Aperçu impossible : ' + e.message);
+            if (!options || !options.silent) showToast('❌ Aperçu impossible');
+        }
+    };
+
+    window.openPreviewTab = function() {
+        try {
+            persistPreviewDraft();
+            window.open(getPreviewDraftUrl(false), '_blank');
+        } catch (e) {
+            console.error('Preview open error:', e);
+            showToast('❌ Impossible d’ouvrir l’aperçu');
+        }
+    };
+
     // ========== SET CONTENU IN FORM ==========
     function setContenuInForm(type, contenu) {
         if (type === 'hierarchiser') type = 'ordre';
@@ -4389,6 +4569,7 @@
         if (ccfCb) ccfCb.checked = false;
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
+        resetPreviewPane('Prépare ton exercice puis actualise l’aperçu.');
         if (window.innerWidth <= 768) closeMenu();
     };
 
@@ -4449,6 +4630,7 @@
         document.getElementById('main-empty').style.display = 'none';
         document.getElementById('main-editor').style.display = 'flex';
         renderExoList();
+        setTimeout(function() { refreshPreviewPane({ silent: true }); }, 220);
         if (window.innerWidth <= 768) closeMenu();
     }
 
@@ -4924,12 +5106,23 @@
             }
             showToast('Exercice sauvegarde !');
             document.getElementById('btn-test').style.display = 'inline-block';
+            refreshPreviewPane({ silent: true });
         } catch(e) { alert('Erreur : ' + e.message); }
     };
 
     window.testerExercice = function() {
-        if (!currentExoId) { showToast('Sauvegardez d\'abord l\'exercice.'); return; }
-        var url = '../PSE/exercices.html?preview=' + encodeURIComponent(currentExoId);
+        var url = '';
+        if (currentExoId) {
+            url = '../PSE/exercices.html?preview=' + encodeURIComponent(currentExoId);
+        } else {
+            try {
+                persistPreviewDraft();
+                url = getPreviewDraftUrl(false);
+            } catch (e) {
+                showToast('Sauvegardez ou actualisez l’aperçu d’abord.');
+                return;
+            }
+        }
         window.open(url, '_blank');
     };
 
@@ -5008,6 +5201,8 @@
             document.getElementById('btn-duplicate').style.display = 'block';
             updatePublishButtons(false);
             renderExoList();
+            document.getElementById('btn-test').style.display = 'inline-block';
+            refreshPreviewPane({ silent: true });
             showToast('Exercice duplique en brouillon.');
         } catch (e) {
             alert('Erreur duplication : ' + e.message);
@@ -5042,6 +5237,7 @@
         document.getElementById('btn-test').style.display = 'none';
         document.getElementById('main-editor').style.display = 'none';
         document.getElementById('main-empty').style.display = 'flex';
+        resetPreviewPane('Aucun exercice chargé pour le moment.');
         showToast('Exercice supprime.');
     };
     window.deleteExerciceById = async function(id) {
@@ -5050,8 +5246,10 @@
         if (id === currentExoId) {
             currentExoId = null;
             document.getElementById('btn-duplicate').style.display = '';
+            document.getElementById('btn-test').style.display = 'none';
             document.getElementById('main-editor').style.display = 'none';
             document.getElementById('main-empty').style.display = 'flex';
+            resetPreviewPane('Aucun exercice chargé pour le moment.');
         }
         showToast('Exercice supprime.');
     };
