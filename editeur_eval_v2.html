@@ -3098,6 +3098,88 @@ window.cleanImportJSONInput = function() {
     );
 };
 
+let importProgrammeModulesCache = null;
+let importProgrammeModulesLoading = null;
+
+function selectedImportModuleId() {
+    const modSel = document.getElementById('eval-module');
+    return modSel ? modSel.value : '';
+}
+
+function selectedImportModuleLabel() {
+    const modSel = document.getElementById('eval-module');
+    if (!modSel) return '';
+    const opt = modSel.options && modSel.selectedIndex >= 0 ? modSel.options[modSel.selectedIndex] : null;
+    return opt ? String(opt.textContent || '').trim() : '';
+}
+
+function preloadImportProgrammeModules() {
+    if (importProgrammeModulesCache || importProgrammeModulesLoading) return importProgrammeModulesLoading;
+    importProgrammeModulesLoading = fetch('programme_modules.json', { cache: 'no-store' })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            importProgrammeModulesCache = data || {};
+            refreshImportPromptPreview();
+            return importProgrammeModulesCache;
+        })
+        .catch(function(e) {
+            console.warn('Contexte module non charge:', e && e.message);
+            return null;
+        })
+        .finally(function() {
+            importProgrammeModulesLoading = null;
+        });
+    return importProgrammeModulesLoading;
+}
+
+function buildModuleContextSync() {
+    const comps = getFocusCompetences();
+    const bareme = (typeof currentBareme !== 'undefined' && currentBareme) ? currentBareme : 20;
+    let ctx = '\n\n=== PARAMETRES (a respecter imperativement) ===\n';
+    ctx += 'Bareme : sur ' + bareme + ' points. La somme des points de TOUTES les questions doit faire EXACTEMENT ' + bareme + '.\n';
+    ctx += 'Competences a evaluer UNIQUEMENT : ' + comps.join(', ') + '. Ne genere aucune question portant sur une autre competence.\n';
+    ctx += "Regle type 'mot' : la reponse attendue fait 1 ou 2 mots maximum ; ajoute dans la consigne, entre parentheses, \"(ecris le mot correctement)\". (La correction ignore les accents et les majuscules.)\n";
+    if (comps.includes('C3') || comps.includes('C5')) {
+        ctx += "C3 (expliquer) / C5 (argumenter) : NE PAS faire rediger une phrase libre (non auto-corrigeable). Transforme-les en RECONNAISSANCE : QCM 'choisir la bonne explication / le bon argument', vrai-faux, association cause->consequence, ou 'ordonner' les etapes d'un mecanisme.\n";
+    }
+    if (comps.includes('C6')) {
+        ctx += "C6 (communication ecrite) ne s'evalue pas en auto-correction : ne genere pas de question dediee a C6.\n";
+    }
+
+    const moduleId = selectedImportModuleId();
+    if (moduleId) {
+        const prog = importProgrammeModulesCache || {};
+        const m = prog.modules && prog.modules[moduleId];
+        ctx += '\n=== CONTEXTE DU MODULE ===\n';
+        if (m) {
+            ctx += 'Module ' + (m.code || moduleId) + ' (' + (m.niveau || '') + ') : ' + (m.titre || '') + '\n';
+            if (m.objectif) ctx += 'Objectif general : ' + m.objectif + '\n';
+            if (m.notions && m.notions.length) ctx += "Notions cles a evaluer :\n- " + m.notions.join('\n- ') + '\n';
+            const blob = ((m.objectif || '') + ' ' + (m.notions || []).join(' ')).toLowerCase();
+            const padOK = blob.includes('apparition du dommage') || blob.includes('evenement declencheur') || blob.includes('événement déclencheur') || (blob.includes('situation dangereuse') && blob.includes('dommage'));
+            const prevContext = blob.includes('danger') || blob.includes('risque professionnel') || blob.includes('situation dangereuse');
+            const prevOK = blob.includes('suppression du risque') || blob.includes('reduction du risque') || blob.includes('réduction du risque') || blob.includes('principes generaux de prevention') || blob.includes('principes généraux de prévention') || ((blob.includes('protection collective') || blob.includes('protection individuelle')) && prevContext);
+            if (comps.includes('C2') && padOK) ctx += "- Approche par le risque : inclus au moins un exercice de type 'pad' (danger -> situation dangereuse -> evenement declencheur -> dommage).\n";
+            if (comps.includes('C2') && prevOK) ctx += "- Inclus au moins un exercice de type 'prevention' (supprimer, reduire, protection collective, protection individuelle, formation).\n";
+        } else {
+            ctx += 'Module selectionne : ' + moduleId + (selectedImportModuleLabel() ? ' - ' + selectedImportModuleLabel() : '') + '.\n';
+            ctx += 'Contexte detaille du module non charge au moment de la copie : respecte le theme et le niveau selectionnes dans l editeur.\n';
+            preloadImportProgrammeModules();
+        }
+    }
+    ctx += "\nIMPORTANT : une consigne = un seul verbe d'action. Reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
+    return ctx;
+}
+
+function getImportPromptText() {
+    return IMPORT_PROMPT + buildModuleContextSync();
+}
+
+function refreshImportPromptPreview() {
+    const promptEl = document.getElementById('import-prompt-text');
+    if (promptEl) promptEl.textContent = getImportPromptText();
+}
+
 window.openImportModal = function() {
     JsonImportUtils.bindImportInputGuards('import-json-input', 'import-warning', 'import-warning-text');
     document.getElementById('import-modal').style.display = 'flex';
@@ -3106,7 +3188,8 @@ window.openImportModal = function() {
     document.getElementById('import-errors').textContent = '';
     document.getElementById('import-opt-titre').checked = false;
     document.getElementById('import-opt-bareme').checked = false;
-    document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
+    refreshImportPromptPreview();
+    preloadImportProgrammeModules();
     const report = document.getElementById('import-clean-report');
     if (report) {
         report.style.display = 'none';
@@ -3128,60 +3211,53 @@ window.setCompPreset = function(p) {
     const map = { decouverte: ['C1', 'C2', 'C4'], intermediaire: ['C1', 'C2', 'C3', 'C4', 'C5'], complet: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] };
     const want = map[p] || [];
     document.querySelectorAll('.comp-focus').forEach(b => { b.checked = want.includes(b.value); });
+    refreshImportPromptPreview();
 };
-async function buildModuleContext() {
-    const comps = getFocusCompetences();
-    const bareme = (typeof currentBareme !== 'undefined' && currentBareme) ? currentBareme : 20;
-    let ctx = '\n\n=== PARAMETRES (a respecter imperativement) ===\n';
-    ctx += 'Bareme : sur ' + bareme + ' points. La somme des points de TOUTES les questions doit faire EXACTEMENT ' + bareme + '.\n';
-    ctx += 'Competences a evaluer UNIQUEMENT : ' + comps.join(', ') + '. Ne genere aucune question portant sur une autre competence.\n';
-    ctx += "Regle type 'mot' : la reponse attendue fait 1 ou 2 mots maximum ; ajoute dans la consigne, entre parentheses, \"(ecris le mot correctement)\". (La correction ignore les accents et les majuscules.)\n";
-    if (comps.includes('C3') || comps.includes('C5')) {
-        ctx += "C3 (expliquer) / C5 (argumenter) : NE PAS faire rediger une phrase libre (non auto-corrigeable). Transforme-les en RECONNAISSANCE : QCM 'choisir la bonne explication / le bon argument', vrai-faux, association cause->consequence, ou 'ordonner' les etapes d'un mecanisme.\n";
-    }
-    if (comps.includes('C6')) {
-        ctx += "C6 (communication ecrite) ne s'evalue pas en auto-correction : ne genere pas de question dediee a C6.\n";
-    }
-    // Contexte du module selectionne (objectif + notions + approche)
+
+function fallbackCopyImportPrompt(fullPrompt) {
+    const ta = document.createElement('textarea');
+    ta.value = fullPrompt;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
     try {
-        const modSel = document.getElementById('eval-module');
-        const moduleId = modSel ? modSel.value : '';
-        if (moduleId) {
-            const resp = await fetch('programme_modules.json', { cache: 'no-store' });
-            const prog = await resp.json();
-            const m = prog.modules && prog.modules[moduleId];
-            if (m) {
-                ctx += '\n=== CONTEXTE DU MODULE ===\n';
-                ctx += 'Module ' + (m.code || moduleId) + ' (' + (m.niveau || '') + ') : ' + (m.titre || '') + '\n';
-                if (m.objectif) ctx += 'Objectif general : ' + m.objectif + '\n';
-                if (m.notions && m.notions.length) ctx += "Notions cles a evaluer :\n- " + m.notions.join('\n- ') + '\n';
-                const blob = ((m.objectif || '') + ' ' + (m.notions || []).join(' ')).toLowerCase();
-                const padOK = blob.includes('apparition du dommage') || blob.includes('evenement declencheur') || blob.includes('événement déclencheur') || (blob.includes('situation dangereuse') && blob.includes('dommage'));
-                const prevContext = blob.includes('danger') || blob.includes('risque professionnel') || blob.includes('situation dangereuse');
-                const prevOK = blob.includes('suppression du risque') || blob.includes('reduction du risque') || blob.includes('réduction du risque') || blob.includes('principes generaux de prevention') || blob.includes('principes généraux de prévention') || ((blob.includes('protection collective') || blob.includes('protection individuelle')) && prevContext);
-                // PAD/Prevention evaluent surtout C2 : ne les proposer que si C2 est ciblee
-                if (comps.includes('C2') && padOK) ctx += "- Approche par le risque : inclus au moins un exercice de type 'pad' (danger -> situation dangereuse -> evenement declencheur -> dommage).\n";
-                if (comps.includes('C2') && prevOK) ctx += "- Inclus au moins un exercice de type 'prevention' (supprimer, reduire, protection collective, protection individuelle, formation).\n";
-            }
-        }
-    } catch (e) { console.warn('Contexte module non injecte:', e && e.message); }
-    ctx += "\nIMPORTANT : une consigne = un seul verbe d'action. Reponds uniquement avec le JSON valide, sans aucun texte autour.\n";
-    return ctx;
-}
-window.copyImportPrompt = async function() {
-    const ctx = await buildModuleContext();
-    const fullPrompt = IMPORT_PROMPT + ctx;
-    try {
-        await navigator.clipboard.writeText(fullPrompt);
-        showToast('📋 Prompt copié (paramètres + module) !');
+        ok = document.execCommand('copy');
     } catch (e) {
-        const ta = document.createElement('textarea');
-        ta.value = fullPrompt;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        showToast('📋 Prompt copié (paramètres + module) !');
+        ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+}
+
+window.copyImportPrompt = function() {
+    const fullPrompt = getImportPromptText();
+    const done = function() { showToast('📋 Prompt copié (paramètres + module) !'); };
+    const fail = function() {
+        const ok = fallbackCopyImportPrompt(fullPrompt);
+        if (ok) {
+            done();
+            return;
+        }
+        const promptEl = document.getElementById('import-prompt-text');
+        if (promptEl) {
+            const range = document.createRange();
+            range.selectNodeContents(promptEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        alert('Safari a bloqué la copie automatique. Le prompt est sélectionné : utilisez ⌘C pour le copier.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullPrompt).then(done).catch(fail);
+    } else {
+        fail();
     }
 };
 
