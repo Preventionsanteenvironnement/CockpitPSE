@@ -780,6 +780,11 @@
                     <input type="text" class="form-input" id="mot-reponse" placeholder="Ex: melatonine">
                     <div class="info-text">Les accents et majuscules seront toleres automatiquement.</div>
                 </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Autres reponses acceptees (facultatif)</label>
+                    <input type="text" class="form-input" id="mot-reponses-acceptees" placeholder="Ex: microbe / germe / bacteries">
+                    <div class="info-text">Separez les variantes par « / ». L'eleve est compte juste s'il ecrit l'une d'elles (synonymes, singulier/pluriel...).</div>
+                </div>
                 <div class="q-extra-fields">
                     <div class="form-row" style="margin-bottom:10px;">
                         <div class="form-group">
@@ -2357,6 +2362,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             setVF(true);
         } else if (type === 'mot') {
             document.getElementById('mot-reponse').value = '';
+            document.getElementById('mot-reponses-acceptees').value = '';
         } else if (type === 'nombre') {
             document.getElementById('nombre-reponse').value = '';
             document.getElementById('nombre-tolerance').value = '0';
@@ -2478,6 +2484,7 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             setVF(q.correct);
         } else if (type === 'mot') {
             document.getElementById('mot-reponse').value = q.correct || q.reponse || '';
+            document.getElementById('mot-reponses-acceptees').value = Array.isArray(q.reponsesAcceptees) ? q.reponsesAcceptees.join(' / ') : (q.reponsesAcceptees || '');
         } else if (type === 'nombre') {
             document.getElementById('nombre-reponse').value = q.correct;
             document.getElementById('nombre-tolerance').value = q.tolerance || 0;
@@ -2556,6 +2563,8 @@ function closeMenu(){ document.body.classList.remove('menu-open'); }
             const reponse = document.getElementById('mot-reponse').value.trim();
             if (!reponse) { alert('Ecris la reponse attendue !'); return; }
             newQ.correct = reponse;
+            const accMot = document.getElementById('mot-reponses-acceptees').value.trim();
+            if (accMot) newQ.reponsesAcceptees = accMot.split(/[\/;|]/).map(s => s.trim()).filter(Boolean);
         } else if (type === 'nombre') {
             const reponse = document.getElementById('nombre-reponse').value;
             if (reponse === '') { alert('Ecris la reponse attendue !'); return; }
@@ -2976,7 +2985,7 @@ TYPES DE QUESTIONS AUTORISÉS :
 - "qcm" : QCM choix unique. choix (tableau 2-6, tous différents), reponse (index 0-based)
 - "qcm_multi" : QCM choix multiples. choix (tableau 2-6, tous différents), reponse (tableau d'indices, non vide)
 - "vf" : Vrai/Faux. reponse (true ou false, boolean strict)
-- "mot" : Réponse courte. reponse (string non vide)
+- "mot" : Réponse courte. reponse (string non vide), reponsesAcceptees (tableau FACULTATIF de synonymes / variantes / singulier-pluriel / orthographes tous acceptés comme justes)
 - "nombre" : Réponse numérique. reponse (number), tolerance (optionnel, number >= 0)
 - "ordonner" : Remettre dans l'ordre. elements (tableau >= 3 éléments, tous différents, dans l'ordre correct)
 - "pad" : Processus d'Apparition du Dommage (analyse de risque). Champs obligatoires :
@@ -3161,7 +3170,7 @@ function buildModuleContextSync() {
     let ctx = '\n\n=== PARAMETRES (a respecter imperativement) ===\n';
     ctx += 'Bareme : sur ' + bareme + ' points. La somme des points de TOUTES les questions doit faire EXACTEMENT ' + bareme + '.\n';
     ctx += 'Competences a evaluer UNIQUEMENT : ' + comps.join(', ') + '. Ne genere aucune question portant sur une autre competence.\n';
-    ctx += "Regle type 'mot' : la reponse attendue fait 1 ou 2 mots maximum ; ajoute dans la consigne, entre parentheses, \"(ecris le mot correctement)\". (La correction ignore les accents et les majuscules.)\n";
+    ctx += "Regle type 'mot' : la reponse attendue fait 1 ou 2 mots maximum ; ajoute dans la consigne, entre parentheses, \"(ecris le mot correctement)\". (La correction ignore les accents et les majuscules.) Quand plusieurs formulations sont justes (synonyme, singulier/pluriel, orthographe), liste-les TOUTES dans reponsesAcceptees.\n";
     if (comps.includes('C3') || comps.includes('C5')) {
         ctx += "C3 (expliquer) / C5 (argumenter) : NE PAS faire rediger une phrase libre (non auto-corrigeable). Transforme-les en RECONNAISSANCE : QCM 'choisir la bonne explication / le bon argument', vrai-faux, association cause->consequence, ou 'ordonner' les etapes d'un mecanisme.\n";
     }
