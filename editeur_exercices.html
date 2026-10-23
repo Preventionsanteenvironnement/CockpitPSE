@@ -1740,6 +1740,7 @@
 
 <script src="data_modules.js"></script>
 <script src="json_import_utils.js"></script>
+<script src="banque_mapse.js"></script>
 <script>
     function toggleMenu(){ document.body.classList.toggle('menu-open'); }
     function closeMenu(){ document.body.classList.remove('menu-open'); }
@@ -1773,6 +1774,18 @@
 
     let currentExoId = null;
     let allExercices = [];
+    // Exercices en ligne sur mapse.fr (liste banque/index.json) ; null tant qu'elle n'est pas lue
+    let enLigneMapse = null;
+    let dernierEnregistrement = null;
+    function estEnLigne(ex) {
+        return enLigneMapse ? enLigneMapse.ids.has(ex.id) : !!ex.publie;
+    }
+    window.BanqueMapse.chargerEnLigne().then(function (r) {
+        enLigneMapse = r;
+        renderExoList();
+        var ex = currentExoId && allExercices.find(function (e) { return e.id === currentExoId; });
+        if (ex) updatePublishButtons(estEnLigne(ex));
+    });
     var currentSourcePrompt = null;
     const EXO_PREVIEW_STORAGE_KEY = 'pse_exercice_preview_current';
     const exoFilters = {
@@ -4513,7 +4526,8 @@
             const item = document.createElement('div');
             item.className = 'exo-list-item' + (ex.id === currentExoId ? ' active' : '');
             const typeBadge = '<span class="ei-badge badge-' + ex.type + '">' + (TYPE_LABELS[ex.type] || ex.type) + '</span>';
-            const pubBadge = ex.publie ? '<span class="ei-badge badge-pub">Publie</span>' : '<span class="ei-badge badge-draft">Brouillon</span>';
+            const pubBadge = estEnLigne(ex) ? '<span class="ei-badge badge-pub">En ligne</span>'
+                : (ex.publie ? '<span class="ei-badge badge-draft" title="Fichier préparé, pas encore déposé sur mapse.fr">A deposer</span>' : '<span class="ei-badge badge-draft">Brouillon</span>');
             const diffBadge = ex.difficulte ? '<span class="ei-badge badge-' + ex.difficulte + '">' + ex.difficulte + '</span>' : '';
             const exClasses = getExoClasseIds(ex);
             const classeBadge = exClasses.length > 0
@@ -4637,7 +4651,7 @@
         document.getElementById('btn-delete').style.display = 'block';
         document.getElementById('btn-duplicate').style.display = 'block';
         document.getElementById('btn-test').style.display = 'inline-block';
-        updatePublishButtons(!!ex.publie);
+        updatePublishButtons(estEnLigne(ex));
         // Restore CCF toggle
         var ccfCb = document.getElementById('exo-ccf');
         if (ccfCb) ccfCb.checked = !!ex.ccf;
@@ -4649,6 +4663,7 @@
     }
 
     window.saveExercice = async function() {
+        dernierEnregistrement = null;
         const titre = document.getElementById('exo-titre').value.trim();
         if (!titre) { alert('Donne un titre !'); return; }
         const type = document.getElementById('exo-type').value;
@@ -5118,6 +5133,7 @@
                 document.getElementById('btn-delete').style.display = 'block';
                 document.getElementById('btn-duplicate').style.display = 'block';
             }
+            dernierEnregistrement = { id: currentExoId, data: data };
             showToast('Exercice sauvegarde !');
             document.getElementById('btn-test').style.display = 'inline-block';
             refreshPreviewPane({ silent: true });
@@ -5223,19 +5239,26 @@
         }
     };
 
+    // Publier sur mapse.fr : le brouillon est enregistré, puis le fichier de l'exercice est téléchargé
+    // pour être déposé dans banque/exercices/ du dépôt PSE (PR). Il apparaît en ligne après fusion.
     window.publishExercice = async function() {
         await saveExercice();
-        if (currentExoId) {
-            await setDoc(doc(db, "exercices_banque", currentExoId), { publie: true }, { merge: true });
-            showToast('Exercice publie !');
-            updatePublishButtons(true);
-        }
+        if (!dernierEnregistrement || dernierEnregistrement.id !== currentExoId) return;
+        await setDoc(doc(db, "exercices_banque", currentExoId), { publie: true }, { merge: true });
+        const existant = allExercices.find(e => e.id === currentExoId) || {};
+        const f = window.BanqueMapse.preparer(Object.assign({}, existant, dernierEnregistrement.data), currentExoId, true);
+        showToast('Fichier ' + f.id + '.json prêt : le déposer dans banque/exercices/ du dépôt PSE (PR). En ligne après fusion.', 9000);
+        renderExoList();
     };
     window.unpublishExercice = async function() {
         if (!currentExoId) return;
         await setDoc(doc(db, "exercices_banque", currentExoId), { publie: false }, { merge: true });
-        showToast('Exercice depublie.');
-        updatePublishButtons(false);
+        const existant = allExercices.find(e => e.id === currentExoId);
+        if (existant) {
+            const f = window.BanqueMapse.preparer(existant, currentExoId, false);
+            showToast('Fichier ' + f.id + '.json (publie : false) prêt : le déposer dans banque/exercices/ pour retirer l\u2019exercice de mapse.fr.', 9000);
+        }
+        renderExoList();
     };
     function updatePublishButtons(isPublished) {
         document.getElementById('btn-publish').style.display = isPublished ? 'none' : '';
@@ -5244,6 +5267,10 @@
 
     window.deleteExercice = async function() {
         if (!currentExoId) return;
+        if (enLigneMapse && enLigneMapse.ids.has(currentExoId)) {
+            alert('Cet exercice est en ligne sur mapse.fr : le dépublier d\u2019abord, puis le supprimer une fois le retrait fusionné.');
+            return;
+        }
         if (!confirm('Supprimer cet exercice ?')) return;
         await deleteDoc(doc(db, "exercices_banque", currentExoId));
         currentExoId = null;
@@ -5255,6 +5282,10 @@
         showToast('Exercice supprime.');
     };
     window.deleteExerciceById = async function(id) {
+        if (enLigneMapse && enLigneMapse.ids.has(id)) {
+            alert('Cet exercice est en ligne sur mapse.fr : le dépublier d\u2019abord, puis le supprimer une fois le retrait fusionné.');
+            return;
+        }
         if (!confirm('Supprimer cet exercice ?')) return;
         await deleteDoc(doc(db, "exercices_banque", id));
         if (id === currentExoId) {

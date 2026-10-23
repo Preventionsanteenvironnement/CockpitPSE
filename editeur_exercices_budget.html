@@ -616,6 +616,7 @@
 <body>
 <script src="data_modules.js"></script>
 <script src="json_import_utils.js"></script>
+<script src="banque_mapse.js"></script>
 
 <div id="app">
     <aside id="sidebar">
@@ -1115,6 +1116,7 @@
     const db = getFirestore(app);
 
     let allBudgetExercises = [];
+    let dernierBudget = null;
     let currentExerciseId = null;
     let currentDifficulty = "facile";
     let toastTimer = null;
@@ -1775,6 +1777,7 @@
                 exercise.publie = options.forcePublish;
             }
             await setDoc(doc(db, "exercices_banque", currentExerciseId), exercise, { merge: true });
+            dernierBudget = { id: currentExerciseId, data: exercise };
             showToast(exercise.publie ? "Exercice Budget publie." : "Exercice Budget sauvegarde.");
             renderLocalButtonState(exercise.publie);
             return true;
@@ -2502,9 +2505,15 @@
             if (success) renderList();
         });
 
+        // Publier sur mapse.fr : fichier téléchargé, à déposer dans banque/exercices/ du dépôt PSE (PR)
         $("btn-publish").addEventListener("click", async () => {
             const success = await saveExercise({ keepStatus: true, forcePublish: true });
-            if (success) renderList();
+            if (success) {
+                const existant = allBudgetExercises.find((e) => e.id === currentExerciseId) || {};
+                const f = window.BanqueMapse.preparer(Object.assign({}, existant, dernierBudget.data), currentExerciseId, true);
+                showToast("Fichier " + f.id + ".json prêt : le déposer dans banque/exercices/ du dépôt PSE (PR).");
+                renderList();
+            }
         });
 
         $("btn-unpublish").addEventListener("click", async () => {
@@ -2512,7 +2521,9 @@
             try {
                 await setDoc(doc(db, "exercices_banque", currentExerciseId), { publie: false, updatedAt: serverTimestamp() }, { merge: true });
                 renderLocalButtonState(false);
-                showToast("Exercice Budget depublie.");
+                const existant = allBudgetExercises.find((e) => e.id === currentExerciseId);
+                if (existant) window.BanqueMapse.preparer(existant, currentExerciseId, false);
+                showToast("Exercice Budget depublie : fichier (publie : false) à déposer dans banque/exercices/.");
             } catch (error) {
                 showToast("Erreur : " + error.message);
             }
