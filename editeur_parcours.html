@@ -783,6 +783,7 @@
 
   <script src="data_modules.js"></script>
   <script src="json_import_utils.js"></script>
+  <script src="banque_mapse.js"></script>
   <script>
 function cleanImportJSONInputParcours() {
     JsonImportUtils.handleCleanButton('import-input', 'import-errors', 'import-clean-report', 'import-warning', 'import-warning-text');
@@ -1157,6 +1158,12 @@ Uniquement le JSON final`;
 
       exerciseBank = [];
       exSnap.forEach((d) => exerciseBank.push({ id: d.id, ...d.data() }));
+      // Exercices publiés sur mapse.fr par fichier et absents de Firebase : ajoutés au choix
+      const enLigne = await window.BanqueMapse.chargerEnLigne();
+      if (enLigne) {
+        const connus = new Set(exerciseBank.map((e) => e.id));
+        enLigne.liste.forEach((e) => { if (e && e.id && !connus.has(e.id)) exerciseBank.push(e); });
+      }
       autoEvalBank = [];
       aeSnap.forEach((d) => autoEvalBank.push({ id: d.id, ...d.data() }));
 
