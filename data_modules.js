@@ -455,7 +455,10 @@ window.DOSSIERS_TRANSVERSAUX = [
       ] },
     { id: 'ANALYSE_RISQUES', label: '🔍 Analyse des risques professionnels', color: '#dc2626',
       description: "Analyse des risques professionnels",
-      autoTypes: [] },
+      autoTypes: [],
+      sousDossiers: [
+          { id: 'IDENTIFIER_ESTIMER', label: 'Identifier et estimer · C5' }
+      ] },
     { id: 'ANALYSE_SITUATION', label: '🏭 Analyse situation de travail', color: '#9333ea',
       description: "Analyse d'une situation de travail",
       autoTypes: [] },
@@ -467,6 +470,12 @@ window.DOSSIERS_TRANSVERSAUX = [
           { id: '5M', label: 'Methode des 5M' },
           { id: 'QQOQCP', label: 'QQOQCP' },
           { id: 'ISHIKAWA', label: 'Diagramme d\'Ishikawa' }
+      ] },
+    { id: 'AT_MP', label: '🚑 AT, trajet et maladies pro.', color: '#be123c',
+      description: "Accidents du travail, accidents de trajet et maladies professionnelles",
+      autoTypes: [],
+      sousDossiers: [
+          { id: 'QUALIFIER_AT_MP', label: 'Qualifier un AT · trajet · MP' }
       ] },
     { id: 'CARTE_MENTALE', label: '🧠 Carte mentale', color: '#ea580c',
       description: "Cartes mentales",
