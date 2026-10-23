@@ -449,7 +449,10 @@ window.DOSSIERS_TRANSVERSAUX = [
       autoTypes: ['pictogramme'] },
     { id: 'ACTEURS_PREV', label: '👥 Acteurs de prevention', color: '#0891b2',
       description: "Les acteurs de prevention en entreprise",
-      autoTypes: [] },
+      autoTypes: [],
+      sousDossiers: [
+          { id: 'PARCOURS_CSE_BACPRO', label: 'Parcours CSE · Bac Pro' }
+      ] },
     { id: 'ANALYSE_RISQUES', label: '🔍 Analyse des risques professionnels', color: '#dc2626',
       description: "Analyse des risques professionnels",
       autoTypes: [] },
